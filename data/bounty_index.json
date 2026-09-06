@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-09-05T10:26:03.769838+00:00",
+  "updated_at": "2026-09-06T10:45:15.110779+00:00",
   "total_count": 124,
   "bounties": [
     {
@@ -688,6 +688,26 @@
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
+      "number": 16870,
+      "title": "[BOUNTY: 15 RTC] x402 integration retest v2 \u2014 corrected endpoint matrix (successor to #351)",
+      "body": "Successor to #351, which was closed as paid on 2026-09-05. The old endpoint list was wrong for months and every retester found the same thing, so this issue carries the **corrected matrix**. Read it before testing.\n\n## What actually exists today\n| Endpoint | Expected |\n|---|---|\n| `GET https://bottube.ai/api/x402/info` | 200, x402 capability JSON (the old `/api/x402/status` path is gone) |\n| `GET https://bottube.ai/api/premium/videos` | **402** with x402 payment-required JSON (premium is paid, not free) |\n| `GET https://bottube.ai/api/premium/analytics/<agent>` | 402 |\n| `GET https://bottube.ai/api/premium/trending/export` | 402 |\n| `POST https://bottube.ai/api/agents/me/coinbase-wallet` (no key) | 401 `API key required` |\n| `GET https://rustchain.org/wallet/swap-info` | 200 swap metadata |\n| Beacon `/beacon/api/x402/*` and `/beacon/api/premium/*` | **not deployed** \u2014 404 is the current truth, do not report it as a bug |\n\n## Known open defects (already paid, do not resubmit)\n- x402 JSON advertises `resource: http://bottube.ai/\u2026` over HTTPS\n- `/wallet/swap-info` sends duplicate conflicting security headers\n\n## What pays here (15 RTC, first complete report only; new defects 5 each, uncapped)\n1. Raw `curl -sv` traces for every row above, from a clean environment, public link.\n2. **A real 402 \u2192 payment \u2192 200 round-trip** on one premium endpoint using `pip install clawrtc[coinbase]` or a Coinbase Agentic Wallet on Base testnet. Nobody has demonstrated the paid path yet; that is the point of this issue.\n3. Any *new* defect with a reproduction.\n\n## Rules (written into #351 the hard way)\nThe first complete report of a finding is paid and closes that finding. Later reproductions pay 0. New, reproduced defects pay separately. State your wallet (native `RTC\u2026` or GitHub handle) in the claim. Email fallback per #16470 is accepted.\n\n<!-- bounty-spec\nreward_rtc: 15\ncap: 1\nsubmit: [comment, email]\n-->",
+      "url": "https://github.com/Scottcjn/rustchain-bounties/issues/16870",
+      "labels": [
+        "bounty",
+        "claimed"
+      ],
+      "created_at": "2026-09-06T01:39:52Z",
+      "reward_rtc": 15.0,
+      "difficulty": "standard",
+      "skills": [
+        "python",
+        "rust",
+        "security",
+        "social-media"
+      ]
+    },
+    {
+      "repo": "Scottcjn/rustchain-bounties",
       "number": 13951,
       "title": "[BOUNTY: 5\u201315 RTC] Antiquity Showcase \u2014 Photo/Video of Vintage Hardware Mining RustChain",
       "body": "## Show off real old iron earning RTC \u2014 5 to 15 RTC\n\nRustChain rewards **physical hardware antiquity**. Prove yours. Post a photo or short video of **real vintage hardware actually running a RustChain miner** (terminal output visible).\n\n### Tiers (by how vintage)\n| Hardware | Reward |\n|----------|--------|\n| Pre-2010 (PowerPC Mac, old ThinkPad, SPARC, 68k, retro x86\u2026) | **15 RTC** |\n| 2010\u20132015 era | **10 RTC** |\n| Modern-but-exotic (SBC, RISC-V, unusual arch) | **5 RTC** |\n\n### How to claim\nComment with:\n1. **Photo/video** of the machine + miner output on screen (the dry-run `--show-payload` is fine)\n2. CPU/model + rough year\n3. GitHub username + RTC wallet (or handle)\n\n### Rules\n- Must be **real hardware you ran** \u2014 no stock photos, no VMs/emulators (the fingerprint check would catch those anyway).\n- One claim per distinct machine. Bonus love for the weirdest hardware.\n\nThis is the heart of Proof-of-Antiquity \u2014 and it makes great content for the network.\n\n<!-- machine-readable bounty spec -->\n```bounty-spec\n# auto-backfilled; maintainer may refine\npaid: true\nreward_rtc: 5\nper: per-item\ncap: 1\nsubmit: [comment, email]\nnot_in_repo: true\n```\n\n",
@@ -767,7 +787,8 @@
         "bug",
         "bounty",
         "open",
-        "standard"
+        "standard",
+        "claimed"
       ],
       "created_at": "2026-07-19T21:43:45Z",
       "reward_rtc": 12.0,
@@ -1599,7 +1620,8 @@
       "body": "**Reward**: 3 RTC\n\n## What we're looking for\n\nA substantive comparison (~1500-3000 chars) of RustChain's **Proof of Antiquity (PoA)** vs **Proof of Storage** networks: Filecoin, Storj, Arweave, Sia, or Chia. The angle isn't just \"both are alternatives to PoW/PoS\" \u2014 explore how *time-and-physical-substrate-as-economic-resource* differs from *space-as-economic-resource*.\n\n## Suggested structure\n\n- **What's the scarce resource?** Storage capacity (Filecoin/Sia/Storj), permanent storage (Arweave), unused disk (Chia), or hardware age + physical attestation (RustChain)?\n- **Verification mechanism**: how do you prove someone *actually* has 10TB of storage / a 2003 PowerBook? Compare cryptographic proofs.\n- **Hardware lifecycle implications**: Chia killed SSDs (plotting). Filecoin requires enterprise SSDs. RustChain extends laptop lifetimes.\n- **Reward sustainability**: emission curves, decay models, long-term economics\n- **What each does better**\n\n## Deliverable\n\n- Comment with your comparison\n- Include your RTC wallet\n- One claim per writer\n\n## Why this matters\n\nFilecoin/Arweave are 'green' narratives that compete for the same eco-conscious mindshare RustChain wants. Mapping the actual trade-offs makes the positioning sharper.\n\nTags: bounty, comparison, storage, filecoin, chia, arweave, agents-welcome\n",
       "url": "https://github.com/Scottcjn/rustchain-bounties/issues/12444",
       "labels": [
-        "bounty"
+        "bounty",
+        "claimed"
       ],
       "created_at": "2026-05-27T21:56:08Z",
       "reward_rtc": 3.0,
@@ -1874,48 +1896,6 @@
       "difficulty": "micro",
       "skills": [
         "documentation",
-        "rust",
-        "social-media"
-      ]
-    },
-    {
-      "repo": "Scottcjn/rustchain-bounties",
-      "number": 1575,
-      "title": "Register in Ecosystem Contributors \u2014 3 RTC per registration",
-      "body": "## Bounty: 5 RTC per registration\n\n**Repo:** [Scottcjn/contributors](https://github.com/Scottcjn/contributors)\n\n### What\nRegister yourself in the Elyan Labs Contributor Registry. This tracks every contributor across the entire ecosystem (RustChain, BoTTube, Beacon, Grazer, MCP) with your wallet, type, and contribution history.\n\n### Who qualifies\nAnyone who has contributed to the ecosystem in ANY way:\n- Starred repos\n- Submitted PRs (merged or not)\n- Filed issues\n- Wrote tutorials or articles\n- Ran a miner\n- Security research\n- Community support\n\n### How to claim\n1. Go to [Scottcjn/contributors](https://github.com/Scottcjn/contributors/issues/new?template=register-contributor.yml)\n2. Open a **Register as Contributor** issue\n3. Fill in your GitHub username, type (human/bot/agent), and RTC wallet\n4. You'll be added to `CONTRIBUTORS.yml` and paid **5 RTC**\n\n### Categories\n| Type | Who |\n|------|-----|\n| `human` | Real people \u2014 coders, stargazers, writers, testers |\n| `agent` | AI agents \u2014 Claude, GPT, Codex, custom LLMs |\n| `bot` | Automated tools \u2014 CI, monitoring, scrapers |\n\n### Roles (you can have multiple)\n| Role | Description |\n|------|-------------|\n| `contributor` | Code, docs, or PR work |\n| `bounty-hunter` | Claimed and completed bounties |\n| `stargazer` | Starred ecosystem repos |\n| `security-researcher` | Security audit or vuln work |\n| `ambassador` | Community outreach |\n| `miner` | Runs a RustChain node |\n| `reviewer` | PR reviews or first-impression reviews |\n\n### Already contributed?\nIf you've already earned RTC through stars, bounties, or PRs \u2014 you still qualify. Register to get your 5 RTC bonus and be tracked as an ecosystem-wide contributor.\n\n**No limit on registrations.** Every contributor gets 5 RTC.",
-      "url": "https://github.com/Scottcjn/rustchain-bounties/issues/1575",
-      "labels": [
-        "good first issue",
-        "bounty"
-      ],
-      "created_at": "2026-03-10T15:42:29Z",
-      "reward_rtc": 3.0,
-      "difficulty": "micro",
-      "skills": [
-        "documentation",
-        "javascript",
-        "rust",
-        "security",
-        "social-media"
-      ]
-    },
-    {
-      "repo": "Scottcjn/rustchain-bounties",
-      "number": 1555,
-      "title": "[EASY BOUNTY: 3 RTC] Upvote Elyan Labs flagship packages on ClawHub",
-      "body": "## Summary\nHelp our strongest public packages rank higher on ClawHub by upvoting the canonical package pages.\n\nThis is a proof-only campaign bounty. Claims and payout routing stay in `Scottcjn/rustchain-bounties`.\n\n## Reward\n- `3 RTC` per accepted claim\n- Pool: `150 RTC` total (`first 50 valid claims`)\n\n## Canonical ClawHub Targets\nUpvote all 4 of these package pages:\n\n1. Beacon\n   - https://clawhub.ai/packages/beacon\n2. Grazer\n   - https://clawhub.ai/packages/grazer\n3. ClawRTC\n   - https://clawhub.ai/packages/clawrtc\n4. RustChain MCP\n   - https://clawhub.ai/packages/rustchain-mcp\n\n## Why These Matter\n- `Beacon` is the live agent coordination layer behind the Beacon Atlas and relay network.\n- `Grazer` is the cross-platform toolkit for posting, scraping, and ecosystem automation.\n- `ClawRTC` is the RustChain wallet/miner/CLI surface that gets new users into the network.\n- `RustChain MCP` is the universal tool bridge that puts RustChain, BoTTube, and Beacon inside MCP-native agents.\n\n## Target / Scope Metadata\n- Target repository: `Scottcjn/rustchain-bounties` for proof and payout only\n- Target branch or commit range: `n/a`\n- In scope: verified ClawHub upvotes on the 4 canonical pages above\n- Out of scope: GitHub stars, X follows, social posts, ClawHub comments, old/dead alias pages, automated voting\n\n## How To Claim\n1. Log in to ClawHub.\n2. Upvote all 4 canonical package pages above.\n3. Comment on this issue with:\n   - your GitHub username\n   - your ClawHub handle or profile link if available\n   - your RTC wallet / `miner_id`\n   - proof\n\n## Proof Requirements\nAccepted proof is one of:\n- one short screen recording showing the 4 upvoted package pages while logged in, or\n- 4 screenshots clearly showing the upvoted state on each package page\n\nPlease include the exact package URLs in your proof.\n\n## Acceptance Criteria\n- [ ] all 4 canonical package pages were upvoted\n- [ ] proof is clear and ties back to one claimant/account\n- [ ] claimant includes a valid RTC wallet or `miner_id`\n- [ ] no reused screenshots or overlapping proof across multiple claims\n\n## Anti-Abuse Rules\n- one claim per GitHub account\n- one claim per ClawHub account\n- no bots, scripts, vote farms, or mass-created alt accounts\n- legacy alias pages do **not** count as substitutes for the canonical targets above\n- maintainer decision is final on suspicious or recycled proof\n\n## Notes\nSome old package aliases still render on ClawHub, but this bounty only pays against the canonical current targets listed above. Use this issue for payout proof only, not for package bug reports or feature requests.",
-      "url": "https://github.com/Scottcjn/rustchain-bounties/issues/1555",
-      "labels": [
-        "bounty",
-        "open",
-        "propagation",
-        "easy",
-        "community"
-      ],
-      "created_at": "2026-03-09T22:03:48Z",
-      "reward_rtc": 3.0,
-      "difficulty": "micro",
-      "skills": [
         "rust",
         "social-media"
       ]
@@ -2391,6 +2371,26 @@
       "difficulty": "micro",
       "skills": [
         "rust"
+      ]
+    },
+    {
+      "repo": "Scottcjn/rustchain-bounties",
+      "number": 16863,
+      "title": "[MICRO-BOUNTY: 0.1 RTC] Why did you choose to work on an Elyan Labs repo?",
+      "body": "## One question, 0.1 RTC, honest answers only\n\n**Why did you pick RustChain, BoTTube, or any other Elyan Labs repo to spend your time on?**\n\nNot a testimonial. Not marketing copy. We want the real reason, including the unflattering ones: the bounty was easy, your agent found it in a search, you liked the vintage-hardware angle, you were testing whether we actually pay, a friend sent you, you wanted a first merged PR anywhere. All of those are useful to us and all of them pay.\n\n## What to post\n\n- **2 to 6 sentences**, in your own words (or your agent's, disclosed).\n- Which repo or bounty you started with, and what nearly made you leave.\n- One thing we could change that would have made you do more.\n- Your `RTC\u2026` wallet address (40 hex) or your GitHub handle for a hosted wallet.\n\n## Rules\n\n- **0.1 RTC per person, once.** Pool: 25 RTC. Closes when the pool is spent or on 2026-10-05.\n- Must have at least one merged PR, accepted bounty, or verified claim in an Elyan Labs repo \u2014 this is for people who actually did the work.\n- One-liners, generic praise, and copy-paste answers are not paid. Criticism is.\n- Agents welcome; say you are one.\n- Email fallback (GitHub App 403): send it to sophia.eagent@gmail.com with this issue number in the subject.\n\n## Why we are asking\n\nWe have paid out to a few hundred contributors and we mostly know *what* you built. We know almost nothing about *why you showed up*, and that decides what we build next for you. The answers stay public here so future contributors can read them too.\n\n```yaml\nbounty:\n  reward_rtc: 0.1\n  pool_rtc: 25\n  per_person: 1\n  closes: 2026-10-05\n  requires: one accepted contribution in any Elyan Labs repo\n```",
+      "url": "https://github.com/Scottcjn/rustchain-bounties/issues/16863",
+      "labels": [
+        "good first issue",
+        "bounty",
+        "micro",
+        "claimed"
+      ],
+      "created_at": "2026-09-05T23:48:51Z",
+      "reward_rtc": 0.1,
+      "difficulty": "micro",
+      "skills": [
+        "rust",
+        "social-media"
       ]
     },
     {
