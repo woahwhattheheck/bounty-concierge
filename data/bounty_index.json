@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-09-06T10:45:15.110779+00:00",
+  "updated_at": "2026-09-07T12:15:07.730100+00:00",
   "total_count": 124,
   "bounties": [
     {
@@ -267,8 +267,7 @@
       "body": "## The problem\n\nFour separate defects were found in the bounty payout pipeline on 2026-08-07/08, and all four shared one shape: **something reported success while doing nothing.** None raised an error. None turned a workflow red.\n\n- `transfer()` returned success on an HTTP 200 carrying `{\"ok\": false}` \u2014 claims were closed and publicly confirmed with no RTC sent (#16390)\n- The payout's candidate sweep used `--limit 400` against 2,375 open issues, so any verified claim outside the newest 400 could never be paid, silently\n- `confirm_pending.sh` had no execute bit for ~3 months. Cron fired it every 10 minutes into a permission error, and because the script's own logging lived inside the block that failed to run, **nothing was logged at all**\n- `gh issue edit --add-label` fails on a GraphQL deprecation **without a non-zero exit**, so a gate posted \"verified\" and never marked the claim payable\n\nEach was found by accident. There is no reason to think they were the last four.\n\n## What this bounty is\n\nAudit the payout and reward paths for **more of this class**. Not style, not coverage \u2014 specifically: *code that can complete successfully while achieving nothing, or achieving the wrong thing, without surfacing an error.*\n\nIn scope:\n- `scripts/bounty_payout.py`, `scripts/docstring_gate.py`, `scripts/pr_review_gate.py`, `scripts/pr_review_gate_backfill.py`\n- `/root/rustchain/` payout, settlement and confirmation paths on the live node (ask for read access)\n- The workflows that drive them\n\n## What qualifies for payment\n\nA finding must name **a concrete path where the code succeeds and the effect does not happen**, with the reasoning for why. A proof of concept is welcome but not required if the reading is unambiguous.\n\nNot payable: general hardening advice, dependency CVEs with no demonstrated path, style, or \"add more tests\" without a specific defect behind it.\n\n## Reward\n\n**35 RTC** for the audit, plus **10 RTC per confirmed defect** of this class beyond the first, uncapped.\n\nPaid on the finding, not on a fix. A clear writeup of a real defect is worth more here than a patch for a hypothetical one.\n",
       "url": "https://github.com/Scottcjn/rustchain-bounties/issues/16471",
       "labels": [
-        "bounty",
-        "claimed"
+        "bounty"
       ],
       "created_at": "2026-08-10T17:31:52Z",
       "reward_rtc": 35.0,
