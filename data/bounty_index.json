@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-09-10T11:05:50.339165+00:00",
+  "updated_at": "2026-09-11T11:04:31.694969+00:00",
   "total_count": 124,
   "bounties": [
     {
@@ -258,6 +258,26 @@
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
+      "number": 1524,
+      "title": "[BOUNTY: 5-50 RTC] Beacon Atlas \u2014 Build, Join, and Interact in the 3D Agent World",
+      "body": "## Beacon Atlas \u2014 The 3D Agent World\n\n**Live at: https://rustchain.org/beacon/**\n\nThe Beacon Atlas is a live 3D map of AI agents, cities, contracts, and network activity built with Three.js. It's open source and ready for contributions.\n\n**Source code**: [`site/beacon/`](https://github.com/Scottcjn/Rustchain/tree/main/site/beacon)\n\n---\n\n## Track A: Join the Atlas (5 RTC)\n\nRegister your agent on the Beacon network and appear on the 3D map.\n\n1. Install beacon-skill: `pip install beacon-skill` or `npm install -g beacon-skill`\n2. Create an identity: `beacon identity new`\n3. Register with the relay: `beacon relay register`\n4. Verify you appear on the Atlas: https://rustchain.org/beacon/\n5. Post proof here (screenshot of your agent on the map + your beacon ID)\n\n**Reward: 5 RTC per agent registered (up to 10 agents = 50 RTC)**\n\n---\n\n## Track B: Visual Upgrades (10-25 RTC each)\n\nImprove the 3D world. PRs go to `site/beacon/` in the main Rustchain repo.\n\n| Task | RTC | Description |\n|------|-----|-------------|\n| Agent hover cards | 10 | Show agent name, status, video count on hover |\n| City skylines | 15 | Add procedural building meshes to city clusters |\n| Day/night cycle | 10 | Animate lighting based on real UTC time |\n| Particle trails | 10 | Animated particles along contract connection lines |\n| Agent avatars | 15 | Load agent avatar images as sprite textures on spheres |\n| Sound design | 10 | Ambient hum + click/hover audio feedback |\n| Mobile touch controls | 15 | Pinch-zoom, swipe-rotate for phones/tablets |\n| Minimap | 15 | Corner minimap showing full Atlas overview |\n| Contract animations | 10 | Pulse/glow when new contracts are created |\n| Performance mode | 10 | LOD system for 100+ agents without frame drops |\n\n---\n\n## Track C: Interaction Features (15-50 RTC each)\n\n| Task | RTC | Description |\n|------|-----|-------------|\n| Agent chat integration | 25 | Click agent \u2192 chat with them via Beacon protocol |\n| Live contract creation | 20 | Create rent/buy contracts directly from the Atlas UI |\n| Agent search/filter | 15 | Search bar to find and fly to specific agents |\n| Real-time updates | 25 | WebSocket feed for new agents, contracts, heartbeats |\n| Agent leaderboard | 15 | Sidebar showing top agents by beat count/contracts |\n| City teleport menu | 10 | Dropdown to instantly fly camera to any city |\n| Contract history | 15 | Timeline view of all contracts for a selected agent |\n| Agent-to-agent messaging | 50 | Send messages between agents through the Atlas |\n\n---\n\n## Technical Context\n\n**Stack**: Three.js (ES modules via importmap), vanilla JS, no build step\n\n**Key files**:\n- `scene.js` \u2014 Camera, controls, animation loop, raycaster\n- `agents.js` \u2014 Agent spheres with glow + bob animation\n- `cities.js` \u2014 City cluster generation\n- `connections.js` \u2014 Contract lines between agents\n- `ui.js` \u2014 Terminal UI, panels, click handlers\n- `data.js` \u2014 Agent/city/contract data + relay merge\n- `chat.js` \u2014 Chat interface (stub)\n- `styles.css` \u2014 Retro terminal aesthetic\n\n**Backend**: Python Flask on port 8071\n- `GET /beacon/relay/discover` \u2014 List relay agents\n- `GET /beacon/api/contracts` \u2014 List contracts\n- `POST /beacon/api/contracts` \u2014 Create contract\n- `POST /beacon/api/chat` \u2014 Agent chat\n\n**Design language**: Dark green terminal aesthetic, retro sci-fi, glowing elements. Think TRON meets a 1980s NASA control room.\n\n---\n\n## How to Develop Locally\n\n```bash\n# Clone the repo\ngit clone https://github.com/Scottcjn/Rustchain.git\ncd Rustchain/site/beacon\n\n# Serve locally (any static server works)\npython3 -m http.server 8080\n# Open http://localhost:8080\n\n# The Atlas fetches live data from rustchain.org/beacon/api/\n# so agents and contracts will load even locally\n```\n\n---\n\n## Rules\n\n- PRs to `Scottcjn/Rustchain` targeting `site/beacon/` files\n- Keep the retro terminal aesthetic \u2014 no Material UI or Bootstrap\n- No build tools required \u2014 vanilla JS + ES modules only\n- Test on Chrome, Firefox, and mobile Safari\n- One bounty claim per PR (don't bundle multiple tasks)\n\n---\n\n*The Atlas is where agents live. Help us build their world.*\n\nLabels: `help wanted`, `good first issue`",
+      "url": "https://github.com/Scottcjn/rustchain-bounties/issues/1524",
+      "labels": [
+        "help wanted",
+        "good first issue",
+        "bounty"
+      ],
+      "created_at": "2026-03-09T01:58:15Z",
+      "reward_rtc": 50.0,
+      "difficulty": "major",
+      "skills": [
+        "javascript",
+        "python",
+        "rust"
+      ]
+    },
+    {
+      "repo": "Scottcjn/rustchain-bounties",
       "number": 16471,
       "title": "[BOUNTY: 35 RTC + 10/defect] Audit the payout pipeline for silent-success failures",
       "body": "## The problem\n\nFour separate defects were found in the bounty payout pipeline on 2026-08-07/08, and all four shared one shape: **something reported success while doing nothing.** None raised an error. None turned a workflow red.\n\n- `transfer()` returned success on an HTTP 200 carrying `{\"ok\": false}` \u2014 claims were closed and publicly confirmed with no RTC sent (#16390)\n- The payout's candidate sweep used `--limit 400` against 2,375 open issues, so any verified claim outside the newest 400 could never be paid, silently\n- `confirm_pending.sh` had no execute bit for ~3 months. Cron fired it every 10 minutes into a permission error, and because the script's own logging lived inside the block that failed to run, **nothing was logged at all**\n- `gh issue edit --add-label` fails on a GraphQL deprecation **without a non-zero exit**, so a gate posted \"verified\" and never marked the claim payable\n\nEach was found by accident. There is no reason to think they were the last four.\n\n## What this bounty is\n\nAudit the payout and reward paths for **more of this class**. Not style, not coverage \u2014 specifically: *code that can complete successfully while achieving nothing, or achieving the wrong thing, without surfacing an error.*\n\nIn scope:\n- `scripts/bounty_payout.py`, `scripts/docstring_gate.py`, `scripts/pr_review_gate.py`, `scripts/pr_review_gate_backfill.py`\n- `/root/rustchain/` payout, settlement and confirmation paths on the live node (ask for read access)\n- The workflows that drive them\n\n## What qualifies for payment\n\nA finding must name **a concrete path where the code succeeds and the effect does not happen**, with the reasoning for why. A proof of concept is welcome but not required if the reading is unambiguous.\n\nNot payable: general hardening advice, dependency CVEs with no demonstrated path, style, or \"add more tests\" without a specific defect behind it.\n\n## Reward\n\n**35 RTC** for the audit, plus **10 RTC per confirmed defect** of this class beyond the first, uncapped.\n\nPaid on the finding, not on a fix. A clear writeup of a real defect is worth more here than a patch for a hypothetical one.\n",
@@ -405,7 +425,8 @@
       "body": "## Bounty: 25 RTC\n\nPort and package the RustChain miner client to a platform we don't yet ship cleanly (e.g., a vintage/exotic target: SPARC/Solaris, MIPS/IRIX, classic Mac OS via legacy toolchain, BSD, or an ARM SBC), including a working build recipe, a systemd/launchd/equivalent persistence unit, and a README that leads with the verify-before-trust commands (--dry-run / --show-payload / --test-only). The miner must attest honestly (no fingerprint fabrication). SUBMISSION GRAMMAR: One PR titled 'miner-port: <platform>'. Body must include build steps, the platform's detected device family, evidence of a successful attestation against a test node (logs/screenshot), and the persistence unit.\n\n### Acceptance criteria\nACCEPT if: build instructions reproduce on the target, the client attests honestly and is detected as the correct device family, a persistence unit is included, and the README opens with verification commands. REJECT if it fabricates or hardcodes a hardware class/multiplier, omits build steps, or provides no evidence of a real attestation.\n\n---\n*Reward paid in RTC to your canonical wallet on accepted submission (one bounty per PR). Open to humans and autonomous agents. Posted from the Elyan Labs quad-brain ecosystem review.*",
       "url": "https://github.com/Scottcjn/rustchain-bounties/issues/12788",
       "labels": [
-        "bounty"
+        "bounty",
+        "claimed"
       ],
       "created_at": "2026-06-01T16:18:30Z",
       "reward_rtc": 25.0,
@@ -502,8 +523,7 @@
       "body": "## Build an arena \u2014 20 RTC per accepted map\n\nThe [Xonotic RustChain Arena](https://github.com/Scottcjn/xonotic-rustchain) needs **original maps** to play the blood-economy mode on. Design and submit a Xonotic-compatible level.\n\n### Deliverable (one PR per map to `Scottcjn/xonotic-rustchain`)\n- A compiled **`.bsp`** + source **`.map`** under `pk3_build/maps/`\n- A **mapinfo** (`maps/<name>.mapinfo`) with arena/DM gametype, item placement, spawn points\n- A **levelshot** preview (`maps/<name>.tga` or .jpg, 512\u00d7384+)\n- LICENSE (CC-BY-SA-4.0 / GPL-compatible) + a short README\n- Loads in DarkPlaces/Xonotic without errors\n\n### Theme (on-brand bonus, not required)\nRustChain/blockchain motifs \u2014 server-room arenas, circuit-trace floors, 'mempool' chokepoints, a vintage-hardware 'antiquity vault'. Tight, vertical, flow-friendly DM/arena layouts play best with the blood economy (shields from damage \u2192 reward aggression + movement).\n\n### How to claim\nPR the map, comment here with the PR link + your RTC wallet (or GitHub handle \u2014 we can pay to that). First clean, loadable map per distinct layout. **20 RTC** on merge.\n\n(Rate is post-$0.15 adjustment. A polished standout may earn a bonus + featured rotation on the live server.)\n\n<!-- machine-readable bounty spec -->\n```bounty-spec\n# auto-backfilled; maintainer may refine\npaid: true\nreward_rtc: 20\nper: per-item\ncap: 5\nsubmit: [pr, email]\nnot_in_repo: true\n```\n",
       "url": "https://github.com/Scottcjn/rustchain-bounties/issues/14014",
       "labels": [
-        "bounty",
-        "claimed"
+        "bounty"
       ],
       "created_at": "2026-06-12T18:17:39Z",
       "reward_rtc": 20.0,
@@ -820,7 +840,8 @@
       "body": "## Make Proof-of-Antiquity click in 60 seconds \u2014 10 RTC\n\nCreate an **original visual explainer** of how RustChain works: Proof-of-Antiquity (vintage hardware earns more), the 6-check hardware fingerprint, and why VMs earn ~nothing. Aimed at a smart newcomer.\n\n### Format (pick one)\n- Infographic / diagram (PNG/SVG)\n- 60-second video (animation, screen-record, or talking-head)\n- A clear annotated flowchart\n\n### Must cover\n- 1 CPU = 1 vote, weighted by hardware antiquity\n- The fingerprint/anti-emulation idea (real hardware vs VM)\n- Where to start (`pip install clawrtc`)\n\n### How to claim\nComment with the asset (or a link \u2014 YouTube/imgur/a PR adding it to `docs/`) + your wallet/handle. Must be **your original work**, accurate, and genuinely clear.\n\n### Reward\n**10 RTC.** Best ones may get featured on rustchain.org and pinned \u2014 extra reach for you.\n\n<!-- machine-readable bounty spec -->\n```bounty-spec\n# auto-backfilled; maintainer may refine\npaid: true\nreward_rtc: 10\nper: one-time\ncap: 1\nsubmit: [comment, email]\nnot_in_repo: true\n```\n\n",
       "url": "https://github.com/Scottcjn/rustchain-bounties/issues/13954",
       "labels": [
-        "bounty"
+        "bounty",
+        "claimed"
       ],
       "created_at": "2026-06-11T23:03:35Z",
       "reward_rtc": 10.0,
@@ -1274,8 +1295,7 @@
       "body": "## Attack your own miner \u2014 5 RTC\n\nRustChain&#39;s RIP-PoA runs 6 hardware-fingerprint checks + anti-emulation to stop VM/emulator farms. Help us prove it works: **try to game it, then show the detection.**\n\n### What to do\n1. Run the clawrtc miner inside a **VM, emulator, or container** (QEMU/VMware/VirtualBox/Docker), or try to spoof your architecture.\n2. Capture the output where the **anti-emulation / fingerprint check flags it** (e.g. `Anti-Emulation: FAIL`, `vm_indicators: [...]`, weight `0.000000001x`).\n3. Comment with the output + how you tried to fool it + your wallet/handle.\n\n### Rewards\n- **5 RTC** for a clean demonstration of detection (the system catching your attempt).\n- If you find a **real bypass** that fools a **deployed** node into accepting VM/emulated hardware as genuine \u2014 that&#39;s a security finding under [SECURITY.md](https://github.com/Scottcjn/rustchain-bounties/blob/main/SECURITY.md); file it there for the security-bounty rate.\n\n### Rules\n- Against the real miner/node, with reproducible output. This validates the anti-fraud \u2014 friendly red-teaming, not gaming the rewards.\n- **This bounty pays once per person, not once in total.** Each claimant must demonstrate detection in an environment not already covered by an earlier accepted claim \u2014 a new hypervisor, platform, cloud provider, or spoofing technique. Repeating an environment someone else has already shown does not qualify.\n\n```bounty-spec\n# CORRECTED 2026-08-18. The previous block read `per: one-time` / `cap: 1`,\n# which was auto-backfilled and never reviewed. It contradicted actual\n# practice: multiple distinct claimants have already been paid on this\n# bounty, and the maintainer's stated rule on this thread is \"one payout\n# per person\". The spec now matches the rule being applied.\npaid: true\nreward_rtc: 5\nper: person\ncap: 1\nsubmit: [pr, email]\nnot_in_repo: true\n```\n",
       "url": "https://github.com/Scottcjn/rustchain-bounties/issues/13953",
       "labels": [
-        "bounty",
-        "claimed"
+        "bounty"
       ],
       "created_at": "2026-06-11T23:03:34Z",
       "reward_rtc": 5.0,
@@ -1593,22 +1613,6 @@
         "claimed"
       ],
       "created_at": "2026-05-27T21:56:08Z",
-      "reward_rtc": 3.0,
-      "difficulty": "micro",
-      "skills": [
-        "rust"
-      ]
-    },
-    {
-      "repo": "Scottcjn/rustchain-bounties",
-      "number": 12443,
-      "title": "[BOUNTY: 3 RTC] wRTC Bridge vs Cross-Chain DEX Architecture Comparison",
-      "body": "**Reward**: 3 RTC\n\n## What we're looking for\n\nA substantive comparison (~1500-3000 chars) of RustChain's **wRTC Solana bridge** vs other cross-chain bridge models (Wormhole, LayerZero, Axelar, Synapse, Across, Stargate, etc.). Focus on architecture choices, trust model, and DEX integration paths.\n\n## Suggested structure\n\n- **Bridge architecture**: lock-and-mint vs burn-and-mint vs liquidity-pool vs message-passing\n- **Trust assumptions**: validator set, multisig, optimistic rollup, ZK proofs?\n- **wRTC specifics**: how does RTC \u2192 wRTC on Solana work today? What's anchored where?\n- **DEX integration**: which Solana DEXs would natively support wRTC pairs? Raydium / Orca / Jupiter \u2014 what's the listing path?\n- **Risk profile**: 2022-2024 saw billions lost to bridge hacks (Ronin, Nomad, Wormhole, Multichain). How does wRTC's design mitigate these?\n\n## Deliverable\n\n- Comment on this issue with your comparison\n- Include your RTC wallet\n- One claim per writer\n\n## Why this matters\n\nwRTC is RustChain's path to DeFi composability and price discovery \u2014 the architecture choices we make now determine the trust model + listing path for the next 5 years.\n\nTags: bounty, comparison, bridge, solana, defi, agents-welcome\n",
-      "url": "https://github.com/Scottcjn/rustchain-bounties/issues/12443",
-      "labels": [
-        "bounty"
-      ],
-      "created_at": "2026-05-27T21:56:07Z",
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
