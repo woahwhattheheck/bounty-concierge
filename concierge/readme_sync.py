@@ -1,23 +1,10 @@
 # SPDX-License-Identifier: MIT
 """Refresh the Open Bounties table in README.md from data/bounty_index.json.
 
-The bounty_index_sync workflow writes ``data/bounty_index.json`` once a day,
-but README.md's "Open Bounties" table is hand-curated and drifts out of
-date. This module rewrites the table from the JSON between sentinel
-markers so the README's headline numbers stay current without manual edits.
-
-Sentinels used in README.md:
-
-    <!-- BOUNTY-TABLE-START -->
-    ...auto-generated content lives here...
-    <!-- BOUNTY-TABLE-END -->
-
-Run as a script::
-
-    python -m concierge.readme_sync
-
-Returns exit code 0 on success, 1 if sentinels are missing or the JSON
-file cannot be read.
+The bounty_index_sync workflow writes ``data/bounty_index.json`` once a day.
+This module rewrites the table from the JSON between sentinel markers. The
+authoritative workflow enables the freshness gate so an inherited or stale
+snapshot cannot be presented as current bounty inventory.
 """
 from __future__ import annotations
 
@@ -26,6 +13,7 @@ import math
 import pathlib
 import re
 import sys
+from datetime import datetime, timedelta, timezone
 from typing import Iterable
 from urllib.parse import quote
 
@@ -36,8 +24,9 @@ INDEX_PATH = REPO_ROOT / "data" / "bounty_index.json"
 START_MARKER = "<!-- BOUNTY-TABLE-START -->"
 END_MARKER = "<!-- BOUNTY-TABLE-END -->"
 
-# Cap to keep the README readable. Sorted by reward_rtc desc, then number.
 DEFAULT_TOP_N = 10
+MAX_INDEX_AGE = timedelta(hours=36)
+MAX_FUTURE_SKEW = timedelta(minutes=5)
 
 _MARKDOWN_LINK_SAFE = ":/?#[]@!$&'*+,;=%-._~"
 
@@ -73,9 +62,6 @@ def _markdown_cell(value) -> str:
     backslash_run = 0
     for char in text:
         if char == "|":
-            # Markdown treats a pipe as escaped only when preceded by an odd
-            # number of backslashes. Preserve literal backslashes while
-            # ensuring that parity for every table delimiter.
             escaped.append("\\" if backslash_run % 2 == 0 else "\\\\")
             escaped.append("|")
             backslash_run = 0
@@ -170,11 +156,40 @@ def render_table(bounties: Iterable[dict], top_n: int = DEFAULT_TOP_N) -> str:
     return "\n".join(lines)
 
 
-def build_section(top_n: int = DEFAULT_TOP_N) -> str:
-    """Build the markdown that goes between the sentinels.
+def _parse_index_timestamp(value) -> datetime:
+    """Parse an explicit UTC index timestamp or reject it."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("bounty index 'updated_at' must be a non-empty UTC timestamp")
+    raw = value.strip()
+    normalized = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ValueError("bounty index 'updated_at' must be valid ISO-8601") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() != timedelta(0):
+        raise ValueError("bounty index 'updated_at' must be timezone-aware UTC")
+    return parsed.astimezone(timezone.utc)
 
-    Reads ``data/bounty_index.json`` and produces a header line plus the
-    table. Raises FileNotFoundError if the JSON is missing.
+
+def _normalize_now(now: datetime | None) -> datetime:
+    now = datetime.now(timezone.utc) if now is None else now
+    if now.tzinfo is None or now.utcoffset() != timedelta(0):
+        raise ValueError("freshness reference time must be timezone-aware UTC")
+    return now.astimezone(timezone.utc)
+
+
+def build_section(
+    top_n: int = DEFAULT_TOP_N,
+    *,
+    require_fresh: bool = False,
+    now: datetime | None = None,
+) -> str:
+    """Build the generated README section.
+
+    When ``require_fresh`` is true, malformed/future timestamps fail closed and
+    snapshots older than ``MAX_INDEX_AGE`` render only a stale warning rather
+    than bounty rows. Direct library callers retain the historical behavior
+    unless they explicitly request freshness; the canonical workflow does.
     """
     if top_n < 0:
         raise ValueError("top_n must be non-negative")
@@ -187,21 +202,34 @@ def build_section(top_n: int = DEFAULT_TOP_N) -> str:
     elif not isinstance(bounties, list):
         raise ValueError("bounty index 'bounties' must be a list")
     bounties = _validated_bounty_rows(bounties)
-    updated = _single_line_text(payload.get("updated_at", "unknown"))
+
+    updated_raw = payload.get("updated_at", "unknown")
+    updated = _single_line_text(updated_raw)
+
+    if require_fresh:
+        updated_at = _parse_index_timestamp(updated_raw)
+        reference = _normalize_now(now)
+        if updated_at > reference + MAX_FUTURE_SKEW:
+            raise ValueError("bounty index 'updated_at' is implausibly in the future")
+        if reference - updated_at > MAX_INDEX_AGE:
+            return (
+                "**WARNING: Cached bounty index is stale and is not shown as current.** "
+                f"Last successful rebuild: {updated}. "
+                "Use `concierge browse` or the live bounty-board link above before "
+                "selecting or claiming paid work."
+            )
+
     table = render_table(bounties, top_n=top_n)
     header = (
         f"_Showing top {min(top_n, len(bounties))} open bounties, "
-        f"sorted by RTC reward. Index rebuilt {updated}. For the live total, use the full bounty board link above._"
+        f"sorted by RTC reward. Index rebuilt {updated}. "
+        "For the live total, use the full bounty board link above._"
     )
     return f"{header}\n\n{table}"
 
 
 def update_readme(readme_text: str, section: str) -> str:
-    """Replace the contents between the unique sentinels with ``section``.
-
-    Returns the updated text. Raises ValueError if either sentinel is
-    missing, duplicated, out of order, or injected by generated content.
-    """
+    """Replace the contents between the unique sentinels with ``section``."""
     start_count = readme_text.count(START_MARKER)
     end_count = readme_text.count(END_MARKER)
     if start_count == 0 or end_count == 0:
@@ -210,17 +238,11 @@ def update_readme(readme_text: str, section: str) -> str:
             "Add them around the Open Bounties table."
         )
     if start_count != 1 or end_count != 1:
-        raise ValueError(
-            "README must contain exactly one Open Bounties sentinel pair."
-        )
+        raise ValueError("README must contain exactly one Open Bounties sentinel pair.")
     if readme_text.index(START_MARKER) > readme_text.index(END_MARKER):
-        raise ValueError(
-            "README Open Bounties sentinels are out of order."
-        )
+        raise ValueError("README Open Bounties sentinels are out of order.")
     if START_MARKER in section or END_MARKER in section:
-        raise ValueError(
-            "Generated README section must not contain Open Bounties sentinels."
-        )
+        raise ValueError("Generated README section must not contain Open Bounties sentinels.")
 
     pattern = re.compile(
         re.escape(START_MARKER) + r"(.*?)" + re.escape(END_MARKER),
@@ -243,12 +265,26 @@ def main(argv: list[str] | None = None) -> int:
             print("error: --top expects a non-negative integer", file=sys.stderr)
             return 2
 
+    allowed = {"--require-fresh"}
+    consumed = set()
+    if "--top" in argv:
+        i = argv.index("--top")
+        consumed.update(argv[i:i + 2])
+    consumed.update(arg for arg in argv if arg in allowed)
+    unknown = [arg for arg in argv if arg not in consumed]
+    if unknown:
+        print(f"error: unrecognized argument: {unknown[0]}", file=sys.stderr)
+        return 2
+
     if not INDEX_PATH.exists():
         print(f"error: {INDEX_PATH} not found", file=sys.stderr)
         return 1
 
     try:
-        section = build_section(top_n=top_n)
+        section = build_section(
+            top_n=top_n,
+            require_fresh="--require-fresh" in argv,
+        )
     except (OSError, ValueError) as exc:
         print(f"error: failed to build section: {exc}", file=sys.stderr)
         return 1
