@@ -4,8 +4,9 @@
 ``bounty_audit`` establishes canonical issue/PR state and
 ``bounty_qualification`` decides whether work is safe to dispatch. This module
 fills the missing ``attempt_count`` input from canonical GitHub issue comments,
-binds formal GitHub assignment state, and authority-binds maintainer
-contribution terms for credential safety.
+binds formal GitHub assignment state, authority-binds maintainer contribution
+terms for credential safety, and revalidates the canonical issue/comment
+generation immediately before an ACTIONABLE dispatch decision is returned.
 """
 
 from __future__ import annotations
@@ -193,6 +194,228 @@ def _assignee_state(
     }
 
 
+def _label_names(issue: dict[str, Any]) -> tuple[str, ...]:
+    raw_labels = issue.get("labels")
+    if raw_labels is None:
+        raw_labels = []
+    if not isinstance(raw_labels, list):
+        raise BountyPreflightError("GitHub issue labels response was not a list")
+    names: list[str] = []
+    for item in raw_labels:
+        if isinstance(item, str):
+            name = item
+        elif isinstance(item, dict):
+            name = item.get("name")
+        else:
+            name = None
+        if not isinstance(name, str):
+            raise BountyPreflightError("GitHub issue label did not contain a string name")
+        names.append(name)
+    return tuple(sorted(names))
+
+
+def _assignee_logins(issue: dict[str, Any]) -> tuple[str, ...]:
+    raw_assignees = issue.get("assignees")
+    if raw_assignees is None:
+        raw_assignees = []
+    if not isinstance(raw_assignees, list):
+        raise BountyPreflightError("GitHub issue assignees response was not a list")
+    logins: list[str] = []
+    for item in raw_assignees:
+        if not isinstance(item, dict):
+            raise BountyPreflightError("GitHub issue assignees contained a malformed item")
+        login = item.get("login")
+        if not isinstance(login, str) or not login.strip():
+            raise BountyPreflightError(
+                "GitHub issue assignee did not contain a non-empty login"
+            )
+        logins.append(login.strip().casefold())
+    return tuple(sorted(set(logins)))
+
+
+def _issue_generation_marker(issue: dict[str, Any]) -> tuple[Any, ...]:
+    """Return authority-relevant issue state without retaining unrelated metadata."""
+    state = issue.get("state")
+    title = issue.get("title")
+    body = issue.get("body")
+    updated_at = issue.get("updated_at")
+    comments = issue.get("comments")
+    if not isinstance(state, str) or not state:
+        raise BountyPreflightError("GitHub issue state generation metadata was malformed")
+    if title is None:
+        title = ""
+    if body is None:
+        body = ""
+    if not isinstance(title, str) or not isinstance(body, str):
+        raise BountyPreflightError("GitHub issue text generation metadata was malformed")
+    if not isinstance(updated_at, str) or not updated_at:
+        raise BountyPreflightError("GitHub issue updated_at generation metadata was malformed")
+    if isinstance(comments, bool) or not isinstance(comments, int) or comments < 0:
+        raise BountyPreflightError("GitHub issue comment-count generation metadata was malformed")
+    return (
+        state.casefold(),
+        title,
+        body,
+        _label_names(issue),
+        _assignee_logins(issue),
+        comments,
+        updated_at,
+    )
+
+
+def _comment_generation_entry(comment: dict[str, Any]) -> tuple[int, str] | None:
+    comment_id = comment.get("id")
+    updated_at = comment.get("updated_at")
+    if (
+        isinstance(comment_id, bool)
+        or not isinstance(comment_id, int)
+        or comment_id <= 0
+        or not isinstance(updated_at, str)
+        or not updated_at
+    ):
+        return None
+    return comment_id, updated_at
+
+
+def _collect_comment_generation(
+    repo: str,
+    number: int,
+    token: str | None,
+    *,
+    session: Any,
+    max_pages: int,
+) -> tuple[tuple[tuple[int, str], ...], bool]:
+    """Read a privacy-safe exact issue-comment generation marker."""
+    headers = _headers(token or GITHUB_TOKEN)
+    comments_url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
+    entries: list[tuple[int, str]] = []
+    for page in range(1, max_pages + 1):
+        payload = _get_json(
+            session,
+            comments_url,
+            headers=headers,
+            params={"per_page": 100, "page": page},
+        )
+        if not isinstance(payload, list):
+            raise BountyPreflightError(
+                f"GitHub issue comments response was not a list for {repo}#{number}"
+            )
+        for comment in payload:
+            if not isinstance(comment, dict):
+                raise BountyPreflightError(
+                    f"GitHub issue comments response contained a malformed item for {repo}#{number}"
+                )
+            marker = _comment_generation_entry(comment)
+            if marker is None:
+                raise BountyPreflightError(
+                    f"GitHub issue comment generation metadata was malformed for {repo}#{number}"
+                )
+            entries.append(marker)
+        if len(payload) < 100:
+            return tuple(entries), False
+    return tuple(entries), True
+
+
+def _canonical_generation_stable(
+    repo: str,
+    number: int,
+    token: str | None,
+    *,
+    session: Any,
+    max_pages: int,
+    issue_snapshot: dict[str, Any],
+    comment_generation: tuple[tuple[int, str], ...] | None,
+) -> bool:
+    """Revalidate the exact issue/comment generation before dispatch authority."""
+    if comment_generation is None:
+        raise BountyPreflightError(
+            "GitHub issue comment generation metadata was incomplete during preflight"
+        )
+    headers = _headers(token or GITHUB_TOKEN)
+    issue_url = f"https://api.github.com/repos/{repo}/issues/{number}"
+    initial_issue = _issue_generation_marker(issue_snapshot)
+
+    before = _object_payload(
+        _get_json(session, issue_url, headers=headers),
+        f"issue {repo}#{number}",
+    )
+    if "pull_request" in before:
+        raise BountyPreflightError(f"{repo}#{number} became a pull request")
+    if _issue_generation_marker(before) != initial_issue:
+        return False
+
+    current_comments, truncated = _collect_comment_generation(
+        repo,
+        number,
+        token,
+        session=session,
+        max_pages=max_pages,
+    )
+    if truncated or current_comments != comment_generation:
+        return False
+
+    after = _object_payload(
+        _get_json(session, issue_url, headers=headers),
+        f"issue {repo}#{number}",
+    )
+    if "pull_request" in after:
+        raise BountyPreflightError(f"{repo}#{number} became a pull request")
+    return _issue_generation_marker(after) == initial_issue
+
+
+def _apply_generation_gate(
+    qualification: dict[str, Any], generation_stable: bool
+) -> dict[str, Any]:
+    """Hold an otherwise actionable dispatch when canonical generation moved."""
+    if not isinstance(qualification, dict):
+        raise BountyPreflightError("qualification result was not an object")
+    result = dict(qualification)
+    signals = result.get("signals")
+    if signals is None:
+        signals = {}
+    elif not isinstance(signals, dict):
+        raise BountyPreflightError("qualification signals were not an object")
+    else:
+        signals = dict(signals)
+    signals["canonical_generation_stable"] = generation_stable
+    result["signals"] = signals
+    if generation_stable:
+        return result
+
+    reasons = result.get("reasons")
+    if reasons is None:
+        reasons = []
+    elif not isinstance(reasons, list):
+        raise BountyPreflightError("qualification reasons were not a list")
+    else:
+        reasons = list(reasons)
+    reason_codes = result.get("reason_codes")
+    if reason_codes is None:
+        reason_codes = []
+    elif not isinstance(reason_codes, list):
+        raise BountyPreflightError("qualification reason_codes were not a list")
+    else:
+        reason_codes = list(reason_codes)
+    if "CANONICAL_GENERATION_CHANGED" not in reason_codes:
+        reason_codes.append("CANONICAL_GENERATION_CHANGED")
+        reasons.append(
+            {
+                "code": "CANONICAL_GENERATION_CHANGED",
+                "severity": "HOLD",
+                "message": (
+                    "Canonical GitHub issue/comment state changed while preflight "
+                    "was running; rerun before dispatching paid work."
+                ),
+            }
+        )
+    result["reasons"] = reasons
+    result["reason_codes"] = reason_codes
+    result["dispatch"] = False
+    if result.get("disposition") != "REJECT":
+        result["disposition"] = "HOLD"
+    return result
+
+
 def _apply_assignee_gate(
     qualification: dict[str, Any], assignee_state: dict[str, Any]
 ) -> dict[str, Any]:
@@ -298,6 +521,8 @@ def _collect_issue_context_with_snapshot(
     claimant_logins: set[str] = set()
     attempt_signal_count = 0
     comments_truncated = False
+    comment_generation: list[tuple[int, str]] = []
+    comment_generation_complete = True
     credential_signals: set[str] = set()
     if _has_maintainer_authority(issue):
         credential_signals.update(credential_gate_signal_types([issue_body]))
@@ -319,6 +544,11 @@ def _collect_issue_context_with_snapshot(
                 raise BountyPreflightError(
                     f"GitHub issue comments response contained a malformed item for {repo}#{number}"
                 )
+            marker = _comment_generation_entry(comment)
+            if marker is None:
+                comment_generation_complete = False
+            else:
+                comment_generation.append(marker)
             body = comment.get("body")
             if body is not None and not isinstance(body, str):
                 raise BountyPreflightError(
@@ -345,6 +575,9 @@ def _collect_issue_context_with_snapshot(
             "attempt_signal_count": attempt_signal_count,
             "comments_truncated": comments_truncated,
             "credential_gate_signal_types": sorted(credential_signals),
+            "_comment_generation": (
+                tuple(comment_generation) if comment_generation_complete else None
+            ),
             **assignee_state,
         },
         issue,
@@ -376,7 +609,7 @@ def collect_issue_context(
         max_pages=max_pages,
         operator_login=operator_login,
     )
-    return context
+    return {key: value for key, value in context.items() if not key.startswith("_")}
 
 
 def preflight_bounty(
@@ -393,8 +626,9 @@ def preflight_bounty(
 
     Issue-derived qualification metadata, formal assignment, credential authority,
     and canonical issue state are bound to one captured GitHub issue generation.
-    PR competition and maintainer-comment reads remain live, but a later issue
-    payload cannot be spliced into the same dispatch decision.
+    PR competition and maintainer-comment reads remain live. Before an actionable
+    result is returned, the issue authority fields and exact comment ID/update
+    generation are re-read and must still match the original snapshot.
     """
     context, issue_snapshot = _collect_issue_context_with_snapshot(
         repo,
@@ -440,6 +674,18 @@ def preflight_bounty(
         "foreign_assignee_count": context["foreign_assignee_count"],
     }
     qualification = _apply_assignee_gate(qualification, assignee_state)
+
+    if qualification.get("dispatch") is True:
+        generation_stable = _canonical_generation_stable(
+            repo,
+            number,
+            token,
+            session=session,
+            max_pages=max_pages,
+            issue_snapshot=issue_snapshot,
+            comment_generation=context["_comment_generation"],
+        )
+        qualification = _apply_generation_gate(qualification, generation_stable)
 
     return {
         "repo": repo,
