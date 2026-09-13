@@ -12,11 +12,16 @@ from __future__ import annotations
 
 import argparse
 import json
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Optional, Union
 
-from concierge.opportunity_ranker import OpportunityRankInputError, rank_opportunities
+from concierge.opportunity_ranker import (
+    OpportunityRankInputError,
+    _exact_decimal as _ranker_exact_decimal,
+    _format_decimal as _ranker_format_decimal,
+    rank_opportunities,
+)
 
 
 class PortfolioInputError(ValueError):
@@ -24,20 +29,30 @@ class PortfolioInputError(ValueError):
 
 
 _MAX_EXACT_CANDIDATES = 20
-_METRIC_QUANTUM = Decimal("0.000001")
+_MAX_RANKER_METRIC_TEXT_CHARS = 256
 
 
 def _exact_decimal(value: Any, name: str) -> Decimal:
-    if isinstance(value, bool) or isinstance(value, float):
-        raise PortfolioInputError(
-            f"{name} must be a decimal string, integer, or Decimal"
-        )
-    if not isinstance(value, (str, int, Decimal)):
-        raise PortfolioInputError(
-            f"{name} must be a decimal string, integer, or Decimal"
-        )
-    if isinstance(value, str) and not value.strip():
-        raise PortfolioInputError(f"{name} must be non-empty")
+    """Apply the canonical bounded operator-input decimal contract."""
+    try:
+        return _ranker_exact_decimal(value, name)
+    except OpportunityRankInputError as exc:
+        raise PortfolioInputError(str(exc)) from exc
+
+
+def _ranker_metric_decimal(value: Any, name: str) -> Decimal:
+    """Parse a bounded fixed-point metric emitted by the canonical ranker.
+
+    Ranker inputs are representation-bounded before arithmetic, but fixed-point
+    output can legitimately contain more coefficient digits after exponent
+    expansion (for example ``1e64`` renders as 65 integer digits).  The
+    allocator therefore accepts only bounded, strip-stable, exponent-free
+    ranker receipt strings rather than re-applying the stricter input parser.
+    """
+    if type(value) is not str or not value or value != value.strip():
+        raise PortfolioInputError(f"{name} must be a canonical fixed-point string")
+    if len(value) > _MAX_RANKER_METRIC_TEXT_CHARS or "e" in value.lower():
+        raise PortfolioInputError(f"{name} exceeds the bounded ranker receipt format")
     try:
         parsed = Decimal(value)
     except (InvalidOperation, ValueError) as exc:
@@ -48,12 +63,8 @@ def _exact_decimal(value: Any, name: str) -> Decimal:
 
 
 def _format_decimal(value: Decimal, *, metric: bool = False) -> str:
-    if metric:
-        value = value.quantize(_METRIC_QUANTUM, rounding=ROUND_HALF_UP)
-    text = format(value, "f")
-    if "." in text:
-        text = text.rstrip("0").rstrip(".")
-    return text or "0"
+    """Render through the canonical boundary-safe ranker formatter."""
+    return _ranker_format_decimal(value, metric=metric)
 
 
 def _portfolio_excluded(
@@ -99,17 +110,17 @@ def _row_to_item(
             f"candidates[{index}].hours_until_deadline",
         )
         group = _collision_group(candidate, source)
-        effort = _exact_decimal(
+        effort = _ranker_metric_decimal(
             row.get("estimated_effort_hours"), "ranker.estimated_effort_hours"
         )
-        reward = _exact_decimal(
+        reward = _ranker_metric_decimal(
             row.get("advertised_reward_usd"), "ranker.advertised_reward_usd"
         )
-        probability = _exact_decimal(
+        probability = _ranker_metric_decimal(
             row.get("estimated_win_probability"),
             "ranker.estimated_win_probability",
         )
-        skill = _exact_decimal(row.get("skill_match"), "ranker.skill_match")
+        skill = _ranker_metric_decimal(row.get("skill_match"), "ranker.skill_match")
     except PortfolioInputError as exc:
         shell = {"input_index": index, "canonical_source_url": source}
         return None, _portfolio_excluded(
