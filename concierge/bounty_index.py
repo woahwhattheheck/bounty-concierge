@@ -249,6 +249,7 @@ def format_markdown(bounties):
 # ---------------------------------------------------------------------------
 # Standalone entry point
 # ---------------------------------------------------------------------------
+
 if __name__ == "__main__":
     data = aggregate()
     print(json.dumps(data, indent=2, default=str))
