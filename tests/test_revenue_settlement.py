@@ -2,18 +2,15 @@
 from __future__ import annotations
 
 import copy
-from pathlib import Path
-import sys
+import json
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
+from concierge import revenue_settlement as rs
 from concierge.revenue_settlement import (
     RevenueSettlementEvidenceError,
     RevenueSettlementInputError,
+    history_envelope_sha256,
     history_row_sha256,
     inventory_history,
     reconcile_cash,
@@ -32,57 +29,101 @@ def closeout(*, pr=7, amount="10", state="MERGED", currency="RTC"):
     }
 
 
-def payment(*, amount=10, to="alice", status=None, tag="a"):
-    row = {
+def incoming(*, amount=10, sender="sponsor", tag=1):
+    return {
         "type": "transfer_in",
         "amount": amount,
-        "to": to,
-        "timestamp": f"2026-09-13T00:00:0{tag}Z",
-        "tx": f"tx-{tag}",
+        "epoch": 200 + tag,
+        "timestamp": 1772848800 + tag,
+        "tx_hash": f"tx-{tag}",
+        "from": sender,
+    }
+
+
+def outgoing(*, amount=10, recipient="bob", tag=1, status=None):
+    row = {
+        "type": "transfer_out",
+        "amount": amount,
+        "epoch": 200 + tag,
+        "timestamp": 1772848800 + tag,
+        "tx_hash": f"out-{tag}",
+        "to": recipient,
     }
     if status is not None:
         row["status"] = status
     return row
 
 
-def bind(item, *rows):
+def reward(*, amount=10, tag=1):
+    return {
+        "type": "reward",
+        "amount": amount,
+        "epoch": 200 + tag,
+        "timestamp": 1772848800 + tag,
+        "tx_hash": None,
+    }
+
+
+def ledger(*, amount=10, tag=1):
+    return {
+        "type": "ledger",
+        "amount": amount,
+        "epoch": 200 + tag,
+        "timestamp": 1772848800 + tag,
+        "tx_hash": None,
+        "reason": "manual_adjustment",
+    }
+
+
+def history(*rows, wallet="alice", total=None):
+    return {
+        "ok": True,
+        "miner_id": wallet,
+        "transactions": list(rows),
+        "total": len(rows) if total is None else total,
+    }
+
+
+def bind(item, *rows, wallet="alice"):
     return {
         "repo": item["repo"],
         "pr": item["pr"],
-        "history_sha256s": [history_row_sha256(row) for row in rows],
+        "history_sha256s": [history_row_sha256(row, wallet) for row in rows],
     }
 
 
 def test_unbound_merge_does_not_become_cash():
     item = closeout()
-    row = payment()
-    result = reconcile_cash([item], [row], [], wallet="alice")
+    row = incoming()
+    result = reconcile_cash([item], history(row), [], wallet="alice")
     assert result[0]["cash_status"] == "not_inferred"
     assert result[0]["verified_amount"] == "0"
 
 
-def test_exact_bound_confirmed_payment_is_verified():
+def test_exact_current_transfer_in_shape_is_verified():
     item = closeout()
-    row = payment()
-    result = reconcile_cash([item], [row], [bind(item, row)], wallet="alice")
+    row = incoming()
+    snapshot = history(row)
+    result = reconcile_cash(
+        [item], snapshot, [bind(item, row)], wallet="alice"
+    )
     assert result[0]["cash_status"] == "verified_paid"
     assert result[0]["verified_amount"] == "10"
-    assert result[0]["payment_evidence"] == [
-        {
-            "history_sha256": history_row_sha256(row),
-            "amount_rtc": "10",
-            "status": "confirmed",
-        }
-    ]
+    evidence = result[0]["payment_evidence"][0]
+    assert evidence["history_sha256"] == history_row_sha256(row, "alice")
+    assert evidence["history_envelope_sha256"] == history_envelope_sha256(snapshot)
+    assert evidence["type"] == "transfer_in"
+    assert evidence["tx_hash"] == "tx-1"
+    assert evidence["status"] == "confirmed"
 
 
 def test_multiple_explicit_rows_can_sum_to_exact_award():
     item = closeout(amount="10")
-    first = payment(amount="4.25", tag="1")
-    second = payment(amount="5.75", tag="2")
+    first = incoming(amount="4.25", tag=1)
+    second = incoming(amount="5.75", tag=2)
     result = reconcile_cash(
         [item],
-        [first, second],
+        history(first, second),
         [bind(item, first, second)],
         wallet="alice",
     )
@@ -92,173 +133,210 @@ def test_multiple_explicit_rows_can_sum_to_exact_award():
 
 def test_partial_bound_payment_is_not_upgraded_to_paid():
     item = closeout(amount="10")
-    row = payment(amount="4")
-    result = reconcile_cash([item], [row], [bind(item, row)], wallet="alice")
+    row = incoming(amount="4")
+    result = reconcile_cash(
+        [item], history(row), [bind(item, row)], wallet="alice"
+    )
     assert result[0]["cash_status"] == "partially_verified"
     assert result[0]["verified_amount"] == "4"
 
 
-@pytest.mark.parametrize("status", ["pending", "confirming", "failed"])
-def test_nonterminal_bound_payment_fails_closed(status):
+@pytest.mark.parametrize("factory", [outgoing, reward, ledger])
+def test_non_incoming_canonical_rows_cannot_settle_bounty(factory):
     item = closeout()
-    row = payment(status=status)
-    with pytest.raises(RevenueSettlementEvidenceError, match="not confirmed"):
-        reconcile_cash([item], [row], [bind(item, row)], wallet="alice")
+    row = factory()
+    with pytest.raises(RevenueSettlementEvidenceError, match="not canonical incoming"):
+        reconcile_cash(
+            [item], history(row), [bind(item, row)], wallet="alice"
+        )
 
 
-def test_unknown_provider_status_fails_before_matching():
+def test_arbitrary_note_row_cannot_manufacture_verified_paid():
     item = closeout()
-    row = payment(status="mystery")
-    with pytest.raises(RevenueSettlementEvidenceError, match="unknown settlement status"):
-        reconcile_cash([item], [row], [bind(item, row)], wallet="alice")
+    row = {
+        "type": "note",
+        "amount": 10,
+        "to": "alice",
+        "timestamp": 1772848800,
+    }
+    binding = {
+        "repo": item["repo"],
+        "pr": item["pr"],
+        "history_sha256s": [history_row_sha256(row, "alice")],
+    }
+    with pytest.raises(RevenueSettlementEvidenceError, match="unsupported transaction type"):
+        reconcile_cash([item], history(row), [binding], wallet="alice")
 
 
-def test_bound_payment_to_other_wallet_fails_closed():
-    item = closeout()
-    row = payment(to="mallory")
+def test_bare_history_list_is_not_cash_authority():
+    row = incoming()
+    with pytest.raises(RevenueSettlementEvidenceError, match="canonical RustChain history envelope"):
+        inventory_history([row], "alice")
+
+
+def test_offline_envelope_must_match_expected_wallet():
+    row = incoming()
     with pytest.raises(RevenueSettlementEvidenceError, match="another wallet"):
-        reconcile_cash([item], [row], [bind(item, row)], wallet="alice")
+        inventory_history(history(row, wallet="mallory"), "alice")
 
 
-def test_overpayment_is_not_silently_counted():
-    item = closeout(amount="10")
-    row = payment(amount="11")
-    with pytest.raises(RevenueSettlementEvidenceError, match="exceed"):
-        reconcile_cash([item], [row], [bind(item, row)], wallet="alice")
+def test_row_fingerprint_is_bound_to_recipient_wallet_provenance():
+    row = incoming()
+    assert history_row_sha256(row, "alice") != history_row_sha256(row, "mallory")
+    with pytest.raises(RevenueSettlementInputError, match="wallet provenance"):
+        history_row_sha256(row)
 
 
-def test_non_rtc_closeout_cannot_use_rustchain_history():
-    item = closeout(currency="USD")
-    row = payment()
-    with pytest.raises(RevenueSettlementEvidenceError, match="not denominated in RTC"):
-        reconcile_cash([item], [row], [bind(item, row)], wallet="alice")
-
-
-def test_unmerged_item_cannot_have_payment_bound_as_closeout_cash():
-    item = closeout(state="OPEN")
-    row = payment()
-    with pytest.raises(RevenueSettlementEvidenceError, match="not merged"):
-        reconcile_cash([item], [row], [bind(item, row)], wallet="alice")
-
-
-def test_missing_bound_row_fails_closed():
+def test_binding_for_other_wallet_row_is_absent_even_if_transaction_same():
     item = closeout()
-    selected = payment(tag="1")
-    actual = payment(tag="2")
+    row = incoming()
+    mallory_binding = bind(item, row, wallet="mallory")
     with pytest.raises(RevenueSettlementEvidenceError, match="is absent"):
-        reconcile_cash([item], [actual], [bind(item, selected)], wallet="alice")
+        reconcile_cash([item], history(row, wallet="alice"), [mallory_binding], wallet="alice")
+
+
+def test_envelope_requires_exact_current_fields():
+    row = incoming()
+    snapshot = history(row)
+    snapshot["schema_version"] = 1
+    with pytest.raises(RevenueSettlementEvidenceError, match="fields are not canonical"):
+        inventory_history(snapshot, "alice")
+
+
+@pytest.mark.parametrize(
+    "total",
+    [-1, True, "1", 0],
+)
+def test_envelope_total_must_cover_returned_transactions(total):
+    row = incoming()
+    with pytest.raises(RevenueSettlementEvidenceError, match="pagination is malformed"):
+        inventory_history(history(row, total=total), "alice")
+
+
+def test_incomplete_history_page_cannot_be_cash_authority():
+    row = incoming()
+    with pytest.raises(RevenueSettlementEvidenceError, match="complete snapshot"):
+        inventory_history(history(row, total=2), "alice")
+
+
+def test_incoming_transfer_rejects_invented_recipient_alias():
+    row = incoming()
+    row["to"] = "alice"
+    with pytest.raises(RevenueSettlementEvidenceError, match="incoming transfer row fields"):
+        inventory_history(history(row), "alice")
+
+
+def test_incoming_transfer_rejects_status_field():
+    row = incoming()
+    row["status"] = "confirmed"
+    with pytest.raises(RevenueSettlementEvidenceError, match="incoming transfer row fields"):
+        inventory_history(history(row), "alice")
+
+
+def test_incoming_transfer_requires_sender_and_transaction_identity():
+    row = incoming()
+    row.pop("from")
+    with pytest.raises(RevenueSettlementEvidenceError, match="incoming transfer row fields"):
+        inventory_history(history(row), "alice")
+    row = incoming()
+    row["tx_hash"] = None
+    with pytest.raises(RevenueSettlementEvidenceError, match="omitted transaction identity"):
+        inventory_history(history(row), "alice")
+
+
+def test_duplicate_indistinguishable_history_rows_are_rejected():
+    row = incoming()
+    with pytest.raises(RevenueSettlementEvidenceError, match="duplicate indistinguishable"):
+        inventory_history(history(row, copy.deepcopy(row)), "alice")
+
+
+def test_fingerprint_is_key_order_independent_and_mutation_sensitive():
+    row = incoming()
+    reordered = {key: row[key] for key in reversed(list(row))}
+    assert history_row_sha256(row, "alice") == history_row_sha256(reordered, "alice")
+    changed = dict(row)
+    changed["amount"] = 9
+    assert history_row_sha256(row, "alice") != history_row_sha256(changed, "alice")
 
 
 def test_same_history_row_cannot_pay_two_awards():
     first = closeout(pr=7)
     second = closeout(pr=8)
-    row = payment()
+    row = incoming()
     bindings = [bind(first, row), bind(second, row)]
     with pytest.raises(RevenueSettlementInputError, match="cannot settle multiple"):
-        reconcile_cash([first, second], [row], bindings, wallet="alice")
+        reconcile_cash([first, second], history(row), bindings, wallet="alice")
 
 
-def test_duplicate_indistinguishable_history_rows_are_rejected():
-    row = payment()
-    with pytest.raises(RevenueSettlementEvidenceError, match="duplicate indistinguishable"):
-        inventory_history([row, copy.deepcopy(row)], "alice")
-
-
-def test_conflicting_amount_fields_are_rejected_when_bound():
+def test_missing_bound_row_fails_closed():
     item = closeout()
-    row = payment()
-    row["amount_rtc"] = 9
-    with pytest.raises(RevenueSettlementEvidenceError, match="conflicting amount"):
-        reconcile_cash([item], [row], [bind(item, row)], wallet="alice")
+    selected = incoming(tag=1)
+    actual = incoming(tag=2)
+    with pytest.raises(RevenueSettlementEvidenceError, match="is absent"):
+        reconcile_cash(
+            [item], history(actual), [bind(item, selected)], wallet="alice"
+        )
 
 
-def test_conflicting_recipient_fields_are_rejected_when_bound():
-    item = closeout()
-    row = payment()
-    row["to_addr"] = "mallory"
-    with pytest.raises(RevenueSettlementEvidenceError, match="conflicting recipient"):
-        reconcile_cash([item], [row], [bind(item, row)], wallet="alice")
+def test_overpayment_is_not_silently_counted():
+    item = closeout(amount="10")
+    row = incoming(amount=11)
+    with pytest.raises(RevenueSettlementEvidenceError, match="exceed"):
+        reconcile_cash([item], history(row), [bind(item, row)], wallet="alice")
 
 
-def test_unrelated_reward_rows_do_not_block_bound_transfer_reconciliation():
-    item = closeout()
-    reward = {"type": "reward", "amount": 2, "timestamp": 1}
-    row = payment()
-    result = reconcile_cash([item], [reward, row], [bind(item, row)], wallet="alice")
-    assert result[0]["cash_status"] == "verified_paid"
+def test_non_rtc_closeout_cannot_use_rustchain_history():
+    item = closeout(currency="USD")
+    row = incoming()
+    with pytest.raises(RevenueSettlementEvidenceError, match="not denominated in RTC"):
+        reconcile_cash([item], history(row), [bind(item, row)], wallet="alice")
 
 
-def test_inventory_marks_unbindable_rows_without_inventing_payment_semantics():
-    reward = {"type": "reward", "amount": 2, "timestamp": 1}
-    inventory = inventory_history([reward], "alice")
-    assert inventory[0]["bindable"] is False
-    assert inventory[0]["history_sha256"] == history_row_sha256(reward)
-
-
-def test_bound_outgoing_transfer_is_rejected():
-    item = closeout()
-    row = payment()
-    row["type"] = "transfer_out"
-    with pytest.raises(RevenueSettlementEvidenceError, match="outgoing transfer"):
-        reconcile_cash([item], [row], [bind(item, row)], wallet="alice")
-
-
-def test_bound_self_funded_transfer_is_rejected():
-    item = closeout()
-    row = payment()
-    row["from"] = "alice"
-    with pytest.raises(RevenueSettlementEvidenceError, match="self-funded"):
-        reconcile_cash([item], [row], [bind(item, row)], wallet="alice")
-
-
-@pytest.mark.parametrize("wallet", ["", " alice", "alice ", "alice bob", "alice\nbob"])
-def test_wallet_identity_is_strict(wallet):
-    with pytest.raises(RevenueSettlementInputError, match="wallet"):
-        inventory_history([], wallet)
+def test_unmerged_item_cannot_have_payment_bound_as_cash():
+    item = closeout(state="OPEN")
+    row = incoming()
+    with pytest.raises(RevenueSettlementEvidenceError, match="not merged"):
+        reconcile_cash([item], history(row), [bind(item, row)], wallet="alice")
 
 
 def test_binding_unknown_closeout_item_is_rejected():
     item = closeout()
-    row = payment()
+    row = incoming()
     unknown = {
         "repo": "Sponsor/project",
         "pr": 99,
-        "history_sha256s": [history_row_sha256(row)],
+        "history_sha256s": [history_row_sha256(row, "alice")],
     }
     with pytest.raises(RevenueSettlementInputError, match="unknown closeout item"):
-        reconcile_cash([item], [row], [unknown], wallet="alice")
+        reconcile_cash([item], history(row), [unknown], wallet="alice")
 
 
 def test_cash_status_must_start_not_inferred():
     item = closeout()
     item["cash_status"] = "paid"
     with pytest.raises(RevenueSettlementInputError, match="must be not_inferred"):
-        reconcile_cash([item], [], [], wallet="alice")
+        reconcile_cash([item], history(), [], wallet="alice")
 
 
-def test_fingerprint_is_key_order_independent_and_mutation_sensitive():
-    row = payment()
-    reordered = {key: row[key] for key in reversed(list(row))}
-    assert history_row_sha256(row) == history_row_sha256(reordered)
-    changed = dict(row)
-    changed["amount"] = 9
-    assert history_row_sha256(row) != history_row_sha256(changed)
+@pytest.mark.parametrize("wallet", ["", " alice", "alice ", "alice bob", "alice\nbob"])
+def test_wallet_identity_is_strict(wallet):
+    with pytest.raises(RevenueSettlementInputError, match="wallet"):
+        inventory_history(history(wallet="alice"), wallet)
 
 
 def test_summary_counts_only_evidence_backed_amounts():
     first = closeout(pr=7, amount="10")
     second = closeout(pr=8, amount="8")
     third = closeout(pr=9, amount="3")
-    paid = payment(amount=10, tag="1")
-    partial = payment(amount=2.5, tag="2")
+    paid = incoming(amount=10, tag=1)
+    partial = incoming(amount=2.5, tag=2)
     results = reconcile_cash(
         [first, second, third],
-        [paid, partial],
+        history(paid, partial),
         [bind(first, paid), bind(second, partial)],
         wallet="alice",
     )
-    summary = summarize_cash(results)
-    assert summary == {
+    assert summarize_cash(results) == {
         "currency": "RTC",
         "verified_cash_total": "12.5",
         "partial_cash_total": "2.5",
@@ -269,13 +347,56 @@ def test_summary_counts_only_evidence_backed_amounts():
     }
 
 
-def test_boolean_amount_is_rejected():
-    item = closeout(amount=True)
+def test_boolean_and_nonfinite_closeout_amounts_are_rejected():
     with pytest.raises(RevenueSettlementInputError, match="decimal"):
-        reconcile_cash([item], [], [], wallet="alice")
+        reconcile_cash([closeout(amount=True)], history(), [], wallet="alice")
+    with pytest.raises(RevenueSettlementInputError, match="bounded positive"):
+        reconcile_cash([closeout(amount="NaN")], history(), [], wallet="alice")
 
 
-def test_non_finite_amount_is_rejected():
-    item = closeout(amount="NaN")
-    with pytest.raises(RevenueSettlementInputError, match="bounded positive decimal"):
-        reconcile_cash([item], [], [], wallet="alice")
+def test_duplicate_json_keys_are_rejected(tmp_path):
+    path = tmp_path / "evidence.json"
+    path.write_text('{"schema_version":1,"schema_version":1,"items":[]}', encoding="utf-8")
+    with pytest.raises(RevenueSettlementInputError, match="duplicate"):
+        rs._load_json(str(path))
+
+
+def test_lone_surrogate_cannot_escape_canonicalization():
+    row = incoming()
+    row["from"] = "\ud800"
+    with pytest.raises(RevenueSettlementInputError, match="canonical JSON"):
+        history_row_sha256(row, "alice")
+
+
+class FakeResponse:
+    def __init__(self, payload):
+        self.payload = payload
+    def raise_for_status(self):
+        return None
+    def json(self):
+        return self.payload
+
+
+def test_live_fetch_preserves_and_validates_canonical_envelope(monkeypatch):
+    row = incoming()
+    snapshot = history(row)
+    calls = []
+    def fake_get(url, **kwargs):
+        calls.append((url, kwargs))
+        return FakeResponse(snapshot)
+    monkeypatch.setattr(rs._payout_tracker.requests, "get", fake_get)
+    result = rs._fetch_canonical_history("alice", node_url="https://node.example")
+    assert result is snapshot
+    assert calls[0][1]["params"] == {"miner_id": "alice", "limit": 200}
+    assert calls[0][1]["verify"] is True
+
+
+def test_live_fetch_rejects_legacy_bare_array(monkeypatch):
+    row = incoming()
+    monkeypatch.setattr(
+        rs._payout_tracker.requests,
+        "get",
+        lambda *args, **kwargs: FakeResponse([row]),
+    )
+    with pytest.raises(rs.PayoutLookupError, match="canonical history"):
+        rs._fetch_canonical_history("alice", node_url="https://node.example")
