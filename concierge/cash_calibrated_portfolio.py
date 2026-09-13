@@ -1,85 +1,42 @@
 # SPDX-License-Identifier: MIT
+"""Cash-history calibration that reacquires live closeout and wallet authority.
+
+This module never accepts a standalone realized-economics receipt as decision
+input.  Production calibration first rebuilds closeout state from live GitHub,
+queries canonical wallet history, and only then invokes the existing
+``compile_realized_unit_economics`` authority path in-process.
+"""
 from __future__ import annotations
 
 import argparse
 import copy
 import hashlib
-import hmac
 import json
+import os
 import re
-from decimal import Decimal, InvalidOperation, localcontext
-from functools import cmp_to_key
+import stat
+import sys
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Optional, Union
 from urllib.parse import urlsplit
 
+from concierge import realized_unit_economics as rue
+from concierge import revenue_closeout as closeout
+from concierge import revenue_settlement as settlement
 from concierge.opportunity_ranker import OpportunityRankInputError, rank_opportunities
 from concierge.portfolio_allocator import PortfolioInputError, allocate_portfolio
 
 
 class CashCalibrationInputError(ValueError):
-    """Raised when realized-cash calibration evidence is not reliable enough to use."""
+    """Raised when calibration inputs or provider-derived evidence are unreliable."""
 
 
-_SCHEMA_VERSION = 1
 _MAX_JSON_BYTES = 4 * 1024 * 1024
-_MAX_HISTORY_ITEMS = 10_000
 _MAX_TERMINAL_SAMPLES = 10_000
-_MAX_ACTIVE_MINUTES = 525_600
 _RATE_SCALE = 1_000_000
-_HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
-_REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _SEGMENT_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
-_ALLOWED_STATES = frozenset({"OPEN", "CLOSED_UNMERGED", "MERGED", "HEAD_MOVED"})
-_ALLOWED_CASH_STATUS = frozenset(
-    {"verified_paid", "partially_verified", "not_inferred"}
-)
-_TOP_KEYS = frozenset(
-    {
-        "schema_version",
-        "wallet",
-        "history_source",
-        "scope_sha256",
-        "summary",
-        "ranking",
-        "items",
-        "receipt_sha256",
-    }
-)
-_SUMMARY_KEYS = frozenset(
-    {
-        "currency",
-        "verified_cash_total",
-        "active_minutes_total",
-        "realized_rtc_per_hour_estimate",
-        "fully_paid_items",
-        "partially_paid_items",
-        "zero_verified_cash_items",
-        "item_count",
-        "scope_complete",
-        "cash_basis",
-        "effort_basis",
-        "fx_conversion",
-        "accounting_revenue_claim",
-        "tax_claim",
-        "payout_or_transfer_authority",
-    }
-)
-_ITEM_KEYS = frozenset(
-    {
-        "repo",
-        "pr",
-        "state",
-        "cash_status",
-        "verified_cash_rtc",
-        "active_minutes",
-        "realized_rtc_per_hour_estimate",
-        "payment_evidence_sha256s",
-    }
-)
-_RANKING_KEYS = frozenset(
-    {"rank", "repo", "pr", "realized_rtc_per_hour_estimate"}
-)
+_POSITIVE_CASH = frozenset({"verified_paid", "partially_verified"})
 
 
 def _canonical_json(value: Any) -> bytes:
@@ -102,281 +59,40 @@ def _sha256(value: Any) -> str:
     return hashlib.sha256(_canonical_json(value)).hexdigest()
 
 
-def _exact_keys(value: Any, expected: frozenset[str], label: str) -> dict[str, Any]:
-    if type(value) is not dict:
-        raise CashCalibrationInputError(f"{label} must be an object")
-    actual = set(value)
-    if actual != expected:
-        missing = sorted(expected - actual)
-        extra = sorted(actual - expected)
-        detail = []
-        if missing:
-            detail.append("missing " + ",".join(missing))
-        if extra:
-            detail.append("unknown " + ",".join(extra))
-        raise CashCalibrationInputError(
-            f"{label} has invalid fields" + (": " + "; ".join(detail) if detail else "")
-        )
-    return value
-
-
-def _decimal_text(value: Any, label: str, *, nonnegative: bool = True) -> Decimal:
+def _decimal_text(value: Any, label: str) -> Decimal:
     if type(value) is not str or not value or value != value.strip() or len(value) > 128:
         raise CashCalibrationInputError(f"{label} must be a bounded decimal string")
     try:
         parsed = Decimal(value)
     except (InvalidOperation, ValueError) as exc:
         raise CashCalibrationInputError(f"{label} must be a finite decimal string") from exc
-    if not parsed.is_finite() or len(parsed.as_tuple().digits) > 30:
-        raise CashCalibrationInputError(f"{label} must be a bounded finite decimal")
     exponent = parsed.as_tuple().exponent
-    if not isinstance(exponent, int) or abs(exponent) > 18:
+    if (
+        not parsed.is_finite()
+        or len(parsed.as_tuple().digits) > 30
+        or not isinstance(exponent, int)
+        or abs(exponent) > 18
+    ):
         raise CashCalibrationInputError(f"{label} must be a bounded finite decimal")
-    if nonnegative and parsed < 0:
-        raise CashCalibrationInputError(f"{label} must not be negative")
     return parsed
 
 
-def _amount_text(value: Decimal) -> str:
+def _probability(value: Any, label: str) -> Decimal:
+    parsed = _decimal_text(value, label)
+    if parsed < 0 or parsed > 1:
+        raise CashCalibrationInputError(f"{label} must be between 0 and 1")
+    return parsed
+
+
+def _probability_text(value: Decimal) -> str:
     text = format(value, "f")
     if "." in text:
         text = text.rstrip("0").rstrip(".")
-    return "0" if text in {"", "-0"} else text
-
-
-def _ratio_text(cash: Decimal, minutes: int) -> str:
-    with localcontext() as context:
-        context.prec = 36
-        value = (cash * Decimal(60)) / Decimal(minutes)
-    return _amount_text(value)
-
-
-def _history_cmp(left: dict[str, Any], right: dict[str, Any]) -> int:
-    left_cross = left["_verified"] * Decimal(right["active_minutes"])
-    right_cross = right["_verified"] * Decimal(left["active_minutes"])
-    if left_cross > right_cross:
-        return -1
-    if left_cross < right_cross:
-        return 1
-    left_key = (left["repo"].casefold(), left["pr"])
-    right_key = (right["repo"].casefold(), right["pr"])
-    return (left_key > right_key) - (left_key < right_key)
-
-
-def _validate_economics_receipt(economics: Any) -> tuple[str, list[dict[str, Any]]]:
-    packet = _exact_keys(economics, _TOP_KEYS, "realized economics receipt")
-    if packet.get("schema_version") != _SCHEMA_VERSION:
-        raise CashCalibrationInputError("realized economics schema_version must be 1")
-    receipt = packet.get("receipt_sha256")
-    if type(receipt) is not str or not _HEX64_RE.fullmatch(receipt):
-        raise CashCalibrationInputError("realized economics receipt_sha256 is invalid")
-    unsigned = {key: value for key, value in packet.items() if key != "receipt_sha256"}
-    expected_receipt = _sha256(unsigned)
-    if not hmac.compare_digest(receipt, expected_receipt):
-        raise CashCalibrationInputError("realized economics receipt integrity check failed")
-
-    wallet = packet.get("wallet")
-    if (
-        type(wallet) is not str
-        or not wallet
-        or wallet != wallet.strip()
-        or any(char.isspace() or not char.isprintable() for char in wallet)
-    ):
-        raise CashCalibrationInputError("realized economics wallet is invalid")
-    if packet.get("history_source") not in {"queried_wallet", "captured_wallet"}:
-        raise CashCalibrationInputError("realized economics history_source is invalid")
-    scope_sha = packet.get("scope_sha256")
-    if type(scope_sha) is not str or not _HEX64_RE.fullmatch(scope_sha):
-        raise CashCalibrationInputError("realized economics scope_sha256 is invalid")
-
-    summary = _exact_keys(packet.get("summary"), _SUMMARY_KEYS, "realized economics summary")
-    if (
-        summary.get("currency") != "RTC"
-        or summary.get("scope_complete") is not True
-        or summary.get("cash_basis") != "revenue_settlement_wallet_evidence"
-        or summary.get("effort_basis") != "operator_active_minutes"
-        or summary.get("fx_conversion") is not False
-        or summary.get("accounting_revenue_claim") is not False
-        or summary.get("tax_claim") is not False
-        or summary.get("payout_or_transfer_authority") is not False
-    ):
-        raise CashCalibrationInputError("realized economics authority summary is incompatible")
-
-    items = packet.get("items")
-    if (
-        type(items) is not list
-        or not items
-        or len(items) > _MAX_HISTORY_ITEMS
-    ):
-        raise CashCalibrationInputError("realized economics items must be a non-empty bounded list")
-
-    normalized: list[dict[str, Any]] = []
-    identities: set[tuple[str, int]] = set()
-    evidence_seen: set[str] = set()
-    total_cash = Decimal("0")
-    total_minutes = 0
-    full = partial = zero_cash = 0
-
-    for index, raw in enumerate(items):
-        row = _exact_keys(raw, _ITEM_KEYS, f"realized economics items[{index}]")
-        repo = row.get("repo")
-        pr = row.get("pr")
-        if type(repo) is not str or not _REPO_RE.fullmatch(repo):
-            raise CashCalibrationInputError(f"realized economics items[{index}].repo is invalid")
-        owner, name = repo.split("/", 1)
-        if owner in {".", ".."} or name in {".", ".."}:
-            raise CashCalibrationInputError(f"realized economics items[{index}].repo is invalid")
-        if isinstance(pr, bool) or not isinstance(pr, int) or pr <= 0:
-            raise CashCalibrationInputError(f"realized economics items[{index}].pr is invalid")
-        identity = (repo.casefold(), pr)
-        if identity in identities:
-            raise CashCalibrationInputError(
-                f"duplicate realized economics identity: {repo}#{pr}"
-            )
-        identities.add(identity)
-
-        state = row.get("state")
-        status = row.get("cash_status")
-        if state not in _ALLOWED_STATES or status not in _ALLOWED_CASH_STATUS:
-            raise CashCalibrationInputError(
-                f"realized economics items[{index}] has invalid state/status"
-            )
-
-        verified = _decimal_text(
-            row.get("verified_cash_rtc"),
-            f"realized economics items[{index}].verified_cash_rtc",
-        )
-        minutes = row.get("active_minutes")
-        if (
-            isinstance(minutes, bool)
-            or not isinstance(minutes, int)
-            or minutes <= 0
-            or minutes > _MAX_ACTIVE_MINUTES
-        ):
-            raise CashCalibrationInputError(
-                f"realized economics items[{index}].active_minutes is invalid"
-            )
-        evidence = row.get("payment_evidence_sha256s")
-        if type(evidence) is not list:
-            raise CashCalibrationInputError(
-                f"realized economics items[{index}].payment_evidence_sha256s is invalid"
-            )
-        for fingerprint in evidence:
-            if type(fingerprint) is not str or not _HEX64_RE.fullmatch(fingerprint):
-                raise CashCalibrationInputError(
-                    f"realized economics items[{index}] has invalid payment evidence"
-                )
-            if fingerprint in evidence_seen:
-                raise CashCalibrationInputError(
-                    "payment evidence cannot support multiple realized economics items"
-                )
-            evidence_seen.add(fingerprint)
-
-        if status == "verified_paid":
-            if state != "MERGED" or verified <= 0 or not evidence:
-                raise CashCalibrationInputError(
-                    f"realized economics items[{index}] verified_paid is inconsistent"
-                )
-            full += 1
-        elif status == "partially_verified":
-            if state != "MERGED" or verified <= 0 or not evidence:
-                raise CashCalibrationInputError(
-                    f"realized economics items[{index}] partially_verified is inconsistent"
-                )
-            partial += 1
-        else:
-            if verified != 0 or evidence:
-                raise CashCalibrationInputError(
-                    f"realized economics items[{index}] not_inferred is inconsistent"
-                )
-            zero_cash += 1
-
-        ratio = row.get("realized_rtc_per_hour_estimate")
-        if type(ratio) is not str or ratio != _ratio_text(verified, minutes):
-            raise CashCalibrationInputError(
-                f"realized economics items[{index}] RTC/hour estimate is inconsistent"
-            )
-        total_cash += verified
-        total_minutes += minutes
-        normalized.append(
-            {
-                "repo": repo,
-                "pr": pr,
-                "state": state,
-                "cash_status": status,
-                "verified_cash_rtc": _amount_text(verified),
-                "active_minutes": minutes,
-                "realized_rtc_per_hour_estimate": ratio,
-                "payment_evidence_sha256s": list(evidence),
-                "_verified": verified,
-            }
-        )
-
-    keys = [(row["repo"].casefold(), row["pr"]) for row in normalized]
-    if keys != sorted(keys):
-        raise CashCalibrationInputError("realized economics items are not canonically ordered")
-
-    normalized_scope = {
-        "cash": [
-            {
-                "repo": row["repo"],
-                "pr": row["pr"],
-                "state": row["state"],
-                "cash_status": row["cash_status"],
-                "verified_cash_rtc": row["verified_cash_rtc"],
-                "payment_evidence_sha256s": row["payment_evidence_sha256s"],
-            }
-            for row in normalized
-        ],
-        "effort": [
-            {
-                "repo": row["repo"],
-                "pr": row["pr"],
-                "active_minutes": row["active_minutes"],
-            }
-            for row in normalized
-        ],
-    }
-    if not hmac.compare_digest(scope_sha, _sha256(normalized_scope)):
-        raise CashCalibrationInputError("realized economics scope integrity check failed")
-
-    if (
-        summary.get("item_count") != len(normalized)
-        or summary.get("fully_paid_items") != full
-        or summary.get("partially_paid_items") != partial
-        or summary.get("zero_verified_cash_items") != zero_cash
-        or summary.get("active_minutes_total") != total_minutes
-        or summary.get("verified_cash_total") != _amount_text(total_cash)
-        or summary.get("realized_rtc_per_hour_estimate")
-        != _ratio_text(total_cash, total_minutes)
-    ):
-        raise CashCalibrationInputError("realized economics summary disagrees with item evidence")
-
-    ranking = packet.get("ranking")
-    if type(ranking) is not list or len(ranking) != len(normalized):
-        raise CashCalibrationInputError("realized economics ranking is invalid")
-    expected_ranked = sorted(normalized, key=cmp_to_key(_history_cmp))
-    for rank, (actual, source) in enumerate(zip(ranking, expected_ranked), start=1):
-        actual_row = _exact_keys(
-            actual, _RANKING_KEYS, f"realized economics ranking[{rank - 1}]"
-        )
-        expected = {
-            "rank": rank,
-            "repo": source["repo"],
-            "pr": source["pr"],
-            "realized_rtc_per_hour_estimate": source[
-                "realized_rtc_per_hour_estimate"
-            ],
-        }
-        if actual_row != expected:
-            raise CashCalibrationInputError(
-                "realized economics ranking disagrees with item evidence"
-            )
-
-    return receipt, normalized
+    return text or "0"
 
 
 def _github_issue_repo(source: Any) -> Optional[tuple[str, str]]:
+    """Return display + casefolded repo only for a canonical GitHub issue URL."""
     if type(source) is not str or not source or source != source.strip():
         return None
     try:
@@ -408,75 +124,89 @@ def _github_issue_repo(source: Any) -> Optional[tuple[str, str]]:
         or issue.startswith("0")
     ):
         return None
-    number = int(issue)
-    if number <= 0:
+    if int(issue) <= 0:
         return None
     display = f"{owner}/{name}"
     return display, display.casefold()
 
 
-def _history_stats(items: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+def _history_stats(items: Any) -> dict[str, dict[str, Any]]:
+    """Project provider-reacquired economics into dimensionless terminal counts."""
+    if type(items) is not list or not items or len(items) > _MAX_TERMINAL_SAMPLES:
+        raise CashCalibrationInputError("compiled economics items are not a bounded list")
     stats: dict[str, dict[str, Any]] = {}
-    for row in items:
-        key = row["repo"].casefold()
+    identities: set[tuple[str, int]] = set()
+    for index, row in enumerate(items):
+        if type(row) is not dict:
+            raise CashCalibrationInputError(f"compiled economics item {index} is malformed")
+        repo = row.get("repo")
+        pr = row.get("pr")
+        if type(repo) is not str or "/" not in repo:
+            raise CashCalibrationInputError(f"compiled economics item {index} repo is invalid")
+        if isinstance(pr, bool) or not isinstance(pr, int) or pr <= 0:
+            raise CashCalibrationInputError(f"compiled economics item {index} pr is invalid")
+        identity = (repo.casefold(), pr)
+        if identity in identities:
+            raise CashCalibrationInputError("compiled economics contains duplicate identity")
+        identities.add(identity)
+
+        state = row.get("state")
+        cash_status = row.get("cash_status")
         entry = stats.setdefault(
-            key,
+            repo.casefold(),
             {
-                "repo": row["repo"],
+                "repo": repo,
                 "cash_observed_terminal": 0,
                 "closed_unmerged_zero_cash_terminal": 0,
                 "unresolved": 0,
             },
         )
-        if row["cash_status"] in {"verified_paid", "partially_verified"}:
+        if cash_status in _POSITIVE_CASH:
+            if state != "MERGED":
+                raise CashCalibrationInputError(
+                    "compiled economics cannot report cash-positive unmerged history"
+                )
             entry["cash_observed_terminal"] += 1
-        elif (
-            row["state"] == "CLOSED_UNMERGED"
-            and row["cash_status"] == "not_inferred"
-        ):
+        elif cash_status == "not_inferred" and state == "CLOSED_UNMERGED":
             entry["closed_unmerged_zero_cash_terminal"] += 1
-        else:
+        elif cash_status == "not_inferred" and state in {"OPEN", "HEAD_MOVED", "MERGED"}:
             entry["unresolved"] += 1
+        else:
+            raise CashCalibrationInputError(
+                f"compiled economics item {index} has unsupported terminal semantics"
+            )
     return stats
 
 
 def _rate_floor(positive: int, total: int) -> tuple[Decimal, str]:
     scaled = (positive * _RATE_SCALE) // total
     value = Decimal(scaled) / Decimal(_RATE_SCALE)
-    text = format(value, "f")
-    if "." in text:
-        text = text.rstrip("0").rstrip(".")
-    return value, text or "0"
-
-
-def _probability(value: Any, label: str) -> Decimal:
-    parsed = _decimal_text(value, label)
-    if parsed < 0 or parsed > 1:
-        raise CashCalibrationInputError(f"{label} must be between 0 and 1")
-    return parsed
-
-
-def _probability_text(value: Decimal) -> str:
-    text = format(value, "f")
-    if "." in text:
-        text = text.rstrip("0").rstrip(".")
-    return text or "0"
+    return value, _probability_text(value)
 
 
 def allocate_cash_calibrated_portfolio(
     candidates: list[dict[str, Any]],
     skills: list[str],
     capacity_hours: Union[str, int, Decimal],
-    economics_receipt: dict[str, Any],
+    closeout_manifest_items: list[dict[str, Any]],
+    payment_bindings: list[dict[str, Any]],
+    effort_log: dict[str, Any],
     *,
+    wallet: str,
     saturation_threshold: int = 4,
     minimum_terminal_samples: int = 2,
+    max_closeout_pages: int = 10,
 ) -> dict[str, Any]:
-    """Dampen operator win estimates with settled-cash history, then allocate exactly.
+    """Reacquire live provider evidence, dampen win estimates, allocate exactly.
 
-    The realized RTC amounts are never combined with USD rewards.  History contributes
-    only a dimensionless same-repository terminal cash-observation rate.  That rate
-    may cap an operator probability; it can never increase one.
+    Authority path, in order:
+      1. ``revenue_closeout.build_closeout_queue`` re-reads current GitHub state.
+      2. ``revenue_settlement._query_canonical_history`` re-reads wallet history.
+      3. ``compile_realized_unit_economics`` reconciles those live observations.
+      4. only the resulting same-repository terminal counts may lower probability.
+
+    No standalone economics receipt/history/closeout result can be passed into this
+    public function.  RTC amounts never enter USD reward arithmetic.
     """
     if (
         isinstance(minimum_terminal_samples, bool)
@@ -487,8 +217,47 @@ def allocate_cash_calibrated_portfolio(
         raise CashCalibrationInputError(
             f"minimum_terminal_samples must be an integer in 1..{_MAX_TERMINAL_SAMPLES}"
         )
-    receipt_sha, history_items = _validate_economics_receipt(economics_receipt)
-    history = _history_stats(history_items)
+    if (
+        isinstance(max_closeout_pages, bool)
+        or not isinstance(max_closeout_pages, int)
+        or max_closeout_pages <= 0
+        or max_closeout_pages > 100
+    ):
+        raise CashCalibrationInputError("max_closeout_pages must be an integer in 1..100")
+
+    # Critical trust boundary: both provider observations are reacquired here.
+    # Callers supply scope/bindings/effort, never the observed PR lifecycle or
+    # wallet-history result that can change calibration.
+    live_closeout = closeout.build_closeout_queue(
+        closeout_manifest_items,
+        max_pages=max_closeout_pages,
+    )
+    live_history, history_wallet = settlement._query_canonical_history(wallet)
+    economics = rue.compile_realized_unit_economics(
+        live_closeout,
+        live_history,
+        payment_bindings,
+        effort_log,
+        wallet=wallet,
+        history_wallet=history_wallet,
+        history_source="queried_wallet",
+    )
+    if not rue.verify_receipt(economics):
+        raise CashCalibrationInputError("in-process realized economics receipt failed integrity")
+    summary = economics.get("summary")
+    if (
+        type(summary) is not dict
+        or summary.get("currency") != "RTC"
+        or summary.get("scope_complete") is not True
+        or summary.get("cash_basis") != "revenue_settlement_wallet_evidence"
+        or summary.get("effort_basis") != "operator_active_minutes"
+        or summary.get("fx_conversion") is not False
+        or summary.get("accounting_revenue_claim") is not False
+        or summary.get("tax_claim") is not False
+        or summary.get("payout_or_transfer_authority") is not False
+    ):
+        raise CashCalibrationInputError("in-process economics authority summary is incompatible")
+    history = _history_stats(economics.get("items"))
 
     try:
         initial = rank_opportunities(
@@ -499,34 +268,30 @@ def allocate_cash_calibrated_portfolio(
     except OpportunityRankInputError as exc:
         raise CashCalibrationInputError(str(exc)) from exc
     ranked = initial.get("ranked")
-    excluded = initial.get("excluded")
-    if type(ranked) is not list or type(excluded) is not list:
+    if type(ranked) is not list or type(initial.get("excluded")) is not list:
         raise CashCalibrationInputError("canonical opportunity ranker returned invalid output")
 
     adjusted = copy.deepcopy(candidates)
     calibration: list[dict[str, Any]] = []
     dampened = 0
-
     for row in ranked:
         if type(row) is not dict:
             raise CashCalibrationInputError("canonical opportunity ranker returned malformed row")
         index = row.get("input_index")
-        source = row.get("canonical_source_url")
         if (
             isinstance(index, bool)
             or not isinstance(index, int)
             or index < 0
             or index >= len(adjusted)
+            or type(adjusted[index]) is not dict
         ):
             raise CashCalibrationInputError("canonical opportunity ranker returned invalid index")
-        if type(adjusted[index]) is not dict:
-            raise CashCalibrationInputError("ranked candidate is not an object")
-        original_text = row.get("estimated_win_probability")
         original = _probability(
-            original_text, "ranked estimated_win_probability"
+            row.get("estimated_win_probability"),
+            "ranked estimated_win_probability",
         )
+        source = row.get("canonical_source_url")
         source_repo = _github_issue_repo(source)
-
         audit: dict[str, Any] = {
             "input_index": index,
             "canonical_source_url": source,
@@ -544,7 +309,6 @@ def allocate_cash_calibrated_portfolio(
         if source_repo is None:
             calibration.append(audit)
             continue
-
         stats = history.get(source_repo[1])
         if stats is None:
             audit["disposition"] = "NO_MATCHING_HISTORY"
@@ -552,21 +316,17 @@ def allocate_cash_calibrated_portfolio(
             continue
         positive = stats["cash_observed_terminal"]
         negative = stats["closed_unmerged_zero_cash_terminal"]
-        unresolved = stats["unresolved"]
         terminal = positive + negative
         audit.update(
-            {
-                "terminal_sample_count": terminal,
-                "cash_observed_terminal_count": positive,
-                "closed_unmerged_zero_cash_terminal_count": negative,
-                "unresolved_history_count": unresolved,
-            }
+            terminal_sample_count=terminal,
+            cash_observed_terminal_count=positive,
+            closed_unmerged_zero_cash_terminal_count=negative,
+            unresolved_history_count=stats["unresolved"],
         )
         if terminal < minimum_terminal_samples:
             audit["disposition"] = "INSUFFICIENT_TERMINAL_HISTORY"
             calibration.append(audit)
             continue
-
         cap, cap_text = _rate_floor(positive, terminal)
         calibrated = min(original, cap)
         calibrated_text = _probability_text(calibrated)
@@ -591,8 +351,8 @@ def allocate_cash_calibrated_portfolio(
         raise
 
     payload: dict[str, Any] = {
-        "schema": "cash-calibrated-opportunity-portfolio/v1",
-        "economics_receipt_sha256": receipt_sha,
+        "schema": "cash-calibrated-opportunity-portfolio/v2",
+        "economics_receipt_sha256": economics["receipt_sha256"],
         "minimum_terminal_samples": minimum_terminal_samples,
         "calibrated_candidate_count": len(calibration),
         "dampened_candidate_count": dampened,
@@ -600,8 +360,12 @@ def allocate_cash_calibrated_portfolio(
         "portfolio": portfolio,
         "authority": {
             "eligibility": "canonical_opportunity_ranker",
-            "cash_history": "realized_unit_economics_schema_and_self_integrity_only",
-            "cash_evidence_authority": "inherited_not_reacquired",
+            "closeout_state": "live_github_reacquired_in_process",
+            "wallet_history": "canonical_provider_reacquired_in_process",
+            "economics": "compiled_in_process_from_live_provider_observations",
+            "standalone_economics_receipt_accepted": False,
+            "captured_wallet_history_accepted": False,
+            "cash_evidence_authority": "reacquired_not_inherited",
             "calibration": "same_repo_terminal_cash_observation_probability_cap_only",
             "currency_conversion": False,
             "rtc_amount_used_in_usd_math": False,
@@ -623,82 +387,129 @@ def format_summary(result: dict[str, Any]) -> str:
         f"calibrated={result.get('calibrated_candidate_count', 0)} "
         f"dampened={result.get('dampened_candidate_count', 0)} "
         f"estimated_portfolio_ev_usd={portfolio.get('estimated_portfolio_expected_value_usd', '0')} "
-        "cash_claim=false currency_conversion=false"
+        "live_closeout=true live_wallet=true cash_claim=false currency_conversion=false"
     )
 
 
-def _load_json(path: str) -> Any:
-    def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        for key, value in pairs:
-            if key in result:
-                raise CashCalibrationInputError(
-                    f"{path} contains duplicate JSON key {key!r}"
-                )
-            result[key] = value
-        return result
+def _duplicate_safe_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise CashCalibrationInputError(f"duplicate JSON key {key!r}")
+        result[key] = value
+    return result
 
+
+def _read_bounded(path: str) -> bytes:
     if path == "-":
-        import sys
-        text = sys.stdin.read(_MAX_JSON_BYTES + 1)
-    else:
-        source = Path(path)
-        if source.stat().st_size > _MAX_JSON_BYTES:
-            raise CashCalibrationInputError(f"{path} is too large")
-        text = source.read_text(encoding="utf-8")
-    if len(text.encode("utf-8")) > _MAX_JSON_BYTES:
-        raise CashCalibrationInputError(f"{path} is too large")
+        data = sys.stdin.buffer.read(_MAX_JSON_BYTES + 1)
+        if len(data) > _MAX_JSON_BYTES:
+            raise CashCalibrationInputError("stdin JSON is too large")
+        return data
+
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    if hasattr(os, "O_NONBLOCK"):
+        flags |= os.O_NONBLOCK
+    fd = os.open(path, flags)
     try:
-        return json.loads(text, object_pairs_hook=unique_object)
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode):
+            raise CashCalibrationInputError(f"{path} must be a regular file")
+        if info.st_size > _MAX_JSON_BYTES:
+            raise CashCalibrationInputError(f"{path} is too large")
+        chunks: list[bytes] = []
+        remaining = _MAX_JSON_BYTES + 1
+        while remaining:
+            chunk = os.read(fd, min(65536, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        data = b"".join(chunks)
+        if len(data) > _MAX_JSON_BYTES:
+            raise CashCalibrationInputError(f"{path} grew beyond the size limit")
+        return data
+    finally:
+        os.close(fd)
+
+
+def _load_json(path: str) -> Any:
+    raw = _read_bounded(path)
+    try:
+        text = raw.decode("utf-8", errors="strict")
+        return json.loads(
+            text,
+            object_pairs_hook=_duplicate_safe_object,
+            parse_constant=lambda value: (_ for _ in ()).throw(
+                CashCalibrationInputError(f"non-finite JSON value {value} is not allowed")
+            ),
+        )
     except CashCalibrationInputError:
         raise
-    except (UnicodeError, json.JSONDecodeError) as exc:
-        raise CashCalibrationInputError(f"{path} is not valid bounded UTF-8 JSON") from exc
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CashCalibrationInputError(f"{path} is not valid strict UTF-8 JSON") from exc
+
+
+def _schema_items(payload: Any, label: str) -> list[dict[str, Any]]:
+    if type(payload) is not dict or payload.get("schema_version") != 1:
+        raise CashCalibrationInputError(f"{label} must be a schema_version 1 object")
+    items = payload.get("items")
+    if type(items) is not list:
+        raise CashCalibrationInputError(f"{label}.items must be a list")
+    return items
 
 
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m concierge.cash_calibrated_portfolio",
         description=(
-            "Dampen operator win estimates with evidence-bound terminal cash history "
-            "without crossing RTC/USD currencies, then run the canonical exact allocator."
+            "Reacquire live GitHub closeout + canonical wallet history, then only "
+            "dampen operator win estimates before exact portfolio allocation."
         ),
     )
     parser.add_argument("request", help="portfolio request JSON path, or - for stdin")
-    parser.add_argument("economics", help="realized-unit-economics JSON path")
-    parser.add_argument(
-        "--minimum-terminal-samples",
-        type=int,
-        default=2,
-        help="minimum same-repo terminal outcomes before a cash-history cap applies",
-    )
-    parser.add_argument(
-        "--saturation-threshold",
-        type=int,
-        default=4,
-        help="forwarded to canonical opportunity ranking",
-    )
-    parser.add_argument("--summary", action="store_true", help="emit one-line summary")
+    parser.add_argument("manifest", help="revenue-closeout manifest JSON path")
+    parser.add_argument("bindings", help="payment bindings JSON path")
+    parser.add_argument("effort", help="operator effort JSON path")
+    parser.add_argument("--wallet", required=True, help="canonical recipient wallet")
+    parser.add_argument("--minimum-terminal-samples", type=int, default=2)
+    parser.add_argument("--saturation-threshold", type=int, default=4)
+    parser.add_argument("--max-closeout-pages", type=int, default=10)
+    parser.add_argument("--summary", action="store_true")
     args = parser.parse_args(argv)
 
-    if args.request == "-" and args.economics == "-":
-        parser.error("request and economics cannot both read from stdin")
+    if [args.request, args.manifest, args.bindings, args.effort].count("-") > 1:
+        parser.error("at most one input may read from stdin")
     try:
         request = _load_json(args.request)
-        economics = _load_json(args.economics)
-        if type(request) is not dict or type(economics) is not dict:
-            raise CashCalibrationInputError("request and economics JSON must be objects")
+        manifest = _load_json(args.manifest)
+        bindings = _load_json(args.bindings)
+        effort = _load_json(args.effort)
+        if type(request) is not dict:
+            raise CashCalibrationInputError("request must be an object")
         result = allocate_cash_calibrated_portfolio(
             request.get("candidates"),
             request.get("skills", []),
             request.get("capacity_hours"),
-            economics,
+            _schema_items(manifest, "manifest"),
+            _schema_items(bindings, "bindings"),
+            effort,
+            wallet=args.wallet,
             saturation_threshold=args.saturation_threshold,
             minimum_terminal_samples=args.minimum_terminal_samples,
+            max_closeout_pages=args.max_closeout_pages,
         )
     except (
         OSError,
         CashCalibrationInputError,
+        closeout.RevenueCloseoutError,
+        closeout.RevenueCloseoutInputError,
+        settlement.PayoutLookupError,
+        settlement.RevenueSettlementInputError,
+        settlement.RevenueSettlementEvidenceError,
+        rue.RealizedUnitEconomicsInputError,
         OpportunityRankInputError,
         PortfolioInputError,
     ) as exc:
