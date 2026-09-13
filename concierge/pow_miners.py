@@ -215,7 +215,9 @@ def query_node_rpc(address: str, base_url: str = NODE_RPC_URL, timeout: int = 5)
             }
             if not resp.ok:
                 payload["errors"].append(f"{key}: HTTP {resp.status_code}")
-            if isinstance(data, dict) and data.get("error"):
+            if not isinstance(data, dict):
+                payload["errors"].append(f"{key}: response payload was not an object")
+            elif data.get("error"):
                 payload["errors"].append(f"{key}: {data['error']}")
         except requests.RequestException as exc:
             payload["results"][key] = {"ok": False, "status_code": None, "error": str(exc)}
