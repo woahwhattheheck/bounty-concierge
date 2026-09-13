@@ -177,7 +177,8 @@ def fuzzy_match(question, entries=None):
         (matched_key, answer, score) where score is 0.0-1.0.
         If no entries exist, returns ("", "", 0.0).
     """
-    entries = entries or FAQ_ENTRIES
+    if entries is None:
+        entries = FAQ_ENTRIES
     if not entries:
         return ("", "", 0.0)
 
