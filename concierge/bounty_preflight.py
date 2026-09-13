@@ -170,6 +170,7 @@ def collect_issue_context(
         comments_truncated = True
 
     return {
+        "title": issue.get("title") if issue.get("title") is not None else "",
         "body": issue.get("body") if issue.get("body") is not None else "",
         "labels": issue.get("labels") if issue.get("labels") is not None else [],
         "attempt_count": len(claimant_logins),
@@ -209,6 +210,7 @@ def preflight_bounty(
         audit["search_truncated"] = True
 
     snapshot = {
+        "title": context["title"],
         "body": context["body"],
         "labels": context["labels"],
         "attempt_count": context["attempt_count"],
