@@ -1,16 +1,9 @@
 # SPDX-License-Identifier: MIT
 """Evidence-bound cash reconciliation for the paid-work closeout queue.
 
-This module composes with :mod:`concierge.revenue_closeout`. A merge, an
-advertised bounty amount, or a settlement follow-up URL is never treated as
-proof of payment. Cash becomes ``verified_paid`` only when the operator binds
-one or more exact wallet-history rows to one merged closeout item and those
-rows independently validate against the expected wallet and amount.
-
-The binding uses a SHA-256 fingerprint of the complete canonical history row,
-not heuristics such as "same amount near the merge time". That makes the
-operator's evidence selection explicit and replayable while keeping this
-module read-only with respect to payment providers.
+Merge state never proves payment. Cash is verified only when an operator binds
+exact wallet-history rows (by SHA-256 of canonical JSON) to a merged closeout
+item and those rows validate as incoming, confirmed RTC for the expected wallet.
 """
 
 from __future__ import annotations
@@ -29,22 +22,21 @@ from concierge.payout_tracker import PayoutLookupError, check_history
 _SCHEMA_VERSION = 1
 _MAX_JSON_BYTES = 4 * 1024 * 1024
 _MAX_ITEMS = 10_000
-_MAX_DECIMAL_CHARS = 64
-_MAX_DECIMAL_DIGITS = 30
-_MAX_DECIMAL_EXPONENT = 18
+_MAX_BOUND_ROWS = 100
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-_TERMINAL_STATUSES = frozenset({"confirmed"})
-_IN_FLIGHT_STATUSES = frozenset({"pending", "confirming"})
-_FAILED_STATUSES = frozenset({"failed"})
+_ALLOWED_STATES = frozenset({"OPEN", "CLOSED_UNMERGED", "MERGED", "HEAD_MOVED"})
+_IN_FLIGHT = frozenset({"pending", "confirming"})
+_TERMINAL = frozenset({"confirmed"})
+_FAILED = frozenset({"failed"})
 
 
 class RevenueSettlementInputError(ValueError):
-    """Raised when reconciliation input is malformed or ambiguous."""
+    """Malformed or ambiguous operator/provider input."""
 
 
 class RevenueSettlementEvidenceError(RuntimeError):
-    """Raised when bound payout evidence does not prove the claimed cash state."""
+    """Bound evidence does not prove the claimed cash state."""
 
 
 def _canonical_json(value: Any) -> bytes:
@@ -64,17 +56,16 @@ def _canonical_json(value: Any) -> bytes:
 
 
 def history_row_sha256(row: dict[str, Any]) -> str:
-    """Return the evidence identity for one exact wallet-history row."""
     if not isinstance(row, dict):
         raise RevenueSettlementInputError("wallet history row must be an object")
     return hashlib.sha256(_canonical_json(row)).hexdigest()
 
 
 def _decimal(value: Any, *, field: str, positive: bool = True) -> Decimal:
-    if isinstance(value, bool) or not isinstance(value, (str, int, Decimal, float)):
+    if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
         raise RevenueSettlementInputError(f"{field} must be a decimal")
     source = str(value)
-    if len(source) > _MAX_DECIMAL_CHARS:
+    if len(source) > 64:
         raise RevenueSettlementInputError(f"{field} representation is too large")
     try:
         amount = Decimal(source)
@@ -83,9 +74,9 @@ def _decimal(value: Any, *, field: str, positive: bool = True) -> Decimal:
     exponent = amount.as_tuple().exponent
     if (
         not amount.is_finite()
-        or len(amount.as_tuple().digits) > _MAX_DECIMAL_DIGITS
+        or len(amount.as_tuple().digits) > 30
         or not isinstance(exponent, int)
-        or abs(exponent) > _MAX_DECIMAL_EXPONENT
+        or abs(exponent) > 18
         or (positive and amount <= 0)
     ):
         raise RevenueSettlementInputError(f"{field} must be a bounded positive decimal")
@@ -94,26 +85,7 @@ def _decimal(value: Any, *, field: str, positive: bool = True) -> Decimal:
 
 def _amount_text(amount: Decimal) -> str:
     text = format(amount, "f")
-    if "." in text:
-        text = text.rstrip("0").rstrip(".")
-    return text or "0"
-
-
-def _repo_and_pr(item: Any) -> tuple[str, int]:
-    if not isinstance(item, dict):
-        raise RevenueSettlementInputError("closeout item must be an object")
-    repo = item.get("repo")
-    pr = item.get("pr")
-    if (
-        not isinstance(repo, str)
-        or not _REPO_RE.fullmatch(repo)
-        or repo.split("/", 1)[0] in {".", ".."}
-        or repo.split("/", 1)[1] in {".", ".."}
-    ):
-        raise RevenueSettlementInputError("repo must be in owner/name form")
-    if isinstance(pr, bool) or not isinstance(pr, int) or pr <= 0:
-        raise RevenueSettlementInputError("pr must be a positive integer")
-    return repo, pr
+    return text.rstrip("0").rstrip(".") if "." in text else text
 
 
 def _wallet(value: Any) -> str:
@@ -127,179 +99,229 @@ def _wallet(value: Any) -> str:
     return value
 
 
+def _identity(raw: Any) -> tuple[str, int]:
+    if not isinstance(raw, dict):
+        raise RevenueSettlementInputError("item must be an object")
+    repo = raw.get("repo")
+    pr = raw.get("pr")
+    if not isinstance(repo, str) or not _REPO_RE.fullmatch(repo):
+        raise RevenueSettlementInputError("repo must be in owner/name form")
+    owner, name = repo.split("/", 1)
+    if owner in {".", ".."} or name in {".", ".."}:
+        raise RevenueSettlementInputError("repo must not contain dot path segments")
+    if isinstance(pr, bool) or not isinstance(pr, int) or pr <= 0:
+        raise RevenueSettlementInputError("pr must be a positive integer")
+    return repo, pr
+
+
+def _history_index(history: Any) -> dict[str, dict[str, Any]]:
+    if not isinstance(history, list) or len(history) > _MAX_ITEMS:
+        raise RevenueSettlementInputError("wallet history must be a bounded list")
+    indexed: dict[str, dict[str, Any]] = {}
+    for row in history:
+        if not isinstance(row, dict):
+            raise RevenueSettlementInputError("wallet history row must be an object")
+        fingerprint = history_row_sha256(row)
+        if fingerprint in indexed:
+            raise RevenueSettlementEvidenceError(
+                "wallet history contains duplicate indistinguishable rows"
+            )
+        indexed[fingerprint] = row
+    return indexed
+
+
 def _history_amount(row: dict[str, Any]) -> Decimal:
-    if "amount_rtc" in row and "amount" in row:
-        legacy = _decimal(row["amount_rtc"], field="history amount_rtc")
-        canonical = _decimal(row["amount"], field="history amount")
-        if legacy != canonical:
+    if "amount" in row and "amount_rtc" in row:
+        left = _decimal(row["amount"], field="history amount")
+        right = _decimal(row["amount_rtc"], field="history amount_rtc")
+        if left != right:
             raise RevenueSettlementEvidenceError(
                 "wallet history row contains conflicting amount fields"
             )
-        return canonical
-    if "amount_rtc" in row:
-        return _decimal(row["amount_rtc"], field="history amount_rtc")
+        return left
     if "amount" in row:
         return _decimal(row["amount"], field="history amount")
+    if "amount_rtc" in row:
+        return _decimal(row["amount_rtc"], field="history amount_rtc")
     raise RevenueSettlementEvidenceError("wallet history row omitted amount")
 
 
-def _history_recipient(row: dict[str, Any]) -> str:
-    values = []
-    for key in ("to", "to_addr", "recipient", "wallet"):
+def _one_identity(
+    row: dict[str, Any],
+    keys: tuple[str, ...],
+    *,
+    kind: str,
+    required: bool,
+) -> str | None:
+    values: list[str] = []
+    for key in keys:
         if key not in row:
             continue
         value = row[key]
         if type(value) is not str or not value:
             raise RevenueSettlementEvidenceError(
-                "wallet history row contains malformed recipient"
+                f"wallet history row contains malformed {kind}"
             )
         values.append(value)
     if not values:
-        raise RevenueSettlementEvidenceError(
-            "wallet history row omitted recipient identity"
-        )
+        if required:
+            raise RevenueSettlementEvidenceError(
+                f"wallet history row omitted {kind} identity"
+            )
+        return None
     if len(set(values)) != 1:
         raise RevenueSettlementEvidenceError(
-            "wallet history row contains conflicting recipient identities"
+            f"wallet history row contains conflicting {kind} identities"
         )
     return values[0]
 
 
 def _history_status(row: dict[str, Any]) -> str:
-    """Return a conservative settlement state for one provider history row."""
     if "status" not in row:
-        # Current RustChain confirmed transfer rows omit status; in-flight rows
-        # carry status. This contract is already enforced by payout_tracker.
+        # Existing payout_tracker contract: confirmed current rows omit status;
+        # in-flight current rows carry pending/confirming.
         return "confirmed"
     status = row["status"]
     if type(status) is not str:
         raise RevenueSettlementEvidenceError(
             "wallet history row contains malformed status"
         )
-    normalized = status.strip().lower()
-    if normalized in _TERMINAL_STATUSES:
+    status = status.strip().lower()
+    if status in _TERMINAL:
         return "confirmed"
-    if normalized in _IN_FLIGHT_STATUSES:
-        return normalized
-    if normalized in _FAILED_STATUSES:
+    if status in _IN_FLIGHT:
+        return status
+    if status in _FAILED:
         return "failed"
     raise RevenueSettlementEvidenceError(
         "wallet history row contains unknown settlement status"
     )
 
 
-def inventory_history(history: Any, wallet: str) -> list[dict[str, Any]]:
-    """Validate and fingerprint a captured wallet history without inferring awards."""
-    wallet = _wallet(wallet)
-    if not isinstance(history, list) or len(history) > _MAX_ITEMS:
-        raise RevenueSettlementInputError("wallet history must be a bounded list")
+def _bound_history_row(row: dict[str, Any], *, wallet: str) -> dict[str, Any]:
+    row_type = row.get("type")
+    if row_type is not None and type(row_type) is not str:
+        raise RevenueSettlementEvidenceError(
+            "wallet history row contains malformed type"
+        )
+    if isinstance(row_type, str) and row_type.strip().lower() == "transfer_out":
+        raise RevenueSettlementEvidenceError(
+            "wallet history row is an outgoing transfer"
+        )
+    recipient = _one_identity(
+        row,
+        ("to", "to_addr", "recipient", "wallet"),
+        kind="recipient",
+        required=True,
+    )
+    sender = _one_identity(
+        row,
+        ("from", "from_addr", "sender"),
+        kind="sender",
+        required=False,
+    )
+    if sender == wallet:
+        raise RevenueSettlementEvidenceError(
+            "wallet history row is self-funded or outgoing"
+        )
+    return {
+        "amount": _history_amount(row),
+        "recipient_matches_wallet": recipient == wallet,
+        "status": _history_status(row),
+    }
 
-    seen: set[str] = set()
+
+def inventory_history(history: Any, wallet: str) -> list[dict[str, Any]]:
+    """Fingerprint every row; classify non-payment rows as unbindable."""
+    wallet = _wallet(wallet)
     result: list[dict[str, Any]] = []
-    for row in history:
-        if not isinstance(row, dict):
-            raise RevenueSettlementInputError("wallet history row must be an object")
-        fingerprint = history_row_sha256(row)
-        if fingerprint in seen:
-            raise RevenueSettlementEvidenceError(
-                "wallet history contains duplicate indistinguishable rows"
+    for fingerprint, row in _history_index(history).items():
+        entry: dict[str, Any] = {
+            "history_sha256": fingerprint,
+            "timestamp": row.get("timestamp", row.get("created_at")),
+        }
+        try:
+            parsed = _bound_history_row(row, wallet=wallet)
+        except RevenueSettlementEvidenceError as exc:
+            entry.update(bindable=False, reason=str(exc))
+        else:
+            entry.update(
+                bindable=True,
+                amount_rtc=_amount_text(parsed["amount"]),
+                recipient_matches_wallet=parsed["recipient_matches_wallet"],
+                status=parsed["status"],
             )
-        seen.add(fingerprint)
-        amount = _history_amount(row)
-        recipient = _history_recipient(row)
-        status = _history_status(row)
+        result.append(entry)
+    return result
+
+
+def _closeout_items(items: Any) -> list[dict[str, Any]]:
+    if not isinstance(items, list) or len(items) > _MAX_ITEMS:
+        raise RevenueSettlementInputError("closeout items must be a bounded list")
+    seen: set[tuple[str, int]] = set()
+    result = []
+    for raw in items:
+        repo, pr = _identity(raw)
+        key = (repo.casefold(), pr)
+        if key in seen:
+            raise RevenueSettlementInputError(f"duplicate closeout item: {repo}#{pr}")
+        seen.add(key)
+        state = raw.get("state")
+        if state not in _ALLOWED_STATES:
+            raise RevenueSettlementInputError(f"{repo}#{pr} has unsupported closeout state")
+        currency = raw.get("currency")
+        if type(currency) is not str or not currency:
+            raise RevenueSettlementInputError(f"{repo}#{pr} omitted currency")
+        if raw.get("cash_status") != "not_inferred":
+            raise RevenueSettlementInputError(
+                f"{repo}#{pr} cash_status must be not_inferred before reconciliation"
+            )
         result.append(
             {
-                "history_sha256": fingerprint,
-                "amount_rtc": _amount_text(amount),
-                "recipient_matches_wallet": recipient == wallet,
-                "status": status,
-                # Timestamp is informational only; it is never used to guess a match.
-                "timestamp": row.get("timestamp", row.get("created_at")),
+                "repo": repo,
+                "pr": pr,
+                "key": key,
+                "state": state,
+                "currency": currency,
+                "amount": _decimal(raw.get("advertised_amount"), field="advertised_amount"),
             }
         )
     return result
 
 
-def _validate_closeout_items(items: Any) -> list[dict[str, Any]]:
-    if not isinstance(items, list) or len(items) > _MAX_ITEMS:
-        raise RevenueSettlementInputError("closeout items must be a bounded list")
-    seen: set[tuple[str, int]] = set()
-    normalized: list[dict[str, Any]] = []
-    for raw in items:
-        repo, pr = _repo_and_pr(raw)
-        identity = (repo.casefold(), pr)
-        if identity in seen:
-            raise RevenueSettlementInputError(
-                f"duplicate closeout item: {repo}#{pr}"
-            )
-        seen.add(identity)
-        state = raw.get("state")
-        if state not in {"OPEN", "CLOSED_UNMERGED", "MERGED", "HEAD_MOVED"}:
-            raise RevenueSettlementInputError(
-                f"{repo}#{pr} has unsupported closeout state"
-            )
-        currency = raw.get("currency")
-        if type(currency) is not str or not currency:
-            raise RevenueSettlementInputError(f"{repo}#{pr} omitted currency")
-        amount = _decimal(raw.get("advertised_amount"), field="advertised_amount")
-        if raw.get("cash_status") != "not_inferred":
-            raise RevenueSettlementInputError(
-                f"{repo}#{pr} cash_status must be not_inferred before reconciliation"
-            )
-        normalized.append(
-            {
-                "raw": raw,
-                "repo": repo,
-                "pr": pr,
-                "identity": identity,
-                "state": state,
-                "currency": currency,
-                "amount": amount,
-            }
-        )
-    return normalized
-
-
-def _validate_bindings(bindings: Any) -> dict[tuple[str, int], list[str]]:
+def _binding_map(bindings: Any) -> dict[tuple[str, int], list[str]]:
     if not isinstance(bindings, list) or len(bindings) > _MAX_ITEMS:
         raise RevenueSettlementInputError("bindings must be a bounded list")
-    by_item: dict[tuple[str, int], list[str]] = {}
-    globally_used: set[str] = set()
+    result: dict[tuple[str, int], list[str]] = {}
+    used_rows: set[str] = set()
     for raw in bindings:
-        repo, pr = _repo_and_pr(raw)
-        identity = (repo.casefold(), pr)
-        if identity in by_item:
-            raise RevenueSettlementInputError(
-                f"duplicate payment binding: {repo}#{pr}"
-            )
-        fingerprints = raw.get("history_sha256s")
-        if (
-            not isinstance(fingerprints, list)
-            or not fingerprints
-            or len(fingerprints) > 100
-        ):
+        repo, pr = _identity(raw)
+        key = (repo.casefold(), pr)
+        if key in result:
+            raise RevenueSettlementInputError(f"duplicate payment binding: {repo}#{pr}")
+        hashes = raw.get("history_sha256s")
+        if not isinstance(hashes, list) or not hashes or len(hashes) > _MAX_BOUND_ROWS:
             raise RevenueSettlementInputError(
                 "history_sha256s must be a non-empty bounded list"
             )
-        local: list[str] = []
-        for value in fingerprints:
+        selected: list[str] = []
+        for value in hashes:
             if type(value) is not str or not _SHA256_RE.fullmatch(value):
                 raise RevenueSettlementInputError(
                     "history_sha256s entries must be lowercase SHA-256 values"
                 )
-            if value in local:
+            if value in selected:
                 raise RevenueSettlementInputError(
                     "payment binding repeats one history row"
                 )
-            if value in globally_used:
+            if value in used_rows:
                 raise RevenueSettlementInputError(
                     "one wallet history row cannot settle multiple closeout items"
                 )
-            local.append(value)
-            globally_used.add(value)
-        by_item[identity] = local
-    return by_item
+            selected.append(value)
+            used_rows.add(value)
+        result[key] = selected
+    return result
 
 
 def reconcile_cash(
@@ -309,33 +331,23 @@ def reconcile_cash(
     *,
     wallet: str,
 ) -> list[dict[str, Any]]:
-    """Reconcile explicitly bound wallet evidence against closeout items.
-
-    Unbound items remain ``not_inferred``. A bound RTC item becomes
-    ``verified_paid`` only when every selected history row is terminal,
-    addressed to ``wallet``, and the exact sum equals the advertised amount.
-    A lower exact sum is reported as ``partially_verified``; overpayment is
-    rejected as ambiguous rather than silently counted as revenue.
-    """
+    """Return evidence-bound cash state; never guess a payment-to-PR match."""
     wallet = _wallet(wallet)
-    items = _validate_closeout_items(closeout_items)
-    binding_map = _validate_bindings(bindings)
-    inventory = inventory_history(history, wallet)
-    history_by_hash = {row["history_sha256"]: row for row in inventory}
-    item_identities = {item["identity"] for item in items}
-
-    unknown_bindings = set(binding_map) - item_identities
-    if unknown_bindings:
-        repo_cf, pr = sorted(unknown_bindings)[0]
+    items = _closeout_items(closeout_items)
+    bound = _binding_map(bindings)
+    history_by_hash = _history_index(history)
+    known = {item["key"] for item in items}
+    unknown = set(bound) - known
+    if unknown:
+        repo_cf, pr = sorted(unknown)[0]
         raise RevenueSettlementInputError(
             f"payment binding references unknown closeout item: {repo_cf}#{pr}"
         )
 
-    results: list[dict[str, Any]] = []
+    results = []
     for item in items:
-        identity = item["identity"]
-        fingerprints = binding_map.get(identity)
-        base = {
+        selected = bound.get(item["key"])
+        row = {
             "repo": item["repo"],
             "pr": item["pr"],
             "currency": item["currency"],
@@ -345,12 +357,10 @@ def reconcile_cash(
             "verified_amount": "0",
             "payment_evidence": [],
         }
-
-        if fingerprints is None:
-            base["reason"] = "no_payment_evidence_bound"
-            results.append(base)
+        if selected is None:
+            row["reason"] = "no_payment_evidence_bound"
+            results.append(row)
             continue
-
         if item["state"] != "MERGED":
             raise RevenueSettlementEvidenceError(
                 f"{item['repo']}#{item['pr']} has payment evidence but is not merged"
@@ -362,26 +372,26 @@ def reconcile_cash(
 
         verified = Decimal("0")
         evidence = []
-        for fingerprint in fingerprints:
-            row = history_by_hash.get(fingerprint)
-            if row is None:
+        for fingerprint in selected:
+            raw = history_by_hash.get(fingerprint)
+            if raw is None:
                 raise RevenueSettlementEvidenceError(
                     f"{item['repo']}#{item['pr']} bound history row is absent"
                 )
-            if row["status"] != "confirmed":
+            parsed = _bound_history_row(raw, wallet=wallet)
+            if parsed["status"] != "confirmed":
                 raise RevenueSettlementEvidenceError(
                     f"{item['repo']}#{item['pr']} bound history row is not confirmed"
                 )
-            if row["recipient_matches_wallet"] is not True:
+            if parsed["recipient_matches_wallet"] is not True:
                 raise RevenueSettlementEvidenceError(
                     f"{item['repo']}#{item['pr']} bound history row targets another wallet"
                 )
-            amount = _decimal(row["amount_rtc"], field="verified history amount")
-            verified += amount
+            verified += parsed["amount"]
             evidence.append(
                 {
                     "history_sha256": fingerprint,
-                    "amount_rtc": row["amount_rtc"],
+                    "amount_rtc": _amount_text(parsed["amount"]),
                     "status": "confirmed",
                 }
             )
@@ -390,32 +400,31 @@ def reconcile_cash(
             raise RevenueSettlementEvidenceError(
                 f"{item['repo']}#{item['pr']} bound payments exceed advertised amount"
             )
-        base["verified_amount"] = _amount_text(verified)
-        base["payment_evidence"] = evidence
+        row["verified_amount"] = _amount_text(verified)
+        row["payment_evidence"] = evidence
         if verified == item["amount"]:
-            base["cash_status"] = "verified_paid"
-            base["reason"] = "bound_confirmed_wallet_evidence_matches_advertised_amount"
+            row["cash_status"] = "verified_paid"
+            row["reason"] = (
+                "bound_confirmed_wallet_evidence_matches_advertised_amount"
+            )
         else:
-            base["cash_status"] = "partially_verified"
-            base["reason"] = "bound_confirmed_wallet_evidence_below_advertised_amount"
-        results.append(base)
+            row["cash_status"] = "partially_verified"
+            row["reason"] = (
+                "bound_confirmed_wallet_evidence_below_advertised_amount"
+            )
+        results.append(row)
     return results
 
 
 def summarize_cash(results: Any) -> dict[str, Any]:
-    """Aggregate verified RTC cash without mixing non-RTC or inferred amounts."""
     if not isinstance(results, list):
         raise RevenueSettlementInputError("reconciliation results must be a list")
-    verified = Decimal("0")
+    total = Decimal("0")
     partial = Decimal("0")
-    fully_paid = 0
-    partially_paid = 0
-    unverified = 0
+    paid_count = partial_count = unverified_count = 0
     for row in results:
         if not isinstance(row, dict):
             raise RevenueSettlementInputError("reconciliation result must be an object")
-        status = row.get("cash_status")
-        currency = row.get("currency")
         amount = _decimal(
             row.get("verified_amount", "0"),
             field="verified_amount",
@@ -423,43 +432,38 @@ def summarize_cash(results: Any) -> dict[str, Any]:
         )
         if amount < 0:
             raise RevenueSettlementInputError("verified_amount must not be negative")
-        if currency == "RTC":
-            verified += amount
+        if row.get("currency") == "RTC":
+            total += amount
+        status = row.get("cash_status")
         if status == "verified_paid":
-            fully_paid += 1
+            paid_count += 1
         elif status == "partially_verified":
-            partially_paid += 1
-            if currency == "RTC":
+            partial_count += 1
+            if row.get("currency") == "RTC":
                 partial += amount
         elif status == "not_inferred":
-            unverified += 1
+            unverified_count += 1
         else:
             raise RevenueSettlementInputError(
                 "unknown cash_status in reconciliation result"
             )
     return {
         "currency": "RTC",
-        "verified_cash_total": _amount_text(verified),
+        "verified_cash_total": _amount_text(total),
         "partial_cash_total": _amount_text(partial),
-        "fully_paid_items": fully_paid,
-        "partially_paid_items": partially_paid,
-        "unverified_items": unverified,
+        "fully_paid_items": paid_count,
+        "partially_paid_items": partial_count,
+        "unverified_items": unverified_count,
         "cash_claim": "wallet_history_evidence_only",
     }
 
 
 def _load_json(path: str) -> Any:
-    if path == "-":
-        raise RevenueSettlementInputError(
-            "stdin is not accepted here because two independent inputs are required"
-        )
     source = Path(path)
     try:
         if source.stat().st_size > _MAX_JSON_BYTES:
             raise RevenueSettlementInputError(f"{path} is too large")
         return json.loads(source.read_text(encoding="utf-8"))
-    except OSError:
-        raise
     except json.JSONDecodeError as exc:
         raise RevenueSettlementInputError(f"{path} is not valid JSON") from exc
 
@@ -492,15 +496,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        closeout_payload = _load_json(args.closeout)
-        closeout_items = _schema_items(closeout_payload, name="closeout")
-        binding_payload = _load_json(args.bindings)
-        binding_items = _schema_items(binding_payload, name="bindings")
-        if args.history:
-            history_payload = _load_json(args.history)
-            history_items = _schema_items(history_payload, name="history")
-        else:
-            history_items = check_history(_wallet(args.wallet))
+        closeout_items = _schema_items(_load_json(args.closeout), name="closeout")
+        binding_items = _schema_items(_load_json(args.bindings), name="bindings")
+        history_items = (
+            _schema_items(_load_json(args.history), name="history")
+            if args.history
+            else check_history(_wallet(args.wallet))
+        )
         results = reconcile_cash(
             closeout_items,
             history_items,
