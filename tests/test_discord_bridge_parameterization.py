@@ -70,6 +70,17 @@ def economy_db(tmp_path, monkeypatch):
     return db_path
 
 
+@pytest.fixture()
+def tracking_db(tmp_path, monkeypatch):
+    tracking_dir = tmp_path / "tracking"
+    tracking_path = tracking_dir / "migrations.db"
+    monkeypatch.setattr(discord_bridge, "_TRACKING_DIR", str(tracking_dir))
+    monkeypatch.setattr(discord_bridge, "_TRACKING_DB", str(tracking_path))
+    con = discord_bridge._init_tracking_db()
+    con.close()
+    return tracking_path
+
+
 def _balance(db_path, user_id):
     con = sqlite3.connect(db_path)
     try:
@@ -99,6 +110,44 @@ def test_balance_lookup_treats_hostile_user_id_as_data(economy_db):
     assert "error" in result
     assert "not found" in result["error"]
     assert discord_bridge.get_discord_balance("bob")["balance"] == 20.0
+
+
+@pytest.mark.parametrize("status", ["partial", "pending", "unknown"])
+def test_unresolved_migration_blocks_balance_preflight_before_remote_query(
+    economy_db, tracking_db, monkeypatch, status
+):
+    assert discord_bridge.record_migration(
+        "alice", "alice-chain", 10.0, "pending-123", status
+    )
+    remote_called = False
+
+    def forbidden_runner(script):
+        nonlocal remote_called
+        remote_called = True
+        raise AssertionError("unresolved migration must not query remote balance")
+
+    monkeypatch.setattr(discord_bridge, "_ssh_run_script", forbidden_runner)
+
+    result = discord_bridge.get_discord_balance("alice")
+
+    assert "error" in result
+    assert "unresolved migration state" in result["error"]
+    assert status in result["error"]
+    assert remote_called is False
+    assert _balance(economy_db, "alice") == (10.0, 2.0)
+
+
+def test_completed_migration_preserves_explicit_force_preflight_semantics(
+    economy_db, tracking_db
+):
+    assert discord_bridge.record_migration(
+        "alice", "alice-chain", 10.0, "settled-123", "completed"
+    )
+
+    result = discord_bridge.get_discord_balance("alice")
+
+    assert result["user_id"] == "alice"
+    assert result["balance"] == 10.0
 
 
 def test_holder_threshold_rejects_non_numeric_sql_payload(economy_db):
