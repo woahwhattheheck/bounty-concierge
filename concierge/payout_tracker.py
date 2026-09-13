@@ -12,11 +12,35 @@ import requests
 from concierge import config
 
 
+def _record_list(payload: object, key: str) -> List[dict]:
+    """Return a validated record list from a direct or wrapped API payload.
+
+    The node endpoints historically return either a bare list of records or an
+    object containing ``pending``/``history``.  Successful HTTP status is not
+    enough to trust the JSON shape: returning a scalar, ``null``, or a mixed
+    list would otherwise violate this module's ``List[dict]`` contract and can
+    crash the CLI formatter later.  Malformed shapes therefore fail closed to
+    an empty list, matching the existing network/HTTP-error behavior.
+    """
+    if isinstance(payload, list):
+        records = payload
+    elif isinstance(payload, dict):
+        records = payload.get(key, [])
+    else:
+        return []
+
+    if not isinstance(records, list):
+        return []
+    if not all(isinstance(item, dict) for item in records):
+        return []
+    return records
+
+
 def check_pending(wallet_id: str, node_url: str | None = None) -> List[dict]:
     """Return pending transfers for *wallet_id*.
 
     Queries ``GET {node_url}/wallet/pending?miner_id={wallet_id}``.
-    Returns an empty list on 404 or connection errors.
+    Returns an empty list on 404, connection errors, or malformed payloads.
     """
     base = (node_url or config.RUSTCHAIN_NODE_URL).rstrip("/")
     url = f"{base}/wallet/pending"
@@ -30,8 +54,7 @@ def check_pending(wallet_id: str, node_url: str | None = None) -> List[dict]:
         if resp.status_code == 404:
             return []
         resp.raise_for_status()
-        data = resp.json()
-        return data if isinstance(data, list) else data.get("pending", [])
+        return _record_list(resp.json(), "pending")
     except requests.RequestException:
         return []
 
@@ -40,7 +63,7 @@ def check_history(wallet_id: str, node_url: str | None = None) -> List[dict]:
     """Return recent transfer history for *wallet_id*.
 
     Queries ``GET {node_url}/wallet/history?miner_id={wallet_id}``.
-    Returns an empty list on 404 or connection errors.
+    Returns an empty list on 404, connection errors, or malformed payloads.
     """
     base = (node_url or config.RUSTCHAIN_NODE_URL).rstrip("/")
     url = f"{base}/wallet/history"
@@ -54,8 +77,7 @@ def check_history(wallet_id: str, node_url: str | None = None) -> List[dict]:
         if resp.status_code == 404:
             return []
         resp.raise_for_status()
-        data = resp.json()
-        return data if isinstance(data, list) else data.get("history", [])
+        return _record_list(resp.json(), "history")
     except requests.RequestException:
         return []
 
