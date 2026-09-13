@@ -8,16 +8,20 @@ claiming new bounties.
 The scanner re-reads the canonical GitHub pull request, validates the expected author
 and optional exact head, then reads maintainer reviews and issue comments. It only
 routes new human feedback from OWNER, MEMBER, or COLLABORATOR accounts after the
-manifest's `last_seen_at` boundary for notification freshness. Review authority is
-separate: the latest decision-bearing review per maintainer is evaluated regardless of
-cursor age, so an unresolved `CHANGES_REQUESTED` remains repair work until that same
-maintainer later APPROVES or the review is DISMISSED. COMMENTED reviews do not clear a
-change request. Maintainer comments and COMMENTED reviews are routed for response only
-when new; approvals do not create reply spam. A moved expected head fails closed before
-feedback is consumed.
+manifest's `last_seen_at` boundary for notification freshness. Because GitHub event
+timestamps are not unique, events exactly equal to the cursor timestamp are replayed
+conservatively rather than risking a same-timestamp miss. Review authority is separate:
+the latest decision-bearing review per maintainer is evaluated regardless of cursor
+age, so an unresolved `CHANGES_REQUESTED` remains repair work until that same maintainer
+later APPROVES or the review is DISMISSED. COMMENTED reviews do not clear a change
+request. New maintainer comments and COMMENTED reviews route a response. Current repair
+and response obligations outrank merged/closed lifecycle routing; only when none remain
+does a merged PR route to settlement or a closed-unmerged PR route to investigation. A
+moved expected head fails closed before feedback is consumed.
 
-Merged PRs are routed either to a missing settlement follow-up or to monitoring an
-already-recorded follow-up URL. Closed-unmerged PRs are routed for investigation.
+Merged PRs with no maintainer obligation are routed either to a missing settlement
+follow-up or to monitoring an already-recorded follow-up URL. Closed-unmerged PRs with
+no maintainer obligation are routed for investigation.
 Neither merge state nor an advertised amount is treated as sponsor acceptance, earned
 revenue, or payment: every output explicitly reports `cash_status: not_inferred`.
 The module performs no comment, email, claim, wallet, payment, or provider mutation.
@@ -41,7 +45,9 @@ The module performs no comment, email, claim, wallet, payment, or provider mutat
 }
 ```
 
-`advertised_amount` accepts exact decimal text or an integer, not binary floats.
+`advertised_amount` accepts bounded exact decimal text or an integer, not binary floats;
+source length, significant digits, and exponent are bounded before any network read or
+fixed-point rendering so hostile scientific notation cannot amplify memory use.
 `last_seen_at` is required, must be timezone-aware, and cannot be materially in the future. `settlement_followup_url`, when present, must be
 an absolute HTTP(S) URL. Duplicate repository/PR identities are rejected.
 
