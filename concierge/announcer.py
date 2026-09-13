@@ -14,6 +14,39 @@ from typing import Dict, List
 # Formatting
 # ---------------------------------------------------------------------------
 
+def _single_line_text(value) -> str:
+    """Render untrusted text without raw line/terminal control characters."""
+    text = str(value)
+    escaped: list[str] = []
+    for char in text:
+        if char.isprintable():
+            escaped.append(char)
+            continue
+        codepoint = ord(char)
+        if codepoint <= 0xFF:
+            escaped.append(f"\\x{codepoint:02x}")
+        elif codepoint <= 0xFFFF:
+            escaped.append(f"\\u{codepoint:04x}")
+        else:
+            escaped.append(f"\\U{codepoint:08x}")
+    return "".join(escaped)
+
+
+def _markdown_cell(value) -> str:
+    """Escape an untrusted value for a single Markdown table cell."""
+    return _single_line_text(value).replace("\\", "\\\\").replace("|", "\\|")
+
+
+def _markdown_link_target(value) -> str:
+    """Escape delimiters in an inline Markdown link destination."""
+    return (
+        _single_line_text(value)
+        .replace("\\", "\\\\")
+        .replace("(", "\\(")
+        .replace(")", "\\)")
+    )
+
+
 def format_announcement(bounties: List[dict]) -> Dict[str, str]:
     """Create platform-specific formatted content from a list of bounties.
 
@@ -32,9 +65,9 @@ def format_announcement(bounties: List[dict]) -> Dict[str, str]:
     # -- short (Twitter) ---------------------------------------------------
     top = bounties[0]
     short = (
-        f"New RustChain bounty: {top['title']} "
-        f"({top.get('rtc', '?')} RTC) "
-        f"{top.get('url', '')}"
+        f"New RustChain bounty: {_single_line_text(top['title'])} "
+        f"({_single_line_text(top.get('rtc', '?'))} RTC) "
+        f"{_single_line_text(top.get('url', ''))}"
     )
     if len(short) > 280:
         short = short[:277] + "..."
@@ -43,7 +76,9 @@ def format_announcement(bounties: List[dict]) -> Dict[str, str]:
     lines = ["Open RustChain bounties:\n"]
     for b in bounties[:5]:
         lines.append(
-            f"- {b['title']} | {b.get('rtc', '?')} RTC | {b.get('url', '')}"
+            f"- {_single_line_text(b['title'])} | "
+            f"{_single_line_text(b.get('rtc', '?'))} RTC | "
+            f"{_single_line_text(b.get('url', ''))}"
         )
     if len(bounties) > 5:
         lines.append(f"\n+{len(bounties) - 5} more at "
@@ -59,8 +94,8 @@ def format_announcement(bounties: List[dict]) -> Dict[str, str]:
     for b in bounties:
         diff = b.get("difficulty", "--")
         long_lines.append(
-            f"| {b['title']} | {b.get('rtc', '?')} | {diff} "
-            f"| [link]({b.get('url', '')}) |"
+            f"| {_markdown_cell(b['title'])} | {_markdown_cell(b.get('rtc', '?'))} | "
+            f"{_markdown_cell(diff)} | [link]({_markdown_link_target(b.get('url', ''))}) |"
         )
     long_lines.append(
         "\n1 RTC = $0.15 USD.  "
