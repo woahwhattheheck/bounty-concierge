@@ -62,7 +62,7 @@ class TestCheckPending:
             "https://node/wallet/history",
             params={"miner_id": "alice"},
             timeout=15,
-            verify=False,
+            verify=True,
         )
 
     @patch("concierge.payout_tracker.requests.get")
@@ -158,7 +158,7 @@ class TestCheckHistory:
             "https://node/wallet/history",
             params={"miner_id": "alice"},
             timeout=15,
-            verify=False,
+            verify=True,
         )
 
     @patch("concierge.payout_tracker.requests.get")

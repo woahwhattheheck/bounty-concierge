@@ -5,7 +5,10 @@ RustChain node.
 
 from __future__ import annotations
 
+import ipaddress
+from pathlib import Path
 from typing import List
+from urllib.parse import urlsplit
 
 import requests
 
@@ -111,6 +114,72 @@ def _terminal_text(value) -> str:
     return "".join(escaped)
 
 
+def _is_loopback_host(hostname: str) -> bool:
+    """Return whether *hostname* is an explicit local loopback authority."""
+    if hostname.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(hostname).is_loopback
+    except ValueError:
+        return False
+
+
+def _node_request_settings(node_url: str | None) -> tuple[str, bool | str]:
+    """Return a canonical base URL and Requests TLS verification authority.
+
+    Remote payout/status reads require HTTPS.  Local loopback HTTP is retained
+    for hermetic development.  HTTPS always verifies peer identity: either via
+    the platform trust store or an explicitly configured private/self-signed
+    CA bundle.
+    """
+    raw = config.RUSTCHAIN_NODE_URL if node_url is None else node_url
+    if (
+        type(raw) is not str
+        or not raw
+        or raw != raw.strip()
+        or any(char.isspace() or not char.isprintable() for char in raw)
+    ):
+        raise PayoutLookupError("RustChain node URL was invalid")
+
+    try:
+        parsed = urlsplit(raw)
+        hostname = parsed.hostname
+        username = parsed.username
+        password = parsed.password
+    except ValueError as exc:
+        raise PayoutLookupError("RustChain node URL was invalid") from exc
+
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or hostname is None
+        or username is not None
+        or password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise PayoutLookupError("RustChain node URL was invalid")
+
+    if parsed.scheme != "https" and not _is_loopback_host(hostname):
+        raise PayoutLookupError("remote RustChain payout reads require HTTPS")
+
+    verify: bool | str = True
+    ca_bundle = config.RUSTCHAIN_CA_BUNDLE
+    if ca_bundle:
+        if type(ca_bundle) is not str or ca_bundle != ca_bundle.strip():
+            raise PayoutLookupError("RustChain CA bundle configuration was invalid")
+        try:
+            bundle_path = Path(ca_bundle).expanduser()
+            bundle_available = bundle_path.is_file()
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise PayoutLookupError("RustChain CA bundle was unavailable") from exc
+        if not bundle_available:
+            raise PayoutLookupError("RustChain CA bundle was unavailable")
+        verify = str(bundle_path)
+
+    return raw.rstrip("/"), verify
+
+
 def _check_transfers(
     wallet_id: str,
     endpoint: str,
@@ -119,14 +188,14 @@ def _check_transfers(
 ) -> List[dict]:
     """Fetch one payout endpoint, distinguishing empty data from failure."""
     wallet_id = _validate_wallet_id(wallet_id)
-    base = (node_url or config.RUSTCHAIN_NODE_URL).rstrip("/")
+    base, verify = _node_request_settings(node_url)
     url = f"{base}/wallet/{endpoint}"
     try:
         resp = requests.get(
             url,
             params={"miner_id": wallet_id},
             timeout=15,
-            verify=False,  # self-signed cert on node
+            verify=verify,
         )
         resp.raise_for_status()
         try:
@@ -140,7 +209,7 @@ def _check_transfers(
         return _payload_list(data, payload_key)
     except PayoutLookupError:
         raise
-    except requests.RequestException as exc:
+    except (requests.RequestException, OSError) as exc:
         raise PayoutLookupError(
             f"{payload_key} payout request failed"
         ) from exc
