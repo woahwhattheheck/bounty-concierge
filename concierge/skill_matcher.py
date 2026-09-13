@@ -84,11 +84,22 @@ if os.path.isfile(_DATA_FILE):
 
 def _bounty_text(bounty: dict) -> str:
     """Combine all searchable text fields from a bounty into one string."""
+    labels = bounty.get("labels", [])
+    if isinstance(labels, (list, tuple)):
+        label_text = " ".join(
+            label for label in labels if isinstance(label, str)
+        )
+    else:
+        label_text = ""
+
     parts = [
-        bounty.get("title", ""),
-        bounty.get("body", ""),
-        " ".join(bounty.get("labels", [])),
-        bounty.get("difficulty", ""),
+        value if isinstance(value, str) else ""
+        for value in (
+            bounty.get("title", ""),
+            bounty.get("body", ""),
+            label_text,
+            bounty.get("difficulty", ""),
+        )
     ]
     return " ".join(parts).lower()
 
