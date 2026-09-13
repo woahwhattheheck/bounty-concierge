@@ -110,7 +110,7 @@ class RevenueCloseoutTests(unittest.TestCase):
         ]
         result = scan_paid_pr(item(), session=FakeSession(routes(reviews=reviews)))
         self.assertEqual(result["next_action"], "repair_requested")
-        self.assertEqual(result["reason"], "new_maintainer_changes_requested")
+        self.assertEqual(result["reason"], "current_maintainer_changes_requested")
         self.assertEqual(result["latest_feedback"]["author"], "maintainer")
 
     def test_maintainer_comment_routes_response(self):
@@ -187,7 +187,20 @@ class RevenueCloseoutTests(unittest.TestCase):
         result = scan_paid_pr(item(), session=FakeSession(routes(comments=comments)))
         self.assertEqual(result["next_action"], "await_acceptance")
 
-    def test_old_feedback_is_not_replayed(self):
+    def test_old_comment_feedback_is_not_replayed(self):
+        reviews = [
+            {
+                "state": "COMMENTED",
+                "submitted_at": "2026-09-12T23:59:59Z",
+                "author_association": "MEMBER",
+                "user": {"login": "maintainer"},
+            }
+        ]
+        result = scan_paid_pr(item(), session=FakeSession(routes(reviews=reviews)))
+        self.assertEqual(result["next_action"], "await_acceptance")
+        self.assertEqual(result["new_feedback_count"], 0)
+
+    def test_old_unresolved_change_request_still_routes_repair(self):
         reviews = [
             {
                 "state": "CHANGES_REQUESTED",
@@ -197,8 +210,49 @@ class RevenueCloseoutTests(unittest.TestCase):
             }
         ]
         result = scan_paid_pr(item(), session=FakeSession(routes(reviews=reviews)))
-        self.assertEqual(result["next_action"], "await_acceptance")
+        self.assertEqual(result["next_action"], "repair_requested")
+        self.assertEqual(result["reason"], "current_maintainer_changes_requested")
         self.assertEqual(result["new_feedback_count"], 0)
+        self.assertEqual(result["current_change_request_count"], 1)
+
+    def test_later_approval_clears_same_maintainer_change_request(self):
+        reviews = [
+            {
+                "state": "CHANGES_REQUESTED",
+                "submitted_at": "2026-09-12T22:00:00Z",
+                "author_association": "MEMBER",
+                "user": {"login": "maintainer"},
+            },
+            {
+                "state": "APPROVED",
+                "submitted_at": "2026-09-12T23:00:00Z",
+                "author_association": "MEMBER",
+                "user": {"login": "maintainer"},
+            },
+        ]
+        result = scan_paid_pr(item(), session=FakeSession(routes(reviews=reviews)))
+        self.assertEqual(result["next_action"], "await_acceptance")
+        self.assertEqual(result["current_change_request_count"], 0)
+        self.assertEqual(result["new_feedback_count"], 0)
+
+    def test_comment_review_does_not_clear_change_request(self):
+        reviews = [
+            {
+                "state": "CHANGES_REQUESTED",
+                "submitted_at": "2026-09-12T22:00:00Z",
+                "author_association": "MEMBER",
+                "user": {"login": "maintainer"},
+            },
+            {
+                "state": "COMMENTED",
+                "submitted_at": "2026-09-12T23:00:00Z",
+                "author_association": "MEMBER",
+                "user": {"login": "maintainer"},
+            },
+        ]
+        result = scan_paid_pr(item(), session=FakeSession(routes(reviews=reviews)))
+        self.assertEqual(result["next_action"], "repair_requested")
+        self.assertEqual(result["current_change_request_count"], 1)
 
     def test_merged_pr_routes_missing_settlement_followup_without_cash_claim(self):
         pr = pr_payload(state="closed", merged_at="2026-09-13T03:00:00Z")
