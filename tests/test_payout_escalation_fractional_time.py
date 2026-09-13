@@ -47,6 +47,63 @@ class FractionalDeadlineTests(unittest.TestCase):
         )
         self.assertEqual(at["items"][0]["action"], "owner_review_missing_transfer")
 
+    def test_missing_binding_for_closeout_item_fails_closed(self):
+        closeout = {
+            "schema_version": 1,
+            "items": [{
+                "repo": "Sponsor/project", "pr": 17,
+                "canonical_url": "https://github.com/Sponsor/project/pull/17",
+                "head_sha": "a" * 40, "advertised_amount": "30", "currency": "RTC",
+                "state": "MERGED", "merged_at": "2026-09-12T12:00:00Z",
+                "next_action": "route_settlement_followup",
+                "reason": "merged_without_settlement_followup_evidence",
+                "new_feedback_count": 0, "current_change_request_count": 0,
+                "latest_feedback": None, "settlement_followup_url": None,
+                "cash_status": "not_inferred",
+            }],
+        }
+        history = {"ok": True, "miner_id": "wallet", "transactions": [], "total": 0}
+        bindings = {
+            "schema_version": 1, "policy_version": policy_receipt()["policy_version"],
+            "wallet": "wallet", "closeout_sha256": closeout_snapshot_sha256(closeout),
+            "history_capture_sha256": history_capture_sha256(history), "items": [],
+        }
+        from concierge.payout_escalation import PayoutEscalationInputError
+        with self.assertRaises(PayoutEscalationInputError):
+            compile_payout_escalation(
+                closeout, history, bindings,
+                as_of=datetime(2026, 9, 13, 12, 0, 0, tzinfo=timezone.utc),
+            )
+
+    def test_submicrosecond_timestamp_text_is_rejected_instead_of_truncated(self):
+        closeout = {
+            "schema_version": 1,
+            "items": [{
+                "repo": "Sponsor/project", "pr": 17,
+                "canonical_url": "https://github.com/Sponsor/project/pull/17",
+                "head_sha": "a" * 40, "advertised_amount": "30", "currency": "RTC",
+                "state": "MERGED", "merged_at": "2026-09-12T12:00:00.1234567Z",
+                "next_action": "route_settlement_followup",
+                "reason": "merged_without_settlement_followup_evidence",
+                "new_feedback_count": 0, "current_change_request_count": 0,
+                "latest_feedback": None, "settlement_followup_url": None,
+                "cash_status": "not_inferred",
+            }],
+        }
+        history = {"ok": True, "miner_id": "wallet", "transactions": [], "total": 0}
+        bindings = {
+            "schema_version": 1, "policy_version": policy_receipt()["policy_version"],
+            "wallet": "wallet", "closeout_sha256": closeout_snapshot_sha256(closeout),
+            "history_capture_sha256": history_capture_sha256(history),
+            "items": [{"repo": "Sponsor/project", "pr": 17, "history_sha256s": []}],
+        }
+        from concierge.payout_escalation import PayoutEscalationInputError
+        with self.assertRaises(PayoutEscalationInputError):
+            compile_payout_escalation(
+                closeout, history, bindings,
+                as_of=datetime(2026, 9, 13, 12, 0, 0, tzinfo=timezone.utc),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
