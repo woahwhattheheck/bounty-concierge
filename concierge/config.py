@@ -23,6 +23,10 @@ SAASCITY_KEY = _env("SAASCITY_KEY")
 # --- RustChain node ---
 
 RUSTCHAIN_NODE_URL = _env("RUSTCHAIN_NODE_URL", "https://50.28.86.131")
+# Optional PEM CA bundle for deployments whose RustChain HTTPS endpoint uses a
+# private/self-signed CA.  Payout/status reads never disable TLS verification;
+# configure trust explicitly instead.
+RUSTCHAIN_CA_BUNDLE = _env("RUSTCHAIN_CA_BUNDLE")
 
 # --- Repositories to aggregate bounties from ---
 
