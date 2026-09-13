@@ -3,6 +3,7 @@
 
 import pathlib
 import sys
+import unittest
 from unittest.mock import MagicMock, patch
 
 import requests
@@ -24,7 +25,7 @@ def _response(status_code=200, payload=None):
     return resp
 
 
-class TestCheckPending:
+class TestCheckPending(unittest.TestCase):
     @patch("concierge.payout_tracker.requests.get")
     def test_pending_accepts_list_payload(self, mock_get):
         mock_get.return_value = _response(payload=[{"amount_rtc": 2}])
@@ -74,7 +75,7 @@ class TestCheckPending:
         assert payout_tracker.check_pending("alice", node_url="https://node") == []
 
 
-class TestCheckHistory:
+class TestCheckHistory(unittest.TestCase):
     @patch("concierge.payout_tracker.requests.get")
     def test_history_accepts_wrapped_payload(self, mock_get):
         mock_get.return_value = _response(payload={"history": [{"tx": "abc"}]})
@@ -113,7 +114,7 @@ class TestCheckHistory:
         assert payout_tracker.check_history("alice", node_url="https://node") == []
 
 
-class TestFormatPayoutStatus:
+class TestFormatPayoutStatus(unittest.TestCase):
     def test_empty_pending_and_history_show_none_markers(self):
         output = payout_tracker.format_payout_status([], [])
 
