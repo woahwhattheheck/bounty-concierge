@@ -13,7 +13,7 @@ Every candidate supplies both:
 
 Before an effort or award-probability estimate can influence ranking, the ranker calls `verify_contract_qualification_receipt(..., as_of=<trusted current UTC>)`. A tampered receipt, stale listing/evidence, elapsed deadline, newly-unsatisfied platform gate, non-ACTIONABLE disposition, or otherwise unverifiable qualification is excluded.
 
-The production CLI owns current UTC. It intentionally exposes no `--as-of` flag.
+The production CLI **and public library API** own current UTC. Neither accepts a caller-selected `as_of`; deterministic timestamp injection exists only in a private evaluator used for tests/internal mechanics. This prevents historical replay from resurrecting an expired qualification as current prioritization authority. The CLI intentionally exposes no `--as-of` flag.
 
 ## Ranking contract
 
