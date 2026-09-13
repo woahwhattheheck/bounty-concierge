@@ -31,7 +31,8 @@ def fetch_bounties(repos=None, token=None):
             repo, number, title, body, url, labels, created_at, reward_rtc,
             difficulty, skills
     """
-    repos = repos or REPOS
+    if repos is None:
+        repos = REPOS
     token = token or GITHUB_TOKEN
 
     headers = {"Accept": "application/vnd.github+json"}
@@ -41,42 +42,47 @@ def fetch_bounties(repos=None, token=None):
     bounties = []
     for repo in repos:
         api_url = f"https://api.github.com/repos/{repo}/issues"
-        params = {"labels": "bounty", "state": "open", "per_page": 100}
+        params = {"labels": "bounty", "state": "open", "per_page": 100, "page": 1}
 
-        try:
-            resp = requests.get(api_url, headers=headers, params=params, timeout=15)
-            if resp.status_code == 404:
-                continue
-            resp.raise_for_status()
-        except requests.RequestException as exc:
-            print(f"[warn] failed to fetch {repo}: {exc}", file=sys.stderr)
-            continue
+        while True:
+            try:
+                resp = requests.get(api_url, headers=headers, params=params, timeout=15)
+                if resp.status_code == 404:
+                    break
+                resp.raise_for_status()
+            except requests.RequestException as exc:
+                print(f"[warn] failed to fetch {repo}: {exc}", file=sys.stderr)
+                break
 
-        for issue in resp.json():
-            # Skip pull requests that come through the issues endpoint
-            if "pull_request" in issue:
-                continue
+            for issue in resp.json():
+                # Skip pull requests that come through the issues endpoint
+                if "pull_request" in issue:
+                    continue
 
-            title = issue.get("title", "")
-            body = issue.get("body", "") or ""
-            label_names = [lb["name"] for lb in issue.get("labels", [])]
+                title = issue.get("title", "")
+                body = issue.get("body", "") or ""
+                label_names = [lb["name"] for lb in issue.get("labels", [])]
 
-            reward = parse_reward(title, body)
-            difficulty = estimate_difficulty(title, label_names, reward)
-            skills = tag_skills(title, body)
+                reward = parse_reward(title, body)
+                difficulty = estimate_difficulty(title, label_names, reward)
+                skills = tag_skills(title, body)
 
-            bounties.append({
-                "repo": repo,
-                "number": issue["number"],
-                "title": title,
-                "body": body,
-                "url": issue["html_url"],
-                "labels": label_names,
-                "created_at": issue.get("created_at", ""),
-                "reward_rtc": reward,
-                "difficulty": difficulty,
-                "skills": skills,
-            })
+                bounties.append({
+                    "repo": repo,
+                    "number": issue["number"],
+                    "title": title,
+                    "body": body,
+                    "url": issue["html_url"],
+                    "labels": label_names,
+                    "created_at": issue.get("created_at", ""),
+                    "reward_rtc": reward,
+                    "difficulty": difficulty,
+                    "skills": skills,
+                })
+
+            if not getattr(resp, "links", {}).get("next"):
+                break
+            params["page"] += 1
 
     return bounties
 
@@ -202,6 +208,12 @@ def aggregate(repos=None, token=None):
     }
 
 
+def _markdown_cell(value):
+    """Escape untrusted text so it cannot create Markdown table cells or rows."""
+    text = str(value).replace("\\", "\\\\").replace("|", "\\|")
+    return re.sub(r"[\r\n]+", " ", text)
+
+
 def format_markdown(bounties):
     """Format a list of bounty dicts as a Markdown table.
 
@@ -214,7 +226,7 @@ def format_markdown(bounties):
     for b in bounties:
         repo_short = b["repo"].split("/")[-1]
         skills = ", ".join(b["skills"]) if b["skills"] else "-"
-        title_short = b["title"][:60]
+        title_short = _markdown_cell(b["title"][:60])
         lines.append(
             f"| {b['number']} | {repo_short} | {title_short} | "
             f"{b['reward_rtc']:.1f} | {b['difficulty']} | {skills} |"
