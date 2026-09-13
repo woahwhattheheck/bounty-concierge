@@ -56,7 +56,7 @@ Bindings are operator-owned attribution evidence. They must pin this exact polic
 
 The two snapshot digests are deterministic drift fences: if the closeout or history capture changes after attribution, the binding is stale and compilation fails. They are self-integrity commitments, **not signatures or independent authentication**; an operator-supplied offline capture remains operator-supplied evidence.
 
-One history row cannot support two PRs. Canonical incoming rows require a printable `tx_hash`; the same transaction identity cannot be represented twice under modified row bytes. Pending/failed rows require an initiation timestamp, must not be future-dated, and must not predate the merge they are attributed to. Bound evidence cannot exceed the advertised RTC amount.
+One history row cannot support two PRs. Canonical incoming rows require a printable `tx_hash`; the same transaction identity cannot be represented twice under modified row bytes. Every bound transfer row, including confirmed/default-confirmed rows, requires temporal evidence. Current canonical RustChain Unix-second `timestamp` values and canonical UTC `timestamp`/`created_at` text are accepted; bool, negative, out-of-range, conflicting, future, and pre-merge times fail closed. Operator binding never substitutes for time evidence tying a transfer to the merged PR. Bound evidence cannot exceed the advertised RTC amount.
 
 ## Actions
 
