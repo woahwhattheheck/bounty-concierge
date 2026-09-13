@@ -144,3 +144,11 @@ class TestRecommend:
         bounties = [{"id": 1, "title": "Python task"}]
 
         assert skill_matcher.recommend(bounties, ["python"], limit=0) == []
+
+    def test_negative_limit_returns_empty_list(self):
+        bounties = [
+            {"id": 1, "title": "Python task"},
+            {"id": 2, "title": "Python tests"},
+        ]
+
+        assert skill_matcher.recommend(bounties, ["python"], limit=-1) == []
