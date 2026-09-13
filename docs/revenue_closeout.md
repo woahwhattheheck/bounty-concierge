@@ -6,18 +6,23 @@ settlement follow-through after implementation is in flight, not for discovering
 claiming new bounties.
 
 The scanner re-reads the canonical GitHub pull request, validates the expected author
-and optional exact head, then reads maintainer reviews and issue comments. It only
-routes new human feedback from OWNER, MEMBER, or COLLABORATOR accounts after the
-manifest's `last_seen_at` boundary for notification freshness. Because GitHub event
-timestamps are not unique, events exactly equal to the cursor timestamp are replayed
-conservatively rather than risking a same-timestamp miss. Review authority is separate:
-the latest decision-bearing review per maintainer is evaluated regardless of cursor
-age, so an unresolved `CHANGES_REQUESTED` remains repair work until that same maintainer
-later APPROVES or the review is DISMISSED. COMMENTED reviews do not clear a change
-request. New maintainer comments and COMMENTED reviews route a response. Current repair
-and response obligations outrank merged/closed lifecycle routing; only when none remain
-does a merged PR route to settlement or a closed-unmerged PR route to investigation. A
-moved expected head fails closed before feedback is consumed.
+and optional exact head, then reads maintainer reviews, inline review comments/replies,
+and issue comments. It only routes new human feedback from OWNER, MEMBER, or
+COLLABORATOR accounts after the manifest's `last_seen_at` boundary for notification
+freshness. Because GitHub event timestamps are not unique, events exactly equal to the
+cursor timestamp are replayed conservatively rather than risking a same-timestamp miss.
+Stable feedback IDs are de-duplicated across pagination; conflicting duplicate snapshots,
+malformed inline identities, or exhausted pagination fail closed. A COMMENTED review
+whose concrete inline children are present is suppressed as an overlapping notification,
+while each distinct inline comment/reply remains actionable. Review authority is separate:
+the latest decision-bearing review per maintainer is evaluated regardless of cursor age,
+so an unresolved `CHANGES_REQUESTED` remains repair work until that same maintainer later
+APPROVES or the review is DISMISSED. COMMENTED reviews do not clear a change request.
+New maintainer issue comments, inline review comments/replies, and non-overlapping
+COMMENTED reviews route a response. Current repair and response obligations outrank
+merged/closed lifecycle routing; only when none remain does a merged PR route to
+settlement or a closed-unmerged PR route to investigation. A moved expected head fails
+closed before feedback is consumed.
 
 Merged PRs with no maintainer obligation are routed either to a missing settlement
 follow-up or to monitoring an already-recorded follow-up URL. Closed-unmerged PRs with
