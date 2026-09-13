@@ -35,6 +35,7 @@ _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _TX_ID_RE = re.compile(r"^[!-~]{1,256}$")
 _UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$")
+_MAX_EPOCH_SECONDS = 253402300799
 _MAX_ITEMS = 10_000
 _MAX_ROWS_PER_ITEM = 100
 _MAX_JSON_BYTES = 4 * 1024 * 1024
@@ -115,6 +116,19 @@ def _parse_timestamp(value: Any, *, field: str) -> datetime:
 
 def _iso(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat(timespec="auto").replace("+00:00", "Z")
+
+
+def _parse_history_timestamp(value: Any, *, field: str) -> datetime:
+    if isinstance(value, bool):
+        raise PayoutEscalationInputError(f"{field} must be canonical UTC text or Unix seconds")
+    if isinstance(value, int):
+        if value < 0 or value > _MAX_EPOCH_SECONDS:
+            raise PayoutEscalationInputError(f"{field} Unix seconds are out of range")
+        try:
+            return datetime.fromtimestamp(value, tz=timezone.utc)
+        except (OverflowError, OSError, ValueError) as exc:
+            raise PayoutEscalationInputError(f"{field} Unix seconds are out of range") from exc
+    return _parse_timestamp(value, field=field)
 
 
 def _positive_decimal(value: Any, *, field: str) -> Decimal:
@@ -345,7 +359,7 @@ def _row_timestamp(row: dict[str, Any], *, required: bool) -> datetime | None:
         if required:
             raise PayoutEscalationEvidenceError("nonterminal wallet history row omitted initiation timestamp")
         return None
-    parsed = [_parse_timestamp(value, field="wallet history timestamp") for value in values]
+    parsed = [_parse_history_timestamp(value, field="wallet history timestamp") for value in values]
     if len(set(parsed)) != 1:
         raise PayoutEscalationEvidenceError("wallet history row has conflicting initiation timestamps")
     return parsed[0]
