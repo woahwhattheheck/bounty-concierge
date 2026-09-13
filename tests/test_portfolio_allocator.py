@@ -231,6 +231,29 @@ class PortfolioAllocatorTests(unittest.TestCase):
 
         self.assertEqual([item["input_index"] for item in result["selected"]], [1])
 
+    def test_equal_ev_does_not_add_zero_ev_skill_filler(self):
+        rows = [
+            row(0, reward="10", effort="1", probability="1", skill="0.5"),
+            row(1, reward="10", effort="1", probability="0", skill="1"),
+        ]
+        values = [
+            candidate("2", group="productive"),
+            candidate("2", group="zero-ev"),
+        ]
+        with patch(
+            "concierge.portfolio_allocator.rank_opportunities",
+            return_value=ranked_result(rows),
+        ):
+            result = allocate_portfolio(values, ["python"], "2")
+
+        self.assertEqual([item["input_index"] for item in result["selected"]], [0])
+        self.assertEqual(result["selected_effort_hours"], "1")
+        self.assertEqual(result["estimated_portfolio_expected_value_usd"], "10")
+        self.assertEqual(
+            result["portfolio_excluded"][0]["reason_code"],
+            "NOT_IN_MAX_ESTIMATED_EV_PORTFOLIO",
+        )
+
     def test_summary_disclaims_cash_claim(self):
         rows = [row(0, reward="10", effort="2")]
         values = [candidate("3")]

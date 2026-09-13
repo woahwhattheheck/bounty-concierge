@@ -156,10 +156,12 @@ def _better(
         return True
     if candidate["expected_value"] != incumbent["expected_value"]:
         return candidate["expected_value"] > incumbent["expected_value"]
-    if candidate["skill_sum"] != incumbent["skill_sum"]:
-        return candidate["skill_sum"] > incumbent["skill_sum"]
+    # Equal estimated value must never consume more scarce operator capacity
+    # merely to improve a secondary evidence score (for example, zero-EV work).
     if candidate["hours"] != incumbent["hours"]:
         return candidate["hours"] < incumbent["hours"]
+    if candidate["skill_sum"] != incumbent["skill_sum"]:
+        return candidate["skill_sum"] > incumbent["skill_sum"]
     return candidate["sources"] < incumbent["sources"]
 
 
@@ -380,8 +382,8 @@ def allocate_portfolio(
             "deadline_model": "serial_earliest_deadline_first",
             "collision_model": "at_most_one_per_collision_group",
             "tie_breaks": [
-                "higher_total_skill_match",
                 "lower_total_effort_hours",
+                "higher_total_skill_match",
                 "lexicographically_smaller_canonical_source_set",
             ],
         },
