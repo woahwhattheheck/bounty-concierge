@@ -76,18 +76,33 @@ def pr_payload(**overrides):
     return value
 
 
-def routes(pr=None, *, reviews=None, comments=None):
+def _with_ids(events, start):
+    if events is not None and not isinstance(events, list):
+        return events
+    result = []
+    for offset, event in enumerate(events or []):
+        value = dict(event)
+        value.setdefault("id", start + offset)
+        result.append(value)
+    return result
+
+
+def routes(pr=None, *, reviews=None, comments=None, review_comments=None):
     base = "https://api.github.com/repos/acme/widgets"
     return {
         f"{base}/pulls/17": pr or pr_payload(),
         (
             f"{base}/pulls/17/reviews",
             (("page", 1), ("per_page", 100)),
-        ): reviews or [],
+        ): _with_ids(reviews, 1000),
         (
             f"{base}/issues/17/comments",
             (("page", 1), ("per_page", 100)),
-        ): comments or [],
+        ): _with_ids(comments, 2000),
+        (
+            f"{base}/pulls/17/comments",
+            (("page", 1), ("per_page", 100)),
+        ): _with_ids(review_comments, 3000),
     }
 
 
@@ -343,6 +358,7 @@ class RevenueCloseoutTests(unittest.TestCase):
             }
             session_routes[(f"{base}/{repo}/pulls/{number}/reviews", (("page", 1), ("per_page", 100)))] = []
             session_routes[(f"{base}/{repo}/issues/{number}/comments", (("page", 1), ("per_page", 100)))] = []
+            session_routes[(f"{base}/{repo}/pulls/{number}/comments", (("page", 1), ("per_page", 100)))] = []
             inputs.append({
                 "repo": repo,
                 "pr": number,
@@ -365,7 +381,7 @@ class RevenueCloseoutTests(unittest.TestCase):
         session = FakeSession(routes())
         with self.assertRaisesRegex(RevenueCloseoutInputError, "duplicate closeout item"):
             build_closeout_queue([item(), item()], session=session)
-        self.assertEqual(len(session.calls), 3)
+        self.assertEqual(len(session.calls), 4)
 
     def test_queue_prioritizes_action_without_cross_currency_value_claims(self):
         base = "https://api.github.com/repos"
@@ -405,13 +421,19 @@ class RevenueCloseoutTests(unittest.TestCase):
                     f"{base}/{repo}/pulls/{number}/reviews",
                     (("page", 1), ("per_page", 100)),
                 )
-            ] = reviews
+            ] = [dict(event, id=1000 + i) for i, event in enumerate(reviews)]
             session_routes[
                 (
                     f"{base}/{repo}/issues/{number}/comments",
                     (("page", 1), ("per_page", 100)),
                 )
-            ] = comments
+            ] = [dict(event, id=2000 + i) for i, event in enumerate(comments)]
+            session_routes[
+                (
+                    f"{base}/{repo}/pulls/{number}/comments",
+                    (("page", 1), ("per_page", 100)),
+                )
+            ] = []
             inputs.append(
                 {
                     "repo": repo,
