@@ -115,7 +115,7 @@ def _parse_timestamp(value: Any, *, field: str) -> datetime:
 
 
 def _iso(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return value.astimezone(timezone.utc).isoformat(timespec="auto").replace("+00:00", "Z")
 
 
 def _positive_decimal(value: Any, *, field: str) -> Decimal:
