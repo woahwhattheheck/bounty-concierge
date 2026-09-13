@@ -144,16 +144,36 @@ _SKILL_KEYWORDS = {
 }
 
 
+def _keyword_matches(text, keyword):
+    """Return whether *keyword* occurs as a complete token or phrase.
+
+    Word guards are applied only when the corresponding keyword edge is a word
+    character.  That prevents short tags such as ``rust`` and ``node`` from
+    matching unrelated words while preserving punctuation-leading file suffix
+    keywords such as ``.py`` and punctuation-bearing labels such as ``CI/CD``.
+    """
+    if not isinstance(keyword, str) or not keyword.strip():
+        return False
+
+    keyword = keyword.casefold()
+    pattern = re.escape(keyword)
+    if re.match(r"\w", keyword[0]):
+        pattern = rf"(?<!\w){pattern}"
+    if re.match(r"\w", keyword[-1]):
+        pattern = rf"{pattern}(?!\w)"
+    return re.search(pattern, text.casefold()) is not None
+
+
 def tag_skills(title, body):
     """Return a list of skill tags relevant to this bounty.
 
-    Scans title and body for keyword matches.
+    Scans title and body for complete keyword/phrase matches.
     """
-    combined = f"{title} {body}".lower()
+    combined = f"{title} {body}"
     matched = []
     for skill, keywords in _SKILL_KEYWORDS.items():
         for kw in keywords:
-            if kw in combined:
+            if _keyword_matches(combined, kw):
                 matched.append(skill)
                 break
     return sorted(matched)
