@@ -14,9 +14,9 @@ import argparse
 import json
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Union
 
-from concierge.opportunity_ranker import rank_opportunities
+from concierge.opportunity_ranker import OpportunityRankInputError, rank_opportunities
 
 
 class PortfolioInputError(ValueError):
@@ -57,7 +57,7 @@ def _format_decimal(value: Decimal, *, metric: bool = False) -> str:
 
 
 def _portfolio_excluded(
-    item: dict[str, Any], code: str, *, detail: str | None = None
+    item: dict[str, Any], code: str, *, detail: Optional[str] = None
 ) -> dict[str, Any]:
     result = {
         "input_index": item["input_index"],
@@ -80,7 +80,7 @@ def _collision_group(candidate: dict[str, Any], source: str) -> str:
 
 def _row_to_item(
     row: dict[str, Any], candidates: list[dict[str, Any]], capacity: Decimal
-) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+) -> tuple[Optional[dict[str, Any]], Optional[dict[str, Any]]]:
     index = row.get("input_index")
     source = row.get("canonical_source_url")
     if isinstance(index, bool) or not isinstance(index, int):
@@ -150,7 +150,7 @@ def _row_to_item(
 
 
 def _better(
-    candidate: dict[str, Any], incumbent: dict[str, Any] | None
+    candidate: dict[str, Any], incumbent: Optional[dict[str, Any]]
 ) -> bool:
     if incumbent is None:
         return True
@@ -187,7 +187,7 @@ def _exact_select(items: list[dict[str, Any]], capacity: Decimal) -> list[int]:
             + items[ordered[pos]]["estimated_expected_value_usd"]
         )
 
-    best: dict[str, Any] | None = None
+    best: Optional[dict[str, Any]] = None
     chosen: list[int] = []
     used_groups: set[str] = set()
 
@@ -201,7 +201,9 @@ def _exact_select(items: list[dict[str, Any]], capacity: Decimal) -> list[int]:
         if best is not None and expected_value + suffix_ev[pos] < best["expected_value"]:
             return
         if pos == len(ordered):
-            sources = tuple(sorted(items[index]["canonical_source_url"] for index in chosen))
+            sources = tuple(
+                sorted(items[index]["canonical_source_url"] for index in chosen)
+            )
             solution = {
                 "indices": tuple(chosen),
                 "hours": used_hours,
@@ -246,7 +248,7 @@ def _exact_select(items: list[dict[str, Any]], capacity: Decimal) -> list[int]:
 def allocate_portfolio(
     candidates: list[dict[str, Any]],
     skills: list[str],
-    capacity_hours: str | int | Decimal,
+    capacity_hours: Union[str, int, Decimal],
     *,
     saturation_threshold: int = 4,
 ) -> dict[str, Any]:
@@ -265,11 +267,15 @@ def allocate_portfolio(
     if capacity <= 0:
         raise PortfolioInputError("capacity_hours must be greater than zero")
 
-    ranking = rank_opportunities(
-        candidates,
-        skills,
-        saturation_threshold=saturation_threshold,
-    )
+    try:
+        ranking = rank_opportunities(
+            candidates,
+            skills,
+            saturation_threshold=saturation_threshold,
+        )
+    except OpportunityRankInputError as exc:
+        raise PortfolioInputError(str(exc)) from exc
+
     ranked = ranking.get("ranked")
     ranking_excluded = ranking.get("excluded")
     if type(ranked) is not list or type(ranking_excluded) is not list:
@@ -410,7 +416,7 @@ def _load_request(path: str) -> dict[str, Any]:
     return payload
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m concierge.portfolio_allocator",
         description=(
