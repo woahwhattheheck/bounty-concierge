@@ -61,6 +61,11 @@ def _post(path, data=None, headers=None):
         return {"error": "Node returned non-JSON response"}
 
 
+def _finite_number(value):
+    """Return whether *value* is a finite JSON-style numeric scalar."""
+    return type(value) in (int, float) and math.isfinite(value)
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -100,8 +105,8 @@ def check_wallet_exists(name):
     """Check whether a wallet already exists on the RustChain node.
 
     Sends GET https://50.28.86.131/balance?miner_id=NAME and inspects the
-    response.  A wallet exists if the node returns balance data without an
-    error.
+    response.  A wallet exists only when the node returns matching, finite
+    balance data without an error.
 
     Args:
         name: The wallet / miner identifier string.
@@ -110,10 +115,12 @@ def check_wallet_exists(name):
         True if the wallet exists, False otherwise.
     """
     result = _get("/balance", params={"miner_id": name})
-    if "error" in result:
+    if not isinstance(result, dict) or "error" in result:
         return False
-    # A zero balance still means the wallet entry exists.
-    return True
+    return (
+        result.get("miner_id") == name
+        and _finite_number(result.get("balance_rtc"))
+    )
 
 
 def get_balance(name):
@@ -266,25 +273,38 @@ def get_all_holders(admin_key=None):
 
     Returns:
         List of dicts with keys: miner_id, amount_rtc, category.
-        Sorted by balance descending. None-id entries are filtered.
+        Sorted by balance descending. None-id entries are filtered. Malformed
+        payloads return an error dict instead of being treated as valid data.
     """
     key = admin_key or os.environ.get("RC_ADMIN_KEY", "")
     if not key:
         return {"error": "RC_ADMIN_KEY is required for holder listing"}
 
     result = _get("/api/balances", headers={"X-Admin-Key": key})
+    if not isinstance(result, dict):
+        return {"error": "Node returned malformed holder balance data"}
     if "error" in result:
         return result
 
-    raw = result.get("balances", [])
+    raw = result.get("balances")
+    if not isinstance(raw, list):
+        return {"error": "Node returned malformed holder balance data"}
+
     holders = []
     for w in raw:
+        if not isinstance(w, dict):
+            return {"error": "Node returned malformed holder balance data"}
         mid = w.get("miner_id")
-        if not mid:
+        if mid is None or mid == "":
             continue
+        if not isinstance(mid, str):
+            return {"error": "Node returned malformed holder balance data"}
+        amount = w.get("amount_rtc", 0.0)
+        if not _finite_number(amount):
+            return {"error": "Node returned malformed holder balance data"}
         holders.append({
             "miner_id": mid,
-            "amount_rtc": w.get("amount_rtc", 0.0),
+            "amount_rtc": amount,
             "category": _classify_wallet(mid),
         })
     holders.sort(key=lambda h: h["amount_rtc"], reverse=True)
