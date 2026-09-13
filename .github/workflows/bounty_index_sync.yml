@@ -27,10 +27,10 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Rebuild bounty index
+      - name: Rebuild bounty index atomically
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python -m concierge.bounty_index > data/bounty_index.json
+        run: python -m concierge.bounty_index_publish --output data/bounty_index.json
 
       - name: Refresh README Open Bounties table
         run: python -m concierge.readme_sync
