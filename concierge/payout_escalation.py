@@ -34,6 +34,7 @@ _POLICY = {
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _TX_ID_RE = re.compile(r"^[!-~]{1,256}$")
+_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$")
 _MAX_ITEMS = 10_000
 _MAX_ROWS_PER_ITEM = 100
 _MAX_JSON_BYTES = 4 * 1024 * 1024
@@ -95,9 +96,9 @@ def _exact_int(value: Any, *, field: str, minimum: int | None = None) -> int:
 
 
 def _parse_timestamp(value: Any, *, field: str) -> datetime:
-    if type(value) is not str or not value or value != value.strip():
-        raise PayoutEscalationInputError(f"{field} must be a canonical ISO-8601 timestamp")
-    text = value[:-1] + "+00:00" if value.endswith("Z") else value
+    if type(value) is not str or not _UTC_RE.fullmatch(value):
+        raise PayoutEscalationInputError(f"{field} must be canonical UTC with at most microsecond precision")
+    text = value[:-1] + "+00:00"
     try:
         parsed = datetime.fromisoformat(text)
     except ValueError as exc:
@@ -108,8 +109,6 @@ def _parse_timestamp(value: Any, *, field: str) -> datetime:
     canonical = utc.isoformat(timespec="seconds").replace("+00:00", "Z")
     normalized_input = parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
     if "." not in value and canonical != normalized_input:
-        raise PayoutEscalationInputError(f"{field} must be canonical UTC")
-    if not value.endswith("Z"):
         raise PayoutEscalationInputError(f"{field} must be canonical UTC")
     return utc
 
@@ -421,6 +420,9 @@ def compile_payout_escalation(
     for key in bindings:
         if key not in closeouts:
             raise PayoutEscalationInputError("binding references a PR absent from closeout")
+    for key in closeouts:
+        if key not in bindings:
+            raise PayoutEscalationInputError("every closeout item requires an explicit binding")
 
     history: dict[str, dict[str, Any]] = {}
     for row in rows:
