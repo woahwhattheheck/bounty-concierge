@@ -72,18 +72,25 @@ def check_devto_articles(api_key: str) -> List[dict]:
     """Fetch the authenticated user's Dev.to articles.
 
     Returns a list of dicts with keys: title, url, page_views,
-    positive_reactions.
+    positive_reactions. Transport failures, malformed JSON, and unsupported
+    payload shapes fail closed to an empty list.
     """
     url = "https://dev.to/api/articles/me"
     headers = {"api-key": api_key, "Accept": "application/json"}
     try:
         resp = requests.get(url, headers=headers, timeout=15)
         resp.raise_for_status()
-    except requests.RequestException:
+        payload = resp.json()
+    except (requests.RequestException, ValueError):
+        return []
+
+    if not isinstance(payload, list):
         return []
 
     articles = []
-    for item in resp.json():
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
         articles.append(
             {
                 "title": item.get("title", ""),
