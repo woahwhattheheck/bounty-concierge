@@ -12,11 +12,21 @@ import requests
 from concierge import config
 
 
+def _payload_list(data, key: str) -> List[dict]:
+    """Normalize supported API payload shapes to the public list contract."""
+    if isinstance(data, list):
+        return data
+    if not isinstance(data, dict):
+        return []
+    value = data.get(key, [])
+    return value if isinstance(value, list) else []
+
+
 def check_pending(wallet_id: str, node_url: str | None = None) -> List[dict]:
     """Return pending transfers for *wallet_id*.
 
     Queries ``GET {node_url}/wallet/pending?miner_id={wallet_id}``.
-    Returns an empty list on 404 or connection errors.
+    Returns an empty list on 404, connection errors, or unsupported payloads.
     """
     base = (node_url or config.RUSTCHAIN_NODE_URL).rstrip("/")
     url = f"{base}/wallet/pending"
@@ -30,8 +40,7 @@ def check_pending(wallet_id: str, node_url: str | None = None) -> List[dict]:
         if resp.status_code == 404:
             return []
         resp.raise_for_status()
-        data = resp.json()
-        return data if isinstance(data, list) else data.get("pending", [])
+        return _payload_list(resp.json(), "pending")
     except requests.RequestException:
         return []
 
@@ -40,7 +49,7 @@ def check_history(wallet_id: str, node_url: str | None = None) -> List[dict]:
     """Return recent transfer history for *wallet_id*.
 
     Queries ``GET {node_url}/wallet/history?miner_id={wallet_id}``.
-    Returns an empty list on 404 or connection errors.
+    Returns an empty list on 404, connection errors, or unsupported payloads.
     """
     base = (node_url or config.RUSTCHAIN_NODE_URL).rstrip("/")
     url = f"{base}/wallet/history"
@@ -54,8 +63,7 @@ def check_history(wallet_id: str, node_url: str | None = None) -> List[dict]:
         if resp.status_code == 404:
             return []
         resp.raise_for_status()
-        data = resp.json()
-        return data if isinstance(data, list) else data.get("history", [])
+        return _payload_list(resp.json(), "history")
     except requests.RequestException:
         return []
 
