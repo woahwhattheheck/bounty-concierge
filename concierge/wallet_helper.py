@@ -6,6 +6,7 @@ name validation, registration guidance, and holder/stats tracking for bounty
 hunters and admins.
 """
 
+import math
 import os
 import re
 
@@ -189,7 +190,7 @@ def transfer_rtc(from_wallet, to_wallet, amount, admin_key=None):
     Args:
         from_wallet: Source miner/wallet ID.
         to_wallet: Destination miner/wallet ID.
-        amount: Amount of RTC to transfer (float).
+        amount: Finite positive RTC amount (int or float).
         admin_key: Optional admin key override.
 
     Returns:
@@ -199,6 +200,10 @@ def transfer_rtc(from_wallet, to_wallet, amount, admin_key=None):
     key = admin_key or os.environ.get("RC_ADMIN_KEY", "")
     if not key:
         return {"error": "RC_ADMIN_KEY is required for transfers"}
+    if type(amount) not in (int, float) or amount <= 0:
+        return {"error": "Transfer amount must be a finite positive number"}
+    if isinstance(amount, float) and not math.isfinite(amount):
+        return {"error": "Transfer amount must be a finite positive number"}
     return _post(
         "/wallet/transfer",
         data={"from_miner": from_wallet, "to_miner": to_wallet,
