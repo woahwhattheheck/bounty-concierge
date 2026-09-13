@@ -10,7 +10,13 @@ from __future__ import annotations
 
 import argparse
 import json
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, localcontext
+from decimal import (
+    Decimal,
+    DecimalException,
+    InvalidOperation,
+    ROUND_HALF_UP,
+    localcontext,
+)
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +29,9 @@ class OpportunityRankInputError(ValueError):
 
 
 _METRIC_QUANTUM = Decimal("0.000001")
+_MAX_DECIMAL_TEXT_CHARS = 128
+_MAX_DECIMAL_DIGITS = 64
+_MAX_DECIMAL_ABS_EXPONENT = 64
 
 
 def _exact_decimal(value: Any, name: str) -> Decimal:
@@ -34,20 +43,45 @@ def _exact_decimal(value: Any, name: str) -> Decimal:
         raise OpportunityRankInputError(
             f"{name} must be a decimal string, integer, or Decimal"
         )
-    if isinstance(value, str) and not value.strip():
-        raise OpportunityRankInputError(f"{name} must be non-empty")
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            raise OpportunityRankInputError(f"{name} must be non-empty")
+        if len(value) > _MAX_DECIMAL_TEXT_CHARS:
+            raise OpportunityRankInputError(
+                f"{name} exceeds the supported exact-decimal representation"
+            )
+    elif isinstance(value, int) and value.bit_length() > 256:
+        raise OpportunityRankInputError(
+            f"{name} exceeds the supported exact-decimal representation"
+        )
     try:
         parsed = Decimal(value)
     except (InvalidOperation, ValueError) as exc:
         raise OpportunityRankInputError(f"{name} must be a finite decimal") from exc
     if not parsed.is_finite():
         raise OpportunityRankInputError(f"{name} must be a finite decimal")
+    parts = parsed.as_tuple()
+    if (
+        len(parts.digits) > _MAX_DECIMAL_DIGITS
+        or abs(parts.exponent) > _MAX_DECIMAL_ABS_EXPONENT
+    ):
+        raise OpportunityRankInputError(
+            f"{name} exceeds the supported exact-decimal representation"
+        )
     return parsed
 
 
 def _format_decimal(value: Decimal, *, metric: bool = False) -> str:
     if metric:
-        value = value.quantize(_METRIC_QUANTUM, rounding=ROUND_HALF_UP)
+        # Quantizing a large-but-bounded exact value to six decimal places can
+        # legitimately need more than the process-wide Decimal precision. Size
+        # the local context from the fixed-point result instead of allowing a
+        # candidate-local display conversion to raise InvalidOperation.
+        integer_digits = max(value.adjusted() + 1, 1)
+        with localcontext() as context:
+            context.prec = max(28, integer_digits + 6)
+            value = value.quantize(_METRIC_QUANTUM, rounding=ROUND_HALF_UP)
     text = format(value, "f")
     if "." in text:
         text = text.rstrip("0").rstrip(".")
@@ -218,10 +252,23 @@ def rank_opportunities(
             excluded.append(_excluded(index, source=source, code="SKILL_SCORE_INVALID"))
             continue
 
-        with localcontext() as context:
-            context.prec = 28
-            expected_value = reward * probability
-            ev_per_hour = expected_value / effort
+        try:
+            with localcontext() as context:
+                context.prec = 28
+                expected_value = reward * probability
+                ev_per_hour = expected_value / effort
+
+            reward_text = _format_decimal(reward)
+            probability_text = _format_decimal(probability)
+            effort_text = _format_decimal(effort)
+            expected_value_text = _format_decimal(expected_value, metric=True)
+            ev_per_hour_text = _format_decimal(ev_per_hour, metric=True)
+            skill_match_text = _format_decimal(skill_score, metric=True)
+        except DecimalException:
+            excluded.append(
+                _excluded(index, source=source, code="ESTIMATE_OR_REWARD_INVALID")
+            )
+            continue
 
         eligible.append(
             {
@@ -233,6 +280,12 @@ def rank_opportunities(
                 "_expected_value": expected_value,
                 "_ev_per_hour": ev_per_hour,
                 "_skill_match": skill_score,
+                "_reward_text": reward_text,
+                "_probability_text": probability_text,
+                "_effort_text": effort_text,
+                "_expected_value_text": expected_value_text,
+                "_ev_per_hour_text": ev_per_hour_text,
+                "_skill_match_text": skill_match_text,
             }
         )
 
@@ -273,16 +326,12 @@ def rank_opportunities(
                 "rank": rank,
                 "input_index": item["input_index"],
                 "canonical_source_url": item["canonical_source_url"],
-                "advertised_reward_usd": _format_decimal(item["_reward"]),
-                "estimated_win_probability": _format_decimal(item["_probability"]),
-                "estimated_effort_hours": _format_decimal(item["_effort"]),
-                "estimated_expected_value_usd": _format_decimal(
-                    item["_expected_value"], metric=True
-                ),
-                "estimated_ev_per_hour_usd": _format_decimal(
-                    item["_ev_per_hour"], metric=True
-                ),
-                "skill_match": _format_decimal(item["_skill_match"], metric=True),
+                "advertised_reward_usd": item["_reward_text"],
+                "estimated_win_probability": item["_probability_text"],
+                "estimated_effort_hours": item["_effort_text"],
+                "estimated_expected_value_usd": item["_expected_value_text"],
+                "estimated_ev_per_hour_usd": item["_ev_per_hour_text"],
+                "skill_match": item["_skill_match_text"],
                 "authority": {
                     "eligibility": "canonical_intake_gate",
                     "reward": "advertised_only",
