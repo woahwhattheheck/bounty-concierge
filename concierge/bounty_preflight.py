@@ -4,8 +4,7 @@
 ``bounty_audit`` establishes canonical issue/PR state and
 ``bounty_qualification`` decides whether work is safe to dispatch.  This module
 fills the missing ``attempt_count`` input from canonical GitHub issue comments
-while forwarding only maintainer-authoritative contribution terms into safety
-qualification.
+while authority-binding maintainer contribution terms for credential safety.
 """
 
 from __future__ import annotations
@@ -122,8 +121,8 @@ def collect_issue_context(
     External comments contribute only to ``attempt_count``.  Raw external
     comment text is never forwarded into qualification, so an arbitrary
     claimant cannot inject lexical safety terms.  OWNER/MEMBER/COLLABORATOR
-    comments are retained as authoritative contribution terms because they can
-    legitimately tighten the conditions for accepting paid work.
+    comments are retained separately as authoritative contribution terms for
+    the credential-safety boundary only.
     """
     if "/" not in repo or not repo.split("/", 1)[0] or not repo.split("/", 1)[1]:
         raise ValueError("repo must be in owner/name form")
@@ -239,7 +238,6 @@ def preflight_bounty(
         "labels": context["labels"],
         "attempt_count": context["attempt_count"],
         "canonical_audit": audit,
-        "contribution_terms": context["trusted_contribution_terms"],
     }
     qualification = qualify_dispatch(
         snapshot,
