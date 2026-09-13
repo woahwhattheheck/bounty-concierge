@@ -271,3 +271,4 @@ def test_edited_inline_review_comment_is_new_version_of_same_stable_identity():
     assert second["next_action"] == "respond_to_maintainer"
     assert second["new_feedback_count"] == 1
     assert second["latest_feedback"]["event_identity"] == "review_comment:123"
+
