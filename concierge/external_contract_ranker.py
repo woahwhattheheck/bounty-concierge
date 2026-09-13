@@ -259,8 +259,8 @@ def _validate_request(candidates: Any, as_of: Any) -> tuple[list[Any], str]:
     return candidates, canonical
 
 
-def rank_external_contracts(candidates: list[dict[str, Any]], *, as_of: str) -> dict[str, Any]:
-    """Reverify and rank external paid contracts inside native-currency partitions."""
+def _rank_external_contracts_at(candidates: list[dict[str, Any]], *, as_of: str) -> dict[str, Any]:
+    """Internal deterministic evaluator at an already-trusted UTC instant."""
     candidates, canonical_as_of = _validate_request(candidates, as_of)
     verified_identities: list[tuple[int, dict[str, Any], dict[str, Any]]] = []
     excluded: list[dict[str, Any]] = []
@@ -388,6 +388,16 @@ def rank_external_contracts(candidates: list[dict[str, Any]], *, as_of: str) -> 
     }
 
 
+def rank_external_contracts(candidates: list[dict[str, Any]]) -> dict[str, Any]:
+    """Rank contracts after verification at trusted current UTC.
+
+    The public authority-producing API intentionally accepts no caller-supplied
+    timestamp. Historical replay must not be able to resurrect stale or closed
+    qualification as current prioritization authority.
+    """
+    return _rank_external_contracts_at(candidates, as_of=_current_utc())
+
+
 def _read_bounded_fd(fd: int) -> bytes:
     chunks: list[bytes] = []
     remaining = _MAX_JSON_BYTES + 1
@@ -454,7 +464,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = parser.parse_args(argv)
     try:
         request = _read_request(args.request)
-        result = rank_external_contracts(request["candidates"], as_of=_current_utc())
+        result = rank_external_contracts(request["candidates"])
     except ExternalContractRankInputError as exc:
         parser.error(str(exc))
     print(json.dumps(result, indent=2, sort_keys=True) if args.json else format_summary(result))
