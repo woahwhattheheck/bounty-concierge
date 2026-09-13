@@ -197,23 +197,33 @@ def build_section(top_n: int = DEFAULT_TOP_N) -> str:
 
 
 def update_readme(readme_text: str, section: str) -> str:
-    """Replace the contents between the sentinels with ``section``.
+    """Replace the contents between the unique sentinels with ``section``.
 
     Returns the updated text. Raises ValueError if either sentinel is
-    missing.
+    missing, duplicated, or out of order.
     """
-    pattern = re.compile(
-        re.escape(START_MARKER) + r"(.*?)" + re.escape(END_MARKER),
-        re.DOTALL,
-    )
-    match = pattern.search(readme_text)
-    if not match:
+    start_count = readme_text.count(START_MARKER)
+    end_count = readme_text.count(END_MARKER)
+    if start_count == 0 or end_count == 0:
         raise ValueError(
             f"README is missing the {START_MARKER} / {END_MARKER} sentinels. "
             "Add them around the Open Bounties table."
         )
+    if start_count != 1 or end_count != 1:
+        raise ValueError(
+            "README must contain exactly one Open Bounties sentinel pair."
+        )
+    if readme_text.index(START_MARKER) > readme_text.index(END_MARKER):
+        raise ValueError(
+            "README Open Bounties sentinels are out of order."
+        )
+
+    pattern = re.compile(
+        re.escape(START_MARKER) + r"(.*?)" + re.escape(END_MARKER),
+        re.DOTALL,
+    )
     new_block = f"{START_MARKER}\n{section}\n{END_MARKER}"
-    return pattern.sub(lambda _match: new_block, readme_text)
+    return pattern.sub(lambda _match: new_block, readme_text, count=1)
 
 
 def main(argv: list[str] | None = None) -> int:
