@@ -19,6 +19,8 @@ Current RustChain `/wallet/history` responses identify the queried wallet in the
 
 A canonical `transfer_in` does not need a row-level `to`: its recipient is the exact wallet already validated by the history envelope (`miner_id == queried wallet`). Settlement therefore binds every row fingerprint to both the raw row and that wallet provenance. Copying identical row JSON into a different wallet capture produces a different evidence identity.
 
+The full wallet-bound row fingerprint remains the exact evidence selector. Canonical incoming rows must also carry one strict printable `tx_hash`, which is treated separately as the transaction reuse identity. Changing a timestamp, memo, or any other row byte cannot make the same canonical transaction count twice. Legacy typeless rows remain compatible; when they expose `tx_hash` or `tx_id`, that explicit identity is also fenced against reuse during reconciliation.
+
 Canonical `reward`, `ledger`, and `transfer_out` rows are never incoming bounty-cash evidence. Legacy typeless history rows remain compatible only when the row itself explicitly names the expected recipient.
 
 ## Workflow
@@ -73,7 +75,7 @@ Canonical `reward`, `ledger`, and `transfer_out` rows are never incoming bounty-
 
 ## Authority boundaries
 
-The reconciler never sends a transfer, contacts a sponsor, changes a claim, or treats merge state as cash. It does not guess matches by amount or timestamp. A selected row is usable only when its evidence fingerprint is bound to the exact wallet, the history provenance equals the settlement wallet, the row is a canonical incoming transfer (or an offline/legacy typeless row with an explicit matching recipient), the row is terminal/confirmed, it is not outgoing or self-funded, and its exact RTC amount fits within the advertised amount. One row cannot settle two closeout items in the same reconciliation. Online settlement additionally rejects provider wallet mismatch, total drift, incomplete pages, and duplicate indistinguishable rows across the canonical pagination snapshot.
+The reconciler never sends a transfer, contacts a sponsor, changes a claim, or treats merge state as cash. It does not guess matches by amount or timestamp. A selected row is usable only when its evidence fingerprint is bound to the exact wallet, the history provenance equals the settlement wallet, the row is a canonical incoming transfer (or an offline/legacy typeless row with an explicit matching recipient), the row is terminal/confirmed, it is not outgoing or self-funded, and its exact RTC amount fits within the advertised amount. Canonical incoming evidence additionally requires a strict `tx_hash`. One row cannot settle two closeout items, and one explicit wallet transaction identity cannot be counted more than once in the same reconciliation. Online settlement additionally rejects provider wallet mismatch, total drift, incomplete pages, duplicate indistinguishable rows, and duplicate canonical incoming transaction identities across the pagination snapshot.
 
 Mixed wallet history is expected. Unrelated reward/ledger/outgoing rows stay fingerprintable for audit but are classified unbindable instead of poisoning valid incoming evidence elsewhere in the same history.
 
