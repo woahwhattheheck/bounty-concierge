@@ -1,4 +1,4 @@
-name: Receivables aging review
+name: Merged work settlement review
 
 on:
   pull_request:
