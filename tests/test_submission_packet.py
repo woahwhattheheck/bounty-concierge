@@ -126,16 +126,20 @@ class SubmissionPacketTests(unittest.TestCase):
             "https://github.com:bad/acme/widgets/issues/17",
             "https://github.com:443/acme/widgets/issues/17",
             "https://github.com/acme/widgets/pull/17",
+            "https://github.com/./widgets/issues/17",
+            "https://github.com/acme/../issues/17",
         ]
         for source in bad_sources:
             with self.subTest(source=source), self.assertRaises(SubmissionPacketInputError):
                 build_submission_packet(portfolio(source), [])
 
-    def test_strict_pr_identity_rejects_query_fragment_and_wrong_shape(self):
+    def test_strict_pr_identity_rejects_query_fragment_wrong_shape_and_dot_aliases(self):
         bad = [
             "https://github.com/acme/widgets/pull/023",
             "https://github.com/acme/widgets/pull/23#discussion",
             "https://github.com/acme/widgets/issues/23",
+            "https://github.com/./widgets/pull/23",
+            "https://github.com/acme/../pull/23",
         ]
         for pr in bad:
             with self.subTest(pr=pr):
@@ -143,6 +147,23 @@ class SubmissionPacketTests(unittest.TestCase):
                 value["pull_request_url"] = pr
                 with self.assertRaises(SubmissionPacketInputError):
                     build_submission_packet(portfolio(), [value])
+
+    def test_pr_repository_must_match_selected_issue_repository(self):
+        value = evidence()
+        value["pull_request_url"] = "https://github.com/other/project/pull/23"
+        with self.assertRaisesRegex(
+            SubmissionPacketInputError,
+            "pull request repository must match canonical source repository",
+        ):
+            build_submission_packet(portfolio(), [value])
+
+    def test_pr_repository_identity_match_is_case_insensitive(self):
+        source = "https://github.com/Acme/Widgets/issues/17"
+        value = evidence(source)
+        value["pull_request_url"] = "https://github.com/acme/widgets/pull/23"
+        result = build_submission_packet(portfolio(source), [value])
+        self.assertEqual(result["ready_count"], 1)
+        self.assertEqual(result["packets"][0]["evidence"]["pull_request_repo"], "acme/widgets")
 
     def test_head_and_digest_must_be_exact_lowercase_hex(self):
         variants = [
