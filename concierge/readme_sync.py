@@ -140,7 +140,7 @@ def render_table(bounties: Iterable[dict], top_n: int = DEFAULT_TOP_N) -> str:
     validated = _validated_bounty_rows(bounties)
     sorted_bounties = sorted(
         validated,
-        key=lambda b: (-(b.get("reward_rtc") or 0), b.get("number", 0)),
+        key=lambda b: (-(b.get("reward_rtc") or 0), b.get("number") or 0),
     )
     rows = sorted_bounties[:top_n]
 
