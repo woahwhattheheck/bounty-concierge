@@ -28,12 +28,12 @@ class _Response:
         return self._payload
 
 
-def _issue(number=1):
+def _issue(number=1, *, repo="example/repo", url=None):
     return {
         "number": number,
         "title": f"[Bounty: {number * 10} RTC] Task {number}",
         "body": "Python fix",
-        "html_url": f"https://github.com/example/repo/issues/{number}",
+        "html_url": url or f"https://github.com/{repo}/issues/{number}",
         "labels": [{"name": "bounty"}],
         "created_at": "2026-09-13T00:00:00Z",
     }
@@ -86,6 +86,39 @@ def test_complete_aggregate_fails_closed_when_later_page_times_out(monkeypatch):
     assert calls == [1, 2]
 
 
+def test_complete_aggregate_rejects_duplicate_identity_across_pages(monkeypatch):
+    def get(url, **kwargs):
+        if kwargs["params"]["page"] == 1:
+            return _Response([_issue(7)], next_page=True)
+        return _Response([_issue(7)])
+
+    monkeypatch.setattr(publisher.requests, "get", get)
+
+    with pytest.raises(publisher.BountyIndexIncompleteError, match="duplicate bounty identity"):
+        publisher.aggregate_complete(repos=["example/repo"], token="unit-test")
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://github.com/other/repo/issues/1",
+        "https://github.com/example/repo/issues/2",
+        "https://github.com/example/repo/issues/1?shadow=2",
+        "http://github.com/example/repo/issues/1",
+    ],
+    ids=["other-repo", "other-number", "query-suffix", "wrong-scheme"],
+)
+def test_complete_aggregate_rejects_cross_wired_issue_url(monkeypatch, url):
+    monkeypatch.setattr(
+        publisher.requests,
+        "get",
+        lambda *args, **kwargs: _Response([_issue(1, url=url)]),
+    )
+
+    with pytest.raises(publisher.BountyIndexIncompleteError, match="cross-wired"):
+        publisher.aggregate_complete(repos=["example/repo"], token="unit-test")
+
+
 def test_best_effort_fetch_remains_salvage_mode(monkeypatch):
     def get(url, **kwargs):
         if url.endswith("/bad/repo/issues"):
@@ -113,6 +146,27 @@ def test_atomic_write_preserves_previous_index_on_source_failure(monkeypatch, tm
     )
 
     with pytest.raises(publisher.BountyIndexIncompleteError):
+        publisher.write_index_atomic(
+            target, repos=["example/repo"], token="unit-test"
+        )
+
+    assert target.read_bytes() == old
+    assert list(tmp_path.glob(".bounty_index.json.*.tmp")) == []
+
+
+def test_atomic_write_preserves_previous_index_on_identity_failure(monkeypatch, tmp_path):
+    target = tmp_path / "bounty_index.json"
+    old = b'{"sentinel":"last-known-good"}\n'
+    target.write_bytes(old)
+
+    def get(url, **kwargs):
+        if kwargs["params"]["page"] == 1:
+            return _Response([_issue(9)], next_page=True)
+        return _Response([_issue(9)])
+
+    monkeypatch.setattr(publisher.requests, "get", get)
+
+    with pytest.raises(publisher.BountyIndexIncompleteError, match="duplicate bounty identity"):
         publisher.write_index_atomic(
             target, repos=["example/repo"], token="unit-test"
         )

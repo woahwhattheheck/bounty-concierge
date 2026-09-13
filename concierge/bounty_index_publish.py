@@ -33,13 +33,20 @@ def _fail(message: str, cause: Exception | None = None) -> None:
     raise BountyIndexIncompleteError(message) from cause
 
 
+def _expected_issue_url(repo: str, number: int) -> str:
+    """Return the only GitHub issue URL authorized for one canonical identity."""
+    return f"https://github.com/{repo}/issues/{number}"
+
+
 def fetch_complete_bounties(repos=None, token=None):
     """Fetch every configured bounty source, failing closed on incompleteness.
 
     Pull-request rows from GitHub's issues endpoint are expected and skipped.
-    Every other row must match the parser's supported issue shape.  A source
-    404, transport error, invalid JSON, unsupported top-level shape, malformed
-    issue row, or later-page failure aborts the authoritative build.
+    Every other row must match the parser's supported issue shape and bind
+    exactly to its configured repository/issue identity. A source 404,
+    transport error, invalid JSON, unsupported top-level shape, malformed row,
+    duplicate issue identity, cross-wired URL, or later-page failure aborts the
+    authoritative build.
     """
     if repos is None:
         repos = REPOS
@@ -50,6 +57,7 @@ def fetch_complete_bounties(repos=None, token=None):
         headers["Authorization"] = f"Bearer {token}"
 
     bounties = []
+    seen_identities = set()
     for repo in repos:
         api_url = f"https://api.github.com/repos/{repo}/issues"
         params = {"labels": "bounty", "state": "open", "per_page": 100, "page": 1}
@@ -89,6 +97,21 @@ def fetch_complete_bounties(repos=None, token=None):
                         f"item {item_index}"
                     )
 
+                number = normalized["number"]
+                identity = (repo, number)
+                expected_url = _expected_issue_url(repo, number)
+                if normalized["url"] != expected_url:
+                    _fail(
+                        f"cross-wired bounty identity for {repo} page {page} "
+                        f"item {item_index}: expected issue {number} URL"
+                    )
+                if identity in seen_identities:
+                    _fail(
+                        f"duplicate bounty identity for {repo} issue {number} "
+                        f"at page {page} item {item_index}"
+                    )
+                seen_identities.add(identity)
+
                 title = normalized["title"]
                 body = normalized["body"]
                 labels = normalized["labels"]
@@ -96,7 +119,7 @@ def fetch_complete_bounties(repos=None, token=None):
                 bounties.append(
                     {
                         "repo": repo,
-                        "number": normalized["number"],
+                        "number": number,
                         "title": title,
                         "body": body,
                         "url": normalized["url"],
