@@ -22,7 +22,7 @@ from typing import Any
 from concierge import revenue_closeout_core as _core
 
 
-# Preserve the established public/test-facing API.  Only the validation and
+# Preserve the established public/test-facing API. Only the validation and
 # closeout decision seams below are replaced.
 for _export_name in dir(_core):
     if not _export_name.startswith("__"):
@@ -65,7 +65,11 @@ def _contact_evidence(
         raise RevenueCloseoutInputError(
             "settlement_followup_evidence must contain exact receipt-binding keys"
         )
-    if raw["repo"] != repo or raw["pr"] != pr:
+    if type(raw["repo"]) is not str or raw["repo"] != repo:
+        raise RevenueCloseoutInputError(
+            "settlement_followup_evidence cannot be transplanted across PR identities"
+        )
+    if type(raw["pr"]) is not int or raw["pr"] != pr:
         raise RevenueCloseoutInputError(
             "settlement_followup_evidence cannot be transplanted across PR identities"
         )
@@ -162,7 +166,7 @@ def scan_paid_pr(
     """Read one paid-work PR without confusing a route with proof of contact."""
     item = _validate_item(raw_item)
 
-    # The core scanner resolves its validator dynamically.  Keep it pointed at
+    # The core scanner resolves its validator dynamically. Keep it pointed at
     # this stricter validator so direct and queue callers share one contract.
     _core._validate_item = globals()["_validate_item"]
     result = _original_scan_paid_pr(
@@ -173,16 +177,18 @@ def scan_paid_pr(
     )
 
     evidence = item["settlement_followup_evidence"]
+    evidence_current = False
     if evidence is not None and result["state"] != "HEAD_MOVED":
         _validate_contact_chronology(result, evidence)
+        evidence_current = True
 
-    # Maintainer repair/response continues to outrank settlement routing.  Only
+    # Maintainer repair/response continues to outrank settlement routing. Only
     # the core's settlement decision pair is refined here.
     if result["state"] == "MERGED" and result["next_action"] in {
         "route_settlement_followup",
         "monitor_settlement",
     }:
-        if evidence is None:
+        if not evidence_current:
             result["next_action"] = "route_settlement_followup"
             if result.get("settlement_followup_url") is None:
                 result["reason"] = "merged_without_settlement_route"
@@ -192,14 +198,14 @@ def scan_paid_pr(
             result["next_action"] = "monitor_settlement"
             result["reason"] = "merged_followup_send_evidenced"
 
-    result["settlement_followup_send_evidenced"] = evidence is not None
+    result["settlement_followup_send_evidenced"] = evidence_current
     result["settlement_followup_evidence"] = evidence
     result["settlement_route_proves_prior_contact"] = False
     return result
 
 
 # Core-defined functions resolve collaborators through the core module's global
-# namespace.  Patch the two guarded seams so build_closeout_queue() and main()
+# namespace. Patch the two guarded seams so build_closeout_queue() and main()
 # automatically use the evidence-bound behavior while preserving their APIs.
 _core._validate_item = _validate_item
 _core.scan_paid_pr = scan_paid_pr

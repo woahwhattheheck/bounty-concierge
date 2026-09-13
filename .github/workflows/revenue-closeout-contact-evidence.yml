@@ -7,6 +7,7 @@ on:
       - "concierge/revenue_closeout_core.py"
       - "tests/test_revenue_closeout.py"
       - "tests/test_revenue_closeout_contact_evidence.py"
+      - "tests/test_revenue_closeout_contact_evidence_edges.py"
       - "docs/REVENUE_CLOSEOUT_CONTACT_EVIDENCE.md"
       - ".github/workflows/revenue-closeout-contact-evidence.yml"
   push:
@@ -17,6 +18,7 @@ on:
       - "concierge/revenue_closeout_core.py"
       - "tests/test_revenue_closeout.py"
       - "tests/test_revenue_closeout_contact_evidence.py"
+      - "tests/test_revenue_closeout_contact_evidence_edges.py"
       - "docs/REVENUE_CLOSEOUT_CONTACT_EVIDENCE.md"
       - ".github/workflows/revenue-closeout-contact-evidence.yml"
 
@@ -52,13 +54,16 @@ jobs:
           concierge/revenue_closeout_core.py
           tests/test_revenue_closeout.py
           tests/test_revenue_closeout_contact_evidence.py
+          tests/test_revenue_closeout_contact_evidence_edges.py
       - name: Run closeout regressions
         run: >-
           python -m unittest -v
           tests.test_revenue_closeout
           tests.test_revenue_closeout_contact_evidence
+          tests.test_revenue_closeout_contact_evidence_edges
       - name: Run optimized closeout regressions
         run: >-
           python -O -m unittest -v
           tests.test_revenue_closeout
           tests.test_revenue_closeout_contact_evidence
+          tests.test_revenue_closeout_contact_evidence_edges
