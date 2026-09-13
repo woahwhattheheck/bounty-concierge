@@ -94,6 +94,8 @@ def _markdown_link_target(value) -> str:
 
 def render_table(bounties: Iterable[dict], top_n: int = DEFAULT_TOP_N) -> str:
     """Return a markdown table from a sequence of bounty dicts."""
+    if top_n < 0:
+        raise ValueError("top_n must be non-negative")
     sorted_bounties = sorted(
         bounties,
         key=lambda b: (-(b.get("reward_rtc") or 0), b.get("number", 0)),
@@ -132,6 +134,8 @@ def build_section(top_n: int = DEFAULT_TOP_N) -> str:
     Reads ``data/bounty_index.json`` and produces a header line plus the
     table. Raises FileNotFoundError if the JSON is missing.
     """
+    if top_n < 0:
+        raise ValueError("top_n must be non-negative")
     payload = json.loads(INDEX_PATH.read_text())
     bounties = payload.get("bounties") or []
     updated = _single_line_text(payload.get("updated_at", "unknown"))
@@ -170,8 +174,10 @@ def main(argv: list[str] | None = None) -> int:
         i = argv.index("--top")
         try:
             top_n = int(argv[i + 1])
+            if top_n < 0:
+                raise ValueError
         except (ValueError, IndexError):
-            print("error: --top expects an integer", file=sys.stderr)
+            print("error: --top expects a non-negative integer", file=sys.stderr)
             return 2
 
     if not INDEX_PATH.exists():
