@@ -42,6 +42,27 @@ def _payload_list(data, key: str) -> List[dict]:
     return items
 
 
+def _history_payload_list(data, wallet_id: str) -> List[dict]:
+    """Normalize the canonical RustChain history envelope plus legacy shapes."""
+    if not isinstance(data, dict) or "transactions" not in data:
+        return _payload_list(data, "history")
+
+    items = data.get("transactions")
+    total = data.get("total")
+    response_wallet = data.get("miner_id")
+    if (
+        data.get("ok") is not True
+        or type(response_wallet) is not str
+        or response_wallet != wallet_id
+        or not isinstance(items, list)
+        or any(not isinstance(item, dict) for item in items)
+        or type(total) is not int
+        or total < len(items)
+    ):
+        raise PayoutLookupError("history payout response was malformed")
+    return items
+
+
 def _terminal_text(value) -> str:
     """Render an untrusted field without raw terminal-control characters."""
     text = str(value)
@@ -77,7 +98,7 @@ def _check_transfers(
             timeout=15,
             verify=False,  # self-signed cert on node
         )
-        if resp.status_code == 404:
+        if resp.status_code == 404 and endpoint == "pending":
             return []
         resp.raise_for_status()
         try:
@@ -86,6 +107,8 @@ def _check_transfers(
             raise PayoutLookupError(
                 f"{payload_key} payout response was not valid JSON"
             ) from exc
+        if endpoint == "history":
+            return _history_payload_list(data, wallet_id)
         return _payload_list(data, payload_key)
     except PayoutLookupError:
         raise
@@ -110,9 +133,10 @@ def check_history(wallet_id: str, node_url: str | None = None) -> List[dict]:
     """Return recent transfer history for *wallet_id*.
 
     Queries ``GET {node_url}/wallet/history?miner_id={wallet_id}``.
-    A genuine 404 remains an empty result. Transport, HTTP, JSON, and payload
-    failures raise :class:`PayoutLookupError` rather than masquerading as no
-    transfer history.
+    Current RustChain returns a 200 ``{ok, miner_id, transactions, total}``
+    envelope, including for an empty history. Legacy list/``history`` wrapper
+    responses remain accepted for older nodes. Transport, HTTP, JSON, and
+    payload failures raise :class:`PayoutLookupError`.
     """
     return _check_transfers(wallet_id, "history", "history", node_url)
 
@@ -126,8 +150,9 @@ def format_payout_status(pending: List[dict], history: List[dict]) -> str:
         Items from :func:`check_pending`.  Each dict should have at least
         ``amount_rtc`` and optionally ``memo``, ``created_at``.
     history : list[dict]
-        Items from :func:`check_history`.  Each dict should have at least
-        ``amount_rtc``, ``from``, ``to``, and optionally ``timestamp``.
+        Items from :func:`check_history`.  Current history entries use
+        ``amount``; legacy entries may use ``amount_rtc``. Transfer entries
+        may include ``from`` / ``to`` and ``timestamp``.
     """
     lines: list[str] = []
 
@@ -157,7 +182,7 @@ def format_payout_status(pending: List[dict], history: List[dict]) -> str:
         lines.append("  (none)")
     else:
         for item in history:
-            amount = _terminal_text(item.get("amount_rtc", "?"))
+            amount = _terminal_text(item.get("amount_rtc", item.get("amount", "?")))
             sender = _terminal_text(item.get("from", "?"))
             recipient = _terminal_text(item.get("to", "?"))
             ts_value = item.get("timestamp", "")
