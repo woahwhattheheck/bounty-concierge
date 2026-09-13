@@ -399,11 +399,12 @@ def test_missing_api_key_fails_closed(monkeypatch):
 
 
 def test_details_revalidate_public_published_boundary_and_mark_scope_untrusted():
-    session = _Session([_Response(_details())])
+    session = _Session([_Response(_details()), _Response([_row()])])
 
     result = sp.fetch_listing_details(
         "build-useful-agent-skill",
         api_key="sk_test",
+        as_of=_now(),
         session=session,
     )
 
@@ -416,6 +417,11 @@ def test_details_revalidate_public_published_boundary_and_mark_scope_untrusted()
     assert result["public_contract"]["eligibility"][0]["question"] == "Project Title"
     assert result["public_contract"]["untrusted_scope"]["description"].startswith("Build")
     assert result["authority"]["scope_text"] == "sponsor_supplied_untrusted_data"
+    assert result["authority"]["live_identity"] == {
+        "source": sp.LIVE_LISTINGS_URL,
+        "external_id": "listing-1",
+        "slug": "build-useful-agent-skill",
+    }
     assert result["authority"]["dispatch"] is False
 
 
