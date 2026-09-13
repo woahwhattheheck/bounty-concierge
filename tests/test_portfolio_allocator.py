@@ -151,6 +151,51 @@ class PortfolioAllocatorTests(unittest.TestCase):
             "PORTFOLIO_CONSTRAINT_INVALID",
         )
 
+    def test_pathological_capacity_uses_canonical_decimal_bounds(self):
+        with patch("concierge.portfolio_allocator.rank_opportunities") as mocked_ranker:
+            for capacity in ("1e-999999999", "1e999999999", "0e-999999999"):
+                with self.subTest(capacity=capacity):
+                    with self.assertRaises(PortfolioInputError):
+                        allocate_portfolio([], ["python"], capacity)
+        mocked_ranker.assert_not_called()
+
+    def test_pathological_deadline_is_candidate_local_failure(self):
+        rows = [
+            row(0, reward="5", effort="1"),
+            row(1, reward="6", effort="1"),
+        ]
+        values = [candidate("1e999999999"), candidate("4")]
+        with patch(
+            "concierge.portfolio_allocator.rank_opportunities",
+            return_value=ranked_result(rows),
+        ):
+            result = allocate_portfolio(values, ["python"], "4")
+
+        self.assertEqual([item["input_index"] for item in result["selected"]], [1])
+        self.assertEqual(result["portfolio_excluded"][0]["input_index"], 0)
+        self.assertEqual(
+            result["portfolio_excluded"][0]["reason_code"],
+            "PORTFOLIO_CONSTRAINT_INVALID",
+        )
+
+    def test_ranker_boundary_receipts_remain_exact_downstream(self):
+        reward = "1" + ("0" * 64)
+        effort = "0." + ("0" * 63) + "1"
+        rows = [row(0, reward=reward, effort=effort, probability="1")]
+        values = [candidate("1")]
+        with patch(
+            "concierge.portfolio_allocator.rank_opportunities",
+            return_value=ranked_result(rows),
+        ):
+            result = allocate_portfolio(values, ["python"], "1")
+
+        self.assertEqual(result["selected_count"], 1)
+        selected = result["selected"][0]
+        self.assertEqual(selected["advertised_reward_usd"], reward)
+        self.assertEqual(selected["estimated_effort_hours"], effort)
+        self.assertEqual(selected["estimated_expected_value_usd"], reward)
+        self.assertEqual(selected["estimated_ev_per_hour_usd"], "1" + ("0" * 128))
+
     def test_candidate_that_cannot_finish_by_own_deadline_is_excluded(self):
         rows = [row(0, reward="50", effort="5")]
         values = [candidate("4")]
