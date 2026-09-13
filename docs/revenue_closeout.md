@@ -6,25 +6,54 @@ settlement follow-through after implementation is in flight, not for discovering
 claiming new bounties.
 
 The scanner re-reads the canonical GitHub pull request, validates the expected author
-and optional exact head, then reads maintainer reviews and issue comments. It only
-routes new human feedback from OWNER, MEMBER, or COLLABORATOR accounts after the
-manifest's `last_seen_at` boundary for notification freshness. Because GitHub event
-timestamps are not unique, events exactly equal to the cursor timestamp are replayed
-conservatively rather than risking a same-timestamp miss. Review authority is separate:
-the latest decision-bearing review per maintainer is evaluated regardless of cursor
-age, so an unresolved `CHANGES_REQUESTED` remains repair work until that same maintainer
-later APPROVES or the review is DISMISSED. COMMENTED reviews do not clear a change
-request. New maintainer comments and COMMENTED reviews route a response. Current repair
-and response obligations outrank merged/closed lifecycle routing; only when none remain
-does a merged PR route to settlement or a closed-unmerged PR route to investigation. A
-moved expected head fails closed before feedback is consumed.
+and optional exact head, then reads all three maintainer feedback surfaces: submitted
+pull-request reviews, top-level issue/PR comments, and inline pull-review comments.
+Only human OWNER, MEMBER, or COLLABORATOR feedback is actionable; bots, outsiders, and
+the operator's own feedback are excluded.
 
-Merged PRs with no maintainer obligation are routed either to a missing settlement
-follow-up or to monitoring an already-recorded follow-up URL. Closed-unmerged PRs with
-no maintainer obligation are routed for investigation.
-Neither merge state nor an advertised amount is treated as sponsor acceptance, earned
-revenue, or payment: every output explicitly reports `cash_status: not_inferred`.
-The module performs no comment, email, claim, wallet, payment, or provider mutation.
+Review authority is separate from notification freshness. The latest decision-bearing
+review per maintainer is evaluated regardless of cursor age, so an unresolved
+`CHANGES_REQUESTED` remains repair work until that same maintainer later APPROVES or the
+review is DISMISSED. COMMENTED reviews do not clear a change request. Current repair
+and new maintainer-response obligations outrank merged/closed lifecycle routing; only
+when no maintainer obligation remains does a merged PR route to settlement or a
+closed-unmerged PR route to investigation.
+
+## Lossless feedback cursor
+
+New integrations should persist the receipt's `next_cursor` and send it back as the
+next manifest item's `feedback_cursor`. A cursor contains:
+
+```json
+{
+  "through_at": "2026-09-13T08:00:00Z",
+  "seen_events": {
+    "review:123": {
+      "at": "2026-09-13T08:00:03Z",
+      "version": "COMMENTED|2026-09-13T08:00:03Z"
+    },
+    "review_comment:456": {
+      "at": "2026-09-13T08:00:04Z",
+      "version": "2026-09-13T08:00:04Z"
+    }
+  }
+}
+```
+
+`through_at` is a safe high-watermark, not scan-completion time. The scanner captures
+scan start before any network read and advances the watermark only to five seconds
+before that instant. Events observed beyond the watermark are recorded by stable
+GitHub endpoint-kind + numeric ID and version, so rerunning the same cursor does not
+recreate a response obligation. An event that races in after an earlier endpoint was
+read remains beyond the safe watermark and is therefore eligible on the next scan.
+Edits to an inline or issue comment keep the stable ID but change `updated_at`, creating
+a new version and a new response obligation.
+
+The cursor retains only observed event versions at or beyond the next watermark and is
+bounded to 1,000 entries. Legacy manifests may provide `last_seen_at` instead of
+`feedback_cursor`; that timestamp is migrated as a cursor with no seen-event map, so
+equality may replay once during migration rather than risk loss. Do not provide both
+fields.
 
 ## Manifest
 
@@ -38,7 +67,10 @@ The module performs no comment, email, claim, wallet, payment, or provider mutat
       "operator_login": "builder",
       "advertised_amount": "500",
       "currency": "USD",
-      "last_seen_at": "2026-09-13T08:00:00Z",
+      "feedback_cursor": {
+        "through_at": "2026-09-13T08:00:00Z",
+        "seen_events": {}
+      },
       "expected_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     }
   ]
@@ -47,9 +79,10 @@ The module performs no comment, email, claim, wallet, payment, or provider mutat
 
 `advertised_amount` accepts bounded exact decimal text or an integer, not binary floats;
 source length, significant digits, and exponent are bounded before any network read or
-fixed-point rendering so hostile scientific notation cannot amplify memory use.
-`last_seen_at` is required, must be timezone-aware, and cannot be materially in the future. `settlement_followup_url`, when present, must be
-an absolute HTTP(S) URL. Duplicate repository/PR identities are rejected.
+fixed-point rendering so hostile scientific notation cannot amplify memory use. Cursor
+timestamps must be timezone-aware and cannot be materially in the future.
+`settlement_followup_url`, when present, must be an absolute HTTP(S) URL. Duplicate
+repository/PR identities are rejected.
 
 Run:
 
@@ -61,5 +94,7 @@ python -m concierge.revenue_closeout closeout.json --json
 The queue order is deterministic: requested repairs, maintainer responses,
 closed-unmerged investigation, settlement routing, settlement monitoring, then passive
 acceptance waits. Within one action class the manifest's operator-supplied order is
-preserved; raw advertised numbers are never compared across currencies. This is
-prioritization evidence only, not a cash ledger.
+preserved; raw advertised numbers are never compared across currencies. Neither merge
+state nor an advertised amount is treated as sponsor acceptance, earned revenue, or
+payment: every output reports `cash_status: not_inferred`. The module performs no
+comment, email, claim, wallet, payment, or provider mutation.
