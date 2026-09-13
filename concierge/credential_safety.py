@@ -34,8 +34,9 @@ _DISCLOSURE_ACTION_RE = re.compile(
 _VERIFICATION_ACTION_RE = re.compile(
     r"(?i)\b(?:verify|authenticate|enter|sign\s+in|log\s+in)\b"
 )
-_DIRECT_CUSTODY_RE = re.compile(
-    r"(?i)\b(?:your|runner|github|account|wallet|session)\b"
+_DIRECT_CUSTODY_PREFIX_RE = re.compile(
+    r"(?i)\b(?:your|runner|github|account|wallet|session)"
+    r"(?:[-_\s]+\w+){0,2}[-_\s]*$"
 )
 
 
@@ -51,11 +52,13 @@ def credential_gate_signal_types(texts: Iterable[str]) -> list[str]:
         if not isinstance(text, str):
             raise TypeError("credential safety text must be a string")
         for match in _SENSITIVE_CREDENTIAL_RE.finditer(text):
+            custody_prefix = text[max(0, match.start() - 80) : match.start()]
+            if not _DIRECT_CUSTODY_PREFIX_RE.search(custody_prefix):
+                continue
+
             start = max(0, match.start() - 140)
             end = min(len(text), match.end() + 220)
             window = text[start:end]
-            if not _DIRECT_CUSTODY_RE.search(window):
-                continue
             if _DISCLOSURE_ACTION_RE.search(window):
                 signals.add("credential_disclosure")
             if (
