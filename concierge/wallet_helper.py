@@ -152,7 +152,9 @@ def get_pending_transfers(name):
     if isinstance(result, dict):
         if "error" in result:
             return []
-        return result.get("pending", [])
+        pending = result.get("pending", [])
+        if isinstance(pending, list):
+            return pending
     return []
 
 
