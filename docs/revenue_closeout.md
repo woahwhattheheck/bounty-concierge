@@ -38,7 +38,7 @@ The module performs no comment, email, claim, wallet, payment, or provider mutat
 ```
 
 `advertised_amount` accepts exact decimal text or an integer, not binary floats.
-`last_seen_at` must be timezone-aware. `settlement_followup_url`, when present, must be
+`last_seen_at` is required, must be timezone-aware, and cannot be materially in the future. `settlement_followup_url`, when present, must be
 an absolute HTTP(S) URL. Duplicate repository/PR identities are rejected.
 
 Run:
@@ -50,5 +50,6 @@ python -m concierge.revenue_closeout closeout.json --json
 
 The queue order is deterministic: requested repairs, maintainer responses,
 closed-unmerged investigation, settlement routing, settlement monitoring, then passive
-acceptance waits; within one action class, larger advertised amounts sort first. This
-is prioritization evidence only, not a cash ledger.
+acceptance waits. Within one action class the manifest's operator-supplied order is
+preserved; raw advertised numbers are never compared across currencies. This is
+prioritization evidence only, not a cash ledger.
