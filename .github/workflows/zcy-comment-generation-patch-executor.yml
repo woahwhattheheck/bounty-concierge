@@ -1,28 +1,22 @@
-name: ZCY exact comment-generation patch executor
+name: ZCY Exact Patch Executor
 
-on:
+"on":
   push:
     branches:
-      - zcy-r7v4/patch-executor-comment-generation-20260913
+      - "zcy-r7v4/patch-executor-comment-generation-20260913"
 
 permissions:
   contents: write
 
-concurrency:
-  group: zcy-comment-generation-patch-executor
-  cancel-in-progress: false
-
 jobs:
-  apply-validate-and-commit:
-    if: github.event.head_commit.message == 'chore: stage exact comment-generation patch executor'
+  apply:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout exact executor branch
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Apply the owner-staged patch exactly
+      - name: Apply exact staged patch
         shell: bash
         run: |
           set -euo pipefail
@@ -31,7 +25,7 @@ jobs:
           rm COMMENT_GENERATION_FIX.patch
           rm .github/workflows/zcy-comment-generation-patch-executor.yml
 
-      - name: Verify exact path scope
+      - name: Verify path scope
         shell: bash
         run: |
           set -euo pipefail
@@ -44,16 +38,15 @@ jobs:
           git status --porcelain=v1 | cut -c4- | LC_ALL=C sort > /tmp/actual-paths
           diff -u /tmp/expected-paths /tmp/actual-paths
 
-      - name: Install focused test dependencies
-        run: python -m pip install -r requirements.txt 'pytest>=8,<9'
+      - name: Validate focused suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -r requirements.txt 'pytest>=8,<9'
+          python -m py_compile concierge/bounty_preflight.py tests/test_bounty_preflight.py
+          python -m pytest -q tests/test_bounty_preflight.py
 
-      - name: Compile patched source and test
-        run: python -m py_compile concierge/bounty_preflight.py tests/test_bounty_preflight.py
-
-      - name: Run focused exact-branch suite
-        run: python -m pytest -q tests/test_bounty_preflight.py
-
-      - name: Commit validated generated tree
+      - name: Commit validated tree
         shell: bash
         run: |
           set -euo pipefail
@@ -61,4 +54,4 @@ jobs:
           git config user.email 'actions@users.noreply.github.com'
           git add -A
           git commit -m 'Fix same-second comment authority generation binding'
-          git push origin HEAD:"${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
