@@ -89,6 +89,31 @@ class TestMatchSkills:
 
         assert skill_matcher.match_skills(bounty, ["testing", "frontend"]) == 0.5
 
+    def test_rust_does_not_match_inside_trustworthy(self):
+        bounty = {"title": "Write trustworthy deployment documentation"}
+
+        assert skill_matcher.match_skills(bounty, ["rust"]) == 0.0
+
+    def test_ci_does_not_match_inside_specific(self):
+        bounty = {"title": "Document specific release requirements"}
+
+        assert skill_matcher.match_skills(bounty, ["testing"]) == 0.0
+
+    def test_unknown_go_does_not_match_inside_django(self):
+        bounty = {"title": "Improve Django migrations"}
+
+        assert skill_matcher.match_skills(bounty, ["go"]) == 0.0
+
+    def test_punctuation_delimited_keyword_still_matches(self):
+        bounty = {"title": "Rust/Cargo parser cleanup"}
+
+        assert skill_matcher.match_skills(bounty, ["rust"]) == 1.0
+
+    def test_multiword_keyword_still_matches(self):
+        assert skill_matcher._keyword_matches(
+            "repair the github actions release workflow", "github actions"
+        )
+
 
 class TestRecommend:
     """Tests for ranked bounty recommendations."""

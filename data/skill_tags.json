@@ -20,7 +20,7 @@
     "bounty_labels": ["social-media", "engagement"]
   },
   "testing": {
-    "aliases": ["test", "qa", "quality"],
+    "aliases": ["test", "qa", "quality", "pytest", "coverage", "benchmark"],
     "bounty_labels": ["testing", "ci"]
   },
   "devops": {
