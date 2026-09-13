@@ -180,6 +180,44 @@ class FractionalDeadlineTests(unittest.TestCase):
                 as_of=datetime(2026, 9, 13, 12, 0, 0, tzinfo=timezone.utc),
             )
 
+    def test_cli_loader_rejects_fifo_without_blocking(self):
+        import os
+        import tempfile
+        from concierge.payout_escalation import PayoutEscalationInputError, _load_json
+        if not hasattr(os, "mkfifo"):
+            self.skipTest("FIFO unsupported on this platform")
+        with tempfile.TemporaryDirectory() as directory:
+            fifo = os.path.join(directory, "input.json")
+            os.mkfifo(fifo)
+            with self.assertRaises(PayoutEscalationInputError):
+                _load_json(fifo)
+
+    def test_cli_loader_rejects_symlink_when_nofollow_is_available(self):
+        import os
+        import tempfile
+        from concierge.payout_escalation import _load_json
+        if not getattr(os, "O_NOFOLLOW", 0):
+            self.skipTest("O_NOFOLLOW unsupported on this platform")
+        with tempfile.TemporaryDirectory() as directory:
+            target = os.path.join(directory, "target.json")
+            link = os.path.join(directory, "link.json")
+            with open(target, "w", encoding="utf-8") as handle:
+                handle.write('{"ok":true}')
+            os.symlink(target, link)
+            with self.assertRaises(OSError):
+                _load_json(link)
+
+    def test_cli_loader_rejects_oversized_file_before_json_parse(self):
+        import os
+        import tempfile
+        from concierge.payout_escalation import PayoutEscalationInputError, _MAX_JSON_BYTES, _load_json
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "large.json")
+            with open(path, "wb") as handle:
+                handle.truncate(_MAX_JSON_BYTES + 1)
+            with self.assertRaises(PayoutEscalationInputError):
+                _load_json(path)
+
 
 if __name__ == "__main__":
     unittest.main()
