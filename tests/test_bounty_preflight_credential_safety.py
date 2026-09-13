@@ -125,10 +125,16 @@ def test_direct_secret_disclosure_is_rejected_without_source_echo():
     assert hostile not in json.dumps(qualification)
 
 
-def test_oauth_and_product_login_prose_are_not_credential_gates():
+def test_oauth_product_login_and_explicit_prohibitions_are_not_credential_gates():
     assert credential_gate_signal_types(
         ["Use GitHub OAuth to link your account; the authorization-code exchange is handled by GitHub."]
     ) == []
     assert credential_gate_signal_types(
-        ["Add a login form where users can enter a password."]
+        ["Your app should add a login form where users can enter their password."]
+    ) == []
+    assert credential_gate_signal_types(
+        ["Never share your GitHub access token. Use GitHub OAuth instead."]
+    ) == []
+    assert credential_gate_signal_types(
+        ["Do not verify your runner credentials on an external portal."]
     ) == []
