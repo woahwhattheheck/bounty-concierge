@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
 import unittest
 
 from concierge.bounty_availability import (
@@ -139,6 +140,62 @@ class AvailabilityTests(unittest.TestCase):
             "acme/widgets", 17, session=stable_session(comments)
         )
         self.assertTrue(result["dispatch"])
+
+    def test_pure_question_still_clears(self):
+        comments = [comment("Is @alice submission accepted?")]
+        result = inspect_bounty_availability(
+            "acme/widgets", 17, session=stable_session(comments)
+        )
+        self.assertTrue(result["dispatch"])
+
+    def test_mixed_assertion_then_question_is_hold(self):
+        comments = [comment("@alice submission accepted. Any questions?")]
+        result = inspect_bounty_availability(
+            "acme/widgets", 17, session=stable_session(comments)
+        )
+        self.assertEqual(result["reason_code"], "MAINTAINER_TERMINAL_OUTCOME")
+        self.assertFalse(result["dispatch"])
+
+    def test_mixed_question_then_assertion_is_hold(self):
+        comments = [comment("Any questions? @alice submission accepted.")]
+        result = inspect_bounty_availability(
+            "acme/widgets", 17, session=stable_session(comments)
+        )
+        self.assertEqual(result["reason_code"], "MAINTAINER_TERMINAL_OUTCOME")
+        self.assertFalse(result["dispatch"])
+
+    def test_declared_comment_count_mismatch_holds(self):
+        comments = [comment("Thanks, submissions remain open.")]
+        payload = issue(comments=2)
+        result = inspect_bounty_availability(
+            "acme/widgets",
+            17,
+            session=stable_session(comments, issue_payload=payload),
+        )
+        self.assertEqual(result["reason_code"], "COMMENT_COUNT_MISMATCH")
+        self.assertFalse(result["dispatch"])
+
+    def test_duplicate_comment_ids_hold(self):
+        comments = [
+            comment("Thanks, submissions remain open.", ident=7),
+            comment("Still open for work.", ident=7),
+        ]
+        result = inspect_bounty_availability(
+            "acme/widgets", 17, session=stable_session(comments)
+        )
+        self.assertEqual(result["reason_code"], "COMMENT_ID_DUPLICATED")
+        self.assertFalse(result["dispatch"])
+
+    def test_workflow_installs_pytest_before_claim_path_step(self):
+        text = Path(".github/workflows/bounty-availability.yml").read_text(
+            encoding="utf-8"
+        )
+        install_at = text.find("pip install")
+        pytest_at = text.find("python -m pytest")
+        self.assertGreaterEqual(install_at, 0)
+        self.assertGreaterEqual(pytest_at, 0)
+        self.assertLess(install_at, pytest_at)
+        self.assertIn("pytest", text[install_at:pytest_at])
 
     def test_explicit_award_is_hold(self):
         comments = [comment("Awarded to @alice for the submission.")]

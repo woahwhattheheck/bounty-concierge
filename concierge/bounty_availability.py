@@ -159,6 +159,9 @@ def _issue_marker(issue: dict[str, Any]) -> tuple[object, ...]:
     )
 
 
+_CLAUSE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
+
+
 def _candidate_lines(text: str) -> Iterable[str]:
     in_fence = False
     for raw in text.splitlines():
@@ -172,20 +175,27 @@ def _candidate_lines(text: str) -> Iterable[str]:
         yield stripped
 
 
+def _assertive_clauses(line: str) -> Iterable[str]:
+    """Skip interrogative clauses only, not mixed assertion/question lines."""
+    for clause in _CLAUSE_SPLIT_RE.split(line):
+        stripped = clause.strip()
+        if not stripped or "?" in stripped:
+            continue
+        yield stripped
+
+
 def _terminal_signals(text: str) -> tuple[str, ...]:
     found: set[str] = set()
     for line in _candidate_lines(text):
-        # Questions are not terminal assertions.
-        if "?" in line:
-            continue
-        for code, pattern in _RULES:
-            match = pattern.search(line)
-            if match is None:
-                continue
-            context = line[max(0, match.start() - 40) : match.end()]
-            if _NEGATION_RE.search(context):
-                continue
-            found.add(code)
+        for clause in _assertive_clauses(line):
+            for code, pattern in _RULES:
+                match = pattern.search(clause)
+                if match is None:
+                    continue
+                context = clause[max(0, match.start() - 40) : match.end()]
+                if _NEGATION_RE.search(context):
+                    continue
+                found.add(code)
     return tuple(sorted(found))
 
 
@@ -388,6 +398,30 @@ def inspect_bounty_availability(
             repo=repo,
             number=number,
             code="COMMENT_GENERATION_CHANGED",
+            issue_state=issue_state,
+        )
+
+    declared_count = after_marker[4]
+    if (
+        len(comments_before) != declared_count
+        or len(comments_after) != declared_count
+    ):
+        return _safe_hold(
+            repo=repo,
+            number=number,
+            code="COMMENT_COUNT_MISMATCH",
+            issue_state=issue_state,
+        )
+
+    before_ids = tuple(item.comment_id for item in comments_before)
+    after_ids = tuple(item.comment_id for item in comments_after)
+    if len(set(before_ids)) != len(before_ids) or len(set(after_ids)) != len(
+        after_ids
+    ):
+        return _safe_hold(
+            repo=repo,
+            number=number,
+            code="COMMENT_ID_DUPLICATED",
             issue_state=issue_state,
         )
 
