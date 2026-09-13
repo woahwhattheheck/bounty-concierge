@@ -118,11 +118,10 @@ def collect_issue_context(
 ) -> dict[str, Any]:
     """Collect safe qualification inputs plus conservative claim pressure.
 
-    External comments contribute only to ``attempt_count``.  Raw external
-    comment text is never forwarded into qualification, so an arbitrary
-    claimant cannot inject lexical safety terms.  OWNER/MEMBER/COLLABORATOR
-    comments are retained separately as authoritative contribution terms for
-    the credential-safety boundary only.
+    External comments contribute only to ``attempt_count``. Raw external comment
+    text is never forwarded into qualification. OWNER/MEMBER/COLLABORATOR terms
+    are reduced immediately to generic credential-safety signals, so raw
+    maintainer comment text does not leave the collection loop either.
     """
     if "/" not in repo or not repo.split("/", 1)[0] or not repo.split("/", 1)[1]:
         raise ValueError("repo must be in owner/name form")
@@ -149,14 +148,18 @@ def collect_issue_context(
     if issue_body is None:
         issue_body = ""
     if not isinstance(issue_body, str):
-        raise BountyPreflightError(f"GitHub issue body was not a string for {repo}#{number}")
+        raise BountyPreflightError(
+            f"GitHub issue body was not a string for {repo}#{number}"
+        )
 
     claimant_logins: set[str] = set()
     attempt_signal_count = 0
     comments_truncated = False
-    trusted_contribution_terms: list[str] = []
-    comments_url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
+    credential_signals: set[str] = set()
+    if _has_maintainer_authority(issue):
+        credential_signals.update(credential_gate_signal_types([issue_body]))
 
+    comments_url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
     for page in range(1, max_pages + 1):
         payload = _get_json(
             session,
@@ -180,7 +183,7 @@ def collect_issue_context(
                 )
             body = body or ""
             if _has_maintainer_authority(comment) and body.strip():
-                trusted_contribution_terms.append(body)
+                credential_signals.update(credential_gate_signal_types([body]))
             external_human, login = _is_external_human(comment)
             if external_human and _signals_attempt(body, repo):
                 attempt_signal_count += 1
@@ -197,8 +200,7 @@ def collect_issue_context(
         "attempt_count": len(claimant_logins),
         "attempt_signal_count": attempt_signal_count,
         "comments_truncated": comments_truncated,
-        "issue_body_authoritative": _has_maintainer_authority(issue),
-        "trusted_contribution_terms": trusted_contribution_terms,
+        "credential_gate_signal_types": sorted(credential_signals),
     }
 
 
@@ -243,13 +245,9 @@ def preflight_bounty(
         snapshot,
         saturation_threshold=saturation_threshold,
     )
-
-    credential_terms = list(context["trusted_contribution_terms"])
-    if context["issue_body_authoritative"]:
-        credential_terms.insert(0, context["body"])
     qualification = apply_credential_gate(
         qualification,
-        credential_gate_signal_types(credential_terms),
+        context["credential_gate_signal_types"],
     )
 
     return {
