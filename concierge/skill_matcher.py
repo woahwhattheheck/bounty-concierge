@@ -133,6 +133,9 @@ def recommend(
     Each returned dict is the original bounty dict with an extra
     ``match_score`` key (float, 0.0--1.0).
     """
+    if limit <= 0:
+        return []
+
     scored = []
     for bounty in bounties:
         score = match_skills(bounty, skills)
