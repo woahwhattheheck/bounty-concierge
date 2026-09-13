@@ -8,6 +8,10 @@ import sys
 from typing import Any
 
 from concierge.bounty_audit import BountyAuditError
+from concierge.bounty_availability import (
+    BountyAvailabilityError,
+    inspect_bounty_availability,
+)
 from concierge.bounty_preflight import BountyPreflightError, preflight_bounty
 from concierge.bounty_qualification import QualificationInputError
 from concierge.cli import main as _cli_main
@@ -79,8 +83,82 @@ def _claim_target(argv: list[str]) -> tuple[str, int] | None:
     return repo, issue
 
 
+def _claim_counts(result: dict[str, Any]) -> tuple[int | None, int | None]:
+    """Extract only safe occupancy counts from canonical preflight."""
+    audit = result.get("canonical_audit")
+    if not isinstance(audit, dict):
+        audit = {}
+    attempt_count = result.get("attempt_count")
+    if isinstance(attempt_count, bool) or not isinstance(attempt_count, int):
+        attempt_count = None
+    open_pr_count = audit.get("open_pr_count")
+    if isinstance(open_pr_count, bool) or not isinstance(open_pr_count, int):
+        open_pr_count = None
+    return attempt_count, open_pr_count
+
+
+def _availability_block(
+    availability: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Reduce availability authority to a safe synthetic HOLD qualification."""
+    if not isinstance(availability, dict):
+        raise BountyAvailabilityError(
+            "canonical bounty availability did not return an object"
+        )
+    dispatch = availability.get("dispatch")
+    disposition = availability.get("disposition")
+    if type(dispatch) is not bool or not isinstance(disposition, str):
+        raise BountyAvailabilityError(
+            "canonical bounty availability returned malformed authority"
+        )
+
+    if dispatch:
+        if disposition != "CLEAR":
+            raise BountyAvailabilityError(
+                "dispatchable bounty availability was not CLEAR"
+            )
+        return None
+
+    if disposition != "HOLD":
+        raise BountyAvailabilityError(
+            "non-dispatchable bounty availability was not HOLD"
+        )
+    reason = availability.get("reason_code")
+    signal_codes = availability.get("signal_codes")
+    if not isinstance(reason, str) or not reason:
+        raise BountyAvailabilityError(
+            "blocked bounty availability was missing reason_code"
+        )
+    if not isinstance(signal_codes, list) or not all(
+        isinstance(code, str) and code for code in signal_codes
+    ):
+        raise BountyAvailabilityError(
+            "blocked bounty availability signal_codes were malformed"
+        )
+
+    qualified_reason = f"AVAILABILITY:{reason}"
+    return {
+        "disposition": "HOLD",
+        "dispatch": False,
+        "reason_codes": [qualified_reason],
+        "reasons": [
+            {
+                "code": qualified_reason,
+                "severity": "HOLD",
+                "message": (
+                    "Canonical maintainer availability evidence requires human "
+                    "review before claim instructions are emitted."
+                ),
+            }
+        ],
+        "signals": {
+            "availability_signal_codes": list(signal_codes),
+        },
+    }
+
+
 def _preflight_claim(argv: list[str]) -> None:
-    """Require canonical ACTIONABLE state before claim instructions are emitted."""
+    """Require canonical ACTIONABLE + available state before claim instructions."""
     target = _claim_target(argv)
     if target is None:
         return
@@ -95,22 +173,26 @@ def _preflight_claim(argv: list[str]) -> None:
         raise BountyPreflightError(
             "canonical bounty preflight returned a malformed qualification"
         )
-    if qualification["dispatch"]:
+
+    attempt_count, open_pr_count = _claim_counts(result)
+    if not qualification["dispatch"]:
+        raise ClaimPreflightBlocked(
+            repo=repo,
+            issue=issue,
+            qualification=qualification,
+            attempt_count=attempt_count,
+            open_pr_count=open_pr_count,
+        )
+
+    availability = inspect_bounty_availability(repo, issue)
+    availability_block = _availability_block(availability)
+    if availability_block is None:
         return
 
-    audit = result.get("canonical_audit")
-    if not isinstance(audit, dict):
-        audit = {}
-    attempt_count = result.get("attempt_count")
-    if isinstance(attempt_count, bool) or not isinstance(attempt_count, int):
-        attempt_count = None
-    open_pr_count = audit.get("open_pr_count")
-    if isinstance(open_pr_count, bool) or not isinstance(open_pr_count, int):
-        open_pr_count = None
     raise ClaimPreflightBlocked(
         repo=repo,
         issue=issue,
-        qualification=qualification,
+        qualification=availability_block,
         attempt_count=attempt_count,
         open_pr_count=open_pr_count,
     )
@@ -139,6 +221,7 @@ def main() -> None:
             print(f"Error: claim blocked: {exc}", file=sys.stderr)
         raise SystemExit(exc.exit_code) from None
     except (
+        BountyAvailabilityError,
         BountyPreflightError,
         BountyAuditError,
         QualificationInputError,

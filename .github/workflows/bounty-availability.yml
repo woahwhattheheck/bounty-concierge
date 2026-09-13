@@ -1,0 +1,45 @@
+name: bounty-availability
+
+on:
+  pull_request:
+    paths:
+      - "concierge/bounty_availability.py"
+      - "concierge/revenue_dispatch.py"
+      - "concierge/entrypoint.py"
+      - "tests/test_bounty_availability.py"
+      - "tests/test_revenue_dispatch.py"
+      - "tests/test_claim_entrypoint_preflight.py"
+      - ".github/workflows/bounty-availability.yml"
+  push:
+    branches: [main]
+    paths:
+      - "concierge/bounty_availability.py"
+      - "concierge/revenue_dispatch.py"
+      - "concierge/entrypoint.py"
+      - "tests/test_bounty_availability.py"
+      - "tests/test_revenue_dispatch.py"
+      - "tests/test_claim_entrypoint_preflight.py"
+      - ".github/workflows/bounty-availability.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  availability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install runtime and test dependencies
+        run: python -m pip install -r requirements.txt 'pytest>=8,<9'
+      - name: Compile changed Python paths
+        run: python -m py_compile concierge/bounty_availability.py concierge/revenue_dispatch.py concierge/entrypoint.py tests/test_bounty_availability.py tests/test_revenue_dispatch.py tests/test_claim_entrypoint_preflight.py
+      - name: Core authority tests
+        run: python -m unittest -v tests.test_bounty_availability tests.test_revenue_dispatch
+      - name: Core authority tests under optimized Python
+        run: python -O -m unittest -v tests.test_bounty_availability tests.test_revenue_dispatch
+      - name: Installed claim-path integration
+        run: python -m pytest -q tests/test_claim_entrypoint_preflight.py
