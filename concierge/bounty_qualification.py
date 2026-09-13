@@ -22,6 +22,15 @@ from typing import Any
 _BODY_BOUNTY_RE = re.compile(
     r"(?im)(?:^|\s)/bounty\s+\$([0-9][0-9,]*(?:\.[0-9]{1,2})?)\b"
 )
+_KEYWORD_REWARD_RE = re.compile(
+    r"(?i)\b(?:bounty|reward)(?:\s+(?:amount|payout))?"
+    r"\s*(?::|=|-|\bis\b|\bof\b)?\s*"
+    r"\$([0-9][0-9,]*(?:\.[0-9]{1,2})?)\b"
+)
+_AMOUNT_BEFORE_REWARD_RE = re.compile(
+    r"(?i)(?<![\w.])\$([0-9][0-9,]*(?:\.[0-9]{1,2})?)"
+    r"\s+(?:bounty|reward)\b"
+)
 _LABEL_REWARD_RE = re.compile(
     r"(?<![\w.])\$([0-9][0-9,]*(?:\.[0-9]{1,2})?)\b"
 )
@@ -68,6 +77,23 @@ def _amount_strings(values: set[Decimal]) -> list[str]:
             text = text.rstrip("0").rstrip(".")
         result.append(text)
     return result
+
+
+def _advertised_rewards(text: str) -> set[Decimal]:
+    """Extract high-confidence sponsor-advertised reward amounts from one field."""
+    values = {_amount(match) for match in _BODY_BOUNTY_RE.findall(text)}
+    values.update(_amount(match) for match in _KEYWORD_REWARD_RE.findall(text))
+    values.update(_amount(match) for match in _AMOUNT_BEFORE_REWARD_RE.findall(text))
+    return values
+
+
+def _title_value(snapshot: dict[str, Any]) -> str:
+    value = snapshot.get("title", "")
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise QualificationInputError("title must be a string")
+    return value
 
 
 def _label_names(snapshot: dict[str, Any]) -> list[str]:
@@ -160,11 +186,14 @@ def qualify_dispatch(
     ):
         raise QualificationInputError("saturation_threshold must be a positive integer")
 
+    title = _title_value(snapshot)
     labels = _label_names(snapshot)
     texts = _text_values(snapshot)
     audit, audit_complete = _canonical_audit(snapshot)
 
-    body_rewards = {_amount(match) for match in _BODY_BOUNTY_RE.findall(texts[0])}
+    body_rewards = _advertised_rewards(texts[0])
+    title_rewards = _advertised_rewards(title)
+    advertised_rewards = body_rewards | title_rewards
     label_rewards = {
         _amount(match) for label in labels for match in _LABEL_REWARD_RE.findall(label)
     }
@@ -224,11 +253,17 @@ def qualify_dispatch(
             "HOLD",
             "Canonical issue/competition audit is missing or incomplete.",
         )
-    if len(body_rewards) > 1:
+    if not advertised_rewards and not label_rewards:
+        add(
+            "REWARD_NOT_ADVERTISED",
+            "HOLD",
+            "No explicit paid reward amount is advertised in canonical issue metadata.",
+        )
+    if len(advertised_rewards) > 1:
         add(
             "AMBIGUOUS_ADVERTISED_REWARD",
             "HOLD",
-            "Issue body contains more than one distinct /bounty amount.",
+            "Issue title/body contains more than one distinct advertised reward amount.",
         )
     if len(label_rewards) > 1:
         add(
@@ -236,11 +271,11 @@ def qualify_dispatch(
             "HOLD",
             "Live labels contain more than one distinct reward amount.",
         )
-    if body_rewards and label_rewards and body_rewards != label_rewards:
+    if advertised_rewards and label_rewards and advertised_rewards != label_rewards:
         add(
             "REWARD_MISMATCH",
             "HOLD",
-            "Advertised body reward and live label reward disagree.",
+            "Advertised title/body reward and live label reward disagree.",
         )
 
     saturated_by_attempts = (
@@ -282,6 +317,8 @@ def qualify_dispatch(
         "reasons": reasons,
         "signals": {
             "body_reward_usd": _amount_strings(body_rewards),
+            "title_reward_usd": _amount_strings(title_rewards),
+            "advertised_reward_usd": _amount_strings(advertised_rewards),
             "live_label_reward_usd": _amount_strings(label_rewards),
             "already_rewarded": already_rewarded,
             "attempt_count": attempt_count,
@@ -323,8 +360,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m concierge.bounty_qualification",
         description=(
-            "Fail closed on contradictory, saturated, stale, or private-context "
-            "paid-work listings."
+            "Fail closed on unpaid/unadvertised, contradictory, saturated, stale, "
+            "or private-context paid-work listings."
         ),
     )
     parser.add_argument("snapshot", help="JSON snapshot path, or - for stdin")
