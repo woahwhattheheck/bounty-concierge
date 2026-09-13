@@ -130,10 +130,15 @@ def _visible_text(value) -> str:
 
 def _markdown_text(value) -> str:
     """Escape untrusted inline Markdown while preserving printable text."""
-    return "".join(
-        f"\\{char}" if char in _MARKDOWN_INLINE_ESCAPES else char
-        for char in _visible_text(value)
-    )
+    escaped: list[str] = []
+    for char in str(value):
+        if not char.isprintable():
+            escaped.append(_visible_text(char))
+        elif char in _MARKDOWN_INLINE_ESCAPES:
+            escaped.append(f"\\{char}")
+        else:
+            escaped.append(char)
+    return "".join(escaped)
 
 
 def _markdown_url(value) -> str:
