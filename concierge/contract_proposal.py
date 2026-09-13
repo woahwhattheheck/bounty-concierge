@@ -14,6 +14,7 @@ import os
 import re
 import stat
 import sys
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Set, Tuple
 
 from .contract_qualification import (
@@ -234,7 +235,12 @@ def _normalize_brief(raw: Any, snapshot: Dict[str, Any], receipt: Dict[str, Any]
 
 
 def build_external_contract_proposal(snapshot: Dict[str, Any], qualification_receipt: Dict[str, Any], brief: Dict[str, Any], *, as_of: str) -> Dict[str, Any]:
-    """Reverify qualification and assemble a deterministic owner-review packet."""
+    """Reverify qualification at a caller-trusted current time and assemble a packet.
+
+    ``as_of`` is an authority-bearing input. Library callers must source it from
+    a trusted host clock, not from marketplace/customer payloads or an end-user
+    override. The production CLI deliberately supplies its own current UTC.
+    """
     snapshot = _obj(snapshot, "snapshot"); receipt = _obj(qualification_receipt, "qualification_receipt")
     try:
         verified = verify_contract_qualification_receipt(snapshot, receipt, as_of=as_of)
@@ -298,6 +304,11 @@ def format_summary(result: Dict[str, Any]) -> str:
     )
 
 
+def _trusted_current_utc() -> str:
+    """Return verifier-owned process UTC at canonical second precision."""
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
 def _load_json(path: str, name: str) -> Dict[str, Any]:
     if path == "-":
         data = sys.stdin.buffer.read(MAX_INPUT_BYTES + 1)
@@ -328,14 +339,14 @@ def _load_json(path: str, name: str) -> Dict[str, Any]:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="python -m concierge.contract_proposal")
     parser.add_argument("snapshot"); parser.add_argument("qualification_receipt"); parser.add_argument("brief")
-    parser.add_argument("--as-of", required=True); parser.add_argument("--json", action="store_true")
+    parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     if [args.snapshot, args.qualification_receipt, args.brief].count("-") > 1:
         parser.error("at most one input may be read from stdin")
     try:
         result = build_external_contract_proposal(
             _load_json(args.snapshot, "snapshot"), _load_json(args.qualification_receipt, "qualification_receipt"),
-            _load_json(args.brief, "brief"), as_of=args.as_of,
+            _load_json(args.brief, "brief"), as_of=_trusted_current_utc(),
         )
     except (OSError, ContractProposalInputError) as exc:
         parser.error(str(exc))
