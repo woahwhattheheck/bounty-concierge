@@ -63,6 +63,36 @@ def _history_payload_list(data, wallet_id: str) -> List[dict]:
     return items
 
 
+def _pending_from_history(items: List[dict]) -> List[dict]:
+    """Return in-flight transfer rows from one validated history snapshot.
+
+    Current RustChain exposes public pending-transfer state through
+    ``/wallet/history``.  Canonical pending-ledger rows are ``transfer_out``
+    entries carrying ``status``; confirmed rows omit that field.  Legacy
+    history rows may omit ``type`` but still carry a transfer ``status``.
+
+    Unknown or malformed status values fail closed: silently treating a
+    future in-flight state as "no pending payouts" is worse than reporting
+    status as unavailable.
+    """
+    pending: list[dict] = []
+    for item in items:
+        if "status" not in item:
+            continue
+
+        status = item["status"]
+        if type(status) is not str or status not in {"pending", "confirming", "confirmed", "failed"}:
+            raise PayoutLookupError("pending payout state was malformed")
+
+        item_type = item.get("type")
+        if item_type is not None and item_type != "transfer_out":
+            raise PayoutLookupError("pending payout state was malformed")
+
+        if status in {"pending", "confirming"}:
+            pending.append(item)
+    return pending
+
+
 def _terminal_text(value) -> str:
     """Render an untrusted field without raw terminal-control characters."""
     text = str(value)
@@ -98,8 +128,6 @@ def _check_transfers(
             timeout=15,
             verify=False,  # self-signed cert on node
         )
-        if resp.status_code == 404 and endpoint == "pending":
-            return []
         resp.raise_for_status()
         try:
             data = resp.json()
@@ -121,12 +149,17 @@ def _check_transfers(
 def check_pending(wallet_id: str, node_url: str | None = None) -> List[dict]:
     """Return pending transfers for *wallet_id*.
 
-    Queries ``GET {node_url}/wallet/pending?miner_id={wallet_id}``.
-    A genuine 404 remains an empty result. Transport, HTTP, JSON, and payload
-    failures raise :class:`PayoutLookupError` rather than masquerading as no
-    pending transfers.
+    RustChain's public wallet contract exposes pending-ledger rows through
+    ``GET {node_url}/wallet/history?miner_id={wallet_id}``; there is no
+    public ``/wallet/pending`` contract.  Derive pending rows from the same
+    validated history envelope used by :func:`check_history` so a missing
+    endpoint cannot masquerade as a genuine empty pending set.
+
+    Transport, HTTP, JSON, envelope, and pending-state failures raise
+    :class:`PayoutLookupError`.
     """
-    return _check_transfers(wallet_id, "pending", "pending", node_url)
+    history = _check_transfers(wallet_id, "history", "history", node_url)
+    return _pending_from_history(history)
 
 
 def check_history(wallet_id: str, node_url: str | None = None) -> List[dict]:
@@ -147,10 +180,10 @@ def format_payout_status(pending: List[dict], history: List[dict]) -> str:
     Parameters
     ----------
     pending : list[dict]
-        Items from :func:`check_pending`.  Each dict should have at least
-        ``amount_rtc`` and optionally ``memo``, ``created_at``.
+        Items from :func:`check_pending`. Current entries use ``amount`` and
+        ``timestamp``; legacy rows may use ``amount_rtc`` / ``created_at``.
     history : list[dict]
-        Items from :func:`check_history`.  Current history entries use
+        Items from :func:`check_history`. Current history entries use
         ``amount``; legacy entries may use ``amount_rtc``. Transfer entries
         may include ``from`` / ``to`` and ``timestamp``.
     """
@@ -162,12 +195,22 @@ def format_payout_status(pending: List[dict], history: List[dict]) -> str:
         lines.append("  (none)")
     else:
         for item in pending:
-            amount = _terminal_text(item.get("amount_rtc", "?"))
+            amount = _terminal_text(item.get("amount_rtc", item.get("amount", "?")))
             memo_value = item.get("memo", "")
             memo = "" if memo_value is None else _terminal_text(memo_value)
-            ts_value = item.get("created_at", "")
+            ts_value = item.get("created_at", item.get("timestamp", ""))
             ts = "" if ts_value is None else _terminal_text(ts_value)
+            recipient_value = item.get("to", item.get("to_addr", ""))
+            recipient = (
+                "" if recipient_value is None else _terminal_text(recipient_value)
+            )
+            status_value = item.get("status", "")
+            status = "" if status_value is None else _terminal_text(status_value)
             entry = f"  {amount} RTC"
+            if recipient:
+                entry += f"  -> {recipient}"
+            if status:
+                entry += f"  [{status}]"
             if memo:
                 entry += f"  memo: {memo}"
             if ts:
