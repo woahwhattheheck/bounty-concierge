@@ -223,6 +223,7 @@ def rank_partitioned_opportunities(
 
     eligible: list[dict[str, Any]] = []
     excluded: list[dict[str, Any]] = []
+    source_occurrences: dict[str, list[int]] = {}
 
     for index, candidate in enumerate(candidates):
         if type(candidate) is not dict:
@@ -291,6 +292,11 @@ def rank_partitioned_opportunities(
             )
             continue
 
+        # Duplicate work is a request-wide authority ambiguity. Record the
+        # canonical source before reward/estimate/skill validation so a malformed
+        # duplicate cannot let its valid sibling survive into either partition.
+        source_occurrences.setdefault(source, []).append(index)
+
         try:
             currency, reward = _resolve_reward(intake)
         except (CurrencyPartitionedRankInputError, OpportunityRankInputError):
@@ -344,25 +350,27 @@ def rank_partitioned_opportunities(
             continue
         eligible.append(scored)
 
-    # Duplicate canonical work is ambiguous globally, not once per currency:
-    # the same source must never survive by being represented in two partitions.
-    by_source: dict[str, list[dict[str, Any]]] = {}
-    for item in eligible:
-        by_source.setdefault(item["canonical_source_url"], []).append(item)
-
+    # Duplicate canonical work is ambiguous globally, not once per currency
+    # and not only among rows that happened to score successfully. A malformed
+    # duplicate must not make a valid sibling eligible.
+    duplicate_sources = {
+        source
+        for source, indices in source_occurrences.items()
+        if len(indices) > 1
+    }
     unique: list[dict[str, Any]] = []
-    for source, items in by_source.items():
-        if len(items) > 1:
-            for item in items:
-                excluded.append(
-                    _excluded(
-                        item["input_index"],
-                        source=source,
-                        code="DUPLICATE_CANONICAL_SOURCE",
-                    )
+    for item in eligible:
+        source = item["canonical_source_url"]
+        if source in duplicate_sources:
+            excluded.append(
+                _excluded(
+                    item["input_index"],
+                    source=source,
+                    code="DUPLICATE_CANONICAL_SOURCE",
                 )
+            )
         else:
-            unique.append(items[0])
+            unique.append(item)
 
     partition_rows: dict[str, list[dict[str, Any]]] = {
         currency: [] for currency in _CURRENCIES
