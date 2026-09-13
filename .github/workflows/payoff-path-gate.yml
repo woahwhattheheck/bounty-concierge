@@ -4,16 +4,22 @@ on:
   pull_request:
     paths:
       - "concierge/payoff_path_gate.py"
+      - "concierge/payoff_path_gate_core.py"
       - "tests/test_payoff_path_gate.py"
+      - "tests/test_payoff_path_file_custody.py"
       - "docs/PAYOFF_PATH_GATE.md"
+      - "docs/PAYOFF_PATH_FILE_CUSTODY.md"
       - ".github/workflows/payoff-path-gate.yml"
   push:
     branches:
       - main
     paths:
       - "concierge/payoff_path_gate.py"
+      - "concierge/payoff_path_gate_core.py"
       - "tests/test_payoff_path_gate.py"
+      - "tests/test_payoff_path_file_custody.py"
       - "docs/PAYOFF_PATH_GATE.md"
+      - "docs/PAYOFF_PATH_FILE_CUSTODY.md"
       - ".github/workflows/payoff-path-gate.yml"
 
 permissions:
@@ -43,8 +49,13 @@ jobs:
       - name: Install test dependency
         run: python -m pip install 'pytest>=8,<9'
       - name: Compile payoff path source
-        run: python -m py_compile concierge/payoff_path_gate.py tests/test_payoff_path_gate.py
+        run: >-
+          python -m py_compile
+          concierge/payoff_path_gate.py
+          concierge/payoff_path_gate_core.py
+          tests/test_payoff_path_gate.py
+          tests/test_payoff_path_file_custody.py
       - name: Run payoff path hostile tests
-        run: python -m pytest -q tests/test_payoff_path_gate.py
+        run: python -m pytest -q tests/test_payoff_path_gate.py tests/test_payoff_path_file_custody.py
       - name: Run optimized payoff path hostile tests
-        run: python -O -m pytest -q tests/test_payoff_path_gate.py
+        run: python -O -m pytest -q tests/test_payoff_path_gate.py tests/test_payoff_path_file_custody.py
