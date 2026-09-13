@@ -17,6 +17,7 @@ from decimal import (
     ROUND_HALF_UP,
     localcontext,
 )
+from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
@@ -86,6 +87,36 @@ def _format_decimal(value: Decimal, *, metric: bool = False) -> str:
     if "." in text:
         text = text.rstrip("0").rstrip(".")
     return text or "0"
+
+
+def _fraction_to_exact_decimal(value: Fraction) -> Decimal:
+    """Convert a terminating rational to Decimal without ambient-context rounding."""
+    numerator = value.numerator
+    denominator = value.denominator
+    twos = 0
+    fives = 0
+    while denominator % 2 == 0:
+        denominator //= 2
+        twos += 1
+    while denominator % 5 == 0:
+        denominator //= 5
+        fives += 1
+    if denominator != 1:
+        raise OpportunityRankInputError("exact metric is not a terminating decimal")
+    scale = max(twos, fives)
+    scaled = numerator * (2 ** (scale - twos)) * (5 ** (scale - fives))
+    sign = 1 if scaled < 0 else 0
+    digits = tuple(int(char) for char in str(abs(scaled))) or (0,)
+    return Decimal((sign, digits, -scale))
+
+
+def _fraction_to_metric_decimal(value: Fraction) -> Decimal:
+    """Render-only rational approximation with enough precision for six decimals."""
+    numerator_digits = len(str(abs(value.numerator)))
+    denominator_digits = len(str(abs(value.denominator)))
+    with localcontext() as context:
+        context.prec = max(28, numerator_digits + denominator_digits + 12)
+        return Decimal(value.numerator) / Decimal(value.denominator)
 
 
 def _estimate(candidate: dict[str, Any]) -> tuple[Decimal, Decimal]:
@@ -253,18 +284,22 @@ def rank_opportunities(
             continue
 
         try:
-            with localcontext() as context:
-                context.prec = 28
-                expected_value = reward * probability
-                ev_per_hour = expected_value / effort
+            reward_fraction = Fraction(reward)
+            effort_fraction = Fraction(effort)
+            probability_fraction = Fraction(probability)
+            expected_value_fraction = reward_fraction * probability_fraction
+            ev_per_hour_fraction = expected_value_fraction / effort_fraction
+            expected_value = _fraction_to_exact_decimal(expected_value_fraction)
 
             reward_text = _format_decimal(reward)
             probability_text = _format_decimal(probability)
             effort_text = _format_decimal(effort)
             expected_value_text = _format_decimal(expected_value, metric=True)
-            ev_per_hour_text = _format_decimal(ev_per_hour, metric=True)
+            ev_per_hour_text = _format_decimal(
+                _fraction_to_metric_decimal(ev_per_hour_fraction), metric=True
+            )
             skill_match_text = _format_decimal(skill_score, metric=True)
-        except DecimalException:
+        except (DecimalException, OpportunityRankInputError, ZeroDivisionError):
             excluded.append(
                 _excluded(index, source=source, code="ESTIMATE_OR_REWARD_INVALID")
             )
@@ -278,8 +313,11 @@ def rank_opportunities(
                 "_effort": effort,
                 "_probability": probability,
                 "_expected_value": expected_value,
-                "_ev_per_hour": ev_per_hour,
-                "_skill_match": skill_score,
+                "_ev_per_hour_fraction": ev_per_hour_fraction,
+                "_expected_value_fraction": expected_value_fraction,
+                "_skill_fraction": Fraction(skill_score),
+                "_reward_fraction": reward_fraction,
+                "_effort_fraction": effort_fraction,
                 "_reward_text": reward_text,
                 "_probability_text": probability_text,
                 "_effort_text": effort_text,
@@ -309,11 +347,11 @@ def rank_opportunities(
 
     unique.sort(
         key=lambda item: (
-            -item["_ev_per_hour"],
-            -item["_expected_value"],
-            -item["_skill_match"],
-            -item["_reward"],
-            item["_effort"],
+            -item["_ev_per_hour_fraction"],
+            -item["_expected_value_fraction"],
+            -item["_skill_fraction"],
+            -item["_reward_fraction"],
+            item["_effort_fraction"],
             item["canonical_source_url"],
             item["input_index"],
         )
