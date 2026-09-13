@@ -58,6 +58,8 @@ def _strict_github_url(value: Any, kind: str) -> tuple[str, str, int]:
     owner, repo, raw_number = parts[1], parts[2], parts[4]
     if not _GITHUB_NAME_RE.fullmatch(owner) or not _GITHUB_NAME_RE.fullmatch(repo):
         raise SubmissionPacketInputError(f"{kind} URL repository identity is invalid")
+    if owner in {".", ".."} or repo in {".", ".."}:
+        raise SubmissionPacketInputError(f"{kind} URL repository identity is invalid")
     if not raw_number.isdigit() or int(raw_number) <= 0 or str(int(raw_number)) != raw_number:
         raise SubmissionPacketInputError(f"{kind} URL number is invalid")
     canonical = f"https://github.com/{owner}/{repo}/{marker}/{raw_number}"
@@ -177,9 +179,16 @@ def _bind_evidence(entry: dict[str, Any]) -> dict[str, Any]:
     if set(entry) != allowed_keys:
         raise SubmissionPacketInputError("evidence entry has missing or undeclared fields")
     source = entry["canonical_source_url"]
-    _strict_github_url(source, "issue")
+    source_owner, source_repo, _ = _strict_github_url(source, "issue")
     pr_url = entry["pull_request_url"]
     pr_owner, pr_repo, pr_number = _strict_github_url(pr_url, "pull")
+    if (source_owner.casefold(), source_repo.casefold()) != (
+        pr_owner.casefold(),
+        pr_repo.casefold(),
+    ):
+        raise SubmissionPacketInputError(
+            "pull request repository must match canonical source repository"
+        )
     head_sha = entry["head_sha"]
     if type(head_sha) is not str or not _SHA40_RE.fullmatch(head_sha):
         raise SubmissionPacketInputError("head_sha must be exactly 40 lowercase hex characters")
