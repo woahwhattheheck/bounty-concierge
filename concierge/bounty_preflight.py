@@ -2,9 +2,10 @@
 """End-to-end paid-work preflight with issue-thread competition pressure.
 
 ``bounty_audit`` establishes canonical issue/PR state and
-``bounty_qualification`` decides whether work is safe to dispatch.  This module
-fills the missing ``attempt_count`` input from canonical GitHub issue comments
-while authority-binding maintainer contribution terms for credential safety.
+``bounty_qualification`` decides whether work is safe to dispatch. This module
+fills the missing ``attempt_count`` input from canonical GitHub issue comments,
+binds formal GitHub assignment state, and authority-binds maintainer
+contribution terms for credential safety.
 """
 
 from __future__ import annotations
@@ -153,6 +154,103 @@ def _signals_attempt(body: str, repo: str) -> bool:
     return bool(same_repo_pr.search(body))
 
 
+def _normalized_operator_login(operator_login: str | None) -> str | None:
+    if operator_login is None:
+        return None
+    if not isinstance(operator_login, str) or not operator_login.strip():
+        raise ValueError("operator_login must be a non-empty string when provided")
+    return operator_login.strip().casefold()
+
+
+def _assignee_state(
+    issue: dict[str, Any], operator_login: str | None
+) -> dict[str, Any]:
+    """Reduce captured GitHub assignees to privacy-safe occupancy signals."""
+    raw_assignees = issue.get("assignees")
+    if raw_assignees is None:
+        raw_assignees = []
+    if not isinstance(raw_assignees, list):
+        raise BountyPreflightError("GitHub issue assignees response was not a list")
+
+    assignees: set[str] = set()
+    for item in raw_assignees:
+        if not isinstance(item, dict):
+            raise BountyPreflightError("GitHub issue assignees contained a malformed item")
+        login = item.get("login")
+        if not isinstance(login, str) or not login.strip():
+            raise BountyPreflightError(
+                "GitHub issue assignee did not contain a non-empty login"
+            )
+        assignees.add(login.strip().casefold())
+
+    operator = _normalized_operator_login(operator_login)
+    assigned_to_operator = operator is not None and operator in assignees
+    foreign_assignees = assignees - ({operator} if operator is not None else set())
+    return {
+        "formal_assignee_count": len(assignees),
+        "assigned_to_operator": assigned_to_operator,
+        "foreign_assignee_count": len(foreign_assignees),
+    }
+
+
+def _apply_assignee_gate(
+    qualification: dict[str, Any], assignee_state: dict[str, Any]
+) -> dict[str, Any]:
+    """Hold dispatch when the captured issue generation is assigned elsewhere."""
+    if not isinstance(qualification, dict):
+        raise BountyPreflightError("qualification result was not an object")
+
+    result = dict(qualification)
+    signals = result.get("signals")
+    if signals is None:
+        signals = {}
+    elif not isinstance(signals, dict):
+        raise BountyPreflightError("qualification signals were not an object")
+    else:
+        signals = dict(signals)
+    signals.update(assignee_state)
+    result["signals"] = signals
+
+    if assignee_state["foreign_assignee_count"] <= 0:
+        return result
+
+    reasons = result.get("reasons")
+    if reasons is None:
+        reasons = []
+    elif not isinstance(reasons, list):
+        raise BountyPreflightError("qualification reasons were not a list")
+    else:
+        reasons = list(reasons)
+
+    reason_codes = result.get("reason_codes")
+    if reason_codes is None:
+        reason_codes = []
+    elif not isinstance(reason_codes, list):
+        raise BountyPreflightError("qualification reason_codes were not a list")
+    else:
+        reason_codes = list(reason_codes)
+
+    if "FORMALLY_ASSIGNED" not in reason_codes:
+        reason_codes.append("FORMALLY_ASSIGNED")
+        reasons.append(
+            {
+                "code": "FORMALLY_ASSIGNED",
+                "severity": "HOLD",
+                "message": (
+                    "Canonical GitHub state formally assigns this issue to another "
+                    "contributor; do not dispatch duplicate paid work."
+                ),
+            }
+        )
+
+    result["reasons"] = reasons
+    result["reason_codes"] = reason_codes
+    result["dispatch"] = False
+    if result.get("disposition") != "REJECT":
+        result["disposition"] = "HOLD"
+    return result
+
+
 def _collect_issue_context_with_snapshot(
     repo: str,
     number: int,
@@ -160,6 +258,7 @@ def _collect_issue_context_with_snapshot(
     *,
     session: Any = requests,
     max_pages: int = 10,
+    operator_login: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Collect safe context plus the exact canonical issue generation used."""
 
@@ -173,6 +272,7 @@ def _collect_issue_context_with_snapshot(
         or max_pages <= 0
     ):
         raise ValueError("max_pages must be positive")
+    _normalized_operator_login(operator_login)
 
     token = token or GITHUB_TOKEN
     headers = _headers(token)
@@ -193,6 +293,7 @@ def _collect_issue_context_with_snapshot(
         raise BountyPreflightError(
             f"GitHub issue body was not a string for {repo}#{number}"
         )
+    assignee_state = _assignee_state(issue, operator_login)
 
     claimant_logins: set[str] = set()
     attempt_signal_count = 0
@@ -244,6 +345,7 @@ def _collect_issue_context_with_snapshot(
             "attempt_signal_count": attempt_signal_count,
             "comments_truncated": comments_truncated,
             "credential_gate_signal_types": sorted(credential_signals),
+            **assignee_state,
         },
         issue,
     )
@@ -256,13 +358,15 @@ def collect_issue_context(
     *,
     session: Any = requests,
     max_pages: int = 10,
+    operator_login: str | None = None,
 ) -> dict[str, Any]:
     """Collect safe qualification inputs plus conservative claim pressure.
 
     External comments contribute only to ``attempt_count``. Raw external comment
     text is never forwarded into qualification. OWNER/MEMBER/COLLABORATOR terms
-    are reduced immediately to generic credential-safety signals, so raw
-    maintainer comment text does not leave the collection loop either.
+    are reduced immediately to generic credential-safety signals, and assignees
+    are reduced to counts/operator-membership from the same captured issue
+    generation, so raw identities never leave the collection boundary.
     """
     context, _issue_snapshot = _collect_issue_context_with_snapshot(
         repo,
@@ -270,6 +374,7 @@ def collect_issue_context(
         token,
         session=session,
         max_pages=max_pages,
+        operator_login=operator_login,
     )
     return context
 
@@ -282,12 +387,13 @@ def preflight_bounty(
     session: Any = requests,
     max_pages: int = 10,
     saturation_threshold: int = 4,
+    operator_login: str | None = None,
 ) -> dict[str, Any]:
     """Return an operator-safe paid-work preflight result for one issue.
 
-    Issue-derived qualification metadata, credential authority, and canonical
-    issue state are bound to one captured GitHub issue generation. PR
-    competition and maintainer-comment reads remain live, but a later issue
+    Issue-derived qualification metadata, formal assignment, credential authority,
+    and canonical issue state are bound to one captured GitHub issue generation.
+    PR competition and maintainer-comment reads remain live, but a later issue
     payload cannot be spliced into the same dispatch decision.
     """
     context, issue_snapshot = _collect_issue_context_with_snapshot(
@@ -296,6 +402,7 @@ def preflight_bounty(
         token,
         session=session,
         max_pages=max_pages,
+        operator_login=operator_login,
     )
     issue_url = f"https://api.github.com/repos/{repo}/issues/{number}"
     audit_session = _CapturedIssueSession(session, issue_url, issue_snapshot)
@@ -327,6 +434,12 @@ def preflight_bounty(
         qualification,
         context["credential_gate_signal_types"],
     )
+    assignee_state = {
+        "formal_assignee_count": context["formal_assignee_count"],
+        "assigned_to_operator": context["assigned_to_operator"],
+        "foreign_assignee_count": context["foreign_assignee_count"],
+    }
+    qualification = _apply_assignee_gate(qualification, assignee_state)
 
     return {
         "repo": repo,
@@ -334,6 +447,7 @@ def preflight_bounty(
         "attempt_count": context["attempt_count"],
         "attempt_signal_count": context["attempt_signal_count"],
         "comments_truncated": context["comments_truncated"],
+        **assignee_state,
         "canonical_audit": audit,
         "qualification": qualification,
     }
@@ -353,14 +467,21 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m concierge.bounty_preflight",
         description=(
-            "Audit canonical bounty state, issue-thread claim pressure, "
-            "and dispatch safety."
+            "Audit canonical bounty state, formal assignment, issue-thread claim "
+            "pressure, and dispatch safety."
         ),
     )
     parser.add_argument("repo", help="Repository in owner/name form")
     parser.add_argument("issue", type=int, help="Bounty issue number")
     parser.add_argument("--max-pages", type=int, default=10)
     parser.add_argument("--saturation-threshold", type=int, default=4)
+    parser.add_argument(
+        "--operator-login",
+        help=(
+            "GitHub login that may already own the issue; when omitted, any formal "
+            "assignee holds dispatch"
+        ),
+    )
     parser.add_argument("--json", action="store_true", help="Emit full safe JSON result")
     args = parser.parse_args(argv)
 
@@ -370,6 +491,7 @@ def main(argv: list[str] | None = None) -> int:
             args.issue,
             max_pages=args.max_pages,
             saturation_threshold=args.saturation_threshold,
+            operator_login=args.operator_login,
         )
     except (
         BountyPreflightError,
