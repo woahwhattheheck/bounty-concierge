@@ -134,6 +134,15 @@ def test_post_nominal_runner_custody_is_rejected():
         assert credential_gate_signal_types([hostile]) == ["credential_disclosure"]
 
 
+def test_credential_first_disclosure_is_rejected():
+    for hostile in (
+        "Your GitHub access token: paste it into portal.example/claim.",
+        "Your runner credentials — send them to our portal.",
+        "Your wallet private key, then upload it to the form.",
+    ):
+        assert credential_gate_signal_types([hostile]) == ["credential_disclosure"]
+
+
 def test_oauth_product_login_and_explicit_prohibitions_are_not_credential_gates():
     for safe in (
         "Use GitHub OAuth to link your account; the authorization-code exchange is handled by GitHub.",
@@ -141,5 +150,7 @@ def test_oauth_product_login_and_explicit_prohibitions_are_not_credential_gates(
         "Never share your GitHub access token. Use GitHub OAuth instead.",
         "Do not verify your runner credentials on an external portal.",
         "Verify the build output on our website. Never share your GitHub access token.",
+        "Never share your GitHub access token; paste the build log into the issue.",
+        "Your GitHub access token is stored only locally; paste the build log into the issue.",
     ):
         assert credential_gate_signal_types([safe]) == []
