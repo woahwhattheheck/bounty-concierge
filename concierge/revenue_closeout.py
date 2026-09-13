@@ -9,7 +9,7 @@ does not infer sponsor acceptance, earned money, or payment from a merge.
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 import json
 import re
@@ -121,6 +121,9 @@ def _validate_item(raw: Any) -> dict[str, Any]:
     repo = raw.get("repo")
     if not isinstance(repo, str) or not _REPO_RE.fullmatch(repo):
         raise RevenueCloseoutInputError("repo must be in owner/name form")
+    owner, name = repo.split("/", 1)
+    if owner in {".", ".."} or name in {".", ".."}:
+        raise RevenueCloseoutInputError("repo must not contain dot path segments")
     number = raw.get("pr")
     if isinstance(number, bool) or not isinstance(number, int) or number <= 0:
         raise RevenueCloseoutInputError("pr must be a positive integer")
@@ -133,7 +136,11 @@ def _validate_item(raw: Any) -> dict[str, Any]:
             "currency must be an uppercase 2-12 character code"
         )
     amount = _positive_amount(raw.get("advertised_amount"))
-    last_seen = _parse_timestamp(raw.get("last_seen_at"), field="last_seen_at")
+    last_seen = _parse_timestamp(
+        raw.get("last_seen_at"), field="last_seen_at", allow_none=False
+    )
+    if last_seen > datetime.now(timezone.utc) + timedelta(minutes=5):
+        raise RevenueCloseoutInputError("last_seen_at must not be in the future")
     settlement_url = raw.get("settlement_followup_url")
     if settlement_url is not None:
         if not isinstance(settlement_url, str):
@@ -440,8 +447,9 @@ def build_closeout_queue(
     if isinstance(max_pages, bool) or not isinstance(max_pages, int) or max_pages <= 0:
         raise RevenueCloseoutInputError("max_pages must be positive")
     seen: set[tuple[str, int]] = set()
+    manifest_order: dict[tuple[str, int], int] = {}
     results: list[dict[str, Any]] = []
-    for raw in items:
+    for index, raw in enumerate(items):
         validated = _validate_item(raw)
         identity = (validated["repo"].casefold(), validated["pr"])
         if identity in seen:
@@ -449,17 +457,16 @@ def build_closeout_queue(
                 f"duplicate closeout item: {validated['repo']}#{validated['pr']}"
             )
         seen.add(identity)
+        manifest_order[identity] = index
         results.append(
             scan_paid_pr(raw, token, session=session, max_pages=max_pages)
         )
 
-    def sort_key(result: dict[str, Any]) -> tuple[Any, ...]:
-        amount = Decimal(result["advertised_amount"])
+    def sort_key(result: dict[str, Any]) -> tuple[int, int]:
+        identity = (result["repo"].casefold(), result["pr"])
         return (
             _ACTION_ORDER[result["next_action"]],
-            -amount,
-            result["repo"].casefold(),
-            result["pr"],
+            manifest_order[identity],
         )
 
     results.sort(key=sort_key)
