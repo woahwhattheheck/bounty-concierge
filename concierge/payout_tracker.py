@@ -15,11 +15,14 @@ from concierge import config
 def _payload_list(data, key: str) -> List[dict]:
     """Normalize supported API payload shapes to the public list contract."""
     if isinstance(data, list):
-        return data
-    if not isinstance(data, dict):
+        items = data
+    elif isinstance(data, dict):
+        items = data.get(key, [])
+    else:
         return []
-    value = data.get(key, [])
-    return value if isinstance(value, list) else []
+    if not isinstance(items, list):
+        return []
+    return [item for item in items if isinstance(item, dict)]
 
 
 def check_pending(wallet_id: str, node_url: str | None = None) -> List[dict]:
