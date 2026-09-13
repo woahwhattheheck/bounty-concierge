@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Set, Tuple
 
 from .contract_qualification import (
     ContractQualificationInputError,
+    trusted_utc_now,
     verify_contract_qualification_receipt,
 )
 
@@ -234,7 +235,7 @@ def _normalize_brief(raw: Any, snapshot: Dict[str, Any], receipt: Dict[str, Any]
 
 
 def build_external_contract_proposal(snapshot: Dict[str, Any], qualification_receipt: Dict[str, Any], brief: Dict[str, Any], *, as_of: str) -> Dict[str, Any]:
-    """Reverify qualification and assemble a deterministic owner-review packet."""
+    """Assemble at an explicitly trusted verifier time supplied by a caller/test harness."""
     snapshot = _obj(snapshot, "snapshot"); receipt = _obj(qualification_receipt, "qualification_receipt")
     try:
         verified = verify_contract_qualification_receipt(snapshot, receipt, as_of=as_of)
@@ -272,6 +273,15 @@ def build_external_contract_proposal(snapshot: Dict[str, Any], qualification_rec
         "authority": {key: False for key in sorted(_AUTHORITY)},
     }
     result = dict(core); result["packet_sha256"] = _hash(core); return result
+
+
+def build_external_contract_proposal_current(
+    snapshot: Dict[str, Any], qualification_receipt: Dict[str, Any], brief: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Production proposal assembly with verifier-owned current UTC."""
+    return build_external_contract_proposal(
+        snapshot, qualification_receipt, brief, as_of=trusted_utc_now()
+    )
 
 
 def verify_external_contract_proposal(packet: Dict[str, Any]) -> Dict[str, Any]:
@@ -328,14 +338,14 @@ def _load_json(path: str, name: str) -> Dict[str, Any]:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="python -m concierge.contract_proposal")
     parser.add_argument("snapshot"); parser.add_argument("qualification_receipt"); parser.add_argument("brief")
-    parser.add_argument("--as-of", required=True); parser.add_argument("--json", action="store_true")
+    parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     if [args.snapshot, args.qualification_receipt, args.brief].count("-") > 1:
         parser.error("at most one input may be read from stdin")
     try:
-        result = build_external_contract_proposal(
+        result = build_external_contract_proposal_current(
             _load_json(args.snapshot, "snapshot"), _load_json(args.qualification_receipt, "qualification_receipt"),
-            _load_json(args.brief, "brief"), as_of=args.as_of,
+            _load_json(args.brief, "brief"),
         )
     except (OSError, ContractProposalInputError) as exc:
         parser.error(str(exc))

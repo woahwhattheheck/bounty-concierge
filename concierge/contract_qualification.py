@@ -113,6 +113,11 @@ def _time(value: Any, name: str) -> tuple[str, int]:
     return canonical, int(parsed.timestamp())
 
 
+def trusted_utc_now() -> str:
+    """Return verifier-owned process time for production currentness checks."""
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
 def _amount(value: Any, name: str) -> Decimal:
     if isinstance(value, bool) or isinstance(value, float) or not isinstance(value, (str, int, Decimal)):
         raise ContractQualificationInputError(f"{name} must be an exact decimal string or integer")
@@ -298,6 +303,7 @@ def _bid(raw: Any, listing: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
 
 
 def qualify_external_contract(snapshot: dict[str, Any], *, as_of: str) -> dict[str, Any]:
+    """Evaluate at an explicitly trusted time supplied by a verifier/test harness."""
     root = _obj(snapshot, "snapshot")
     _keys(root, {"schema_version", "listing", "required_claims", "evidence", "platform", "bid"}, "snapshot")
     if root["schema_version"] != SCHEMA_VERSION:
@@ -340,8 +346,13 @@ def qualify_external_contract(snapshot: dict[str, Any], *, as_of: str) -> dict[s
     }
 
 
+def qualify_external_contract_current(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Production current-time qualification with no caller timestamp input."""
+    return qualify_external_contract(snapshot, as_of=trusted_utc_now())
+
+
 def verify_contract_qualification_receipt(snapshot: dict[str, Any], receipt: dict[str, Any], *, as_of: str) -> dict[str, Any]:
-    """Verify integrity, then re-evaluate the bound evidence at trusted current time."""
+    """Verify integrity, then re-evaluate at an explicitly trusted verifier time."""
     receipt = _obj(receipt, "receipt")
     bound_as_of = receipt.get("as_of")
     if type(bound_as_of) is not str:
@@ -359,6 +370,13 @@ def verify_contract_qualification_receipt(snapshot: dict[str, Any], receipt: dic
     return {"valid": True, "qualification_digest": rebuilt["qualification_digest"],
             "status": rebuilt["status"], "current_disposition": current["disposition"],
             "verified_as_of": current_as_of, "submitted": False}
+
+
+def verify_contract_qualification_receipt_current(
+    snapshot: dict[str, Any], receipt: dict[str, Any]
+) -> dict[str, Any]:
+    """Production receipt verification with verifier-owned current UTC."""
+    return verify_contract_qualification_receipt(snapshot, receipt, as_of=trusted_utc_now())
 
 
 def format_summary(result: dict[str, Any]) -> str:
@@ -379,10 +397,10 @@ def _load(path: str) -> dict[str, Any]:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="python -m concierge.contract_qualification")
-    parser.add_argument("snapshot"); parser.add_argument("--as-of", required=True); parser.add_argument("--json", action="store_true")
+    parser.add_argument("snapshot"); parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     try:
-        result = qualify_external_contract(_load(args.snapshot), as_of=args.as_of)
+        result = qualify_external_contract_current(_load(args.snapshot))
     except (OSError, json.JSONDecodeError, ContractQualificationInputError) as exc:
         parser.error(str(exc))
     print(json.dumps(result, indent=2, sort_keys=True) if args.json else format_summary(result))
