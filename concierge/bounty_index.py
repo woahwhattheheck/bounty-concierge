@@ -19,6 +19,54 @@ from concierge.config import GITHUB_TOKEN, REPOS
 # Fetching
 # ---------------------------------------------------------------------------
 
+def _normalize_issue_row(issue):
+    """Return parser-safe issue fields, or None for an unsupported API row."""
+    if not isinstance(issue, dict) or "pull_request" in issue:
+        return None
+
+    number = issue.get("number")
+    title = issue.get("title", "")
+    body = issue.get("body", "")
+    url = issue.get("html_url")
+    labels = issue.get("labels", [])
+    created_at = issue.get("created_at", "")
+
+    if isinstance(number, bool) or not isinstance(number, int) or number < 1:
+        return None
+    if not isinstance(title, str):
+        return None
+    if body is None:
+        body = ""
+    elif not isinstance(body, str):
+        return None
+    if not isinstance(url, str) or not url:
+        return None
+    if not isinstance(labels, list):
+        return None
+    if created_at is None:
+        created_at = ""
+    elif not isinstance(created_at, str):
+        return None
+
+    label_names = []
+    for label in labels:
+        if not isinstance(label, dict):
+            return None
+        name = label.get("name")
+        if not isinstance(name, str):
+            return None
+        label_names.append(name)
+
+    return {
+        "number": number,
+        "title": title,
+        "body": body,
+        "url": url,
+        "labels": label_names,
+        "created_at": created_at,
+    }
+
+
 def fetch_bounties(repos=None, token=None):
     """Fetch open bounty issues from one or more GitHub repos.
 
@@ -54,14 +102,23 @@ def fetch_bounties(repos=None, token=None):
                 print(f"[warn] failed to fetch {repo}: {exc}", file=sys.stderr)
                 break
 
-            for issue in resp.json():
-                # Skip pull requests that come through the issues endpoint
-                if "pull_request" in issue:
+            try:
+                issues = resp.json()
+            except ValueError as exc:
+                print(f"[warn] failed to decode {repo}: {exc}", file=sys.stderr)
+                break
+            if not isinstance(issues, list):
+                print(f"[warn] unsupported payload for {repo}: expected list", file=sys.stderr)
+                break
+
+            for issue in issues:
+                normalized = _normalize_issue_row(issue)
+                if normalized is None:
                     continue
 
-                title = issue.get("title", "")
-                body = issue.get("body", "") or ""
-                label_names = [lb["name"] for lb in issue.get("labels", [])]
+                title = normalized["title"]
+                body = normalized["body"]
+                label_names = normalized["labels"]
 
                 reward = parse_reward(title, body)
                 difficulty = estimate_difficulty(title, label_names, reward)
@@ -69,12 +126,12 @@ def fetch_bounties(repos=None, token=None):
 
                 bounties.append({
                     "repo": repo,
-                    "number": issue["number"],
+                    "number": normalized["number"],
                     "title": title,
                     "body": body,
-                    "url": issue["html_url"],
+                    "url": normalized["url"],
                     "labels": label_names,
-                    "created_at": issue.get("created_at", ""),
+                    "created_at": normalized["created_at"],
                     "reward_rtc": reward,
                     "difficulty": difficulty,
                     "skills": skills,
