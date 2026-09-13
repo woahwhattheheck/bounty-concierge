@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 from decimal import Decimal, InvalidOperation
+from fractions import Fraction
 from pathlib import Path
 from typing import Any, Optional, Union
 
@@ -20,6 +21,8 @@ from concierge.opportunity_ranker import (
     OpportunityRankInputError,
     _exact_decimal as _ranker_exact_decimal,
     _format_decimal as _ranker_format_decimal,
+    _fraction_to_exact_decimal,
+    _fraction_to_metric_decimal,
     rank_opportunities,
 )
 
@@ -139,7 +142,17 @@ def _row_to_item(
     if skill < 0 or skill > 1:
         raise PortfolioInputError("ranker emitted an invalid skill score")
 
-    expected_value = reward * probability
+    effort_fraction = Fraction(effort)
+    deadline_fraction = Fraction(deadline)
+    capacity_fraction = Fraction(capacity)
+    reward_fraction = Fraction(reward)
+    probability_fraction = Fraction(probability)
+    skill_fraction = Fraction(skill)
+    expected_value_fraction = reward_fraction * probability_fraction
+    ev_per_hour_fraction = expected_value_fraction / effort_fraction
+    expected_value = _fraction_to_exact_decimal(expected_value_fraction)
+    estimated_ev_per_hour = _fraction_to_metric_decimal(ev_per_hour_fraction)
+
     item = {
         "input_index": index,
         "canonical_source_url": source,
@@ -148,14 +161,18 @@ def _row_to_item(
         "estimated_win_probability": probability,
         "estimated_effort_hours": effort,
         "estimated_expected_value_usd": expected_value,
-        "estimated_ev_per_hour_usd": expected_value / effort,
+        "estimated_ev_per_hour_usd": estimated_ev_per_hour,
         "skill_match": skill,
         "hours_until_deadline": deadline,
         "collision_group": group,
+        "_effort_fraction": effort_fraction,
+        "_deadline_fraction": deadline_fraction,
+        "_expected_value_fraction": expected_value_fraction,
+        "_skill_fraction": skill_fraction,
     }
-    if effort > capacity:
+    if effort_fraction > capacity_fraction:
         return None, _portfolio_excluded(item, "EXCEEDS_PORTFOLIO_CAPACITY")
-    if effort > deadline:
+    if effort_fraction > deadline_fraction:
         return None, _portfolio_excluded(item, "DEADLINE_INFEASIBLE_ALONE")
     return item, None
 
@@ -188,27 +205,28 @@ def _exact_select(items: list[dict[str, Any]], capacity: Decimal) -> list[int]:
     ordered = sorted(
         range(len(items)),
         key=lambda i: (
-            items[i]["hours_until_deadline"],
+            items[i]["_deadline_fraction"],
             items[i]["canonical_source_url"],
             items[i]["input_index"],
         ),
     )
-    suffix_ev = [Decimal(0)] * (len(ordered) + 1)
+    suffix_ev = [Fraction(0)] * (len(ordered) + 1)
     for pos in range(len(ordered) - 1, -1, -1):
         suffix_ev[pos] = (
             suffix_ev[pos + 1]
-            + items[ordered[pos]]["estimated_expected_value_usd"]
+            + items[ordered[pos]]["_expected_value_fraction"]
         )
 
     best: Optional[dict[str, Any]] = None
     chosen: list[int] = []
     used_groups: set[str] = set()
+    capacity_fraction = Fraction(capacity)
 
     def visit(
         pos: int,
-        used_hours: Decimal,
-        expected_value: Decimal,
-        skill_sum: Decimal,
+        used_hours: Fraction,
+        expected_value: Fraction,
+        skill_sum: Fraction,
     ) -> None:
         nonlocal best
         if best is not None and expected_value + suffix_ev[pos] < best["expected_value"]:
@@ -237,8 +255,8 @@ def _exact_select(items: list[dict[str, Any]], capacity: Decimal) -> list[int]:
         group = item["collision_group"]
         if group in used_groups:
             return
-        next_hours = used_hours + item["estimated_effort_hours"]
-        if next_hours > capacity or next_hours > item["hours_until_deadline"]:
+        next_hours = used_hours + item["_effort_fraction"]
+        if next_hours > capacity_fraction or next_hours > item["_deadline_fraction"]:
             return
 
         used_groups.add(group)
@@ -246,13 +264,13 @@ def _exact_select(items: list[dict[str, Any]], capacity: Decimal) -> list[int]:
         visit(
             pos + 1,
             next_hours,
-            expected_value + item["estimated_expected_value_usd"],
-            skill_sum + item["skill_match"],
+            expected_value + item["_expected_value_fraction"],
+            skill_sum + item["_skill_fraction"],
         )
         chosen.pop()
         used_groups.remove(group)
 
-    visit(0, Decimal(0), Decimal(0), Decimal(0))
+    visit(0, Fraction(0), Fraction(0), Fraction(0))
     if best is None:
         return []
     return list(best["indices"])
@@ -314,7 +332,7 @@ def allocate_portfolio(
     selected_items = [feasible[index] for index in selected_indices]
     selected_items.sort(
         key=lambda item: (
-            item["hours_until_deadline"],
+            item["_deadline_fraction"],
             item["canonical_source_url"],
             item["input_index"],
         )
@@ -328,11 +346,12 @@ def allocate_portfolio(
             )
 
     selected: list[dict[str, Any]] = []
-    cumulative = Decimal(0)
-    total_ev = Decimal(0)
+    cumulative_fraction = Fraction(0)
+    total_ev_fraction = Fraction(0)
     for order, item in enumerate(selected_items, start=1):
-        cumulative += item["estimated_effort_hours"]
-        total_ev += item["estimated_expected_value_usd"]
+        cumulative_fraction += item["_effort_fraction"]
+        total_ev_fraction += item["_expected_value_fraction"]
+        cumulative = _fraction_to_exact_decimal(cumulative_fraction)
         selected.append(
             {
                 "allocation_order": order,
@@ -371,7 +390,10 @@ def allocate_portfolio(
         )
 
     portfolio_excluded.sort(key=lambda row: row["input_index"])
-    remaining = capacity - cumulative
+    capacity_fraction = Fraction(capacity)
+    cumulative = _fraction_to_exact_decimal(cumulative_fraction)
+    remaining = _fraction_to_exact_decimal(capacity_fraction - cumulative_fraction)
+    total_ev = _fraction_to_exact_decimal(total_ev_fraction)
     return {
         "schema": "qualified-opportunity-portfolio/v1",
         "candidate_count": len(candidates),
