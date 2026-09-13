@@ -1,38 +1,104 @@
 {
   "python": {
-    "aliases": ["py", "python3"],
-    "bounty_labels": ["python", "backend"]
+    "aliases": [
+      "py",
+      "python3"
+    ],
+    "bounty_labels": [
+      "python",
+      "backend"
+    ]
   },
   "rust": {
-    "aliases": ["rs", "rustlang"],
-    "bounty_labels": ["rust", "core"]
+    "aliases": [
+      "rs",
+      "rustlang"
+    ],
+    "bounty_labels": [
+      "rust",
+      "core"
+    ]
   },
   "docs": {
-    "aliases": ["documentation", "writing", "markdown"],
-    "bounty_labels": ["docs", "documentation"]
+    "aliases": [
+      "documentation",
+      "writing",
+      "markdown"
+    ],
+    "bounty_labels": [
+      "docs",
+      "documentation"
+    ]
   },
   "security": {
-    "aliases": ["sec", "audit", "pentest"],
-    "bounty_labels": ["security", "red-team"]
+    "aliases": [
+      "sec",
+      "audit",
+      "pentest"
+    ],
+    "bounty_labels": [
+      "security",
+      "red-team"
+    ]
   },
   "social-media": {
-    "aliases": ["social", "marketing", "engagement"],
-    "bounty_labels": ["social-media", "engagement"]
+    "aliases": [
+      "social",
+      "marketing",
+      "engagement"
+    ],
+    "bounty_labels": [
+      "social-media",
+      "engagement"
+    ]
   },
   "testing": {
-    "aliases": ["test", "qa", "quality"],
-    "bounty_labels": ["testing", "ci"]
+    "aliases": [
+      "test",
+      "qa",
+      "quality",
+      "pytest",
+      "coverage",
+      "benchmark"
+    ],
+    "bounty_labels": [
+      "testing",
+      "ci"
+    ]
   },
   "devops": {
-    "aliases": ["infra", "infrastructure", "ci-cd"],
-    "bounty_labels": ["devops", "infrastructure"]
+    "aliases": [
+      "infra",
+      "infrastructure",
+      "ci-cd"
+    ],
+    "bounty_labels": [
+      "devops",
+      "infrastructure"
+    ]
   },
   "frontend": {
-    "aliases": ["ui", "web", "html", "css", "javascript"],
-    "bounty_labels": ["frontend", "ui"]
+    "aliases": [
+      "ui",
+      "web",
+      "html",
+      "css",
+      "javascript"
+    ],
+    "bounty_labels": [
+      "frontend",
+      "ui"
+    ]
   },
   "blockchain": {
-    "aliases": ["crypto", "web3", "defi"],
-    "bounty_labels": ["blockchain", "protocol"]
+    "aliases": [
+      "crypto",
+      "web3",
+      "defi"
+    ],
+    "bounty_labels": [
+      "blockchain",
+      "protocol"
+    ]
   }
 }
