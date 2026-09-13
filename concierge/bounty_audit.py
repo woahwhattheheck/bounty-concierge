@@ -52,7 +52,17 @@ def _get_json(session: Any, url: str, *, headers: dict[str, str], params: dict[s
         response.raise_for_status()
     except requests.RequestException as exc:
         raise BountyAuditError(f"GitHub request failed for {url}: {exc}") from exc
-    return response.json()
+    try:
+        return response.json()
+    except (TypeError, ValueError) as exc:
+        raise BountyAuditError(f"GitHub response was not valid JSON for {url}") from exc
+
+
+def _object_payload(value: Any, context: str) -> dict[str, Any]:
+    """Require one GitHub object response before callers dereference fields."""
+    if not isinstance(value, dict):
+        raise BountyAuditError(f"GitHub {context} response was not an object")
+    return value
 
 
 def _issue_reference_pattern(repo: str, number: int) -> re.Pattern[str]:
@@ -152,7 +162,10 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
     token = token or GITHUB_TOKEN
     headers = _headers(token)
     issue_url = f"https://api.github.com/repos/{repo}/issues/{number}"
-    issue = _get_json(session, issue_url, headers=headers)
+    issue = _object_payload(
+        _get_json(session, issue_url, headers=headers),
+        f"issue {repo}#{number}",
+    )
     if "pull_request" in issue:
         raise ValueError(f"{repo}#{number} is a pull request, not an issue")
 
@@ -160,15 +173,20 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
     search_truncated = False
     search_url = "https://api.github.com/search/issues"
     for page in range(1, max_pages + 1):
-        payload = _get_json(
-            session,
-            search_url,
-            headers=headers,
-            params={"q": f"repo:{repo} is:pr {number}", "per_page": 100, "page": page},
+        payload = _object_payload(
+            _get_json(
+                session,
+                search_url,
+                headers=headers,
+                params={"q": f"repo:{repo} is:pr {number}", "per_page": 100, "page": page},
+            ),
+            f"search for {repo}#{number}",
         )
         if payload.get("incomplete_results") is True:
             search_truncated = True
         items = payload.get("items", [])
+        if not isinstance(items, list) or any(not isinstance(item, dict) for item in items):
+            raise BountyAuditError(f"GitHub search response contained malformed items for {repo}#{number}")
         candidates.extend(items)
         if len(items) < 100:
             break
@@ -185,10 +203,13 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
 
     linked_prs: list[dict[str, Any]] = []
     for pr_number in sorted(exact_candidates):
-        detail = _get_json(
-            session,
-            f"https://api.github.com/repos/{repo}/pulls/{pr_number}",
-            headers=headers,
+        detail = _object_payload(
+            _get_json(
+                session,
+                f"https://api.github.com/repos/{repo}/pulls/{pr_number}",
+                headers=headers,
+            ),
+            f"pull request {repo}#{pr_number}",
         )
         merged = bool(detail.get("merged_at"))
         state = detail.get("state") or "unknown"

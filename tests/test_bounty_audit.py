@@ -13,15 +13,18 @@ from concierge import bounty_audit
 
 
 class FakeResponse:
-    def __init__(self, payload, status=200):
+    def __init__(self, payload, status=200, json_error=None):
         self.payload = payload
         self.status_code = status
+        self.json_error = json_error
 
     def raise_for_status(self):
         if self.status_code >= 400:
             raise requests.HTTPError(f"HTTP {self.status_code}")
 
     def json(self):
+        if self.json_error is not None:
+            raise self.json_error
         return self.payload
 
 
@@ -52,6 +55,19 @@ class FakeSession:
             number = int(path.rsplit("/", 1)[-1])
             return FakeResponse(self.pull_details[number])
         raise AssertionError(f"unexpected URL {url}")
+
+
+class SequenceSession:
+    """Return exact payloads in request order for malformed-shape tests."""
+
+    def __init__(self, *responses):
+        self.responses = iter(responses)
+
+    def get(self, url, headers=None, params=None, timeout=None):
+        response = next(self.responses)
+        if isinstance(response, FakeResponse):
+            return response
+        return FakeResponse(response)
 
 
 def _candidate(number, title, body):
@@ -290,6 +306,62 @@ def test_http_failure_is_explicit():
 
     with pytest.raises(bounty_audit.BountyAuditError):
         bounty_audit.audit_bounty("acme/widget", 42, session=BrokenSession())
+
+
+def test_invalid_json_is_explicit_and_does_not_leak_decoder_detail():
+    session = SequenceSession(
+        FakeResponse(None, json_error=ValueError("raw provider response bytes")),
+    )
+
+    with pytest.raises(bounty_audit.BountyAuditError) as caught:
+        bounty_audit.audit_bounty("acme/widget", 42, session=session)
+
+    assert str(caught.value) == (
+        "GitHub response was not valid JSON for "
+        "https://api.github.com/repos/acme/widget/issues/42"
+    )
+    assert "raw provider" not in str(caught.value)
+
+
+@pytest.mark.parametrize("payload", [[], "not-an-object", None, 7])
+def test_issue_response_requires_object(payload):
+    session = SequenceSession(payload)
+
+    with pytest.raises(
+        bounty_audit.BountyAuditError,
+        match=r"^GitHub issue acme/widget#42 response was not an object$",
+    ):
+        bounty_audit.audit_bounty("acme/widget", 42, session=session)
+
+
+@pytest.mark.parametrize(
+    "search_payload",
+    [
+        [],
+        "not-an-object",
+        {"items": ["corrupt-row"], "incomplete_results": False},
+        {"items": "not-a-list", "incomplete_results": False},
+    ],
+)
+def test_search_response_rejects_malformed_shapes(search_payload):
+    session = SequenceSession({"state": "closed"}, search_payload)
+
+    with pytest.raises(bounty_audit.BountyAuditError):
+        bounty_audit.audit_bounty("acme/widget", 42, session=session)
+
+
+def test_pull_detail_response_requires_object():
+    session = SequenceSession(
+        {"state": "closed"},
+        {"items": [_candidate(10, "Fix #42", "")], "incomplete_results": False},
+        [],
+    )
+
+    with pytest.raises(
+        bounty_audit.BountyAuditError,
+        match=r"^GitHub pull request acme/widget#10 response was not an object$",
+    ):
+        bounty_audit.audit_bounty("acme/widget", 42, session=session)
 
 
 def test_format_summary_surfaces_stale_and_competition_signals():
