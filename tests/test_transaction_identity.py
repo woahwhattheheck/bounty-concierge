@@ -15,6 +15,7 @@ def closeout(*, pr: int = 7, amount: str = "10") -> dict:
         "currency": "RTC",
         "advertised_amount": amount,
         "cash_status": "not_inferred",
+        "merged_at": "1970-01-01T00:00:00Z",
     }
 
 
