@@ -1,8 +1,14 @@
 # SPDX-License-Identifier: MIT
 
+from itertools import count
+
 import pytest
 
 from concierge import bounty_preflight as bp
+
+
+_COMMENT_IDS = count(1)
+_GENERATION_TIME = "2026-09-13T00:00:00Z"
 
 
 class Response:
@@ -18,7 +24,12 @@ class Response:
 
 class Session:
     def __init__(self, issue, pages):
-        self.issue = issue
+        self.issue = dict(issue)
+        self.issue.setdefault("state", "open")
+        self.issue.setdefault("title", "Paid work")
+        self.issue.setdefault("updated_at", _GENERATION_TIME)
+        self.issue.setdefault("comments", sum(len(page) for page in pages))
+        self.issue.setdefault("assignees", [])
         self.pages = pages
         self.calls = []
 
@@ -29,8 +40,18 @@ class Session:
         return Response(self.issue)
 
 
-def comment(login, body, *, association="NONE", user_type="User"):
+def comment(
+    login,
+    body,
+    *,
+    association="NONE",
+    user_type="User",
+    comment_id=None,
+    updated_at=_GENERATION_TIME,
+):
     return {
+        "id": next(_COMMENT_IDS) if comment_id is None else comment_id,
+        "updated_at": updated_at,
         "body": body,
         "author_association": association,
         "user": {"login": login, "type": user_type},
@@ -57,6 +78,7 @@ def test_collects_unique_external_human_attempt_pressure_without_comment_injecti
     assert result["attempt_count"] == 3
     assert result["attempt_signal_count"] == 4
     assert "comments" not in result
+    assert "_comment_generation" not in result
     assert result["comments_truncated"] is False
 
 
@@ -140,10 +162,93 @@ def test_preflight_passes_attempt_count_without_raw_comment_text(monkeypatch):
 
     monkeypatch.setattr(bp, "qualify_dispatch", fake_qualify)
 
-    bp.preflight_bounty("acme/repo", 10, session=session)
+    result = bp.preflight_bounty("acme/repo", 10, session=session)
 
     assert seen["snapshot"]["attempt_count"] == 1
     assert "comments" not in seen["snapshot"]
+    assert result["qualification"]["dispatch"] is True
+    assert result["qualification"]["signals"]["canonical_generation_stable"] is True
+    assert "_comment_generation" not in repr(result)
+
+
+def test_actionable_preflight_holds_when_claim_comment_generation_changes(monkeypatch):
+    issue_url = "https://api.github.com/repos/acme/repo/issues/18"
+    issue = {
+        "title": "Paid repair",
+        "body": "/bounty $500",
+        "labels": ["$500"],
+        "assignees": [],
+        "state": "open",
+        "html_url": "https://github.com/acme/repo/issues/18",
+        "updated_at": _GENERATION_TIME,
+        "comments": 3,
+    }
+    initial_comments = [
+        comment("alice", "/attempt #18", comment_id=1801),
+        comment("bob", "Claiming this bounty.", comment_id=1802),
+        comment("carol", "Watching this one.", comment_id=1803),
+    ]
+    changed_comments = [
+        initial_comments[0],
+        initial_comments[1],
+        comment(
+            "carol",
+            "I'm working on this bounty.",
+            comment_id=1803,
+            updated_at="2026-09-13T00:00:01Z",
+        ),
+    ]
+
+    class EditingClaimSession:
+        def __init__(self):
+            self.comment_reads = 0
+            self.issue_reads = 0
+
+        def get(self, url, *, headers, params=None, timeout=15):
+            if url == issue_url:
+                self.issue_reads += 1
+                return Response(issue)
+            if url.endswith("/comments"):
+                self.comment_reads += 1
+                return Response(
+                    initial_comments if self.comment_reads == 1 else changed_comments
+                )
+            raise AssertionError(f"unexpected URL: {url}")
+
+    session = EditingClaimSession()
+    monkeypatch.setattr(
+        bp,
+        "audit_bounty",
+        lambda *args, **kwargs: {
+            "issue_state": "open",
+            "open_pr_count": 0,
+            "stale_listing_signal": False,
+            "search_truncated": False,
+        },
+    )
+    monkeypatch.setattr(
+        bp,
+        "qualify_dispatch",
+        lambda snapshot, *, saturation_threshold: {
+            "disposition": "ACTIONABLE",
+            "dispatch": True,
+            "reason_codes": [],
+            "reasons": [],
+            "signals": {},
+        },
+    )
+
+    result = bp.preflight_bounty(
+        "acme/repo", 18, session=session, saturation_threshold=3
+    )
+
+    assert result["attempt_count"] == 2
+    assert result["qualification"]["disposition"] == "HOLD"
+    assert result["qualification"]["dispatch"] is False
+    assert "CANONICAL_GENERATION_CHANGED" in result["qualification"]["reason_codes"]
+    assert result["qualification"]["signals"]["canonical_generation_stable"] is False
+    assert session.comment_reads == 2
+    assert session.issue_reads >= 2
 
 
 def test_preflight_binds_issue_metadata_and_state_to_one_generation(monkeypatch):
