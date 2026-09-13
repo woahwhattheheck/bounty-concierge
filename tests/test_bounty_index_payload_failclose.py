@@ -90,3 +90,39 @@ def test_fetch_bounties_ignores_malformed_object_rows_but_keeps_valid_sibling(mo
     assert [item["number"] for item in result] == [11]
     assert result[0]["reward_rtc"] == 40.0
     assert result[0]["skills"] == ["python"]
+
+
+def test_fetch_bounties_continues_to_later_repo_after_malformed_row(monkeypatch):
+    malformed = {
+        "number": 1,
+        "title": {"structured": True},
+        "body": "",
+        "html_url": "https://github.com/bad/repo/issues/1",
+        "labels": [{"name": "bounty"}],
+    }
+    valid = {
+        "number": 12,
+        "title": "[Bounty: 60 RTC] Later repository",
+        "body": "Rust fix",
+        "html_url": "https://github.com/good/repo/issues/12",
+        "labels": [{"name": "bounty"}],
+        "created_at": "2026-01-03T00:00:00Z",
+    }
+
+    def fake_get(url, **kwargs):
+        if "/bad/repo/" in url:
+            return _Response(payload=[malformed])
+        if "/good/repo/" in url:
+            return _Response(payload=[valid])
+        raise AssertionError(f"unexpected URL: {url}")
+
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    result = bounty_index.fetch_bounties(
+        repos=["bad/repo", "good/repo"],
+        token="token",
+    )
+
+    assert [(item["repo"], item["number"]) for item in result] == [("good/repo", 12)]
+    assert result[0]["reward_rtc"] == 60.0
+    assert result[0]["skills"] == ["rust"]
