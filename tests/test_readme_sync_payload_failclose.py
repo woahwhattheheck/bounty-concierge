@@ -55,6 +55,26 @@ class ReadmeSyncPayloadFailClosedTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "number"):
             readme_sync.render_table([{"number": False}])
 
+    def test_null_number_sorts_with_integer_on_tied_reward(self) -> None:
+        table = readme_sync.render_table(
+            [
+                {
+                    "repo": "example/null-number",
+                    "number": None,
+                    "title": "Missing issue number",
+                    "reward_rtc": 10,
+                },
+                {
+                    "repo": "example/integer-number",
+                    "number": 7,
+                    "title": "Integer issue number",
+                    "reward_rtc": 10,
+                },
+            ]
+        )
+        self.assertIn("| null-number | [#None]", table)
+        self.assertIn("| integer-number | [#7]", table)
+
     def test_main_returns_one_for_valid_json_with_invalid_shape(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             index_path = pathlib.Path(tmpdir) / "bounty_index.json"
