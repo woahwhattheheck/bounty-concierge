@@ -37,7 +37,6 @@ compile_revenue_response_queue(
     manifest,
     fetch_authenticated_thread,
     *,
-    now,
     max_snapshot_age_seconds=300,
     auto_ack_grace_hours=24,
 )
@@ -78,6 +77,10 @@ Do not implement it as a lambda over:
 Those are data, not independent reacquisition authority.
 
 The core calls the callback exactly once per bound thread.
+
+Current time is verifier-owned: the public API does not accept a caller-selected
+`now`. Freshness and follow-up thresholds use the module's current UTC clock,
+so a request cannot manufacture or suppress a due action by choosing time.
 
 ## Normalized provider snapshot
 
@@ -322,7 +325,7 @@ The hostile suite exercises:
 - automated-ack grace;
 - one-touch / DNR semantics;
 - exact retained message and recipient binding;
-- complete/fresh snapshot requirements;
+- complete/fresh snapshot requirements and verifier-owned current time;
 - provider callback failure;
 - conflicting/duplicate provider evidence;
 - stable same-time provider ordering;
