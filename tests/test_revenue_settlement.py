@@ -31,6 +31,7 @@ def closeout(*, pr=7, amount="10", state="MERGED", currency="RTC"):
         "currency": currency,
         "advertised_amount": amount,
         "cash_status": "not_inferred",
+        "merged_at": "2026-09-12T23:59:59Z",
     }
 
 
@@ -39,7 +40,7 @@ def payment(*, amount=10, sender="treasury", status=None, tag="a"):
         "type": "transfer_in",
         "amount": amount,
         "from": sender,
-        "timestamp": f"2026-09-13T00:00:0{tag}Z",
+        "timestamp": "2026-09-13T00:00:01Z",
         "tx_hash": f"tx-{tag}",
     }
     if status is not None:
@@ -52,7 +53,7 @@ def legacy_payment(*, amount=10, sender="treasury", to="alice", tag="a"):
         "amount_rtc": amount,
         "from": sender,
         "to": to,
-        "created_at": f"2026-09-13T00:00:0{tag}Z",
+        "created_at": "2026-09-13T00:00:01Z",
         "tx_hash": f"legacy-{tag}",
     }
 
