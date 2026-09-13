@@ -2,20 +2,17 @@
 """Repository-wide pytest compatibility fixtures.
 
 Settlement chronology became part of the cash-evidence contract after the
-original settlement and transaction-identity suites were written. Their local
-``closeout()`` helpers intentionally model merged work but predate ``merged_at``.
-This fixture upgrades only those historical test helpers; production code still
-fails closed when a cash-bound merged item omits provider merge time.
+original settlement suite was written. Its local ``closeout()`` helper models
+merged work but predates ``merged_at``. This fixture upgrades only that
+historical helper; production code still fails closed when a cash-bound merged
+item omits provider merge time.
 """
 from __future__ import annotations
 
 import pytest
 
 
-_LEGACY_SETTLEMENT_MODULES = {
-    "test_revenue_settlement",
-    "test_transaction_identity",
-}
+_LEGACY_SETTLEMENT_MODULES = {"test_revenue_settlement"}
 _TEST_MERGED_AT = "1970-01-01T00:00:00Z"
 
 
