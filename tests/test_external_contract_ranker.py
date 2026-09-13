@@ -91,6 +91,28 @@ class ExternalContractRankerTests(unittest.TestCase):
         self.assertFalse(result["authority"]["fx_conversion"])
         self.assertFalse(result["authority"]["cross_currency_ranking"])
 
+    def test_unicode_currency_homographs_fail_closed(self):
+        result = self.rank([
+            candidate("https://market.example/good", "USD"),
+            candidate("https://market.example/cyrillic", "UЅD"),
+            candidate("https://market.example/umlaut", "ÜSD"),
+            candidate("https://market.example/greek", "ΕUR"),
+        ])
+        self.assertEqual(result["ranked_count"], 1)
+        self.assertEqual(list(result["partitions"]), ["USD"])
+        self.assertEqual(
+            result["partitions"]["USD"]["ranked"][0]["canonical_source_url"],
+            "https://market.example/good",
+        )
+        self.assertEqual(
+            [row["reason_code"] for row in result["excluded"]],
+            [
+                "QUALIFICATION_INVALID_OR_STALE",
+                "QUALIFICATION_INVALID_OR_STALE",
+                "QUALIFICATION_INVALID_OR_STALE",
+            ],
+        )
+
     def test_ranking_uses_exact_fraction_arithmetic(self):
         rows = [
             candidate("https://market.example/lower", "USD", "1", effort="1", probability="0.333333333332"),
@@ -165,6 +187,15 @@ class ExternalContractRankerTests(unittest.TestCase):
         ])
         self.assertEqual(result["ranked_count"], 0)
         self.assertTrue(all(row["reason_code"] == "ESTIMATE_INVALID" for row in result["excluded"]))
+
+    def test_in_memory_giant_integer_estimate_fails_closed(self):
+        result = self.rank([
+            candidate("https://market.example/giant-int", effort=10 ** 5000),
+            candidate("https://market.example/good"),
+        ])
+        self.assertEqual(result["ranked_count"], 1)
+        self.assertEqual(result["partitions"]["USD"]["ranked"][0]["canonical_source_url"], "https://market.example/good")
+        self.assertEqual(result["excluded"][0]["reason_code"], "ESTIMATE_INVALID")
 
     def test_qualification_identity_is_bound_into_public_row(self):
         row = candidate("https://market.example/a", "GBP", "125.50")
@@ -251,6 +282,13 @@ class ExternalContractRankerTests(unittest.TestCase):
             ranker.loads_strict_json('{"candidates":[],"candidates":[]}')
         with self.assertRaises(ranker.ExternalContractRankInputError):
             ranker.loads_strict_json('{"x":NaN}')
+
+    def test_strict_json_rejects_oversized_integer_tokens(self):
+        payload = '{"estimated_effort_hours":' + ("9" * 4301) + '}'
+        with self.assertRaises(ranker.ExternalContractRankInputError):
+            ranker.loads_strict_json(payload)
+        accepted = ranker.loads_strict_json('{"value":' + ("9" * 64) + '}')
+        self.assertEqual(accepted["value"], int("9" * 64))
 
     def test_regular_file_reader_rejects_duplicate_key_request(self):
         with tempfile.TemporaryDirectory() as temp:
