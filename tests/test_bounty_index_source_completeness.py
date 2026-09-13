@@ -8,6 +8,7 @@ import pytest
 import requests
 
 from concierge import bounty_index
+from concierge import bounty_index_publish as publisher
 
 
 class _Response:
@@ -38,14 +39,14 @@ def _issue(number=1):
     }
 
 
-def test_aggregate_treats_explicit_empty_sources_as_complete(monkeypatch):
+def test_complete_aggregate_treats_explicit_empty_sources_as_complete(monkeypatch):
     monkeypatch.setattr(
-        bounty_index.requests,
+        publisher.requests,
         "get",
         lambda *args, **kwargs: pytest.fail("repos=[] must not perform network I/O"),
     )
 
-    result = bounty_index.aggregate(repos=[], token="unit-test")
+    result = publisher.aggregate_complete(repos=[], token="unit-test")
 
     assert result["total_count"] == 0
     assert result["bounties"] == []
@@ -61,14 +62,14 @@ def test_aggregate_treats_explicit_empty_sources_as_complete(monkeypatch):
     ],
     ids=["configured-source-404", "invalid-json", "non-list-payload", "malformed-row"],
 )
-def test_aggregate_fails_closed_on_incomplete_source(monkeypatch, response):
-    monkeypatch.setattr(bounty_index.requests, "get", lambda *args, **kwargs: response)
+def test_complete_aggregate_fails_closed_on_incomplete_source(monkeypatch, response):
+    monkeypatch.setattr(publisher.requests, "get", lambda *args, **kwargs: response)
 
-    with pytest.raises(bounty_index.BountyIndexIncompleteError):
-        bounty_index.aggregate(repos=["example/repo"], token="unit-test")
+    with pytest.raises(publisher.BountyIndexIncompleteError):
+        publisher.aggregate_complete(repos=["example/repo"], token="unit-test")
 
 
-def test_aggregate_fails_closed_when_later_page_times_out(monkeypatch):
+def test_complete_aggregate_fails_closed_when_later_page_times_out(monkeypatch):
     calls = []
 
     def get(url, **kwargs):
@@ -77,10 +78,10 @@ def test_aggregate_fails_closed_when_later_page_times_out(monkeypatch):
             return _Response([_issue(1)], next_page=True)
         raise requests.Timeout("page two timed out")
 
-    monkeypatch.setattr(bounty_index.requests, "get", get)
+    monkeypatch.setattr(publisher.requests, "get", get)
 
-    with pytest.raises(bounty_index.BountyIndexIncompleteError, match="page 2"):
-        bounty_index.aggregate(repos=["example/repo"], token="unit-test")
+    with pytest.raises(publisher.BountyIndexIncompleteError, match="page 2"):
+        publisher.aggregate_complete(repos=["example/repo"], token="unit-test")
 
     assert calls == [1, 2]
 
@@ -106,13 +107,13 @@ def test_atomic_write_preserves_previous_index_on_source_failure(monkeypatch, tm
     target.write_bytes(old)
 
     monkeypatch.setattr(
-        bounty_index.requests,
+        publisher.requests,
         "get",
         lambda *args, **kwargs: _Response(error=ValueError("truncated response")),
     )
 
-    with pytest.raises(bounty_index.BountyIndexIncompleteError):
-        bounty_index.write_index_atomic(
+    with pytest.raises(publisher.BountyIndexIncompleteError):
+        publisher.write_index_atomic(
             target, repos=["example/repo"], token="unit-test"
         )
 
@@ -124,12 +125,12 @@ def test_atomic_write_replaces_target_only_after_complete_success(monkeypatch, t
     target = tmp_path / "bounty_index.json"
     target.write_text("stale\n", encoding="utf-8")
     monkeypatch.setattr(
-        bounty_index.requests,
+        publisher.requests,
         "get",
         lambda *args, **kwargs: _Response([_issue(3)]),
     )
 
-    data = bounty_index.write_index_atomic(
+    data = publisher.write_index_atomic(
         target, repos=["example/repo"], token="unit-test"
     )
     published = json.loads(target.read_text(encoding="utf-8"))
@@ -144,21 +145,24 @@ def test_cli_output_failure_returns_nonzero_without_clobber(monkeypatch, tmp_pat
     target = tmp_path / "bounty_index.json"
     target.write_text("last-good\n", encoding="utf-8")
     monkeypatch.setattr(
-        bounty_index,
-        "aggregate",
+        publisher,
+        "aggregate_complete",
         lambda repos=None, token=None: (_ for _ in ()).throw(
-            bounty_index.BountyIndexIncompleteError("source incomplete")
+            publisher.BountyIndexIncompleteError("source incomplete")
         ),
     )
 
-    assert bounty_index.main(["--output", str(target)]) == 2
+    assert publisher.main(["--output", str(target)]) == 2
     assert target.read_text(encoding="utf-8") == "last-good\n"
 
 
-def test_sync_workflow_uses_atomic_output_path():
+def test_sync_workflow_uses_atomic_publisher():
     workflow = (
         Path(__file__).resolve().parents[1] / ".github" / "workflows" / "bounty_index_sync.yml"
     ).read_text(encoding="utf-8")
 
-    assert "python -m concierge.bounty_index --output data/bounty_index.json" in workflow
+    assert (
+        "python -m concierge.bounty_index_publish --output data/bounty_index.json"
+        in workflow
+    )
     assert "python -m concierge.bounty_index > data/bounty_index.json" not in workflow
