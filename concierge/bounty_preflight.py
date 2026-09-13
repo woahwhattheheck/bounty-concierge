@@ -10,6 +10,7 @@ while authority-binding maintainer contribution terms for credential safety.
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 import json
 import re
 from typing import Any
@@ -41,6 +42,50 @@ _ATTEMPT_PHRASE_RE = re.compile(
 
 class BountyPreflightError(RuntimeError):
     """Raised when canonical GitHub preflight inputs cannot be read reliably."""
+
+
+class _CapturedIssueResponse:
+    """Minimal requests-compatible response for one frozen canonical issue."""
+
+    def __init__(self, payload: dict[str, Any]):
+        self._payload = deepcopy(payload)
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict[str, Any]:
+        return deepcopy(self._payload)
+
+
+class _CapturedIssueSession:
+    """Replay one captured issue generation while forwarding all other reads."""
+
+    def __init__(
+        self,
+        session: Any,
+        issue_url: str,
+        issue_snapshot: dict[str, Any],
+    ):
+        self._session = session
+        self._issue_url = issue_url
+        self._issue_snapshot = deepcopy(issue_snapshot)
+
+    def get(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str],
+        params: dict[str, Any] | None = None,
+        timeout: int = 15,
+    ) -> Any:
+        if url == self._issue_url:
+            return _CapturedIssueResponse(self._issue_snapshot)
+        return self._session.get(
+            url,
+            headers=headers,
+            params=params,
+            timeout=timeout,
+        )
 
 
 def _headers(token: str | None) -> dict[str, str]:
@@ -108,21 +153,16 @@ def _signals_attempt(body: str, repo: str) -> bool:
     return bool(same_repo_pr.search(body))
 
 
-def collect_issue_context(
+def _collect_issue_context_with_snapshot(
     repo: str,
     number: int,
     token: str | None = None,
     *,
     session: Any = requests,
     max_pages: int = 10,
-) -> dict[str, Any]:
-    """Collect safe qualification inputs plus conservative claim pressure.
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Collect safe context plus the exact canonical issue generation used."""
 
-    External comments contribute only to ``attempt_count``. Raw external comment
-    text is never forwarded into qualification. OWNER/MEMBER/COLLABORATOR terms
-    are reduced immediately to generic credential-safety signals, so raw
-    maintainer comment text does not leave the collection loop either.
-    """
     if "/" not in repo or not repo.split("/", 1)[0] or not repo.split("/", 1)[1]:
         raise ValueError("repo must be in owner/name form")
     if isinstance(number, bool) or not isinstance(number, int) or number <= 0:
@@ -137,9 +177,11 @@ def collect_issue_context(
     token = token or GITHUB_TOKEN
     headers = _headers(token)
     issue_url = f"https://api.github.com/repos/{repo}/issues/{number}"
-    issue = _object_payload(
-        _get_json(session, issue_url, headers=headers),
-        f"issue {repo}#{number}",
+    issue = deepcopy(
+        _object_payload(
+            _get_json(session, issue_url, headers=headers),
+            f"issue {repo}#{number}",
+        )
     )
     if "pull_request" in issue:
         raise ValueError(f"{repo}#{number} is a pull request, not an issue")
@@ -193,15 +235,43 @@ def collect_issue_context(
     else:
         comments_truncated = True
 
-    return {
-        "title": issue.get("title") if issue.get("title") is not None else "",
-        "body": issue_body,
-        "labels": issue.get("labels") if issue.get("labels") is not None else [],
-        "attempt_count": len(claimant_logins),
-        "attempt_signal_count": attempt_signal_count,
-        "comments_truncated": comments_truncated,
-        "credential_gate_signal_types": sorted(credential_signals),
-    }
+    return (
+        {
+            "title": issue.get("title") if issue.get("title") is not None else "",
+            "body": issue_body,
+            "labels": issue.get("labels") if issue.get("labels") is not None else [],
+            "attempt_count": len(claimant_logins),
+            "attempt_signal_count": attempt_signal_count,
+            "comments_truncated": comments_truncated,
+            "credential_gate_signal_types": sorted(credential_signals),
+        },
+        issue,
+    )
+
+
+def collect_issue_context(
+    repo: str,
+    number: int,
+    token: str | None = None,
+    *,
+    session: Any = requests,
+    max_pages: int = 10,
+) -> dict[str, Any]:
+    """Collect safe qualification inputs plus conservative claim pressure.
+
+    External comments contribute only to ``attempt_count``. Raw external comment
+    text is never forwarded into qualification. OWNER/MEMBER/COLLABORATOR terms
+    are reduced immediately to generic credential-safety signals, so raw
+    maintainer comment text does not leave the collection loop either.
+    """
+    context, _issue_snapshot = _collect_issue_context_with_snapshot(
+        repo,
+        number,
+        token,
+        session=session,
+        max_pages=max_pages,
+    )
+    return context
 
 
 def preflight_bounty(
@@ -213,19 +283,27 @@ def preflight_bounty(
     max_pages: int = 10,
     saturation_threshold: int = 4,
 ) -> dict[str, Any]:
-    """Return an operator-safe paid-work preflight result for one issue."""
-    context = collect_issue_context(
+    """Return an operator-safe paid-work preflight result for one issue.
+
+    Issue-derived qualification metadata, credential authority, and canonical
+    issue state are bound to one captured GitHub issue generation. PR
+    competition and maintainer-comment reads remain live, but a later issue
+    payload cannot be spliced into the same dispatch decision.
+    """
+    context, issue_snapshot = _collect_issue_context_with_snapshot(
         repo,
         number,
         token,
         session=session,
         max_pages=max_pages,
     )
+    issue_url = f"https://api.github.com/repos/{repo}/issues/{number}"
+    audit_session = _CapturedIssueSession(session, issue_url, issue_snapshot)
     raw_audit = audit_bounty(
         repo,
         number,
         token,
-        session=session,
+        session=audit_session,
         max_pages=max_pages,
     )
     if not isinstance(raw_audit, dict):

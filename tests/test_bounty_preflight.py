@@ -146,6 +146,75 @@ def test_preflight_passes_attempt_count_without_raw_comment_text(monkeypatch):
     assert "comments" not in seen["snapshot"]
 
 
+def test_preflight_binds_issue_metadata_and_state_to_one_generation(monkeypatch):
+    issue_url = "https://api.github.com/repos/acme/repo/issues/17"
+    first_issue = {
+        "title": "Paid repair",
+        "body": "/bounty $500",
+        "labels": ["$500"],
+        "state": "closed",
+        "html_url": "https://github.com/acme/repo/issues/17",
+    }
+    second_issue = {
+        "title": "Paid repair",
+        "body": "",
+        "labels": [],
+        "state": "open",
+        "html_url": "https://github.com/acme/repo/issues/17",
+    }
+
+    class MutatingIssueSession:
+        def __init__(self):
+            self.issue_reads = 0
+
+        def get(self, url, *, headers, params=None, timeout=15):
+            if url == issue_url:
+                self.issue_reads += 1
+                payload = first_issue if self.issue_reads == 1 else second_issue
+                return Response(payload)
+            if url.endswith("/comments"):
+                return Response([])
+            if url == "https://api.github.com/search/issues":
+                return Response({"items": [], "incomplete_results": False})
+            raise AssertionError(f"unexpected URL: {url}")
+
+    session = MutatingIssueSession()
+
+    def fake_audit(repo, number, token=None, *, session, max_pages):
+        response = session.get(issue_url, headers={}, timeout=15)
+        response.raise_for_status()
+        issue = response.json()
+        return {
+            "repo": repo,
+            "number": number,
+            "issue_url": issue["html_url"],
+            "issue_state": issue["state"],
+            "open_pr_count": 0,
+            "stale_listing_signal": False,
+            "search_truncated": False,
+        }
+
+    def fake_qualify(snapshot, *, saturation_threshold):
+        # Under the pre-fix two-read flow, this would splice first-generation
+        # reward metadata with second-generation "open" state and authorize.
+        if (
+            snapshot["body"] == "/bounty $500"
+            and snapshot["canonical_audit"]["issue_state"] == "open"
+        ):
+            return {"disposition": "ACTIONABLE", "dispatch": True}
+        return {"disposition": "REJECT", "dispatch": False}
+
+    monkeypatch.setattr(bp, "audit_bounty", fake_audit)
+    monkeypatch.setattr(bp, "qualify_dispatch", fake_qualify)
+
+    result = bp.preflight_bounty("acme/repo", 17, session=session)
+
+    assert session.issue_reads == 1
+    assert result["canonical_audit"]["issue_state"] == "closed"
+    assert result["qualification"]["disposition"] == "REJECT"
+    assert result["qualification"]["dispatch"] is False
+
+
 @pytest.mark.parametrize(
     ("repo", "number", "max_pages"),
     [
