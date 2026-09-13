@@ -31,7 +31,8 @@ def fetch_bounties(repos=None, token=None):
             repo, number, title, body, url, labels, created_at, reward_rtc,
             difficulty, skills
     """
-    repos = repos or REPOS
+    if repos is None:
+        repos = REPOS
     token = token or GITHUB_TOKEN
 
     headers = {"Accept": "application/vnd.github+json"}
