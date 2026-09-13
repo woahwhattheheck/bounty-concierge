@@ -37,7 +37,8 @@ def _normalise_tags(raw: Dict) -> Dict[str, List[str]]:
 
     Accepts both structured (aliases + bounty_labels) and flat (list) formats.
     For structured entries, the keyword list is built from the skill name
-    itself, its aliases, and its bounty_labels.
+    itself, its aliases, and its bounty_labels.  Malformed optional structured
+    fields are ignored instead of making matcher import fail.
     """
     result: Dict[str, List[str]] = {}
     for skill, value in raw.items():
@@ -45,8 +46,14 @@ def _normalise_tags(raw: Dict) -> Dict[str, List[str]]:
             result[skill] = value
         elif isinstance(value, dict):
             keywords = [skill]
-            keywords.extend(value.get("aliases", []))
-            keywords.extend(value.get("bounty_labels", []))
+            for field in ("aliases", "bounty_labels"):
+                entries = value.get(field, [])
+                if not isinstance(entries, list):
+                    continue
+                keywords.extend(
+                    kw for kw in entries
+                    if isinstance(kw, str) and kw.strip()
+                )
             # Deduplicate while preserving order
             seen = set()
             unique = []
