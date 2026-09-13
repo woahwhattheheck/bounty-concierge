@@ -41,8 +41,9 @@ def _get_json(session: Any, url: str, *, headers: dict[str, str], params: dict[s
 def _issue_reference_pattern(repo: str, number: int) -> re.Pattern[str]:
     owner, name = repo.split("/", 1)
     full_url = rf"https?://github\.com/{re.escape(owner)}/{re.escape(name)}/issues/{number}(?!\d)"
-    short_ref = rf"(?<!\d)#{number}(?!\d)"
-    return re.compile(rf"(?:{full_url}|{short_ref})", re.IGNORECASE)
+    qualified_ref = rf"(?<![A-Za-z0-9_.-]){re.escape(owner)}/{re.escape(name)}#{number}(?!\d)"
+    short_ref = rf"(?<![A-Za-z0-9_.-])#{number}(?!\d)"
+    return re.compile(rf"(?:{full_url}|{qualified_ref}|{short_ref})", re.IGNORECASE)
 
 
 def references_issue(pr: dict[str, Any], repo: str, number: int) -> bool:
