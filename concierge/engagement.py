@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 from typing import Dict, List, Optional
+from urllib.parse import quote
 
 import requests
 
@@ -106,6 +107,40 @@ def check_devto_articles(api_key: str) -> List[dict]:
 # Engagement proof generation
 # ---------------------------------------------------------------------------
 
+_MARKDOWN_INLINE_ESCAPES = frozenset("\\`*_[]<>")
+_MARKDOWN_URL_SAFE = ":/?#@!$&'*,;+%=~._-"
+
+
+def _visible_text(value) -> str:
+    """Render caller text without raw control or format characters."""
+    escaped: list[str] = []
+    for char in str(value):
+        if char.isprintable():
+            escaped.append(char)
+            continue
+        codepoint = ord(char)
+        if codepoint <= 0xFF:
+            escaped.append(f"\\x{codepoint:02x}")
+        elif codepoint <= 0xFFFF:
+            escaped.append(f"\\u{codepoint:04x}")
+        else:
+            escaped.append(f"\\U{codepoint:08x}")
+    return "".join(escaped)
+
+
+def _markdown_text(value) -> str:
+    """Escape untrusted inline Markdown while preserving printable text."""
+    return "".join(
+        f"\\{char}" if char in _MARKDOWN_INLINE_ESCAPES else char
+        for char in _visible_text(value)
+    )
+
+
+def _markdown_url(value) -> str:
+    """Percent-encode bytes that can terminate a Markdown link destination."""
+    return quote(str(value), safe=_MARKDOWN_URL_SAFE)
+
+
 def generate_engagement_proof(platform: str, action: str, proof_url: str) -> str:
     """Format a markdown comment suitable for claiming a social bounty.
 
@@ -123,11 +158,15 @@ def generate_engagement_proof(platform: str, action: str, proof_url: str) -> str
     str
         Markdown-formatted proof comment ready to paste into a GitHub issue.
     """
+    platform_text = _markdown_text(platform)
+    action_text = _markdown_text(action)
+    proof_text = _markdown_text(proof_url)
+    proof_destination = _markdown_url(proof_url)
     return (
         f"**Engagement Proof**\n\n"
-        f"- **Platform:** {platform}\n"
-        f"- **Action:** {action}\n"
-        f"- **Proof:** [{proof_url}]({proof_url})\n\n"
+        f"- **Platform:** {platform_text}\n"
+        f"- **Action:** {action_text}\n"
+        f"- **Proof:** [{proof_text}]({proof_destination})\n\n"
         f"Requesting payout per the bounty terms."
     )
 
