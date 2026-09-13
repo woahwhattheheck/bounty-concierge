@@ -164,18 +164,51 @@ def test_duplicate_indistinguishable_history_rows_are_rejected():
         inventory_history([row, copy.deepcopy(row)], "alice")
 
 
-def test_conflicting_amount_fields_are_rejected():
+def test_conflicting_amount_fields_are_rejected_when_bound():
+    item = closeout()
     row = payment()
     row["amount_rtc"] = 9
     with pytest.raises(RevenueSettlementEvidenceError, match="conflicting amount"):
-        inventory_history([row], "alice")
+        reconcile_cash([item], [row], [bind(item, row)], wallet="alice")
 
 
-def test_conflicting_recipient_fields_are_rejected():
+def test_conflicting_recipient_fields_are_rejected_when_bound():
+    item = closeout()
     row = payment()
     row["to_addr"] = "mallory"
     with pytest.raises(RevenueSettlementEvidenceError, match="conflicting recipient"):
-        inventory_history([row], "alice")
+        reconcile_cash([item], [row], [bind(item, row)], wallet="alice")
+
+
+def test_unrelated_reward_rows_do_not_block_bound_transfer_reconciliation():
+    item = closeout()
+    reward = {"type": "reward", "amount": 2, "timestamp": 1}
+    row = payment()
+    result = reconcile_cash([item], [reward, row], [bind(item, row)], wallet="alice")
+    assert result[0]["cash_status"] == "verified_paid"
+
+
+def test_inventory_marks_unbindable_rows_without_inventing_payment_semantics():
+    reward = {"type": "reward", "amount": 2, "timestamp": 1}
+    inventory = inventory_history([reward], "alice")
+    assert inventory[0]["bindable"] is False
+    assert inventory[0]["history_sha256"] == history_row_sha256(reward)
+
+
+def test_bound_outgoing_transfer_is_rejected():
+    item = closeout()
+    row = payment()
+    row["type"] = "transfer_out"
+    with pytest.raises(RevenueSettlementEvidenceError, match="outgoing transfer"):
+        reconcile_cash([item], [row], [bind(item, row)], wallet="alice")
+
+
+def test_bound_self_funded_transfer_is_rejected():
+    item = closeout()
+    row = payment()
+    row["from"] = "alice"
+    with pytest.raises(RevenueSettlementEvidenceError, match="self-funded"):
+        reconcile_cash([item], [row], [bind(item, row)], wallet="alice")
 
 
 @pytest.mark.parametrize("wallet", ["", " alice", "alice ", "alice bob", "alice\nbob"])
