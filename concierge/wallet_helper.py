@@ -147,13 +147,15 @@ def get_pending_transfers(name):
         A list of pending transfer dicts, or an empty list on error.
     """
     result = _get("/wallet/pending", params={"miner_id": name})
-    if isinstance(result, list):
-        return result
     if isinstance(result, dict):
         if "error" in result:
             return []
-        return result.get("pending", [])
-    return []
+        result = result.get("pending", [])
+    if not isinstance(result, list):
+        return []
+    if any(not isinstance(item, dict) for item in result):
+        return []
+    return result
 
 
 def register_wallet_guide(name):
