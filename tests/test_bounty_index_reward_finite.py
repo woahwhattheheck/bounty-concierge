@@ -22,6 +22,15 @@ def test_overflowing_title_reward_falls_through_to_valid_body_reward():
     assert reward == 25.0
 
 
+def test_overflowing_reward_falls_through_to_later_finite_reward_in_same_field():
+    reward = parse_reward(
+        f"{'9' * 400} RTC placeholder; payout 25 RTC",
+        "",
+    )
+
+    assert reward == 25.0
+
+
 def test_large_finite_and_canonical_grouped_rewards_remain_supported():
     large = parse_reward(f"1{'0' * 307} RTC", "")
     grouped = parse_reward("Reward: 1,234.5 RTC", "")

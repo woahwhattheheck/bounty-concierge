@@ -166,8 +166,7 @@ def parse_reward(title, body):
     or 0.0 if nothing valid is found.
     """
     for text in (title, body):
-        match = _RTC_PATTERN.search(text)
-        if match:
+        for match in _RTC_PATTERN.finditer(text):
             raw = match.group(1).replace(",", "")
             try:
                 value = float(raw)
