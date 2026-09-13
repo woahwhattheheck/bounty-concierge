@@ -19,6 +19,11 @@ class PayoutLookupError(RuntimeError):
     """Raised when payout status cannot be determined reliably."""
 
 
+_HISTORY_PAGE_LIMIT = 200
+_HISTORY_MAX_OFFSET = 9800
+_HISTORY_MAX_RECORDS = _HISTORY_MAX_OFFSET + _HISTORY_PAGE_LIMIT
+
+
 def _validate_wallet_id(wallet_id: object) -> str:
     """Return one unambiguous wallet identifier or fail before network I/O."""
     if (
@@ -45,10 +50,12 @@ def _payload_list(data, key: str) -> List[dict]:
     return items
 
 
-def _history_payload_list(data, wallet_id: str) -> List[dict]:
-    """Normalize the canonical RustChain history envelope plus legacy shapes."""
+def _canonical_history_page(
+    data, wallet_id: str
+) -> tuple[List[dict], int] | None:
+    """Validate one canonical RustChain history page, if present."""
     if not isinstance(data, dict) or "transactions" not in data:
-        return _payload_list(data, "history")
+        return None
 
     items = data.get("transactions")
     total = data.get("total")
@@ -63,7 +70,15 @@ def _history_payload_list(data, wallet_id: str) -> List[dict]:
         or total < len(items)
     ):
         raise PayoutLookupError("history payout response was malformed")
-    return items
+    return items, total
+
+
+def _history_payload_list(data, wallet_id: str) -> List[dict]:
+    """Normalize the canonical RustChain history envelope plus legacy shapes."""
+    page = _canonical_history_page(data, wallet_id)
+    if page is None:
+        return _payload_list(data, "history")
+    return page[0]
 
 
 def _pending_from_history(items: List[dict]) -> List[dict]:
@@ -215,19 +230,110 @@ def _check_transfers(
         ) from exc
 
 
+def _check_complete_history(
+    wallet_id: str, node_url: str | None = None
+) -> List[dict]:
+    """Read every canonical history page needed for pending-state authority.
+
+    Canonical RustChain history is paginated.  The first read keeps the
+    historical request shape for compatibility; if its ``total`` proves that
+    more records exist, subsequent reads use bounded ``limit``/``offset``
+    pagination.  A changing total, a stalled page, or a history larger than
+    the public offset contract fails closed instead of certifying a partial
+    snapshot as "no pending transfers".
+
+    Legacy list/``history`` wrapper responses carry no pagination metadata and
+    retain their historical single-response behavior.
+    """
+    wallet_id = _validate_wallet_id(wallet_id)
+    base, verify = _node_request_settings(node_url)
+    url = f"{base}/wallet/history"
+
+    collected: list[dict] = []
+    expected_total: int | None = None
+    offset = 0
+
+    while True:
+        params: dict[str, object] = {"miner_id": wallet_id}
+        if expected_total is not None:
+            remaining = expected_total - offset
+            if remaining <= 0:
+                return collected
+            alignment = offset % _HISTORY_PAGE_LIMIT
+            page_limit = (
+                _HISTORY_PAGE_LIMIT
+                if alignment == 0
+                else _HISTORY_PAGE_LIMIT - alignment
+            )
+            params.update(
+                {
+                    "limit": min(page_limit, remaining),
+                    "offset": offset,
+                }
+            )
+
+        try:
+            resp = requests.get(
+                url,
+                params=params,
+                timeout=15,
+                verify=verify,
+            )
+            resp.raise_for_status()
+            try:
+                data = resp.json()
+            except (TypeError, ValueError) as exc:
+                raise PayoutLookupError(
+                    "history payout response was not valid JSON"
+                ) from exc
+        except PayoutLookupError:
+            raise
+        except (requests.RequestException, OSError) as exc:
+            raise PayoutLookupError("history payout request failed") from exc
+
+        canonical = _canonical_history_page(data, wallet_id)
+        if canonical is None:
+            if expected_total is not None or offset != 0:
+                raise PayoutLookupError("history payout pagination was malformed")
+            return _payload_list(data, "history")
+
+        page, total = canonical
+        if expected_total is None:
+            expected_total = total
+            if expected_total > _HISTORY_MAX_RECORDS:
+                raise PayoutLookupError(
+                    "history payout pagination exceeds supported range"
+                )
+        elif total != expected_total:
+            raise PayoutLookupError(
+                "history payout pagination changed during read"
+            )
+
+        if offset + len(page) > expected_total:
+            raise PayoutLookupError("history payout pagination was malformed")
+
+        collected.extend(page)
+        offset += len(page)
+        if offset == expected_total:
+            return collected
+        if not page or offset > _HISTORY_MAX_OFFSET:
+            raise PayoutLookupError("history payout pagination was incomplete")
+
+
 def check_pending(wallet_id: str, node_url: str | None = None) -> List[dict]:
     """Return pending transfers for *wallet_id*.
 
     RustChain's public wallet contract exposes pending-ledger rows through
     ``GET {node_url}/wallet/history?miner_id={wallet_id}``; there is no
-    public ``/wallet/pending`` contract.  Derive pending rows from the same
-    validated history envelope used by :func:`check_history` so a missing
-    endpoint cannot masquerade as a genuine empty pending set.
+    public ``/wallet/pending`` contract.  Canonical history is paginated, so
+    all pages are read before deriving in-flight transfer state; this prevents
+    a first-page-only read from certifying a false empty pending set.  Legacy
+    history shapes retain their single-response compatibility path.
 
-    Transport, HTTP, JSON, envelope, and pending-state failures raise
-    :class:`PayoutLookupError`.
+    Transport, HTTP, JSON, envelope, pagination, and pending-state failures
+    raise :class:`PayoutLookupError`.
     """
-    history = _check_transfers(wallet_id, "history", "history", node_url)
+    history = _check_complete_history(wallet_id, node_url)
     return _pending_from_history(history)
 
 

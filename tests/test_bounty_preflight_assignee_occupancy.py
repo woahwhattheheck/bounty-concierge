@@ -5,6 +5,9 @@ import pytest
 from concierge import bounty_preflight as bp
 
 
+_GENERATION_TIME = "2026-09-13T00:00:00Z"
+
+
 class Response:
     def __init__(self, payload):
         self.payload = payload
@@ -42,6 +45,9 @@ def paid_issue(*, assignees=None):
         "body": "/bounty $100",
         "labels": [{"name": "$100"}],
         "assignees": [] if assignees is None else assignees,
+        "state": "open",
+        "updated_at": _GENERATION_TIME,
+        "comments": 0,
     }
 
 
@@ -78,6 +84,7 @@ def test_operator_assignment_does_not_block_own_dispatch(monkeypatch):
     assert result["qualification"]["disposition"] == "ACTIONABLE"
     assert result["qualification"]["dispatch"] is True
     assert "FORMALLY_ASSIGNED" not in result["qualification"]["reason_codes"]
+    assert result["qualification"]["signals"]["canonical_generation_stable"] is True
 
 
 def test_mixed_operator_and_foreign_assignment_still_holds(monkeypatch):
@@ -149,6 +156,7 @@ def test_unassigned_control_remains_actionable(monkeypatch):
     assert result["foreign_assignee_count"] == 0
     assert result["qualification"]["disposition"] == "ACTIONABLE"
     assert result["qualification"]["dispatch"] is True
+    assert result["qualification"]["signals"]["canonical_generation_stable"] is True
 
 
 def test_invalid_operator_login_fails_closed_before_network_use():
