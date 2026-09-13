@@ -238,6 +238,7 @@ class CashCycleReviewTests(unittest.TestCase):
         self.assertEqual(one["observations"], two["observations"])
         self.assertEqual(one["repositories"], two["repositories"])
         self.assertEqual(one["authority"], two["authority"])
+        # Exact source-list ordering is part of custody even though analytics are stable.
         self.assertNotEqual(one["source"]["closeout_sha256"],
                             two["source"]["closeout_sha256"])
 
