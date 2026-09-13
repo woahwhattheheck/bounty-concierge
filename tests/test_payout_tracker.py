@@ -48,6 +48,20 @@ class TestCheckPending:
         ]
 
     @patch("concierge.payout_tracker.requests.get")
+    def test_pending_rejects_scalar_payload(self, mock_get):
+        mock_get.return_value = _response(payload="ok")
+
+        assert payout_tracker.check_pending("alice", node_url="https://node") == []
+
+    @patch("concierge.payout_tracker.requests.get")
+    def test_pending_rejects_non_list_wrapper_and_non_record_items(self, mock_get):
+        mock_get.return_value = _response(payload={"pending": {"id": "p1"}})
+        assert payout_tracker.check_pending("alice", node_url="https://node") == []
+
+        mock_get.return_value = _response(payload=[{"id": "p1"}, "not-a-record"])
+        assert payout_tracker.check_pending("alice", node_url="https://node") == []
+
+    @patch("concierge.payout_tracker.requests.get")
     def test_pending_404_returns_empty_list(self, mock_get):
         mock_get.return_value = _response(status_code=404, payload={"error": "missing"})
 
@@ -79,6 +93,17 @@ class TestCheckHistory:
     def test_history_unexpected_dict_without_history_returns_empty(self, mock_get):
         mock_get.return_value = _response(payload={"status": "ok"})
 
+        assert payout_tracker.check_history("alice", node_url="https://node") == []
+
+    @patch("concierge.payout_tracker.requests.get")
+    def test_history_rejects_scalar_and_malformed_record_payloads(self, mock_get):
+        mock_get.return_value = _response(payload=17)
+        assert payout_tracker.check_history("alice", node_url="https://node") == []
+
+        mock_get.return_value = _response(payload={"history": "not-a-list"})
+        assert payout_tracker.check_history("alice", node_url="https://node") == []
+
+        mock_get.return_value = _response(payload=[{"tx": "abc"}, None])
         assert payout_tracker.check_history("alice", node_url="https://node") == []
 
     @patch("concierge.payout_tracker.requests.get")
