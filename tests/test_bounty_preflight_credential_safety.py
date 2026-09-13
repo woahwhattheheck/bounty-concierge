@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 
+from itertools import count
 import json
 
 from concierge import bounty_preflight as bp
@@ -7,6 +8,10 @@ from concierge.credential_safety import (
     apply_credential_gate,
     credential_gate_signal_types,
 )
+
+
+_COMMENT_IDS = count(1)
+_GENERATION_TIME = "2026-09-13T00:00:00Z"
 
 
 class Response:
@@ -22,7 +27,12 @@ class Response:
 
 class Session:
     def __init__(self, issue, pages):
-        self.issue = issue
+        self.issue = dict(issue)
+        self.issue.setdefault("state", "open")
+        self.issue.setdefault("title", "Paid work")
+        self.issue.setdefault("updated_at", _GENERATION_TIME)
+        self.issue.setdefault("comments", sum(len(page) for page in pages))
+        self.issue.setdefault("assignees", [])
         self.pages = pages
 
     def get(self, url, *, headers, params=None, timeout=15):
@@ -33,6 +43,8 @@ class Session:
 
 def comment(login, body, *, association="NONE", user_type="User"):
     return {
+        "id": next(_COMMENT_IDS),
+        "updated_at": _GENERATION_TIME,
         "body": body,
         "author_association": association,
         "user": {"login": login, "type": user_type},
@@ -101,6 +113,7 @@ def test_external_comment_cannot_inject_credential_rejection(monkeypatch):
 
     assert result["qualification"]["disposition"] == "ACTIONABLE"
     assert result["qualification"]["signals"]["credential_gate_signal_types"] == []
+    assert result["qualification"]["signals"]["canonical_generation_stable"] is True
 
 
 def test_direct_secret_disclosure_is_rejected_without_source_echo():
