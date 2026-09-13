@@ -28,6 +28,9 @@ DETAILS_URL_PREFIX = f"{BASE_URL}/api/agents/listings/details"
 LISTING_URL_PREFIX = f"{BASE_URL}/earn/listing"
 API_KEY_ENV = "SUPERTEAM_EARN_API_KEY"
 MAX_RESPONSE_BYTES = 2_000_000
+STREAM_CHUNK_BYTES = 64 * 1024
+MAX_DECIMAL_SIGNIFICANT_DIGITS = 128
+MAX_DECIMAL_TEXT_CHARS = 256
 MAX_BATCHES = 5
 MAX_TOTAL_ROWS = 250
 _ALLOWED_TYPES = frozenset({"bounty", "project", "hackathon"})
@@ -88,6 +91,30 @@ def _nonnegative_int(value: Any, name: str) -> int:
     return value
 
 
+def _decimal_fixed_text_size(value: Decimal) -> int:
+    """Return the maximum fixed-point characters before trailing-zero stripping."""
+    digits = len(value.as_tuple().digits)
+    exponent = value.as_tuple().exponent
+    if not isinstance(exponent, int):
+        return MAX_DECIMAL_TEXT_CHARS + 1
+    if value.is_zero() and exponent >= 0:
+        return 1
+    if exponent >= 0:
+        return digits + exponent
+    if digits + exponent > 0:
+        return digits + 1
+    return 2 - exponent
+
+
+def _validate_decimal_boundary(value: Decimal, name: str) -> None:
+    digits = len(value.as_tuple().digits)
+    if (
+        digits > MAX_DECIMAL_SIGNIFICANT_DIGITS
+        or _decimal_fixed_text_size(value) > MAX_DECIMAL_TEXT_CHARS
+    ):
+        raise SuperteamProviderError(f"{name} is outside the supported amount boundary")
+
+
 def _decimal(value: Any, name: str, *, allow_none: bool = True) -> Decimal | None:
     if value is None and allow_none:
         return None
@@ -97,6 +124,8 @@ def _decimal(value: Any, name: str, *, allow_none: bool = True) -> Decimal | Non
         )
     if not isinstance(value, (Decimal, int, str)):
         raise SuperteamProviderError(f"{name} must be an exact decimal")
+    if isinstance(value, str) and len(value) > MAX_DECIMAL_TEXT_CHARS:
+        raise SuperteamProviderError(f"{name} is outside the supported amount boundary")
     try:
         parsed = Decimal(value)
     except (InvalidOperation, ValueError) as exc:
@@ -105,12 +134,14 @@ def _decimal(value: Any, name: str, *, allow_none: bool = True) -> Decimal | Non
         raise SuperteamProviderError(
             f"{name} must be a non-negative finite decimal"
         )
+    _validate_decimal_boundary(parsed, name)
     return parsed
 
 
 def _decimal_text(value: Decimal | None) -> str | None:
     if value is None:
         return None
+    _validate_decimal_boundary(value, "decimal")
     text = format(value, "f")
     if "." in text:
         text = text.rstrip("0").rstrip(".")
@@ -159,32 +190,38 @@ def _api_key(value: str | None) -> str:
     return value
 
 
-def _response_json(response: Any, *, name: str) -> Any:
-    status = getattr(response, "status_code", None)
-    if isinstance(status, bool) or not isinstance(status, int):
-        raise SuperteamProviderError(f"{name} returned no HTTP status")
-    if status == 401:
-        raise SuperteamProviderError("Superteam agent API authentication failed")
-    if status == 403:
-        raise SuperteamProviderError("Superteam agent API denied this read")
-    if status == 429:
-        raise SuperteamProviderError("Superteam agent API rate limit reached")
-    if status < 200 or status >= 300:
-        raise SuperteamProviderError(f"{name} returned HTTP {status}")
-
+def _declared_response_length(response: Any, *, name: str) -> None:
     headers = getattr(response, "headers", None)
-    if isinstance(headers, Mapping):
-        raw_length = headers.get("Content-Length")
-        if raw_length is not None:
-            try:
-                header_length = int(raw_length)
-            except (TypeError, ValueError) as exc:
-                raise SuperteamProviderError(
-                    f"{name} returned invalid Content-Length"
-                ) from exc
-            if header_length < 0 or header_length > MAX_RESPONSE_BYTES:
-                raise SuperteamProviderError(f"{name} response exceeds size limit")
+    if not isinstance(headers, Mapping):
+        return
+    raw_length = headers.get("Content-Length")
+    if raw_length is None:
+        return
+    try:
+        header_length = int(raw_length)
+    except (TypeError, ValueError) as exc:
+        raise SuperteamProviderError(f"{name} returned invalid Content-Length") from exc
+    if header_length < 0 or header_length > MAX_RESPONSE_BYTES:
+        raise SuperteamProviderError(f"{name} response exceeds size limit")
 
+
+def _bounded_response_bytes(response: Any, *, name: str) -> bytes:
+    _declared_response_length(response, name=name)
+    iterator = getattr(response, "iter_content", None)
+    if callable(iterator):
+        out = bytearray()
+        for chunk in iterator(chunk_size=STREAM_CHUNK_BYTES):
+            if chunk in (b"", None):
+                continue
+            if not isinstance(chunk, (bytes, bytearray)):
+                raise SuperteamProviderError(f"{name} returned no readable body")
+            if len(out) + len(chunk) > MAX_RESPONSE_BYTES:
+                raise SuperteamProviderError(f"{name} response exceeds size limit")
+            out.extend(chunk)
+        return bytes(out)
+
+    # Compatibility for injected test doubles. Production ``requests``
+    # responses always take the streamed iterator path above.
     raw = getattr(response, "content", None)
     if not isinstance(raw, (bytes, bytearray)):
         text = getattr(response, "text", None)
@@ -196,14 +233,36 @@ def _response_json(response: Any, *, name: str) -> Any:
             raise SuperteamProviderError(f"{name} response is not UTF-8") from exc
     if len(raw) > MAX_RESPONSE_BYTES:
         raise SuperteamProviderError(f"{name} response exceeds size limit")
+    return bytes(raw)
+
+
+def _response_json(response: Any, *, name: str) -> Any:
+    close = getattr(response, "close", None)
     try:
-        text = bytes(raw).decode("utf-8")
-    except UnicodeDecodeError as exc:
-        raise SuperteamProviderError(f"{name} response is not UTF-8") from exc
-    try:
-        return json.loads(text, parse_float=Decimal)
-    except (json.JSONDecodeError, InvalidOperation) as exc:
-        raise SuperteamProviderError(f"{name} returned invalid JSON") from exc
+        status = getattr(response, "status_code", None)
+        if isinstance(status, bool) or not isinstance(status, int):
+            raise SuperteamProviderError(f"{name} returned no HTTP status")
+        if status == 401:
+            raise SuperteamProviderError("Superteam agent API authentication failed")
+        if status == 403:
+            raise SuperteamProviderError("Superteam agent API denied this read")
+        if status == 429:
+            raise SuperteamProviderError("Superteam agent API rate limit reached")
+        if status < 200 or status >= 300:
+            raise SuperteamProviderError(f"{name} returned HTTP {status}")
+
+        raw = _bounded_response_bytes(response, name=name)
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise SuperteamProviderError(f"{name} response is not UTF-8") from exc
+        try:
+            return json.loads(text, parse_float=Decimal)
+        except (json.JSONDecodeError, InvalidOperation, ValueError) as exc:
+            raise SuperteamProviderError(f"{name} returned invalid JSON") from exc
+    finally:
+        if callable(close):
+            close()
 
 
 def _request_json(
@@ -226,10 +285,12 @@ def _request_json(
             timeout=15,
             # Never forward the bearer token to a redirect target.
             allow_redirects=False,
+            # Bound the body before Requests buffers it into ``content``.
+            stream=True,
         )
+        return _response_json(response, name=name)
     except requests.RequestException as exc:
         raise SuperteamProviderError(f"{name} request failed") from exc
-    return _response_json(response, name=name)
 
 
 def _count_block(value: Any) -> dict[str, int]:
@@ -556,6 +617,12 @@ def fetch_listing_details(
     if type(payload) is not dict:
         raise SuperteamProviderError(
             "Superteam listing details payload must be an object"
+        )
+
+    returned_slug = _text(payload.get("slug"), "slug", max_chars=200)
+    if returned_slug != slug:
+        raise SuperteamProviderError(
+            "Superteam listing details do not match the requested slug"
         )
 
     # The details endpoint is broader than the live-feed query. Reapply the
