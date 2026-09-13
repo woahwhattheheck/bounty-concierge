@@ -1,52 +1,64 @@
 # Revenue Response Queue
 
-`concierge.revenue_response_queue` is a read-only decision-support layer for the
-period after an outbound revenue message is sent and before an engagement is
-closed or settled.
+`concierge.revenue_response_queue` is the read-only control plane between an already-sent revenue message and engagement closeout. It classifies provider-observed post-send state into a deterministic operator queue without sending mail, replying to buyers, mutating a provider, changing contact policy, or recognizing payment/revenue.
 
-It exists to answer one narrow question from provider truth:
+The v2 design is intentionally stricter than a normal callback interface: **caller data cannot claim to be provider truth.**
 
-> Which already-sent engagements need a human response, route repair, follow-up,
-> or continued waiting right now?
+## Authority boundary
 
-It does **not** send messages, reply to buyers, mutate a mailbox, alter contact
-policy, recognize revenue, or recognize payment.
-
-## Why this exists
-
-The revenue stack already has separate controls for intake, dispatch, outbound
-dedupe, closeout, settlement, and portfolio allocation. Without a provider-
-grounded post-send queue, operators can still lose money in the middle:
-
-- a real human reply can be buried below auto-acknowledgements;
-- a bounced route can remain mistaken for a live sales path;
-- an already-sent follow-up can be forgotten and duplicated;
-- a one-touch / DNR engagement can be accidentally converted into an automated
-  follow-up campaign;
-- stale screenshots or caller-built CRM rows can be mistaken for current inbox
-  truth.
-
-This module makes that middle state explicit and fail-closed.
-
-## Authority model
-
-The production API is:
+The authoritative API is:
 
 ```python
 compile_revenue_response_queue(
     manifest,
-    fetch_authenticated_thread,
+    provider_read_batch,
     *,
-    max_snapshot_age_seconds=300,
-    auto_ack_grace_hours=24,
+    policy,
 )
 ```
 
-There are two authority classes.
+There is no public fetch callback and no caller-selected `now`.
 
-### 1. Operator-owned manifest scope
+A credential-owning host must first reacquire every exact provider thread. After those reads finish, the host builds one complete batch and HMAC-attests it with a host-only secret. The batch binds:
 
-The manifest says which engagements are allowed to participate and binds:
+- the canonical operator manifest (`scope_sha256`);
+- the canonical host/operator queue policy (`policy_sha256`);
+- provider identity and authenticated principal;
+- batch capture time;
+- the exact normalized provider snapshots.
+
+The compiler verifies that attestation before the snapshots can mint `HUMAN_REPLY`, `FOLLOW_UP_DUE`, or any other authoritative queue state.
+
+### Host configuration
+
+The verifying host supplies:
+
+```text
+BOUNTY_RESPONSE_QUEUE_ATTESTATION_KEY_B64
+BOUNTY_RESPONSE_QUEUE_ATTESTATION_KEY_ID
+```
+
+The HMAC key must decode to at least 32 bytes. The library deliberately does **not** ship a production signing helper. The provider adapter that owns credentials must own signing too; request payloads, webhooks, CRM rows, model output, and arbitrary caller callbacks are not allowed to act as the signer.
+
+Threat model: the attestation secret must not be readable or writable by untrusted request data. Code already executing with arbitrary access to the credential-owning host process/environment is inside this trust boundary and must be isolated by the host/runtime, not by this pure-Python module.
+
+## Trusted policy
+
+Policy is an exact object:
+
+```json
+{
+  "schema": "bounty-concierge.revenue-response-policy/v1",
+  "max_snapshot_age_seconds": 300,
+  "auto_ack_grace_hours": 24
+}
+```
+
+These are host/operator policy, not buyer/request-controlled knobs. The HMAC-attested batch commits the exact policy digest, so a batch cannot be replayed under a looser freshness window or different auto-ack grace period.
+
+## Operator manifest
+
+Each active engagement binds:
 
 - `engagement_id`
 - `provider_thread_id`
@@ -57,43 +69,49 @@ The manifest says which engagements are allowed to participate and binds:
 - `contact_policy`
 - `follow_up_after_hours`
 
-This is policy/scope, not proof that a reply, bounce, or send actually happened.
+The compiler rejects duplicate engagement ids, thread ids, sent message ids, and `(buyer_route, offer_key)` pairs.
 
-### 2. Trusted provider reacquisition capability
+`contact_policy` is either:
 
-`fetch_authenticated_thread(thread_id)` is a **trusted host capability**. A
-production host must keep this callback inside the credential-owning provider
-adapter and perform a fresh authenticated provider read for the exact retained
-thread id.
+- `follow_up_allowed`, with an integer `follow_up_after_hours`; or
+- `wait_for_buyer_event`, with `follow_up_after_hours: null`.
 
-Do not implement it as a lambda over:
+The canonical full manifest is hashed into `scope_sha256`. Each output item also contains privacy-safe commitments to its complete manifest row, exact buyer route, and complete authorized-reply-route set. A buyer or representative substitution therefore changes the receipt even when no current inbound event uses that route.
 
-- webhook payloads;
-- caller-supplied message objects;
-- cached CRM rows;
-- screenshots;
-- previously serialized queue input.
+## Provider-read batch
 
-Those are data, not independent reacquisition authority.
-
-The core calls the callback exactly once per bound thread.
-
-Current time is verifier-owned: the public API does not accept a caller-selected
-`now`. Freshness and follow-up thresholds use the module's current UTC clock,
-so a request cannot manufacture or suppress a due action by choosing time.
-
-## Normalized provider snapshot
-
-The trusted adapter returns an exact object:
+The credential-owning adapter normalizes its completed read into:
 
 ```json
 {
-  "thread_id": "provider-thread-id",
-  "fetched_at": "2026-09-13T12:34:56Z",
+  "schema": "bounty-concierge.provider-thread-read-batch/v1",
+  "key_id": "host-v1",
+  "provider": "gmail",
+  "authenticated_principal": "provider-account-opaque",
+  "scope_sha256": "...",
+  "policy_sha256": "...",
+  "captured_at": "2026-09-13T13:10:00.400000Z",
+  "snapshots": [],
+  "hmac_sha256": "..."
+}
+```
+
+The HMAC is SHA-256 over canonical JSON of every field except `hmac_sha256`.
+
+The batch must contain exactly one snapshot per manifest thread and no extra thread. `captured_at` is stamped **after provider acquisition**, which lets the compiler sample its own UTC time after the completed reads without falsely rejecting an honest fresh read as future evidence.
+
+## Normalized snapshot contract
+
+Each snapshot is exact and body-free:
+
+```json
+{
+  "thread_id": "provider-thread-opaque",
+  "fetched_at": "2026-09-13T13:10:00.300000Z",
   "complete": true,
   "messages": [
     {
-      "id": "provider-message-id",
+      "id": "provider-message-opaque",
       "kind": "outbound",
       "occurred_at": "2026-09-13T10:00:00Z",
       "from_route": "seller@example.net",
@@ -105,235 +123,87 @@ The trusted adapter returns an exact object:
 }
 ```
 
-Supported `kind` values are:
+Allowed message kinds are `outbound`, `human_inbound`, `automated_inbound`, and `bounce`. Human-vs-automated classification is the authenticated provider adapter's responsibility; the queue does not infer it from subject/body prose.
 
-- `outbound`
-- `human_inbound`
-- `automated_inbound`
-- `bounce`
+`sequence` is a provider-normalizer-owned stable integer ordinal. It resolves same-timestamp chronology without inventing order from lexical provider ids. Distinct messages cannot share one sequence.
 
-The adapter, not this core, is responsible for mapping provider-native records
-to those kinds. In particular, `human_inbound` versus `automated_inbound` must
-come from authenticated provider metadata / a trusted normalization policy; do
-not infer it from arbitrary caller prose.
+The compiler fails closed when a snapshot is stale, future-dated, incomplete, bound to the wrong thread, contains a message after its own `fetched_at`, conflicts on provider message identity, or violates the exact schema.
 
-`sequence` is a provider-normalizer-owned stable integer ordinal. It disambiguates
-multiple messages with the same timestamp. Distinct messages may not share a
-sequence. This prevents lexical message ids from silently becoming chronology.
+## Generation semantics
 
-The snapshot must be explicitly complete and fresh. Messages after
-`snapshot.fetched_at`, conflicting reuse of a provider message id, malformed
-routes, unknown kinds, or stale snapshots fail the entire compilation.
+The retained `sent_message_id` must exist in the fresh provider snapshot, be classified as `outbound`, and target `buyer_route`.
 
-## Anchor and generation semantics
-
-The retained `sent_message_id` must:
-
-1. appear in the freshly reacquired exact thread;
-2. be provider-classified as `outbound`; and
-3. target the bound `buyer_route`.
-
-The queue then finds the **latest provider-observed outbound** at or after that
-anchor that targets an authorized buyer route.
-
-That latest outbound becomes the generation boundary.
-
-This matters because a human reply may already have been consumed by a later
-operator reply. Example:
-
-1. seller sends `sent-1`;
-2. buyer replies;
-3. seller sends `sent-2`.
-
-The old buyer reply is not re-enqueued. `sent-2` becomes the current baseline
-and its time resets the follow-up clock.
+The queue then finds the newest provider-observed outbound at or after that anchor that targets an authorized reply route. That newest outbound becomes the generation boundary. Earlier replies and bounces are not re-enqueued after a later outbound, and the later outbound resets the follow-up clock.
 
 ## States
 
-Items are sorted by action priority.
+Priority order is:
 
-### `HUMAN_REPLY`
+1. `HUMAN_REPLY` — human inbound after the latest outbound from an authorized route.
+2. `HUMAN_REVIEW_REQUIRED` — human inbound from an unbound route; surfaced without pretending the sender is the buyer.
+3. `ROUTE_REPAIR` — a bounce explicitly bound to the latest outbound.
+4. `FOLLOW_UP_DUE` — follow-up-capable engagement crossed its host policy threshold.
+5. `WAIT_AUTO_ACK` — trusted automated acknowledgement extends the grace window.
+6. `WAIT_BUYER_EVENT` — one-touch/DNR policy remains in force until a real buyer event.
+7. `WAIT` — follow-up is allowed, but not due yet.
 
-A provider-classified human inbound arrived after the latest qualifying outbound
-from one of the exact `authorized_reply_routes`.
+An auto-ack never becomes a human buyer event. A DNR engagement cannot become follow-up-due merely because time elapsed.
 
-This is the highest-priority normal state.
+## Durable receipt authenticity
 
-### `HUMAN_REVIEW_REQUIRED`
+The compiler emits two integrity fields with different jobs:
 
-A provider-classified human inbound arrived after the latest outbound, but its
-sender is not in `authorized_reply_routes`.
+- `evidence_sha256` is an unkeyed content checksum over the safe semantic receipt.
+- `host_attestation_hmac_sha256` is the trust root proving the durable receipt was emitted under the host attestation key.
 
-The core refuses to silently equate that sender with the buyer. It still
-surfaces the event so a new representative or forwarded conversation is not
-lost.
+A caller can recompute SHA-256 after tampering, so `evidence_sha256` alone is **not** authority. Downstream code should require:
 
-### `ROUTE_REPAIR`
+```python
+verify_revenue_response_queue_receipt(receipt)
+```
 
-A provider-classified bounce is explicitly bound to the latest outbound message
-id.
+The verifier checks the host HMAC, evidence checksum, policy digest, configured key id, verifier-owned current UTC, and receipt freshness. It accepts no caller-selected key and no caller-selected current time.
 
-This does not authorize contacting another route. It says the retained route
-needs operator repair.
+Provider name, authenticated principal, routes, thread ids, and message ids are represented only by SHA-256 commitments in durable output. Subject, body, and arbitrary headers never enter the provider envelope.
 
-### `FOLLOW_UP_DUE`
+## Authority ceiling
 
-`contact_policy == "follow_up_allowed"` and the latest outbound has crossed its
-configured threshold.
-
-If a trusted automated acknowledgement arrived from an authorized route, the
-next follow-up time is the later of:
-
-- latest outbound + `follow_up_after_hours`; or
-- latest automated acknowledgement + `auto_ack_grace_hours`.
-
-### `WAIT_AUTO_ACK`
-
-An authorized automated acknowledgement exists and its grace window is still
-active.
-
-An auto-ack is **not** treated as a human buyer event.
-
-### `WAIT_BUYER_EVENT`
-
-`contact_policy == "wait_for_buyer_event"` and there is no actionable human
-reply or bounce.
-
-This is the representation for one-touch / DNR-until-buyer-event sales motions.
-`follow_up_after_hours` must be `null` for this policy, so elapsed time cannot
-silently create a follow-up recommendation.
-
-A later authenticated human reply can move the engagement to `HUMAN_REPLY`.
-
-### `WAIT`
-
-A follow-up-capable engagement exists, but its provider-grounded latest outbound
-has not crossed the threshold.
-
-## Collision fences
-
-The manifest rejects duplicate:
-
-- engagement ids;
-- provider thread ids;
-- sent message ids;
-- `(buyer_route, offer_key)` active engagement pairs.
-
-Those fences prevent two active queue rows from independently recommending work
-against the same buyer/offer identity.
-
-The module also re-baselines on newer provider-observed outbound messages, so a
-follow-up that actually happened is not forgotten merely because the manifest
-still points at the original anchor.
-
-## Privacy / output minimization
-
-The provider envelope intentionally has no subject or body field. Extra fields
-are rejected.
-
-Queue output contains no raw:
-
-- email addresses;
-- provider thread ids;
-- provider message ids;
-- subjects;
-- bodies;
-- headers.
-
-Routes and provider ids enter only SHA-256 evidence projections. `engagement_id`
-and `offer_key` are retained as operator-owned stable keys.
-
-The output includes a deterministic `evidence_sha256` over the complete safe
-decision receipt, including capture time and policy parameters.
-
-## Explicit authority ceiling
-
-Every receipt includes:
+Every successful receipt states that provider read, scope, policy, and receipt are attested, while explicitly denying action authority:
 
 ```json
 {
-  "authority": {
-    "send_message": false,
-    "reply_to_buyer": false,
-    "mutate_provider": false,
-    "change_contact_policy": false,
-    "recognize_revenue": false,
-    "recognize_payment": false
-  }
+  "provider_read_attested": true,
+  "scope_attested": true,
+  "policy_attested": true,
+  "receipt_host_attested": true,
+  "send_message": false,
+  "reply_to_buyer": false,
+  "mutate_provider": false,
+  "change_contact_policy": false,
+  "recognize_revenue": false,
+  "recognize_payment": false
 }
 ```
 
-The queue is prioritization evidence only. A later action path must run its own
-outbound dedupe, policy, identity, authorization, and provider-write controls.
-
-## Example manifest
-
-```json
-[
-  {
-    "engagement_id": "cellares-cross-factory-qc",
-    "provider_thread_id": "provider-thread-opaque",
-    "sent_message_id": "provider-sent-opaque",
-    "buyer_route": "buyer@example.com",
-    "authorized_reply_routes": [
-      "buyer@example.com",
-      "representative@example.com"
-    ],
-    "offer_key": "cross-factory-qc-v1",
-    "contact_policy": "wait_for_buyer_event",
-    "follow_up_after_hours": null
-  }
-]
-```
-
-For a conventional follow-up motion:
-
-```json
-{
-  "contact_policy": "follow_up_allowed",
-  "follow_up_after_hours": 72
-}
-```
-
-## Fail-closed conditions
-
-Compilation aborts instead of emitting a partial green queue when:
-
-- the provider callback is unavailable or raises;
-- a snapshot is stale, future-dated, incomplete, or bound to another thread;
-- the retained sent id is missing or is not the expected outbound;
-- the bound outbound did not actually target the buyer route;
-- a provider message occurs after `fetched_at`;
-- distinct provider messages reuse an id or stable sequence;
-- schemas contain unexpected fields;
-- contact/follow-up policy is malformed;
-- active buyer/offer or provider bindings collide.
-
-A partial queue would be dangerous because omitted provider evidence can make a
-follow-up look safe. Whole-compilation failure keeps unknown authority from
-becoming action.
+This module prioritizes already-existing evidence. Any later send/reply path must independently enforce identity, authorization, outbound dedupe, contact policy, and provider-write controls.
 
 ## Validation
 
-The hostile suite exercises:
+The hostile suite covers the authority boundary and core decision semantics under normal and optimized Python execution, including:
 
-- human reply priority;
-- unbound-human review;
-- newer outbound generation reset;
-- latest-outbound bounce binding;
-- no-reply follow-up thresholds;
-- automated-ack grace;
-- one-touch / DNR semantics;
-- exact retained message and recipient binding;
-- complete/fresh snapshot requirements and verifier-owned current time;
-- provider callback failure;
-- conflicting/duplicate provider evidence;
-- stable same-time provider ordering;
-- collision rejection;
-- strict schemas;
-- privacy-safe output;
-- deterministic receipts;
-- optimized (`python -O`) execution.
+- arbitrary callback rejection;
+- missing/wrong host key and invalid HMAC;
+- manifest-scope and policy replay rejection;
+- buyer/representative substitution changing the durable receipt;
+- post-read clock ordering and batch/snapshot freshness;
+- exact thread-set and complete-snapshot requirements;
+- human/unbound-human/bounce/follow-up/auto-ack/DNR states;
+- latest-outbound generation reset;
+- anchor recipient/type and stable-sequence fences;
+- identity-minimized output and explicit action ceiling;
+- host-HMAC receipt verification;
+- rejection of a forged receipt even after an attacker recomputes plain SHA-256;
+- stale receipt replay rejection;
+- strict manifest/policy/batch shapes and collision fences.
 
-The repository-wide GitHub Actions rail compiles the entire package and runs all
-tests on Python 3.9 and Python 3.13 before merge.
+Repository GitHub Actions remains the authoritative uploaded-byte gate before merge.
