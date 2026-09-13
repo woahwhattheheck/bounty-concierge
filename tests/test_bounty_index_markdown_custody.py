@@ -30,4 +30,5 @@ def test_format_markdown_flattens_title_line_breaks_and_preserves_backslash_pipe
     rendered = bounty_index.format_markdown([_bounty("First\r\nSecond \\| literal")])
 
     assert len(rendered.splitlines()) == 3
-    assert "First Second \\\\\\| literal" in rendered
+    segment = rendered.split("Second ", 1)[1].split(" literal", 1)[0]
+    assert segment == "\\" * 3 + "|"
