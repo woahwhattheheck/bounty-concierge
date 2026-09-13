@@ -26,10 +26,11 @@ class FakeResponse:
 
 
 class FakeSession:
-    def __init__(self, issue, search_pages, pull_details):
+    def __init__(self, issue, search_pages, pull_details, incomplete_pages=None):
         self.issue = issue
         self.search_pages = search_pages
         self.pull_details = pull_details
+        self.incomplete_pages = set(incomplete_pages or [])
         self.calls = []
 
     def get(self, url, headers=None, params=None, timeout=None):
@@ -39,7 +40,10 @@ class FakeSession:
             return FakeResponse(self.issue)
         if path == "/search/issues":
             page = int((params or {}).get("page", 1))
-            return FakeResponse({"items": self.search_pages.get(page, [])})
+            return FakeResponse({
+                "items": self.search_pages.get(page, []),
+                "incomplete_results": page in self.incomplete_pages,
+            })
         if "/pulls/" in path:
             number = int(path.rsplit("/", 1)[-1])
             return FakeResponse(self.pull_details[number])
@@ -125,6 +129,22 @@ def test_search_paginates_and_deduplicates_exact_prs():
     assert result["competition_level"] == "high"
     search_pages = [params["page"] for url, params in session.calls if url.endswith("/search/issues")]
     assert search_pages == [1, 2]
+
+
+def test_incomplete_github_search_marks_partial_page_truncated():
+    session = FakeSession(
+        issue={"state": "open"},
+        search_pages={1: [_candidate(10, "Fix #42", "")]},
+        pull_details={10: _detail(10)},
+        incomplete_pages={1},
+    )
+
+    result = bounty_audit.audit_bounty("acme/widget", 42, session=session)
+
+    assert result["linked_pr_count"] == 1
+    assert result["open_pr_count"] == 1
+    assert result["search_truncated"] is True
+    assert "(search truncated)" in bounty_audit.format_summary(result)
 
 
 def test_max_page_cap_marks_search_truncated():

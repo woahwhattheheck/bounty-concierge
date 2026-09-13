@@ -98,6 +98,8 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
             headers=headers,
             params={"q": f"repo:{repo} is:pr {number}", "per_page": 100, "page": page},
         )
+        if payload.get("incomplete_results") is True:
+            search_truncated = True
         items = payload.get("items", [])
         candidates.extend(items)
         if len(items) < 100:
