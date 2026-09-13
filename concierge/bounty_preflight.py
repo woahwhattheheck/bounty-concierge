@@ -4,8 +4,8 @@
 ``bounty_audit`` establishes canonical issue/PR state and
 ``bounty_qualification`` decides whether work is safe to dispatch. This module
 fills the missing ``attempt_count`` input from canonical GitHub issue comments,
-binds formal GitHub assignment state, and authority-binds maintainer
-contribution terms for credential safety.
+binds formal GitHub assignment state to authenticated operator identity, and
+authority-binds maintainer contribution terms for credential safety.
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ from concierge.credential_safety import (
 
 
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
+_AUTHENTICATED_USER_URL = "https://api.github.com/user"
 _ATTEMPT_COMMAND_RE = re.compile(
     r"(?im)^\s*/(?:attempt(?:\s+#?\d+)?|claim(?:\s+#?\d+)?|opire\s+try)(?:\s|$)"
 )
@@ -160,6 +161,39 @@ def _normalized_operator_login(operator_login: str | None) -> str | None:
     if not isinstance(operator_login, str) or not operator_login.strip():
         raise ValueError("operator_login must be a non-empty string when provided")
     return operator_login.strip().casefold()
+
+
+def _authenticated_operator_login(
+    session: Any,
+    *,
+    headers: dict[str, str],
+    token: str | None,
+    asserted_login: str | None,
+) -> str | None:
+    """Return the same-token GitHub principal; an assertion never authorizes alone."""
+    asserted = _normalized_operator_login(asserted_login)
+    if not token:
+        if asserted is not None:
+            raise BountyPreflightError(
+                "operator_login requires an authenticated GitHub token"
+            )
+        return None
+
+    payload = _object_payload(
+        _get_json(session, _AUTHENTICATED_USER_URL, headers=headers),
+        "authenticated user",
+    )
+    login = payload.get("login")
+    if not isinstance(login, str) or not login.strip():
+        raise BountyPreflightError(
+            "GitHub authenticated user response did not contain a non-empty login"
+        )
+    authenticated = login.strip().casefold()
+    if asserted is not None and asserted != authenticated:
+        raise BountyPreflightError(
+            "operator_login did not match authenticated GitHub identity"
+        )
+    return authenticated
 
 
 def _assignee_state(
@@ -293,7 +327,18 @@ def _collect_issue_context_with_snapshot(
         raise BountyPreflightError(
             f"GitHub issue body was not a string for {repo}#{number}"
         )
-    assignee_state = _assignee_state(issue, operator_login)
+
+    anonymous_assignee_state = _assignee_state(issue, None)
+    if anonymous_assignee_state["formal_assignee_count"] > 0:
+        authenticated_operator = _authenticated_operator_login(
+            session,
+            headers=headers,
+            token=token,
+            asserted_login=operator_login,
+        )
+        assignee_state = _assignee_state(issue, authenticated_operator)
+    else:
+        assignee_state = anonymous_assignee_state
 
     claimant_logins: set[str] = set()
     attempt_signal_count = 0
@@ -364,9 +409,10 @@ def collect_issue_context(
 
     External comments contribute only to ``attempt_count``. Raw external comment
     text is never forwarded into qualification. OWNER/MEMBER/COLLABORATOR terms
-    are reduced immediately to generic credential-safety signals, and assignees
-    are reduced to counts/operator-membership from the same captured issue
-    generation, so raw identities never leave the collection boundary.
+    are reduced immediately to generic credential-safety signals. Formal
+    assignment is reduced to counts and membership against the authenticated
+    same-token GitHub principal; a caller-supplied login is only an assertion.
+    Raw identities never leave the collection boundary.
     """
     context, _issue_snapshot = _collect_issue_context_with_snapshot(
         repo,
@@ -393,8 +439,10 @@ def preflight_bounty(
 
     Issue-derived qualification metadata, formal assignment, credential authority,
     and canonical issue state are bound to one captured GitHub issue generation.
-    PR competition and maintainer-comment reads remain live, but a later issue
-    payload cannot be spliced into the same dispatch decision.
+    Formal assignment can be treated as operator-owned only when the same token's
+    authenticated GitHub principal matches; ``operator_login`` is never authority
+    by itself. PR competition and maintainer-comment reads remain live, but a later
+    issue payload cannot be spliced into the same dispatch decision.
     """
     context, issue_snapshot = _collect_issue_context_with_snapshot(
         repo,
@@ -478,8 +526,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--operator-login",
         help=(
-            "GitHub login that may already own the issue; when omitted, any formal "
-            "assignee holds dispatch"
+            "Optional assertion of the authenticated GitHub login for formal "
+            "assignment; it never authorizes dispatch by itself"
         ),
     )
     parser.add_argument("--json", action="store_true", help="Emit full safe JSON result")
