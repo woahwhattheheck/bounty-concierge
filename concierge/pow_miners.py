@@ -177,7 +177,17 @@ def detect_pow_processes() -> Dict:
         or any(s["active"] for s in result["systemd_services"])
         or result["screen_sessions"]
     )
-    result["external_miner_detected"] = result["detected"]
+    miner_process_detected = any(
+        process["type"] in ("bzminer", "janusminer")
+        for process in result["processes"]
+    )
+    miner_service_detected = any(
+        service["name"] == "rustchain-miner" and service["active"]
+        for service in result["systemd_services"]
+    )
+    result["external_miner_detected"] = bool(
+        miner_process_detected or miner_service_detected
+    )
     return result
 
 
@@ -334,19 +344,19 @@ def calculate_bonus_multiplier(
     multiplier = 1.0
     factors = []
 
-    if managed_subprocess_running:
+    if managed_subprocess_running is True:
         multiplier *= MULTIPLIER_MANAGED_SUBPROCESS
         factors.append({"name": "managed_pow_subprocess", "multiplier": MULTIPLIER_MANAGED_SUBPROCESS})
 
-    if external_miner_detected:
+    if external_miner_detected is True:
         multiplier *= MULTIPLIER_EXTERNAL_MINER
         factors.append({"name": "external_miner_detected", "multiplier": MULTIPLIER_EXTERNAL_MINER})
 
-    if pool_account_verified:
+    if pool_account_verified is True:
         multiplier *= MULTIPLIER_POOL_VERIFIED
         factors.append({"name": "pool_account_verified", "multiplier": MULTIPLIER_POOL_VERIFIED})
 
-    if node_rpc_verified:
+    if node_rpc_verified is True:
         multiplier *= MULTIPLIER_NODE_VERIFIED
         factors.append({"name": "node_rpc_verified", "multiplier": MULTIPLIER_NODE_VERIFIED})
 
