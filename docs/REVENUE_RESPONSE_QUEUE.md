@@ -1,12 +1,15 @@
 # Revenue Response Queue
 
-`concierge.revenue_response_queue` is the read-only control plane between an already-sent revenue message and engagement closeout. It classifies provider-observed post-send state into a deterministic operator queue without sending mail, replying to buyers, mutating a provider, changing contact policy, or recognizing payment/revenue.
+`concierge.revenue_response_queue` is the read-only control plane between an already-sent revenue message and engagement closeout. It classifies authenticated provider evidence into an operator queue without sending mail, replying to buyers, mutating a provider, changing contact policy, or recognizing payment/revenue.
 
-The v2 design is intentionally stricter than a normal callback interface: **caller data cannot claim to be provider truth.**
+The v3 design has two independent trust fences:
 
-## Authority boundary
+1. **Provider custody:** caller-built callbacks/snapshots cannot claim to be provider truth. A credential-owning host must HMAC-attest a complete provider-read batch.
+2. **Provider authorization:** a valid host signature is not enough by itself. The signed batch's provider and authenticated principal must also exact-match independently configured host authorization.
 
-The authoritative API is:
+Thread membership is not commercial-engagement authority. A later message advances or satisfies an engagement only when provider-normalized `related_message_id` proves a continuation of the current generation.
+
+## Public API
 
 ```python
 compile_revenue_response_queue(
@@ -19,32 +22,34 @@ compile_revenue_response_queue(
 
 There is no public fetch callback and no caller-selected `now`.
 
-A credential-owning host must first reacquire every exact provider thread. After those reads finish, the host builds one complete batch and HMAC-attests it with a host-only secret. The batch binds:
+The public verifier is:
 
-- the canonical operator manifest (`scope_sha256`);
-- the canonical host/operator queue policy (`policy_sha256`);
-- provider identity and authenticated principal;
-- batch capture time;
-- the exact normalized provider snapshots.
+```python
+verify_revenue_response_queue_receipt(receipt)
+```
 
-The compiler verifies that attestation before the snapshots can mint `HUMAN_REPLY`, `FOLLOW_UP_DUE`, or any other authoritative queue state.
+It accepts no caller-selected key, provider identity, principal identity, or current time.
 
-### Host configuration
+## Host configuration
 
-The verifying host supplies:
+The credential-owning/verifying host supplies four values outside request data:
 
 ```text
 BOUNTY_RESPONSE_QUEUE_ATTESTATION_KEY_B64
 BOUNTY_RESPONSE_QUEUE_ATTESTATION_KEY_ID
+BOUNTY_RESPONSE_QUEUE_AUTHORIZED_PROVIDER
+BOUNTY_RESPONSE_QUEUE_AUTHORIZED_PRINCIPAL_SHA256
 ```
 
-The HMAC key must decode to at least 32 bytes. The library deliberately does **not** ship a production signing helper. The provider adapter that owns credentials must own signing too; request payloads, webhooks, CRM rows, model output, and arbitrary caller callbacks are not allowed to act as the signer.
+The attestation key must decode to at least 32 bytes. `AUTHORIZED_PRINCIPAL_SHA256` is the lowercase SHA-256 hex digest of the exact authenticated-principal identifier exposed by the trusted provider adapter.
 
-Threat model: the attestation secret must not be readable or writable by untrusted request data. Code already executing with arbitrary access to the credential-owning host process/environment is inside this trust boundary and must be isolated by the host/runtime, not by this pure-Python module.
+A batch signed under the correct HMAC key is rejected if its provider or principal does not match those independent host bindings. This prevents a correctly signed batch from another account/provider from being transplanted into the same manifest/policy/thread set.
+
+The library deliberately does not expose a production signing helper. Provider acquisition and signing belong inside the credential-owning host boundary. Webhooks, request payloads, CRM rows, screenshots, model output, and arbitrary callbacks are data, not provider-read authority.
 
 ## Trusted policy
 
-Policy is an exact object:
+Policy is an exact host/operator object:
 
 ```json
 {
@@ -54,11 +59,11 @@ Policy is an exact object:
 }
 ```
 
-These are host/operator policy, not buyer/request-controlled knobs. The HMAC-attested batch commits the exact policy digest, so a batch cannot be replayed under a looser freshness window or different auto-ack grace period.
+The signed batch commits `policy_sha256`, so provider evidence cannot be replayed under a different freshness or auto-ack policy.
 
 ## Operator manifest
 
-Each active engagement binds:
+Each engagement binds:
 
 - `engagement_id`
 - `provider_thread_id`
@@ -69,18 +74,13 @@ Each active engagement binds:
 - `contact_policy`
 - `follow_up_after_hours`
 
-The compiler rejects duplicate engagement ids, thread ids, sent message ids, and `(buyer_route, offer_key)` pairs.
+Duplicate engagement, thread, sent-message, and `(buyer_route, offer_key)` bindings fail closed.
 
-`contact_policy` is either:
-
-- `follow_up_allowed`, with an integer `follow_up_after_hours`; or
-- `wait_for_buyer_event`, with `follow_up_after_hours: null`.
-
-The canonical full manifest is hashed into `scope_sha256`. Each output item also contains privacy-safe commitments to its complete manifest row, exact buyer route, and complete authorized-reply-route set. A buyer or representative substitution therefore changes the receipt even when no current inbound event uses that route.
+The canonical manifest is committed as `scope_sha256`. Each item additionally commits the complete manifest row, buyer route, and complete authorized-route set without exposing raw addresses.
 
 ## Provider-read batch
 
-The credential-owning adapter normalizes its completed read into:
+After all authenticated provider reads finish, the trusted host emits one exact batch:
 
 ```json
 {
@@ -96,13 +96,13 @@ The credential-owning adapter normalizes its completed read into:
 }
 ```
 
-The HMAC is SHA-256 over canonical JSON of every field except `hmac_sha256`.
+`hmac_sha256` covers canonical JSON of every other field. The compiler verifies HMAC, exact scope/policy digests, host-authorized provider/principal, capture time, and an exact one-snapshot-per-manifest-thread set before classification.
 
-The batch must contain exactly one snapshot per manifest thread and no extra thread. `captured_at` is stamped **after provider acquisition**, which lets the compiler sample its own UTC time after the completed reads without falsely rejecting an honest fresh read as future evidence.
+Verifier-owned UTC is sampled only after the completed/attested provider acquisition. This avoids treating an honest provider timestamp created during the read as future evidence.
 
-## Normalized snapshot contract
+## Normalized snapshot
 
-Each snapshot is exact and body-free:
+Each provider snapshot is exact, complete, fresh, and body-free:
 
 ```json
 {
@@ -123,56 +123,70 @@ Each snapshot is exact and body-free:
 }
 ```
 
-Allowed message kinds are `outbound`, `human_inbound`, `automated_inbound`, and `bounce`. Human-vs-automated classification is the authenticated provider adapter's responsibility; the queue does not infer it from subject/body prose.
+Allowed kinds are `outbound`, `human_inbound`, `automated_inbound`, and `bounce`.
 
-`sequence` is a provider-normalizer-owned stable integer ordinal. It resolves same-timestamp chronology without inventing order from lexical provider ids. Distinct messages cannot share one sequence.
+The provider normalizer owns two important evidence fields:
 
-The compiler fails closed when a snapshot is stale, future-dated, incomplete, bound to the wrong thread, contains a message after its own `fetched_at`, conflicts on provider message identity, or violates the exact schema.
+- `sequence`: a stable integer ordinal used when timestamps tie. Distinct messages cannot share a sequence.
+- `related_message_id`: the provider-grounded continuation/reply relation. It is the only evidence allowed to advance a commercial generation or attribute an inbound event to the current generation.
 
-## Generation semantics
+Subjects, bodies, and arbitrary headers never enter the authority envelope.
 
-The retained `sent_message_id` must exist in the fresh provider snapshot, be classified as `outbound`, and target `buyer_route`.
+## Engagement-generation semantics
 
-The queue then finds the newest provider-observed outbound at or after that anchor that targets an authorized reply route. That newest outbound becomes the generation boundary. Earlier replies and bounces are not re-enqueued after a later outbound, and the later outbound resets the follow-up clock.
+The retained `sent_message_id` is the initial generation anchor. It must exist in the authenticated snapshot, be provider-classified `outbound`, and target the bound buyer.
 
-## States
+A later outbound advances the generation only when all are true:
+
+1. it occurs after the current baseline;
+2. it targets an authorized route; and
+3. `related_message_id` equals the current baseline message id.
+
+A unique linked successor becomes the new baseline and resets the follow-up clock. This can repeat as a chain.
+
+A later same-thread outbound to the same buyer **without** that relation does not reset the offer clock. It surfaces `HUMAN_REVIEW_REQUIRED`. Multiple direct linked successor branches are also review-required rather than guessed.
+
+The same rule applies to inbound evidence:
+
+- an authorized human inbound becomes `HUMAN_REPLY` only when it is linked to the current baseline;
+- a linked human from an unbound route becomes `HUMAN_REVIEW_REQUIRED`;
+- an authorized but unlinked human/auto inbound becomes `HUMAN_REVIEW_REQUIRED` instead of being silently attributed to the offer;
+- a bounce must link to the current baseline to become `ROUTE_REPAIR`;
+- only a linked automated acknowledgement may extend the follow-up grace window.
+
+This prevents activity for a second offer in a long-lived buyer thread from consuming or delaying the first offer.
+
+## Queue states
 
 Priority order is:
 
-1. `HUMAN_REPLY` — human inbound after the latest outbound from an authorized route.
-2. `HUMAN_REVIEW_REQUIRED` — human inbound from an unbound route; surfaced without pretending the sender is the buyer.
-3. `ROUTE_REPAIR` — a bounce explicitly bound to the latest outbound.
-4. `FOLLOW_UP_DUE` — follow-up-capable engagement crossed its host policy threshold.
-5. `WAIT_AUTO_ACK` — trusted automated acknowledgement extends the grace window.
-6. `WAIT_BUYER_EVENT` — one-touch/DNR policy remains in force until a real buyer event.
-7. `WAIT` — follow-up is allowed, but not due yet.
+1. `HUMAN_REPLY`
+2. `HUMAN_REVIEW_REQUIRED`
+3. `ROUTE_REPAIR`
+4. `FOLLOW_UP_DUE`
+5. `WAIT_AUTO_ACK`
+6. `WAIT_BUYER_EVENT`
+7. `WAIT`
 
-An auto-ack never becomes a human buyer event. A DNR engagement cannot become follow-up-due merely because time elapsed.
+`wait_for_buyer_event` requires `follow_up_after_hours: null`, so time alone cannot convert a one-touch/DNR motion into a follow-up recommendation.
 
-## Durable receipt authenticity
+## Durable receipt
 
-The compiler emits two integrity fields with different jobs:
+The output exposes no raw buyer address, representative address, provider name, provider principal, provider thread id, or provider message id. It contains SHA-256 commitments for audit/collision purposes.
 
-- `evidence_sha256` is an unkeyed content checksum over the safe semantic receipt.
-- `host_attestation_hmac_sha256` is the trust root proving the durable receipt was emitted under the host attestation key.
+Two integrity fields serve different roles:
 
-A caller can recompute SHA-256 after tampering, so `evidence_sha256` alone is **not** authority. Downstream code should require:
+- `evidence_sha256`: unkeyed content checksum over the safe semantic receipt;
+- `host_attestation_hmac_sha256`: host-authenticity proof over the receipt.
 
-```python
-verify_revenue_response_queue_receipt(receipt)
-```
+`verify_revenue_response_queue_receipt()` rechecks the host HMAC, content checksum, policy digest, configured key id, independently authorized provider/principal hashes, verifier-owned UTC, and freshness. Recomputing plain SHA-256 after tampering is insufficient.
 
-The verifier checks the host HMAC, evidence checksum, policy digest, configured key id, verifier-owned current UTC, and receipt freshness. It accepts no caller-selected key and no caller-selected current time.
-
-Provider name, authenticated principal, routes, thread ids, and message ids are represented only by SHA-256 commitments in durable output. Subject, body, and arbitrary headers never enter the provider envelope.
-
-## Authority ceiling
-
-Every successful receipt states that provider read, scope, policy, and receipt are attested, while explicitly denying action authority:
+Every successful receipt explicitly grants only evidence authority:
 
 ```json
 {
   "provider_read_attested": true,
+  "provider_identity_authorized": true,
   "scope_attested": true,
   "policy_attested": true,
   "receipt_host_attested": true,
@@ -185,25 +199,41 @@ Every successful receipt states that provider read, scope, policy, and receipt a
 }
 ```
 
-This module prioritizes already-existing evidence. Any later send/reply path must independently enforce identity, authorization, outbound dedupe, contact policy, and provider-write controls.
+Any later customer-contact path must independently enforce identity, authorization, outbound dedupe, contact policy, and provider-write controls.
+
+## Fail-closed conditions
+
+Compilation refuses to emit an authoritative queue when, among other things:
+
+- the host key or independent authorized provider/principal binding is unavailable;
+- HMAC, key id, provider, principal, scope, or policy binding fails;
+- the batch/snapshot is stale, future-dated, incomplete, or thread-mismatched;
+- the retained anchor is missing, wrong-kind, or does not target the buyer;
+- provider ids/sequences conflict;
+- schemas contain unexpected fields;
+- manifest collision fences fail.
+
+Ambiguous same-thread commercial activity does not fail the entire queue; it is represented as `HUMAN_REVIEW_REQUIRED` while retaining the last proven generation baseline.
 
 ## Validation
 
-The hostile suite covers the authority boundary and core decision semantics under normal and optimized Python execution, including:
+The hostile suite runs normally and under `python -O` and covers:
 
 - arbitrary callback rejection;
-- missing/wrong host key and invalid HMAC;
-- manifest-scope and policy replay rejection;
-- buyer/representative substitution changing the durable receipt;
-- post-read clock ordering and batch/snapshot freshness;
-- exact thread-set and complete-snapshot requirements;
-- human/unbound-human/bounce/follow-up/auto-ack/DNR states;
-- latest-outbound generation reset;
-- anchor recipient/type and stable-sequence fences;
+- missing/wrong host key;
+- correctly HMAC-signed wrong-provider and wrong-principal transplant rejection;
+- scope/policy replay;
+- buyer/authorized-route receipt binding;
+- post-read clock/freshness and exact thread sets;
+- linked vs unlinked human attribution;
+- bounce binding;
+- unrelated same-thread outbound not resetting the offer clock;
+- positively linked successor outbound advancing the generation;
+- ambiguous linked successor branches surfacing review;
+- DNR and linked auto-ack semantics;
+- sequence/anchor/strict-schema fences;
 - identity-minimized output and explicit action ceiling;
-- host-HMAC receipt verification;
-- rejection of a forged receipt even after an attacker recomputes plain SHA-256;
-- stale receipt replay rejection;
-- strict manifest/policy/batch shapes and collision fences.
+- receipt HMAC, identity authorization, tamper, and stale-replay verification;
+- deterministic input order and manifest collision rejection.
 
-Repository GitHub Actions remains the authoritative uploaded-byte gate before merge.
+Repository GitHub Actions remains the authoritative uploaded-byte execution gate before merge.
