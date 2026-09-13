@@ -26,6 +26,7 @@ import pathlib
 import re
 import sys
 from typing import Iterable
+from urllib.parse import quote
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 README_PATH = REPO_ROOT / "README.md"
@@ -37,12 +38,58 @@ END_MARKER = "<!-- BOUNTY-TABLE-END -->"
 # Cap to keep the README readable. Sorted by reward_rtc desc, then number.
 DEFAULT_TOP_N = 10
 
+_MARKDOWN_LINK_SAFE = ":/?#[]@!$&'*+,;=%-._~"
+
 
 def _format_int(n: float) -> str:
     """Render an RTC reward without trailing .0."""
     if n == int(n):
         return str(int(n))
     return f"{n:.1f}"
+
+
+def _single_line_text(value) -> str:
+    """Render untrusted text without raw line or control characters."""
+    escaped: list[str] = []
+    for char in str(value):
+        if char.isprintable():
+            escaped.append(char)
+            continue
+        codepoint = ord(char)
+        if codepoint <= 0xFF:
+            escaped.append(f"\\x{codepoint:02x}")
+        elif codepoint <= 0xFFFF:
+            escaped.append(f"\\u{codepoint:04x}")
+        else:
+            escaped.append(f"\\U{codepoint:08x}")
+    return "".join(escaped)
+
+
+def _markdown_cell(value) -> str:
+    """Escape untrusted text for one Markdown table cell."""
+    text = _single_line_text(value)
+    escaped: list[str] = []
+    backslash_run = 0
+    for char in text:
+        if char == "|":
+            # Markdown treats a pipe as escaped only when preceded by an odd
+            # number of backslashes. Preserve literal backslashes while
+            # ensuring that parity for every table delimiter.
+            escaped.append("\\" if backslash_run % 2 == 0 else "\\\\")
+            escaped.append("|")
+            backslash_run = 0
+            continue
+        escaped.append(char)
+        if char == "\\":
+            backslash_run += 1
+        else:
+            backslash_run = 0
+    return "".join(escaped)
+
+
+def _markdown_link_target(value) -> str:
+    """Percent-encode characters that can escape an inline link target."""
+    return quote(str(value), safe=_MARKDOWN_LINK_SAFE)
 
 
 def render_table(bounties: Iterable[dict], top_n: int = DEFAULT_TOP_N) -> str:
@@ -58,18 +105,21 @@ def render_table(bounties: Iterable[dict], top_n: int = DEFAULT_TOP_N) -> str:
         "|------|-------|-------|-----|------------|--------|",
     ]
     for b in rows:
-        repo_short = (b.get("repo") or "").split("/")[-1]
+        repo = b.get("repo") or ""
+        repo_short = _markdown_cell(repo.split("/")[-1])
         issue_num = b.get("number", "?")
-        url = b.get("url") or f"https://github.com/{b.get('repo', '')}/issues/{issue_num}"
-        title = (b.get("title") or "").strip().replace("|", "\\|")
+        issue_label = _markdown_cell(issue_num)
+        url = b.get("url") or f"https://github.com/{repo}/issues/{issue_num}"
+        url = _markdown_link_target(url)
+        title = _markdown_cell((b.get("title") or "").strip())
         if len(title) > 60:
             title = title[:57] + "..."
         rtc = _format_int(b.get("reward_rtc") or 0)
-        diff = b.get("difficulty") or "unknown"
-        skills = ", ".join(b.get("skills") or []) or "-"
+        diff = _markdown_cell(b.get("difficulty") or "unknown")
+        skills = _markdown_cell(", ".join(b.get("skills") or []) or "-")
         lines.append(
             f"| {repo_short} | "
-            f"[#{issue_num}]({url}) | "
+            f"[#{issue_label}]({url}) | "
             f"{title} | "
             f"{rtc} | {diff} | {skills} |"
         )
@@ -84,7 +134,7 @@ def build_section(top_n: int = DEFAULT_TOP_N) -> str:
     """
     payload = json.loads(INDEX_PATH.read_text())
     bounties = payload.get("bounties") or []
-    updated = payload.get("updated_at", "unknown")
+    updated = _single_line_text(payload.get("updated_at", "unknown"))
     table = render_table(bounties, top_n=top_n)
     header = (
         f"_Showing top {min(top_n, len(bounties))} open bounties, "
