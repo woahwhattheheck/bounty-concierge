@@ -155,6 +155,41 @@ class OpportunityRankerTests(unittest.TestCase):
             )
         )
 
+    def test_pathological_decimal_representation_is_candidate_local_failure(self):
+        values = [
+            candidate(1, effort="1e-999999999"),
+            candidate(2, effort="1e999999999"),
+            candidate(3, probability="0e-999999999"),
+            candidate(4, effort="8", probability="0.5"),
+        ]
+        result = rank_opportunities(values, ["python"])
+        self.assertEqual(result["ranked_count"], 1)
+        self.assertEqual(
+            result["ranked"][0]["canonical_source_url"],
+            "https://github.com/acme/widgets/issues/4",
+        )
+        self.assertEqual(result["excluded_count"], 3)
+        self.assertEqual(
+            [row["reason_code"] for row in result["excluded"]],
+            [
+                "ESTIMATE_OR_REWARD_INVALID",
+                "ESTIMATE_OR_REWARD_INVALID",
+                "ESTIMATE_OR_REWARD_INVALID",
+            ],
+        )
+
+    def test_bounded_scientific_notation_remains_exact_and_renderable(self):
+        result = rank_opportunities(
+            [candidate(1, reward="1e64", effort="1e-64", probability="1")],
+            ["python"],
+        )
+        self.assertEqual(result["ranked_count"], 1)
+        row = result["ranked"][0]
+        self.assertEqual(row["advertised_reward_usd"], "1" + ("0" * 64))
+        self.assertEqual(row["estimated_effort_hours"], "0." + ("0" * 63) + "1")
+        self.assertEqual(row["estimated_expected_value_usd"], "1" + ("0" * 64))
+        self.assertEqual(row["estimated_ev_per_hour_usd"], "1" + ("0" * 128))
+
     def test_float_estimates_are_rejected_to_avoid_binary_money_math(self):
         value = candidate(1)
         value["estimated_win_probability"] = 0.5
