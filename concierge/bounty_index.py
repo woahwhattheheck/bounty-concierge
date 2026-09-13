@@ -6,6 +6,7 @@ parses reward amounts, estimates difficulty, and tags required skills.
 """
 
 import json
+import math
 import re
 import sys
 from datetime import datetime, timezone
@@ -157,21 +158,23 @@ _RTC_PATTERN = re.compile(
 
 
 def parse_reward(title, body):
-    """Extract the first RTC reward amount from a title or body string.
+    """Extract the first finite RTC reward amount from title or body text.
 
     Looks for patterns like '150 RTC', '1,000 RTC', '1,000,000 RTC',
     '1,234.5 RTC', and '0.5 RTC'.  Commas are accepted only as canonical
-    three-digit thousands separators.  Returns the amount as a float, or 0.0
-    if nothing valid is found.
+    three-digit thousands separators.  Returns the amount as a finite float,
+    or 0.0 if nothing valid is found.
     """
     for text in (title, body):
         match = _RTC_PATTERN.search(text)
         if match:
             raw = match.group(1).replace(",", "")
             try:
-                return float(raw)
+                value = float(raw)
             except ValueError:
                 continue
+            if math.isfinite(value):
+                return value
     return 0.0
 
 
