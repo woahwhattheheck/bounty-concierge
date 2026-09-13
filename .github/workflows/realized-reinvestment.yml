@@ -1,0 +1,37 @@
+name: Realized reinvestment review
+
+on:
+  push:
+    paths:
+      - "concierge/reinvestment_allocator.py"
+      - "tests/test_reinvestment_allocator.py"
+      - "docs/REALIZED_REINVESTMENT.md"
+      - ".github/workflows/realized-reinvestment.yml"
+  pull_request:
+    paths:
+      - "concierge/reinvestment_allocator.py"
+      - "tests/test_reinvestment_allocator.py"
+      - "docs/REALIZED_REINVESTMENT.md"
+      - ".github/workflows/realized-reinvestment.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.13"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Focused tests
+        run: python -m unittest -v tests.test_reinvestment_allocator
+      - name: Optimized tests
+        run: python -O -m unittest -v tests.test_reinvestment_allocator
+      - name: Compile
+        run: python -m py_compile concierge/reinvestment_allocator.py tests/test_reinvestment_allocator.py
