@@ -1,26 +1,35 @@
 # Payoff Path Gate
 
-`concierge.payoff_path_gate` is an offline owner-review product for one commercial question:
+`concierge.payoff_path_gate` is an offline owner-review gate for one question:
 
-> **Before compensation is secured, is there a current, evidence-backed route from this unpaid/speculative work to a possible payoff, and is our free-work exposure still inside an owner-set cap?**
+> **Before compensation is secured, is there a current evidence-backed payoff path, and is cumulative unpaid effort still inside an explicit owner cap?**
 
-It exists to prevent indefinite free implementation, speculative competition work with no usable prize/entry path, and “relationship building” whose conversion step was never named. It is deliberately **not** an expected-value engine and deliberately **not** a buyer-facing sales tool.
+It is deliberately **not** an expected-value engine, a buyer-facing sales tool, payment authority, or a revenue-recognition surface.
 
-## What counts as a payoff path
+## v2 continuity model
 
-A work item either has no payoff path (`null`) or binds all of the following:
+`payoff-path-work/v2` removes caller-authored cumulative-spend snapshots. Unpaid effort is derived only from immutable effort events, and owner caps are versioned policies linked to the prior receipt.
 
-- one mechanism: `BOUNTY`, `COMPETITION_PRIZE`, `PAID_OFFER_OR_PILOT`, `PRIME_SUBCONTRACT`, `REFERRAL_COMMISSION`, or `SPONSOR_OR_GRANT`;
-- a source value state:
-  - `FIXED` or `POOL` requires exact positive integer minor units plus a 3-letter currency;
-  - `NEGOTIATED` or `UNSPECIFIED_BY_SOURCE` **must not** carry a made-up amount;
-- canonical HTTPS source evidence with immutable evidence ref/SHA-256, observed-at time, and owner-selected freshness bound;
-- the mechanism-specific next conversion event and deadline, with separate evidence ref/SHA-256;
-- positive owner-set free-work budget in minutes and exact minutes already spent.
+Each work item carries:
 
-Mechanism-to-event mappings are fixed so “have a plan” cannot degrade into vague prose:
+- exact `work_id` + `opportunity_id` identity;
+- an owner `budget_policy` with `policy_id`, monotonic `generation`, `cap_minutes`, evidence ref/SHA-256, observed-at time, predecessor-policy digest, and exact superseded-receipt digest;
+- append-only `effort_events`, each with a unique per-work event ID, exact work/opportunity identity, integer minutes, observed-at time, and evidence ref/SHA-256;
+- the evidence-backed payoff path.
 
-| Mechanism | Required next conversion event |
+A successor document embeds the exact prior receipt as `predecessor_receipt`. Compilation fails closed when prior work disappears, an effort event is omitted or changed, derived spend goes backward, a same-generation cap changes, a policy generation skips, predecessor links do not match, successor evidence is not strictly later than the predecessor receipt, or a receipt is transplanted across opportunities.
+
+Receipts preserve the complete ordered policy-generation digest history plus every admitted effort-event fingerprint. Exact replay is deterministic and event order is normalized.
+
+A prior `STOP_UNPAID_WORK` cannot return to READY by resetting a spend field because no spend field exists. It can reopen only through a new explicit owner policy generation whose cap exceeds cumulative immutable effort; the result then includes `OWNER_CAP_GENERATION_EXPLICITLY_REOPENED_PREVIOUS_STOP`.
+
+**Custody requirement:** continuity is only as strong as retention of the prior receipt chain. A successor must be compiled against the exact retained predecessor receipt. Discarding the chain and pretending an old work item is fresh genesis is a custody violation outside what an offline hash chain can detect by itself.
+
+## Payoff path evidence
+
+Supported mechanisms and required conversion events remain fixed:
+
+| Mechanism | Required conversion event |
 |---|---|
 | `BOUNTY` | `SUBMIT_WORK` |
 | `COMPETITION_PRIZE` | `ENTER_COMPETITION` |
@@ -29,27 +38,49 @@ Mechanism-to-event mappings are fixed so “have a plan” cannot degrade into v
 | `REFERRAL_COMMISSION` | `COMPLETE_REFERRAL` |
 | `SPONSOR_OR_GRANT` | `APPLY_FOR_GRANT` |
 
-## States
+`FIXED` and `POOL` values require positive integer minor units plus a three-letter currency. `NEGOTIATED` and `UNSPECIFIED_BY_SOURCE` must not invent a numeric amount. Source evidence remains canonical HTTPS + immutable ref/SHA-256 + observed-at + freshness bound. Conversion evidence remains event + deadline + immutable ref/SHA-256.
 
-- `READY_FOR_OWNER_SPECULATIVE_WORK_REVIEW`: path evidence is current, deadline is still open, and unpaid exposure is below the cap. **Review only.**
-- `HOLD_NO_PAYOFF_PATH`: no compensation path was evidenced.
-- `HOLD_STALE_OR_INVALID`: path evidence is stale/future, conversion deadline is expired/invalid, or work start time is future.
-- `STOP_UNPAID_WORK`: already-spent unpaid minutes are greater than or equal to the owner-set cap. This is strongest even when the path is otherwise valid.
+## States and authority ceiling
 
-No state means “won,” “accepted,” “paid,” “revenue,” or permission to contact/submit/enter/spend.
+- `READY_FOR_OWNER_SPECULATIVE_WORK_REVIEW`: current payoff evidence and derived cumulative effort below the owner cap. **Owner review only.**
+- `HOLD_NO_PAYOFF_PATH`: no compensation path evidenced.
+- `HOLD_STALE_OR_INVALID`: temporal/source/continuity-adjacent evidence invalid for current review.
+- `STOP_UNPAID_WORK`: cumulative immutable effort is at or above the current owner cap.
 
-## Input example
+No state means “won,” “accepted,” “paid,” or “revenue,” and no state authorizes outreach, submission, competition entry, spend, delivery, contracting, invoice/payment action, account mutation, or any other external action.
+
+## Genesis input example
 
 ```json
 {
-  "schema": "payoff-path-work/v1",
+  "schema": "payoff-path-work/v2",
+  "predecessor_receipt": null,
   "work_items": [
     {
       "work_id": "fix-384",
       "opportunity_id": "agentlily-267",
       "started_at_utc": "2026-09-13T13:00:00.000Z",
-      "free_work_budget_minutes": 240,
-      "free_work_spent_minutes": 90,
+      "budget_policy": {
+        "policy_id": "owner-cap-1",
+        "generation": 1,
+        "cap_minutes": 240,
+        "observed_at_utc": "2026-09-13T13:00:00.000Z",
+        "evidence_ref": "owner:cap-1",
+        "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "predecessor_policy_sha256": null,
+        "supersedes_receipt_sha256": null
+      },
+      "effort_events": [
+        {
+          "event_id": "effort-1",
+          "work_id": "fix-384",
+          "opportunity_id": "agentlily-267",
+          "minutes": 90,
+          "observed_at_utc": "2026-09-13T14:00:00.000Z",
+          "evidence_ref": "effort:1",
+          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
       "payoff_path": {
         "mechanism": "BOUNTY",
         "value": {"kind": "FIXED", "currency": "USD", "amount_minor": 9000},
@@ -72,38 +103,22 @@ No state means “won,” “accepted,” “paid,” “revenue,” or permissi
 }
 ```
 
-## CLI
+For a successor packet, carry forward every prior effort event, embed the exact prior receipt, and either retain the exact current policy or advance exactly one policy generation with both predecessor digests populated.
 
-Production compilation deliberately has **no caller-supplied `--as-of` flag**. Current process UTC is the authority.
+## CLI and verification
+
+Production compilation deliberately exposes no caller-supplied `--as-of` override; process UTC is authoritative.
 
 ```bash
 python -m concierge.payoff_path_gate compile \
-  --input work.json \
-  --packet payoff.packet.json \
-  --markdown payoff.review.md \
-  --receipt payoff.receipt.json
+  --input work.json --packet payoff.packet.json \
+  --markdown payoff.review.md --receipt payoff.receipt.json
 
 python -m concierge.payoff_path_gate verify \
-  --input work.json \
-  --packet payoff.packet.json \
-  --markdown payoff.review.md \
-  --receipt payoff.receipt.json
+  --input work.json --packet payoff.packet.json \
+  --markdown payoff.review.md --receipt payoff.receipt.json
 ```
 
-Outputs are create-exclusive. Final symlink outputs, existing outputs, symlink/FIFO/non-regular inputs, duplicate JSON keys, unknown fields, bool-as-int values, unsafe integers, noncanonical UTC, malformed SHA-256, secret/PII-shaped durable refs, and non-HTTPS source URLs fail closed.
+The public wrapper keeps descriptor-bound file custody: non-symlink parent traversal, retained directory descriptors, regular-file generation checks, exclusive output creation, and file/directory fsync. Outputs are never silently overwritten. Strict JSON rejects duplicate keys, non-finite values, unknown fields, bool-as-int values, unsafe integers, malformed SHA-256, noncanonical UTC, secret/PII-shaped durable refs, and unsafe URLs.
 
-## Verification model
-
-The packet is bound to a canonical digest of the normalized input. The receipt binds the input digest, exact packet digest, and exact Markdown bytes. Verification:
-
-1. re-normalizes exact inputs;
-2. rejects a packet evaluated in the future;
-3. recompiles at the packet's original trusted process timestamp and requires exact packet/Markdown/receipt equality;
-4. re-evaluates temporal validity at the verifier's **current process UTC**;
-5. rejects a previously-READY item if its source/deadline has since gone stale.
-
-This preserves reproducibility without allowing an old READY packet to act like current authority forever.
-
-## Authority ceiling
-
-The gate performs offline owner decision support only. It cannot authorize or perform buyer/platform/prime contact, email/SMS/DM/calls, supplier registration, competition entry, bid/proposal/work submission, contract/signature action, source work outside its own carrier, delivery/fulfillment, invoice/payment/refund, bank/provider mutation, spend/deployment, tax/accounting/legal determinations, award/payment/cash assertions, or recognized-revenue claims.
+Verification re-normalizes the exact document, enforces predecessor continuity, recompiles at the packet's recorded evaluation time, requires exact packet/Markdown/receipt equality, and re-checks current temporal validity so an old READY packet cannot remain current after source or deadline expiry.
