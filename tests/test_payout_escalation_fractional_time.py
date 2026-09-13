@@ -75,6 +75,82 @@ class FractionalDeadlineTests(unittest.TestCase):
                 as_of=datetime(2026, 9, 13, 12, 0, 0, tzinfo=timezone.utc),
             )
 
+    def test_current_provider_integer_epoch_timestamp_is_supported(self):
+        from concierge.payout_escalation import history_row_sha256
+        closeout = {
+            "schema_version": 1,
+            "items": [{
+                "repo": "Sponsor/project", "pr": 17,
+                "canonical_url": "https://github.com/Sponsor/project/pull/17",
+                "head_sha": "a" * 40, "advertised_amount": "30", "currency": "RTC",
+                "state": "MERGED", "merged_at": "2026-09-12T18:00:00Z",
+                "next_action": "route_settlement_followup",
+                "reason": "merged_without_settlement_followup_evidence",
+                "new_feedback_count": 0, "current_change_request_count": 0,
+                "latest_feedback": None, "settlement_followup_url": None,
+                "cash_status": "not_inferred",
+            }],
+        }
+        row = {
+            "type": "transfer_in", "amount": 30, "from": "treasury",
+            "timestamp": 1789264800, "tx_hash": "tx-current-shape", "status": "pending",
+        }
+        history = {"ok": True, "miner_id": "wallet", "transactions": [row], "total": 1}
+        bindings = {
+            "schema_version": 1, "policy_version": policy_receipt()["policy_version"],
+            "wallet": "wallet", "closeout_sha256": closeout_snapshot_sha256(closeout),
+            "history_capture_sha256": history_capture_sha256(history),
+            "items": [{
+                "repo": "Sponsor/project", "pr": 17,
+                "history_sha256s": [history_row_sha256(row, wallet="wallet")],
+            }],
+        }
+        out = compile_payout_escalation(
+            closeout, history, bindings,
+            as_of=datetime(2026, 9, 13, 12, 0, 0, tzinfo=timezone.utc),
+        )
+        self.assertEqual(out["items"][0]["action"], "monitor_pending_confirmation")
+        self.assertEqual(out["items"][0]["pending_confirmation_expected_by"], "2026-09-14T02:00:00Z")
+
+    def test_history_timestamp_bool_and_out_of_range_epoch_fail_closed(self):
+        from concierge.payout_escalation import (
+            PayoutEscalationInputError, history_row_sha256,
+        )
+        for value in (True, -1, 253402300800):
+            closeout = {
+                "schema_version": 1,
+                "items": [{
+                    "repo": "Sponsor/project", "pr": 17,
+                    "canonical_url": "https://github.com/Sponsor/project/pull/17",
+                    "head_sha": "a" * 40, "advertised_amount": "30", "currency": "RTC",
+                    "state": "MERGED", "merged_at": "2026-09-12T18:00:00Z",
+                    "next_action": "route_settlement_followup",
+                    "reason": "merged_without_settlement_followup_evidence",
+                    "new_feedback_count": 0, "current_change_request_count": 0,
+                    "latest_feedback": None, "settlement_followup_url": None,
+                    "cash_status": "not_inferred",
+                }],
+            }
+            row = {
+                "type": "transfer_in", "amount": 30, "from": "treasury",
+                "timestamp": value, "tx_hash": "tx-current-shape", "status": "pending",
+            }
+            history = {"ok": True, "miner_id": "wallet", "transactions": [row], "total": 1}
+            bindings = {
+                "schema_version": 1, "policy_version": policy_receipt()["policy_version"],
+                "wallet": "wallet", "closeout_sha256": closeout_snapshot_sha256(closeout),
+                "history_capture_sha256": history_capture_sha256(history),
+                "items": [{
+                    "repo": "Sponsor/project", "pr": 17,
+                    "history_sha256s": [history_row_sha256(row, wallet="wallet")],
+                }],
+            }
+            with self.assertRaises(PayoutEscalationInputError):
+                compile_payout_escalation(
+                    closeout, history, bindings,
+                    as_of=datetime(2026, 9, 13, 12, 0, 0, tzinfo=timezone.utc),
+                )
+
     def test_submicrosecond_timestamp_text_is_rejected_instead_of_truncated(self):
         closeout = {
             "schema_version": 1,
