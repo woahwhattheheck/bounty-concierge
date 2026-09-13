@@ -18,6 +18,23 @@ import requests
 from concierge.config import GITHUB_TOKEN
 
 
+_MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
+_MAINTAINER_EXPIRY_PATTERNS = (
+    re.compile(
+        r"\b(?:this|the)\s+bounty\s+(?:has\s+been\s+expired|has\s+expired|is\s+expired|expired)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:this|the)\s+bounty\s+(?:has\s+been\s+|has\s+|is\s+|was\s+)?cancel(?:l)?ed\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:this|the)\s+bounty\s+is\s+no\s+longer\s+(?:active|available|offered)\b",
+        re.IGNORECASE,
+    ),
+)
+
+
 class BountyAuditError(RuntimeError):
     """Raised when canonical GitHub state cannot be read reliably."""
 
@@ -66,13 +83,64 @@ def _competition_level(open_pr_count: int) -> str:
     return "high"
 
 
+def _is_explicit_maintainer_expiry(comment: dict[str, Any]) -> bool:
+    association = comment.get("author_association")
+    if not isinstance(association, str) or association.upper() not in _MAINTAINER_ASSOCIATIONS:
+        return False
+    body = comment.get("body")
+    if not isinstance(body, str):
+        return False
+    return any(pattern.search(body) for pattern in _MAINTAINER_EXPIRY_PATTERNS)
+
+
+def _maintainer_expiry_evidence(
+    session: Any,
+    repo: str,
+    number: int,
+    *,
+    headers: dict[str, str],
+    max_pages: int,
+) -> tuple[list[dict[str, Any]], bool]:
+    evidence: list[dict[str, Any]] = []
+    comments_url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
+    for page in range(1, max_pages + 1):
+        payload = _get_json(
+            session,
+            comments_url,
+            headers=headers,
+            params={"per_page": 100, "page": page},
+        )
+        if not isinstance(payload, list):
+            raise BountyAuditError(f"GitHub issue comments response was not a list for {repo}#{number}")
+        for comment in payload:
+            if not isinstance(comment, dict):
+                raise BountyAuditError(f"GitHub issue comments response contained a malformed item for {repo}#{number}")
+            if not _is_explicit_maintainer_expiry(comment):
+                continue
+            user = comment.get("user")
+            login = user.get("login") if isinstance(user, dict) else None
+            evidence.append(
+                {
+                    "url": comment.get("html_url") or "",
+                    "author_association": str(comment.get("author_association") or "").upper(),
+                    "author": login or "",
+                    "created_at": comment.get("created_at"),
+                    "body": comment.get("body") or "",
+                }
+            )
+        if len(payload) < 100:
+            return evidence, False
+    return evidence, True
+
+
 def audit_bounty(repo: str, number: int, token: str | None = None, *, session: Any = requests, max_pages: int = 10) -> dict[str, Any]:
-    """Audit one GitHub bounty issue against canonical linked pull requests.
+    """Audit one GitHub bounty issue against canonical repository signals.
 
     ``stale_listing_signal`` is intentionally conservative: it is true only
-    when the issue is still open while at least one explicitly linked PR has
-    already merged.  That is a review signal, not proof that the full bounty was
-    satisfied; broad issues can legitimately have partial merged PRs.
+    when the issue is still open and either an explicitly linked PR has already
+    merged or a repository maintainer explicitly says that the bounty expired,
+    was cancelled, or is no longer offered.  That is a review signal, not proof
+    that the full bounty was satisfied.
     """
     if "/" not in repo or not repo.split("/", 1)[0] or not repo.split("/", 1)[1]:
         raise ValueError("repo must be in owner/name form")
@@ -141,6 +209,19 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
     closed_unmerged_pr_count = sum(1 for pr in linked_prs if pr["state"] == "closed" and not pr["merged"])
     issue_state = issue.get("state") or "unknown"
 
+    maintainer_expiry_comments: list[dict[str, Any]] = []
+    comments_truncated = False
+    if issue_state == "open":
+        maintainer_expiry_comments, comments_truncated = _maintainer_expiry_evidence(
+            session,
+            repo,
+            number,
+            headers=headers,
+            max_pages=max_pages,
+        )
+    search_truncated = search_truncated or comments_truncated
+    maintainer_expiry_signal = bool(maintainer_expiry_comments)
+
     return {
         "repo": repo,
         "number": number,
@@ -151,7 +232,10 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
         "merged_pr_count": merged_pr_count,
         "closed_unmerged_pr_count": closed_unmerged_pr_count,
         "competition_level": _competition_level(open_pr_count),
-        "stale_listing_signal": issue_state == "open" and merged_pr_count > 0,
+        "maintainer_expiry_signal": maintainer_expiry_signal,
+        "maintainer_expiry_comment_count": len(maintainer_expiry_comments),
+        "maintainer_expiry_comments": maintainer_expiry_comments,
+        "stale_listing_signal": issue_state == "open" and (merged_pr_count > 0 or maintainer_expiry_signal),
         "search_truncated": search_truncated,
         "linked_prs": linked_prs,
     }
@@ -176,12 +260,14 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
 def format_summary(audit: dict[str, Any]) -> str:
     """Format the high-signal audit fields for a human operator."""
     signal = "YES" if audit["stale_listing_signal"] else "no"
+    maintainer_signal = "YES" if audit.get("maintainer_expiry_signal") else "no"
     truncation = " (search truncated)" if audit["search_truncated"] else ""
     return (
         f"{audit['repo']}#{audit['number']} issue={audit['issue_state']} "
         f"linked_prs={audit['linked_pr_count']} open={audit['open_pr_count']} "
         f"merged={audit['merged_pr_count']} closed_unmerged={audit['closed_unmerged_pr_count']} "
-        f"competition={audit['competition_level']} stale_listing_signal={signal}{truncation}"
+        f"competition={audit['competition_level']} maintainer_expiry_signal={maintainer_signal} "
+        f"stale_listing_signal={signal}{truncation}"
     )
 
 
