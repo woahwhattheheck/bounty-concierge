@@ -38,9 +38,10 @@ def test_wrapped_payload_requires_list_value(mock_get):
             assert reader("alice", node_url="https://node") == []
 
 
-def test_payload_list_preserves_supported_list_forms():
-    direct = [{"id": "direct"}]
-    wrapped = [{"id": "wrapped"}]
+def test_payload_list_preserves_dict_records_and_drops_malformed_elements():
+    valid = {"id": "valid"}
 
-    assert payout_tracker._payload_list(direct, "pending") is direct
-    assert payout_tracker._payload_list({"pending": wrapped}, "pending") is wrapped
+    assert payout_tracker._payload_list([valid, "bad", None, 7], "pending") == [valid]
+    assert payout_tracker._payload_list(
+        {"history": ["bad", valid, True]}, "history"
+    ) == [valid]
