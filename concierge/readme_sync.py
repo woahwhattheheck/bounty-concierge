@@ -22,6 +22,7 @@ file cannot be read.
 from __future__ import annotations
 
 import json
+import math
 import pathlib
 import re
 import sys
@@ -92,12 +93,53 @@ def _markdown_link_target(value) -> str:
     return quote(str(value), safe=_MARKDOWN_LINK_SAFE)
 
 
+def _validated_bounty_rows(bounties: Iterable[dict]) -> list[dict]:
+    """Return renderer-safe rows or fail closed on malformed index data."""
+    try:
+        rows = list(bounties)
+    except TypeError as exc:
+        raise ValueError("bounties must be an iterable of objects") from exc
+
+    for index, bounty in enumerate(rows):
+        if not isinstance(bounty, dict):
+            raise ValueError(f"bounties[{index}] must be an object")
+
+        reward = bounty.get("reward_rtc")
+        if reward is not None and (
+            isinstance(reward, bool)
+            or not isinstance(reward, (int, float))
+            or (isinstance(reward, float) and not math.isfinite(reward))
+        ):
+            raise ValueError(f"bounties[{index}].reward_rtc must be a finite number")
+
+        number = bounty.get("number")
+        if number is not None and (
+            isinstance(number, bool) or not isinstance(number, int)
+        ):
+            raise ValueError(f"bounties[{index}].number must be an integer")
+
+        for field in ("repo", "title", "url", "difficulty"):
+            value = bounty.get(field)
+            if value is not None and not isinstance(value, str):
+                raise ValueError(f"bounties[{index}].{field} must be a string")
+
+        skills = bounty.get("skills")
+        if skills is not None and (
+            not isinstance(skills, list)
+            or any(not isinstance(skill, str) for skill in skills)
+        ):
+            raise ValueError(f"bounties[{index}].skills must be a list of strings")
+
+    return rows
+
+
 def render_table(bounties: Iterable[dict], top_n: int = DEFAULT_TOP_N) -> str:
     """Return a markdown table from a sequence of bounty dicts."""
     if top_n < 0:
         raise ValueError("top_n must be non-negative")
+    validated = _validated_bounty_rows(bounties)
     sorted_bounties = sorted(
-        bounties,
+        validated,
         key=lambda b: (-(b.get("reward_rtc") or 0), b.get("number", 0)),
     )
     rows = sorted_bounties[:top_n]
@@ -137,7 +179,14 @@ def build_section(top_n: int = DEFAULT_TOP_N) -> str:
     if top_n < 0:
         raise ValueError("top_n must be non-negative")
     payload = json.loads(INDEX_PATH.read_text())
-    bounties = payload.get("bounties") or []
+    if not isinstance(payload, dict):
+        raise ValueError("bounty index root must be an object")
+    bounties = payload.get("bounties")
+    if bounties is None:
+        bounties = []
+    elif not isinstance(bounties, list):
+        raise ValueError("bounty index 'bounties' must be a list")
+    bounties = _validated_bounty_rows(bounties)
     updated = _single_line_text(payload.get("updated_at", "unknown"))
     table = render_table(bounties, top_n=top_n)
     header = (
