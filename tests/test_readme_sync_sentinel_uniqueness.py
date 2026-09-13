@@ -39,3 +39,11 @@ def test_single_reversed_pair_is_rejected():
 
     with pytest.raises(ValueError, match="out of order"):
         rs.update_readme(readme, "replacement")
+
+
+@pytest.mark.parametrize("marker", [rs.START_MARKER, rs.END_MARKER])
+def test_generated_section_cannot_inject_sentinel(marker):
+    readme = f"intro\n{_pair()}\noutro"
+
+    with pytest.raises(ValueError, match="Generated README section"):
+        rs.update_readme(readme, f"replacement\n{marker}\ncontent")
