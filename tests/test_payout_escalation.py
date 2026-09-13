@@ -138,10 +138,17 @@ class PayoutEscalationTests(unittest.TestCase):
         self.assertEqual(item["cash_status"], "not_inferred")
         self.assertEqual(item["bound_confirmed_count"], 1)
 
-    def test_missing_status_is_confirmed_candidate_compatible_with_settlement(self):
+    def test_missing_status_without_time_is_not_attributable_to_this_pr(self):
         row = self.row(status=None, timestamp=None)
-        out = self.compile([row])
-        self.assertEqual(out["items"][0]["action"], "run_revenue_settlement")
+        self.expect_evidence(lambda: self.compile([row]))
+
+    def test_confirmed_without_time_is_not_attributable_to_this_pr(self):
+        row = self.row(status="confirmed", timestamp=None)
+        self.expect_evidence(lambda: self.compile([row]))
+
+    def test_confirmed_premerge_transfer_fails_bounty_attribution(self):
+        row = self.row(status="confirmed", timestamp="2026-09-12T17:59:59Z")
+        self.expect_evidence(lambda: self.compile([row]))
 
     def test_failed_transfer_is_owner_review(self):
         row = self.row(status="failed")
