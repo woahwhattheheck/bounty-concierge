@@ -1,0 +1,39 @@
+name: active-claim-portfolio
+
+on:
+  pull_request:
+    paths:
+      - "concierge/active_claim_portfolio.py"
+      - "tests/test_active_claim_portfolio.py"
+      - "docs/ACTIVE_CLAIM_PORTFOLIO.md"
+      - ".github/workflows/active-claim-portfolio.yml"
+  push:
+    branches: [main]
+    paths:
+      - "concierge/active_claim_portfolio.py"
+      - "tests/test_active_claim_portfolio.py"
+      - "docs/ACTIVE_CLAIM_PORTFOLIO.md"
+      - ".github/workflows/active-claim-portfolio.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  active-claim-portfolio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile exact paths
+        run: python -m py_compile concierge/active_claim_portfolio.py tests/test_active_claim_portfolio.py
+      - name: Focused hostile suite
+        run: python -m unittest -v tests.test_active_claim_portfolio
+      - name: Focused hostiles under optimized Python
+        run: python -O -m unittest -v tests.test_active_claim_portfolio
