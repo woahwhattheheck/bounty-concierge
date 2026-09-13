@@ -55,3 +55,38 @@ def test_fetch_bounties_ignores_non_object_rows_but_keeps_valid_issues(monkeypat
     result = bounty_index.fetch_bounties(repos=["example/repo"], token="token")
     assert [item["number"] for item in result] == [7]
     assert result[0]["reward_rtc"] == 25.0
+
+
+def test_fetch_bounties_ignores_malformed_object_rows_but_keeps_valid_sibling(monkeypatch):
+    common = {
+        "title": "Malformed bounty",
+        "body": "",
+        "html_url": "https://github.com/example/repo/issues/1",
+        "labels": [{"name": "bounty"}],
+        "created_at": "2026-01-01T00:00:00Z",
+    }
+    payload = [
+        {**common, "number": 1, "labels": [None]},
+        {key: value for key, value in common.items()},
+        {**common, "number": 3, "html_url": None},
+        {**common, "number": 4, "title": {"structured": True}},
+        {**common, "number": 5, "body": {"structured": True}},
+        {**common, "number": 6, "labels": {"name": "bounty"}},
+        {**common, "number": 7, "labels": [{"name": 7}]},
+        {**common, "number": 8, "created_at": {"structured": True}},
+        {
+            "number": 11,
+            "title": "[Bounty: 40 RTC] Valid sibling",
+            "body": "Python fix",
+            "html_url": "https://github.com/example/repo/issues/11",
+            "labels": [{"name": "bounty"}],
+            "created_at": "2026-01-02T00:00:00Z",
+        },
+    ]
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: _Response(payload=payload))
+
+    result = bounty_index.fetch_bounties(repos=["example/repo"], token="token")
+
+    assert [item["number"] for item in result] == [11]
+    assert result[0]["reward_rtc"] == 40.0
+    assert result[0]["skills"] == ["python"]
