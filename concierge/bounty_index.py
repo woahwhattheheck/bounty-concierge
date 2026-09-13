@@ -202,6 +202,12 @@ def aggregate(repos=None, token=None):
     }
 
 
+def _markdown_cell(value):
+    """Escape untrusted text so it cannot create Markdown table cells or rows."""
+    text = str(value).replace("\\", "\\\\").replace("|", "\\|")
+    return re.sub(r"[\r\n]+", " ", text)
+
+
 def format_markdown(bounties):
     """Format a list of bounty dicts as a Markdown table.
 
@@ -214,7 +220,7 @@ def format_markdown(bounties):
     for b in bounties:
         repo_short = b["repo"].split("/")[-1]
         skills = ", ".join(b["skills"]) if b["skills"] else "-"
-        title_short = b["title"][:60]
+        title_short = _markdown_cell(b["title"][:60])
         lines.append(
             f"| {b['number']} | {repo_short} | {title_short} | "
             f"{b['reward_rtc']:.1f} | {b['difficulty']} | {skills} |"
