@@ -38,3 +38,15 @@ def test_log_pump_closes_both_resources_when_log_write_fails():
 
     pipe.close.assert_called_once_with()
     log_file.close.assert_called_once_with()
+
+
+def test_log_pump_still_closes_log_when_pipe_close_fails():
+    pipe = MagicMock()
+    pipe.readline.return_value = ""
+    pipe.close.side_effect = OSError("pipe close failed")
+    log_file = MagicMock()
+
+    _pump_logs(pipe, log_file)
+
+    pipe.close.assert_called_once_with()
+    log_file.close.assert_called_once_with()
