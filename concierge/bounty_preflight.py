@@ -2,9 +2,10 @@
 """End-to-end paid-work preflight with issue-thread competition pressure.
 
 ``bounty_audit`` establishes canonical issue/PR state and
-``bounty_qualification`` decides whether work is safe to dispatch.  This module
-fills the missing ``attempt_count`` input from canonical GitHub issue comments
-while authority-binding maintainer contribution terms for credential safety.
+``bounty_qualification`` decides whether work is safe to dispatch. This module
+fills the missing ``attempt_count`` input from canonical GitHub issue comments,
+authority-binds reward advertisements, and authority-binds maintainer
+contribution terms for credential safety.
 """
 
 from __future__ import annotations
@@ -127,6 +128,16 @@ def _has_maintainer_authority(item: dict[str, Any]) -> bool:
     )
 
 
+def _issue_author_association(issue: dict[str, Any]) -> str:
+    """Normalize GitHub author authority without inventing maintainer status."""
+    association = issue.get("author_association")
+    if association is None:
+        return "UNKNOWN"
+    if not isinstance(association, str) or not association.strip():
+        raise BountyPreflightError("GitHub issue author_association was not a string")
+    return association.upper()
+
+
 def _is_external_human(comment: dict[str, Any]) -> tuple[bool, str]:
     if _has_maintainer_authority(comment):
         return False, ""
@@ -151,6 +162,55 @@ def _signals_attempt(body: str, repo: str) -> bool:
         rf"https?://github\.com/{re.escape(repo)}/pull/\d+(?!\d)", re.IGNORECASE
     )
     return bool(same_repo_pr.search(body))
+
+
+def apply_reward_authority_gate(
+    qualification: dict[str, Any], issue_author_association: str
+) -> dict[str, Any]:
+    """Hold body/title-only reward claims that lack maintainer authority.
+
+    Repository labels are treated as canonical maintainer-controlled reward
+    metadata. A live reward label can therefore authority-bind an externally
+    authored issue. Without one, issue title/body reward prose is dispatch
+    authority only for OWNER/MEMBER/COLLABORATOR authors.
+    """
+    if not isinstance(qualification, dict):
+        raise TypeError("qualification must be an object")
+    if not isinstance(issue_author_association, str) or not issue_author_association:
+        raise TypeError("issue_author_association must be a non-empty string")
+
+    association = issue_author_association.upper()
+    result = dict(qualification)
+    signals = dict(result.get("signals") or {})
+    signals["issue_author_association"] = association
+    result["signals"] = signals
+
+    advertised = signals.get("advertised_reward_usd")
+    live_labels = signals.get("live_label_reward_usd")
+    if not advertised or live_labels or association in _MAINTAINER_ASSOCIATIONS:
+        return result
+
+    reasons = [dict(reason) for reason in (result.get("reasons") or [])]
+    reason_codes = list(result.get("reason_codes") or [])
+    if "REWARD_AUTHORITY_UNVERIFIED" not in reason_codes:
+        reasons.append(
+            {
+                "code": "REWARD_AUTHORITY_UNVERIFIED",
+                "severity": "HOLD",
+                "message": (
+                    "Issue title/body advertises a reward without maintainer "
+                    "author authority or a canonical live reward label."
+                ),
+            }
+        )
+        reason_codes.append("REWARD_AUTHORITY_UNVERIFIED")
+
+    result["reasons"] = reasons
+    result["reason_codes"] = reason_codes
+    if result.get("disposition") != "REJECT":
+        result["disposition"] = "HOLD"
+        result["dispatch"] = False
+    return result
 
 
 def _collect_issue_context_with_snapshot(
@@ -285,9 +345,9 @@ def preflight_bounty(
 ) -> dict[str, Any]:
     """Return an operator-safe paid-work preflight result for one issue.
 
-    Issue-derived qualification metadata, credential authority, and canonical
-    issue state are bound to one captured GitHub issue generation. PR
-    competition and maintainer-comment reads remain live, but a later issue
+    Issue-derived qualification metadata, reward authority, credential authority,
+    and canonical issue state are bound to one captured GitHub issue generation.
+    PR competition and maintainer-comment reads remain live, but a later issue
     payload cannot be spliced into the same dispatch decision.
     """
     context, issue_snapshot = _collect_issue_context_with_snapshot(
@@ -323,6 +383,10 @@ def preflight_bounty(
         snapshot,
         saturation_threshold=saturation_threshold,
     )
+    qualification = apply_reward_authority_gate(
+        qualification,
+        _issue_author_association(issue_snapshot),
+    )
     qualification = apply_credential_gate(
         qualification,
         context["credential_gate_signal_types"],
@@ -354,7 +418,7 @@ def main(argv: list[str] | None = None) -> int:
         prog="python -m concierge.bounty_preflight",
         description=(
             "Audit canonical bounty state, issue-thread claim pressure, "
-            "and dispatch safety."
+            "reward authority, and dispatch safety."
         ),
     )
     parser.add_argument("repo", help="Repository in owner/name form")
