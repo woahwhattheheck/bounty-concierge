@@ -25,6 +25,24 @@ def _payload_list(data, key: str) -> List[dict]:
     return [item for item in items if isinstance(item, dict)]
 
 
+def _terminal_text(value) -> str:
+    """Render an untrusted field without raw terminal-control characters."""
+    text = str(value)
+    escaped: list[str] = []
+    for char in text:
+        if char.isprintable():
+            escaped.append(char)
+            continue
+        codepoint = ord(char)
+        if codepoint <= 0xFF:
+            escaped.append(f"\\x{codepoint:02x}")
+        elif codepoint <= 0xFFFF:
+            escaped.append(f"\\u{codepoint:04x}")
+        else:
+            escaped.append(f"\\U{codepoint:08x}")
+    return "".join(escaped)
+
+
 def check_pending(wallet_id: str, node_url: str | None = None) -> List[dict]:
     """Return pending transfers for *wallet_id*.
 
@@ -91,9 +109,11 @@ def format_payout_status(pending: List[dict], history: List[dict]) -> str:
         lines.append("  (none)")
     else:
         for item in pending:
-            amount = item.get("amount_rtc", "?")
-            memo = item.get("memo", "")
-            ts = item.get("created_at", "")
+            amount = _terminal_text(item.get("amount_rtc", "?"))
+            memo_value = item.get("memo", "")
+            memo = "" if memo_value is None else _terminal_text(memo_value)
+            ts_value = item.get("created_at", "")
+            ts = "" if ts_value is None else _terminal_text(ts_value)
             entry = f"  {amount} RTC"
             if memo:
                 entry += f"  memo: {memo}"
@@ -109,10 +129,11 @@ def format_payout_status(pending: List[dict], history: List[dict]) -> str:
         lines.append("  (none)")
     else:
         for item in history:
-            amount = item.get("amount_rtc", "?")
-            sender = item.get("from", "?")
-            recipient = item.get("to", "?")
-            ts = item.get("timestamp", "")
+            amount = _terminal_text(item.get("amount_rtc", "?"))
+            sender = _terminal_text(item.get("from", "?"))
+            recipient = _terminal_text(item.get("to", "?"))
+            ts_value = item.get("timestamp", "")
+            ts = "" if ts_value is None else _terminal_text(ts_value)
             entry = f"  {amount} RTC  {sender} -> {recipient}"
             if ts:
                 entry += f"  ({ts})"
