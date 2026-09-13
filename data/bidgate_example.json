@@ -1,0 +1,75 @@
+{
+  "opportunity": {
+    "id": "SYNTH-RFP-001",
+    "title": "Synthetic workflow assurance RFP",
+    "source": "fixture://synthetic-rfp-001",
+    "decision_time": "2026-09-13T13:00:00+00:00",
+    "question_deadline": "2026-09-14T15:00:00+00:00",
+    "proposal_deadline": "2026-09-18T20:00:00+00:00",
+    "contact_policy": "questions only through the named procurement contact",
+    "minimum_score": 5,
+    "requirements": [
+      {
+        "id": "insurance",
+        "level": "mandatory",
+        "authority": "prime_only",
+        "evidence_type": "insurance_ready",
+        "rule": {"op": "equals", "value": true},
+        "question": "May insurance be bound after notice of intent to award?"
+      },
+      {
+        "id": "references",
+        "level": "mandatory",
+        "authority": "partner_allowed",
+        "evidence_type": "comparable_references",
+        "rule": {"op": "gte", "value": 3}
+      },
+      {
+        "id": "technical_fit",
+        "level": "scored",
+        "authority": "prime_only",
+        "evidence_type": "technical_fit",
+        "rule": {"op": "equals", "value": true},
+        "weight": 5
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "synthetic-prime",
+      "role": "prime",
+      "evidence": [
+        {
+          "id": "prime-insurance",
+          "type": "insurance_ready",
+          "value": true,
+          "source": "fixture://prime-insurance",
+          "observed_at": "2026-09-13T12:00:00+00:00",
+          "provenance_sha256": "30ef77a25a0db65415bbd7ed5a393c088de6cb56ce4af4ee1ac2f1926d134e82"
+        },
+        {
+          "id": "prime-technical-fit",
+          "type": "technical_fit",
+          "value": true,
+          "source": "fixture://prime-technical-fit",
+          "observed_at": "2026-09-13T12:00:00+00:00",
+          "provenance_sha256": "86f8be0d08fe3ac0e1fe5d00651e11ead51488989a4d4bfb6565c46ea5b00b76"
+        }
+      ]
+    },
+    {
+      "id": "synthetic-qualified-partner",
+      "role": "partner",
+      "evidence": [
+        {
+          "id": "partner-references",
+          "type": "comparable_references",
+          "value": 7,
+          "source": "fixture://partner-references",
+          "observed_at": "2026-09-13T12:00:00+00:00",
+          "provenance_sha256": "948e1f6442a6faf0e0b2ccf5b3cd7d252565ee792d770bd1d02c506b36d0c6a2"
+        }
+      ]
+    }
+  ]
+}
