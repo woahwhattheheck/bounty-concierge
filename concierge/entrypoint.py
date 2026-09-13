@@ -15,6 +15,7 @@ from concierge.bounty_availability import (
 from concierge.bounty_preflight import BountyPreflightError, preflight_bounty
 from concierge.bounty_qualification import QualificationInputError
 from concierge.cli import main as _cli_main
+from concierge.payoff_claim_gate import ClaimPayoffError, verify_claim_payoff_bundle
 from concierge.payout_tracker import PayoutLookupError
 
 
@@ -59,13 +60,35 @@ def _option_value(args: list[str], name: str) -> str | None:
     return None
 
 
-def _claim_target(argv: list[str]) -> tuple[str, int] | None:
-    """Extract a valid live claim target; leave syntax errors to the main CLI."""
+def _option_values(args: list[str], name: str) -> list[str | None]:
+    values: list[str | None] = []
+    prefix = f"{name}="
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg == name:
+            values.append(args[index + 1] if index + 1 < len(args) else None)
+            index += 2
+            continue
+        if arg.startswith(prefix):
+            values.append(arg[len(prefix) :])
+        index += 1
+    return values
+
+
+def _claim_tail(argv: list[str]) -> list[str] | None:
     try:
         command_index = argv.index("claim")
     except ValueError:
         return None
-    tail = argv[command_index + 1 :]
+    return argv[command_index + 1 :]
+
+
+def _claim_target(argv: list[str]) -> tuple[str, int] | None:
+    """Extract a valid live claim target; leave syntax errors to the main CLI."""
+    tail = _claim_tail(argv)
+    if tail is None:
+        return None
     if "--dry-run" in argv or "-h" in tail or "--help" in tail:
         return None
     issue_text = _option_value(tail, "--issue")
@@ -81,6 +104,49 @@ def _claim_target(argv: list[str]) -> tuple[str, int] | None:
     if "/" not in repo:
         repo = f"Scottcjn/{repo}"
     return repo, issue
+
+
+def _claim_payoff_bundle(argv: list[str]) -> str:
+    """Require exactly one entrypoint-owned payoff bundle option for live claims."""
+    tail = _claim_tail(argv)
+    if tail is None:
+        raise ClaimPayoffError("BUNDLE_REQUIRED", "live claim requires --payoff-bundle")
+    values = _option_values(tail, "--payoff-bundle")
+    if not values or values[0] is None or values[0] == "":
+        raise ClaimPayoffError(
+            "BUNDLE_REQUIRED",
+            "live claim requires --payoff-bundle DIR",
+        )
+    if len(values) != 1:
+        raise ClaimPayoffError(
+            "DUPLICATE_BUNDLE_OPTION",
+            "live claim accepts exactly one --payoff-bundle option",
+        )
+    return values[0]
+
+
+def _strip_claim_payoff_option(argv: list[str]) -> list[str]:
+    """Remove the wrapper-owned option before handing argv to argparse CLI."""
+    try:
+        command_index = argv.index("claim")
+    except ValueError:
+        return list(argv)
+
+    result = list(argv[: command_index + 1])
+    tail = argv[command_index + 1 :]
+    index = 0
+    prefix = "--payoff-bundle="
+    while index < len(tail):
+        arg = tail[index]
+        if arg == "--payoff-bundle":
+            index += 2
+            continue
+        if arg.startswith(prefix):
+            index += 1
+            continue
+        result.append(arg)
+        index += 1
+    return result
 
 
 def _claim_counts(result: dict[str, Any]) -> tuple[int | None, int | None]:
@@ -158,11 +224,17 @@ def _availability_block(
 
 
 def _preflight_claim(argv: list[str]) -> None:
-    """Require canonical ACTIONABLE + available state before claim instructions."""
+    """Require verified payoff, canonical ACTIONABLE, and available state."""
     target = _claim_target(argv)
     if target is None:
         return
     repo, issue = target
+
+    # Offline, owner-supplied payoff evidence is the first prerequisite. Do not spend
+    # provider reads on a claim whose compensation path is missing, stale, exhausted,
+    # ambiguous, or bound to another target.
+    verify_claim_payoff_bundle(repo, issue, _claim_payoff_bundle(argv))
+
     result = preflight_bounty(repo, issue)
     if not isinstance(result, dict):
         raise BountyPreflightError("canonical bounty preflight did not return an object")
@@ -211,9 +283,27 @@ def _blocked_json(exc: ClaimPreflightBlocked) -> dict[str, Any]:
 
 
 def main() -> None:
-    """Run the CLI and fail closed on claim/payout lookup uncertainty."""
+    """Run the CLI and fail closed on claim/payoff/payout uncertainty."""
+    original_argv = sys.argv
     try:
-        _preflight_claim(sys.argv[1:])
+        _preflight_claim(original_argv[1:])
+    except ClaimPayoffError as exc:
+        if _json_requested():
+            print(
+                json.dumps(
+                    {
+                        "error": "claim_payoff_unavailable",
+                        "reason_code": exc.code,
+                    },
+                    sort_keys=True,
+                )
+            )
+        else:
+            print(
+                f"Error: claim payoff path unavailable [{exc.code}]: {exc}",
+                file=sys.stderr,
+            )
+        raise SystemExit(2) from None
     except ClaimPreflightBlocked as exc:
         if _json_requested():
             print(json.dumps(_blocked_json(exc), sort_keys=True))
@@ -233,8 +323,15 @@ def main() -> None:
             print(f"Error: claim preflight unavailable: {exc}", file=sys.stderr)
         raise SystemExit(2) from None
 
+    sanitized_argv = [
+        original_argv[0],
+        *_strip_claim_payoff_option(original_argv[1:]),
+    ]
     try:
+        sys.argv = sanitized_argv
         _cli_main()
     except PayoutLookupError as exc:
         print(f"Error: payout status unavailable: {exc}", file=sys.stderr)
         raise SystemExit(2) from None
+    finally:
+        sys.argv = original_argv

@@ -1,388 +1,209 @@
 # SPDX-License-Identifier: MIT
-"""Installed claim path must consume canonical preflight + availability authority."""
-
-from __future__ import annotations
+"""Installed claim composes payoff, preflight, and availability authority."""
 
 import json
-
 import pytest
+from concierge import entrypoint as e
 
-from concierge import entrypoint
+B = "/tmp/payoff-bundle"
 
 
-def _result(*, disposition="ACTIONABLE", attempts=1, open_prs=1, reasons=None):
-    reasons = reasons or []
+def R(disposition="ACTIONABLE", codes=(), attempts=1, prs=1):
     return {
-        "repo": "acme/widget",
-        "number": 42,
         "attempt_count": attempts,
-        "canonical_audit": {
-            "open_pr_count": open_prs,
-            # Hostile source text must never escape blocked output.
-            "maintainer_expiry_comments": [{"body": "DO NOT ECHO THIS SOURCE"}],
-        },
+        "canonical_audit": {"open_pr_count": prs, "comments": ["DO NOT ECHO"]},
         "qualification": {
             "disposition": disposition,
             "dispatch": disposition == "ACTIONABLE",
-            "reason_codes": reasons,
-            "reasons": [
-                {"code": code, "severity": disposition, "message": "safe"}
-                for code in reasons
-            ],
-            "signals": {"private_context_signal_types": []},
+            "reason_codes": list(codes),
+            "reasons": [{"code": c, "severity": disposition, "message": "safe"} for c in codes],
+            "signals": {},
         },
     }
 
 
-def _availability(*, dispatch=True, reason=None, signals=None):
+def A(dispatch=True, reason=None, signals=()):
     return {
-        "schema": "bounty-availability/v1",
-        "repo": "acme/widget",
-        "number": 42,
-        "disposition": "CLEAR" if dispatch else "HOLD",
         "dispatch": dispatch,
+        "disposition": "CLEAR" if dispatch else "HOLD",
         "reason_code": reason,
-        "signal_codes": [] if signals is None else list(signals),
-        "evidence": [
-            {
-                "comment_id": 99,
-                "association": "OWNER",
-                "signal": "DO NOT ECHO RAW COMMENT OR USER",
-            }
-        ],
+        "signal_codes": list(signals),
+        "evidence": [{"body": "DO NOT ECHO", "user": "secret"}],
     }
 
 
-def test_actionable_claim_runs_both_authorities_then_existing_cli(monkeypatch):
+def V(*, repo="acme/widget", json_out=False, dry=False):
+    out = ["concierge"] + (["--json"] if json_out else []) + [
+        "claim", "--repo", repo, "--issue", "42", "--wallet", "alice",
+        "--payoff-bundle", B,
+    ]
+    return out + (["--dry-run"] if dry else [])
+
+
+def allow(monkeypatch, seen=None):
+    def payoff(repo, issue, bundle):
+        if seen is not None:
+            seen.append(("payoff", repo, issue, bundle))
+        return {}
+    monkeypatch.setattr(e, "verify_claim_payoff_bundle", payoff)
+    monkeypatch.setattr(e, "preflight_bounty", lambda repo, issue: (
+        seen.append(("preflight", repo, issue)) if seen is not None else None
+    ) or R())
+    monkeypatch.setattr(e, "inspect_bounty_availability", lambda repo, issue: (
+        seen.append(("availability", repo, issue)) if seen is not None else None
+    ) or A())
+
+
+def test_live_claim_orders_authorities_strips_option_and_restores_argv(monkeypatch):
     seen = []
-    monkeypatch.setattr(
-        entrypoint,
-        "preflight_bounty",
-        lambda repo, issue: seen.append(("preflight", repo, issue)) or _result(),
-    )
-    monkeypatch.setattr(
-        entrypoint,
-        "inspect_bounty_availability",
-        lambda repo, issue: seen.append(("availability", repo, issue))
-        or _availability(),
-    )
-    monkeypatch.setattr(entrypoint, "_cli_main", lambda: seen.append("cli"))
-    monkeypatch.setattr(
-        entrypoint.sys,
-        "argv",
-        ["concierge", "claim", "--repo", "acme/widget", "--issue", "42", "--wallet", "alice"],
-    )
-
-    entrypoint.main()
-
-    assert seen == [
+    allow(monkeypatch, seen)
+    def cli():
+        seen.append(("cli", list(e.sys.argv)))
+        assert "--payoff-bundle" not in e.sys.argv and B not in e.sys.argv
+    monkeypatch.setattr(e, "_cli_main", cli)
+    original = V()
+    monkeypatch.setattr(e.sys, "argv", original)
+    e.main()
+    assert seen[:3] == [
+        ("payoff", "acme/widget", 42, B),
         ("preflight", "acme/widget", 42),
         ("availability", "acme/widget", 42),
-        "cli",
     ]
+    assert seen[3][0] == "cli" and e.sys.argv is original
 
 
-def test_short_repo_is_normalized_for_both_authorities(monkeypatch):
+def test_short_repo_and_equals_forms_are_normalized(monkeypatch):
     seen = []
-    monkeypatch.setattr(
-        entrypoint,
-        "preflight_bounty",
-        lambda repo, issue: seen.append(("preflight", repo, issue)) or _result(),
-    )
-    monkeypatch.setattr(
-        entrypoint,
-        "inspect_bounty_availability",
-        lambda repo, issue: seen.append(("availability", repo, issue))
-        or _availability(),
-    )
-    monkeypatch.setattr(entrypoint, "_cli_main", lambda: None)
-    monkeypatch.setattr(
-        entrypoint.sys,
-        "argv",
-        ["concierge", "claim", "--repo", "widget", "--issue=42", "--wallet", "alice"],
-    )
-
-    entrypoint.main()
-
+    allow(monkeypatch, seen)
+    monkeypatch.setattr(e, "_cli_main", lambda: None)
+    monkeypatch.setattr(e.sys, "argv", [
+        "concierge", "claim", "--repo", "widget", "--issue=42", "--wallet", "a",
+        f"--payoff-bundle={B}",
+    ])
+    e.main()
     assert seen == [
+        ("payoff", "Scottcjn/widget", 42, B),
         ("preflight", "Scottcjn/widget", 42),
         ("availability", "Scottcjn/widget", 42),
     ]
 
 
-def test_hold_blocks_before_availability_and_cli(monkeypatch, capsys):
-    monkeypatch.setattr(
-        entrypoint,
-        "preflight_bounty",
-        lambda *a: _result(
-            disposition="HOLD",
-            attempts=5,
-            open_prs=2,
-            reasons=["SATURATED_COMPETITION"],
-        ),
-    )
-    monkeypatch.setattr(
-        entrypoint,
-        "inspect_bounty_availability",
-        lambda *a: pytest.fail("upstream HOLD must short-circuit availability"),
-    )
-    monkeypatch.setattr(
-        entrypoint,
-        "_cli_main",
-        lambda: pytest.fail("blocked claim reached primary CLI"),
-    )
-    monkeypatch.setattr(
-        entrypoint.sys,
-        "argv",
-        ["concierge", "claim", "--issue", "42", "--wallet", "alice"],
-    )
-
+@pytest.mark.parametrize("args,code", [
+    (["concierge", "claim", "--issue", "42", "--wallet", "a"], "BUNDLE_REQUIRED"),
+    (V() + ["--payoff-bundle", "/tmp/other"], "DUPLICATE_BUNDLE_OPTION"),
+])
+def test_missing_or_duplicate_bundle_fails_before_authority(monkeypatch, capsys, args, code):
+    for name in ("verify_claim_payoff_bundle", "preflight_bounty", "_cli_main"):
+        monkeypatch.setattr(e, name, lambda *x, n=name: pytest.fail(n))
+    monkeypatch.setattr(e.sys, "argv", args)
     with pytest.raises(SystemExit) as caught:
-        entrypoint.main()
+        e.main()
+    assert caught.value.code == 2 and code in capsys.readouterr().err
 
+
+def test_payoff_failure_is_safe_json_and_short_circuits_network(monkeypatch, capsys):
+    def fail(*_):
+        raise e.ClaimPayoffError("CLAIM_TARGET_NOT_IN_BUNDLE", "DO NOT ECHO")
+    monkeypatch.setattr(e, "verify_claim_payoff_bundle", fail)
+    monkeypatch.setattr(e, "preflight_bounty", lambda *_: pytest.fail("network"))
+    monkeypatch.setattr(e, "_cli_main", lambda: pytest.fail("cli"))
+    monkeypatch.setattr(e.sys, "argv", V(json_out=True))
+    with pytest.raises(SystemExit) as caught:
+        e.main()
+    output = capsys.readouterr().out
     assert caught.value.code == 2
-    stderr = capsys.readouterr().err
-    assert "SATURATED_COMPETITION" in stderr
-    assert "attempts=5" in stderr
-    assert "DO NOT ECHO" not in stderr
+    assert json.loads(output) == {
+        "error": "claim_payoff_unavailable",
+        "reason_code": "CLAIM_TARGET_NOT_IN_BUNDLE",
+    }
+    assert "DO NOT ECHO" not in output
 
 
-def test_reject_json_is_safe_and_skips_availability(monkeypatch, capsys):
-    monkeypatch.setattr(
-        entrypoint,
-        "preflight_bounty",
-        lambda *a: _result(disposition="REJECT", reasons=["ALREADY_REWARDED"]),
-    )
-    monkeypatch.setattr(
-        entrypoint,
-        "inspect_bounty_availability",
-        lambda *a: pytest.fail("upstream REJECT must short-circuit availability"),
-    )
-    monkeypatch.setattr(
-        entrypoint,
-        "_cli_main",
-        lambda: pytest.fail("blocked claim reached primary CLI"),
-    )
-    monkeypatch.setattr(
-        entrypoint.sys,
-        "argv",
-        ["concierge", "--json", "claim", "--issue", "42", "--wallet", "alice"],
-    )
-
+@pytest.mark.parametrize("disposition,code,exit_code", [
+    ("HOLD", "SATURATED", 2),
+    ("REJECT", "ALREADY_REWARDED", 3),
+])
+def test_preflight_block_is_safe_and_short_circuits(monkeypatch, capsys, disposition, code, exit_code):
+    allow(monkeypatch)
+    monkeypatch.setattr(e, "preflight_bounty", lambda *_: R(disposition, [code], 5, 2))
+    monkeypatch.setattr(e, "inspect_bounty_availability", lambda *_: pytest.fail("availability"))
+    monkeypatch.setattr(e, "_cli_main", lambda: pytest.fail("cli"))
+    monkeypatch.setattr(e.sys, "argv", V(json_out=True))
     with pytest.raises(SystemExit) as caught:
-        entrypoint.main()
-
-    assert caught.value.code == 3
-    stdout = capsys.readouterr().out
-    payload = json.loads(stdout)
-    assert payload["error"] == "claim_blocked"
-    assert payload["qualification"]["reason_codes"] == ["ALREADY_REWARDED"]
-    assert "DO NOT ECHO" not in stdout
+        e.main()
+    output = capsys.readouterr().out
+    payload = json.loads(output)
+    assert caught.value.code == exit_code
+    assert payload["qualification"]["reason_codes"] == [code]
+    assert payload["attempt_count"] == 5 and "DO NOT ECHO" not in output
 
 
-def test_terminal_availability_blocks_actionable_claim_safely(monkeypatch, capsys):
-    monkeypatch.setattr(entrypoint, "preflight_bounty", lambda *a: _result())
-    monkeypatch.setattr(
-        entrypoint,
-        "inspect_bounty_availability",
-        lambda *a: _availability(
-            dispatch=False,
-            reason="MAINTAINER_TERMINAL_OUTCOME",
-            signals=["MAINTAINER_ACCEPTANCE_SIGNAL"],
-        ),
-    )
-    monkeypatch.setattr(
-        entrypoint,
-        "_cli_main",
-        lambda: pytest.fail("terminal availability reached primary CLI"),
-    )
-    monkeypatch.setattr(
-        entrypoint.sys,
-        "argv",
-        ["concierge", "--json", "claim", "--issue", "42", "--wallet", "alice"],
-    )
-
+def test_terminal_availability_blocks_without_exposing_source(monkeypatch, capsys):
+    allow(monkeypatch)
+    monkeypatch.setattr(e, "inspect_bounty_availability", lambda *_: A(False, "TERMINAL", ["ACCEPTED"]))
+    monkeypatch.setattr(e, "_cli_main", lambda: pytest.fail("cli"))
+    monkeypatch.setattr(e.sys, "argv", V(json_out=True))
     with pytest.raises(SystemExit) as caught:
-        entrypoint.main()
-
+        e.main()
+    output = capsys.readouterr().out
+    q = json.loads(output)["qualification"]
     assert caught.value.code == 2
-    stdout = capsys.readouterr().out
-    payload = json.loads(stdout)
-    qualification = payload["qualification"]
-    assert qualification["reason_codes"] == [
-        "AVAILABILITY:MAINTAINER_TERMINAL_OUTCOME"
-    ]
-    assert qualification["signals"]["availability_signal_codes"] == [
-        "MAINTAINER_ACCEPTANCE_SIGNAL"
-    ]
-    assert "DO NOT ECHO RAW COMMENT OR USER" not in stdout
-    assert "comment_id" not in stdout
+    assert q["reason_codes"] == ["AVAILABILITY:TERMINAL"]
+    assert q["signals"]["availability_signal_codes"] == ["ACCEPTED"]
+    assert "DO NOT ECHO" not in output and "secret" not in output
 
 
-def test_dry_run_and_help_skip_both_network_authorities(monkeypatch):
-    monkeypatch.setattr(
-        entrypoint,
-        "preflight_bounty",
-        lambda *a: pytest.fail("preview/help must stay non-network"),
-    )
-    monkeypatch.setattr(
-        entrypoint,
-        "inspect_bounty_availability",
-        lambda *a: pytest.fail("preview/help must stay non-network"),
-    )
+def test_dry_run_help_and_non_claim_skip_new_authorities(monkeypatch):
+    for name in ("verify_claim_payoff_bundle", "preflight_bounty", "inspect_bounty_availability"):
+        monkeypatch.setattr(e, name, lambda *x, n=name: pytest.fail(n))
     calls = []
-    monkeypatch.setattr(entrypoint, "_cli_main", lambda: calls.append("cli"))
-
-    monkeypatch.setattr(
-        entrypoint.sys,
-        "argv",
-        ["concierge", "claim", "--issue", "42", "--wallet", "alice", "--dry-run"],
-    )
-    entrypoint.main()
-    monkeypatch.setattr(entrypoint.sys, "argv", ["concierge", "claim", "--help"])
-    entrypoint.main()
-
-    assert calls == ["cli", "cli"]
+    monkeypatch.setattr(e, "_cli_main", lambda: calls.append(list(e.sys.argv)))
+    for args in (V(dry=True), ["concierge", "claim", "--help", "--payoff-bundle", B], ["concierge", "browse"]):
+        monkeypatch.setattr(e.sys, "argv", args)
+        e.main()
+    assert calls[0][-1] == "--dry-run"
+    assert all("--payoff-bundle" not in call for call in calls)
 
 
-def test_preflight_provider_failure_fails_closed(monkeypatch, capsys):
-    monkeypatch.setattr(
-        entrypoint,
-        "preflight_bounty",
-        lambda *a: (_ for _ in ()).throw(
-            entrypoint.BountyPreflightError("provider down")
-        ),
-    )
-    monkeypatch.setattr(
-        entrypoint,
-        "inspect_bounty_availability",
-        lambda *a: pytest.fail("failed preflight must skip availability"),
-    )
-    monkeypatch.setattr(
-        entrypoint,
-        "_cli_main",
-        lambda: pytest.fail("unqualified claim reached primary CLI"),
-    )
-    monkeypatch.setattr(
-        entrypoint.sys,
-        "argv",
-        ["concierge", "claim", "--issue", "42", "--wallet", "alice"],
-    )
-
+@pytest.mark.parametrize("authority,exc", [
+    ("preflight_bounty", e.BountyPreflightError("down")),
+    ("inspect_bounty_availability", e.BountyAvailabilityError("down")),
+])
+def test_provider_failures_fail_closed(monkeypatch, capsys, authority, exc):
+    allow(monkeypatch)
+    monkeypatch.setattr(e, authority, lambda *_: (_ for _ in ()).throw(exc))
+    monkeypatch.setattr(e, "_cli_main", lambda: pytest.fail("cli"))
+    monkeypatch.setattr(e.sys, "argv", V())
     with pytest.raises(SystemExit) as caught:
-        entrypoint.main()
-
+        e.main()
     assert caught.value.code == 2
     assert "claim preflight unavailable" in capsys.readouterr().err
 
 
-def test_availability_provider_failure_fails_closed(monkeypatch, capsys):
-    monkeypatch.setattr(entrypoint, "preflight_bounty", lambda *a: _result())
-    monkeypatch.setattr(
-        entrypoint,
-        "inspect_bounty_availability",
-        lambda *a: (_ for _ in ()).throw(
-            entrypoint.BountyAvailabilityError("provider down")
-        ),
-    )
-    monkeypatch.setattr(
-        entrypoint,
-        "_cli_main",
-        lambda: pytest.fail("unavailable authority reached primary CLI"),
-    )
-    monkeypatch.setattr(
-        entrypoint.sys,
-        "argv",
-        ["concierge", "claim", "--issue", "42", "--wallet", "alice"],
-    )
-
+@pytest.mark.parametrize("bad", [
+    {},
+    {"dispatch": 1, "disposition": "CLEAR"},
+    {"dispatch": True, "disposition": "HOLD"},
+    {"dispatch": False, "disposition": "CLEAR", "reason_code": "X", "signal_codes": []},
+    {"dispatch": False, "disposition": "HOLD", "reason_code": None, "signal_codes": []},
+    {"dispatch": False, "disposition": "HOLD", "reason_code": "X", "signal_codes": [1]},
+])
+def test_malformed_availability_fails_closed(monkeypatch, bad):
+    allow(monkeypatch)
+    monkeypatch.setattr(e, "inspect_bounty_availability", lambda *_: bad)
+    monkeypatch.setattr(e, "_cli_main", lambda: pytest.fail("cli"))
+    monkeypatch.setattr(e.sys, "argv", V())
     with pytest.raises(SystemExit) as caught:
-        entrypoint.main()
-
-    assert caught.value.code == 2
-    assert "claim preflight unavailable" in capsys.readouterr().err
-
-
-@pytest.mark.parametrize(
-    "availability",
-    [
-        {},
-        {"dispatch": 1, "disposition": "CLEAR"},
-        {"dispatch": True, "disposition": "HOLD"},
-        {"dispatch": False, "disposition": "CLEAR", "reason_code": "X", "signal_codes": []},
-        {"dispatch": False, "disposition": "HOLD", "reason_code": None, "signal_codes": []},
-        {"dispatch": False, "disposition": "HOLD", "reason_code": "X", "signal_codes": [1]},
-    ],
-)
-def test_malformed_availability_authority_fails_closed(
-    monkeypatch, availability
-):
-    monkeypatch.setattr(entrypoint, "preflight_bounty", lambda *a: _result())
-    monkeypatch.setattr(
-        entrypoint,
-        "inspect_bounty_availability",
-        lambda *a: availability,
-    )
-    monkeypatch.setattr(
-        entrypoint,
-        "_cli_main",
-        lambda: pytest.fail("malformed availability reached primary CLI"),
-    )
-    monkeypatch.setattr(
-        entrypoint.sys,
-        "argv",
-        ["concierge", "claim", "--issue", "42", "--wallet", "alice"],
-    )
-
-    with pytest.raises(SystemExit) as caught:
-        entrypoint.main()
-
+        e.main()
     assert caught.value.code == 2
 
 
-def test_malformed_preflight_result_fails_closed(monkeypatch):
-    monkeypatch.setattr(
-        entrypoint,
-        "preflight_bounty",
-        lambda *a: {"qualification": {}},
-    )
-    monkeypatch.setattr(
-        entrypoint,
-        "inspect_bounty_availability",
-        lambda *a: pytest.fail("malformed preflight must skip availability"),
-    )
-    monkeypatch.setattr(
-        entrypoint,
-        "_cli_main",
-        lambda: pytest.fail("malformed preflight reached primary CLI"),
-    )
-    monkeypatch.setattr(
-        entrypoint.sys,
-        "argv",
-        ["concierge", "claim", "--issue", "42", "--wallet", "alice"],
-    )
-
+def test_malformed_preflight_fails_closed(monkeypatch):
+    allow(monkeypatch)
+    monkeypatch.setattr(e, "preflight_bounty", lambda *_: {"qualification": {}})
+    monkeypatch.setattr(e, "inspect_bounty_availability", lambda *_: pytest.fail("availability"))
+    monkeypatch.setattr(e, "_cli_main", lambda: pytest.fail("cli"))
+    monkeypatch.setattr(e.sys, "argv", V())
     with pytest.raises(SystemExit) as caught:
-        entrypoint.main()
-
+        e.main()
     assert caught.value.code == 2
-
-
-def test_non_claim_command_preserves_existing_cli_path(monkeypatch):
-    monkeypatch.setattr(
-        entrypoint,
-        "preflight_bounty",
-        lambda *a: pytest.fail("non-claim command must not preflight"),
-    )
-    monkeypatch.setattr(
-        entrypoint,
-        "inspect_bounty_availability",
-        lambda *a: pytest.fail("non-claim command must not inspect availability"),
-    )
-    calls = []
-    monkeypatch.setattr(entrypoint, "_cli_main", lambda: calls.append("cli"))
-    monkeypatch.setattr(entrypoint.sys, "argv", ["concierge", "browse"])
-
-    entrypoint.main()
-
-    assert calls == ["cli"]
