@@ -1,0 +1,59 @@
+name: Currency-partitioned opportunity ranker
+
+on:
+  pull_request:
+    paths:
+      - "concierge/currency_partitioned_ranker.py"
+      - "concierge/opportunity_ranker.py"
+      - "concierge/revenue_intake.py"
+      - "concierge/bounty_qualification.py"
+      - "tests/test_currency_partitioned_ranker.py"
+      - "tests/test_opportunity_ranker.py"
+      - "tests/test_native_rtc_qualification.py"
+      - "docs/CURRENCY_PARTITIONED_RANKING.md"
+      - ".github/workflows/currency_partitioned_opportunity_ranker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.13"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install runtime and test dependencies
+        run: python -m pip install -r requirements.txt 'pytest>=8,<9'
+
+      - name: Compile focused modules
+        run: >-
+          python -m py_compile
+          concierge/currency_partitioned_ranker.py
+          concierge/opportunity_ranker.py
+          tests/test_currency_partitioned_ranker.py
+          tests/test_opportunity_ranker.py
+          tests/test_native_rtc_qualification.py
+
+      - name: Normal interpreter contract
+        run: >-
+          python -m pytest -q
+          tests/test_currency_partitioned_ranker.py
+          tests/test_opportunity_ranker.py
+          tests/test_native_rtc_qualification.py
+
+      - name: Optimized unittest contract
+        run: >-
+          python -O -m unittest -v
+          tests.test_currency_partitioned_ranker
+          tests.test_opportunity_ranker
