@@ -55,6 +55,9 @@ _NEGATION_PREFIX_RE = re.compile(
 _CREDENTIAL_THEN_VERIFY_RE = re.compile(
     r"(?i)^\s*(?:to|then|and\s+then)\s*$"
 )
+_CREDENTIAL_THEN_DISCLOSE_RE = re.compile(
+    r"(?i)^\s*(?:(?:[:\u2014\u2013-]|,)\s*(?:then\s*)?|(?:then|and\s+then)\s*)?$"
+)
 
 
 def _unnegated_actions(pattern: Pattern[str], text: str) -> list[re.Match[str]]:
@@ -82,6 +85,19 @@ def _action_before_credential(
         action.start() <= credential.start()
         and credential.start() - action.end() <= max_gap
     )
+
+
+def _disclosure_relates_to_credential(
+    segment: str,
+    action: re.Match[str],
+    credential: re.Match[str],
+) -> bool:
+    if _action_before_credential(action, credential, max_gap=120):
+        return True
+    if action.start() < credential.end() or action.start() - credential.end() > 80:
+        return False
+    between = segment[credential.end() : action.start()]
+    return bool(_CREDENTIAL_THEN_DISCLOSE_RE.search(between))
 
 
 def _verification_relates_to_credential(
@@ -113,7 +129,8 @@ def credential_gate_signal_types(texts: Iterable[str]) -> list[str]:
     Each signal is bound within one local sentence/clause to an unnegated action,
     credential phrase, direct custody relation, and (for verification) external
     destination. This prevents unrelated prose from being combined into a
-    terminal rejection while still catching pre- and post-nominal custody.
+    terminal rejection while still catching pre- and post-nominal custody and
+    both action-before-credential and credential-before-action instructions.
     """
     signals: set[str] = set()
     for text in texts:
@@ -131,7 +148,7 @@ def credential_gate_signal_types(texts: Iterable[str]) -> list[str]:
                     continue
 
                 if any(
-                    _action_before_credential(action, credential, max_gap=120)
+                    _disclosure_relates_to_credential(segment, action, credential)
                     for action in disclosure_actions
                 ):
                     signals.add("credential_disclosure")
