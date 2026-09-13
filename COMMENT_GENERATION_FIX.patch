@@ -1,0 +1,139 @@
+--- a/concierge/bounty_preflight.py
++++ b/concierge/bounty_preflight.py
+@@ -13,6 +13,7 @@
+ 
+ import argparse
+ from copy import deepcopy
++import hashlib
+ import json
+ import re
+ from typing import Any
+@@ -263,18 +264,66 @@
+     )
+ 
+ 
+-def _comment_generation_entry(comment: dict[str, Any]) -> tuple[int, str] | None:
++def _comment_authority_digest(comment: dict[str, Any]) -> str | None:
++    """Hash only comment fields that can affect dispatch authority classification."""
++    body = comment.get("body")
++    if body is None:
++        body = ""
++    association = comment.get("author_association")
++    if association is None:
++        association = ""
++    user = comment.get("user")
++    if user is None:
++        login = ""
++        user_type = ""
++    elif isinstance(user, dict):
++        login = user.get("login")
++        user_type = user.get("type")
++        if login is None:
++            login = ""
++        if user_type is None:
++            user_type = ""
++    else:
++        return None
++    if not all(
++        isinstance(value, str)
++        for value in (body, association, login, user_type)
++    ):
++        return None
++
++    # Normalize only dimensions whose downstream classification is itself
++    # case-insensitive; keep body exact because claim/credential semantics are
++    # derived from its concrete representation.
++    authority_view = (
++        body,
++        association.upper(),
++        login.casefold(),
++        user_type.casefold(),
++    )
++    encoded = json.dumps(
++        authority_view,
++        ensure_ascii=False,
++        separators=(",", ":"),
++    ).encode("utf-8")
++    return hashlib.sha256(encoded).hexdigest()
++
++
++def _comment_generation_entry(
++    comment: dict[str, Any],
++) -> tuple[int, str, str] | None:
+     comment_id = comment.get("id")
+     updated_at = comment.get("updated_at")
++    authority_digest = _comment_authority_digest(comment)
+     if (
+         isinstance(comment_id, bool)
+         or not isinstance(comment_id, int)
+         or comment_id <= 0
+         or not isinstance(updated_at, str)
+         or not updated_at
++        or authority_digest is None
+     ):
+         return None
+-    return comment_id, updated_at
++    return comment_id, updated_at, authority_digest
+ 
+ 
+ def _collect_comment_generation(
+@@ -284,11 +333,11 @@
+     *,
+     session: Any,
+     max_pages: int,
+-) -> tuple[tuple[tuple[int, str], ...], bool]:
++) -> tuple[tuple[tuple[int, str, str], ...], bool]:
+     """Read a privacy-safe exact issue-comment generation marker."""
+     headers = _headers(token or GITHUB_TOKEN)
+     comments_url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
+-    entries: list[tuple[int, str]] = []
++    entries: list[tuple[int, str, str]] = []
+     for page in range(1, max_pages + 1):
+         payload = _get_json(
+             session,
+@@ -324,7 +373,7 @@
+     session: Any,
+     max_pages: int,
+     issue_snapshot: dict[str, Any],
+-    comment_generation: tuple[tuple[int, str], ...] | None,
++    comment_generation: tuple[tuple[int, str, str], ...] | None,
+ ) -> bool:
+     """Revalidate the exact issue/comment generation before dispatch authority."""
+     if comment_generation is None:
+@@ -521,7 +570,7 @@
+     claimant_logins: set[str] = set()
+     attempt_signal_count = 0
+     comments_truncated = False
+-    comment_generation: list[tuple[int, str]] = []
++    comment_generation: list[tuple[int, str, str]] = []
+     comment_generation_complete = True
+     credential_signals: set[str] = set()
+     if _has_maintainer_authority(issue):
+@@ -627,8 +676,8 @@
+     Issue-derived qualification metadata, formal assignment, credential authority,
+     and canonical issue state are bound to one captured GitHub issue generation.
+     PR competition and maintainer-comment reads remain live. Before an actionable
+-    result is returned, the issue authority fields and exact comment ID/update
+-    generation are re-read and must still match the original snapshot.
++    result is returned, the issue authority fields and privacy-safe comment
++    authority generation are re-read and must still match the original snapshot.
+     """
+     context, issue_snapshot = _collect_issue_context_with_snapshot(
+         repo,
+--- a/tests/test_bounty_preflight.py
++++ b/tests/test_bounty_preflight.py
+@@ -191,11 +191,13 @@
+     changed_comments = [
+         initial_comments[0],
+         initial_comments[1],
++        # GitHub comment timestamps serialize at second precision. A semantic
++        # edit can therefore preserve both id and updated_at inside one second.
+         comment(
+             "carol",
+             "I'm working on this bounty.",
+             comment_id=1803,
+-            updated_at="2026-09-13T00:00:01Z",
++            updated_at=_GENERATION_TIME,
+         ),
+     ]
+ 
