@@ -27,6 +27,9 @@ _CURRENCY_RE = re.compile(r"^[A-Z][A-Z0-9_.-]{1,11}$")
 _MAX_AMOUNT_SOURCE_CHARS = 64
 _MAX_AMOUNT_DIGITS = 30
 _MAX_AMOUNT_ABS_EXPONENT = 18
+_CURSOR_SAFETY_LAG = timedelta(seconds=5)
+_MAX_CURSOR_SEEN_EVENTS = 1000
+_EVENT_IDENTITY_RE = re.compile(r"^(review|comment|review_comment):[1-9][0-9]*$")
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
 _REVIEW_DECISION_STATES = frozenset({"CHANGES_REQUESTED", "APPROVED", "DISMISSED"})
 _ACTION_ORDER = {
@@ -130,6 +133,53 @@ def _positive_amount(value: Any) -> Decimal:
     return amount
 
 
+def _validate_feedback_cursor(raw: Any, legacy_last_seen: Any) -> dict[str, Any]:
+    if raw is None:
+        through = _parse_timestamp(
+            legacy_last_seen, field="last_seen_at", allow_none=False
+        )
+        return {"through_at": through, "seen_events": {}}
+    if legacy_last_seen is not None:
+        raise RevenueCloseoutInputError(
+            "use feedback_cursor or last_seen_at, not both"
+        )
+    if not isinstance(raw, dict):
+        raise RevenueCloseoutInputError("feedback_cursor must be an object")
+    through = _parse_timestamp(
+        raw.get("through_at"), field="feedback_cursor.through_at", allow_none=False
+    )
+    seen_raw = raw.get("seen_events", {})
+    if not isinstance(seen_raw, dict) or len(seen_raw) > _MAX_CURSOR_SEEN_EVENTS:
+        raise RevenueCloseoutInputError("feedback_cursor.seen_events is invalid or too large")
+    seen: dict[str, dict[str, Any]] = {}
+    for identity, entry in seen_raw.items():
+        if not isinstance(identity, str) or not _EVENT_IDENTITY_RE.fullmatch(identity):
+            raise RevenueCloseoutInputError("feedback_cursor contains an invalid event identity")
+        if not isinstance(entry, dict):
+            raise RevenueCloseoutInputError("feedback_cursor event entry must be an object")
+        at = _parse_timestamp(
+            entry.get("at"), field="feedback_cursor event at", allow_none=False
+        )
+        version = entry.get("version")
+        if not isinstance(version, str) or not version or len(version) > 96:
+            raise RevenueCloseoutInputError("feedback_cursor event version is invalid")
+        seen[identity] = {"at": at, "version": version}
+    return {"through_at": through, "seen_events": seen}
+
+
+def _cursor_payload(cursor: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "through_at": _iso_or_none(cursor["through_at"]),
+        "seen_events": {
+            identity: {
+                "at": _iso_or_none(entry["at"]),
+                "version": entry["version"],
+            }
+            for identity, entry in sorted(cursor["seen_events"].items())
+        },
+    }
+
+
 def _validate_item(raw: Any) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise RevenueCloseoutInputError("each closeout item must be an object")
@@ -151,11 +201,11 @@ def _validate_item(raw: Any) -> dict[str, Any]:
             "currency must be an uppercase 2-12 character code"
         )
     amount = _positive_amount(raw.get("advertised_amount"))
-    last_seen = _parse_timestamp(
-        raw.get("last_seen_at"), field="last_seen_at", allow_none=False
+    feedback_cursor = _validate_feedback_cursor(
+        raw.get("feedback_cursor"), raw.get("last_seen_at")
     )
-    if last_seen > datetime.now(timezone.utc) + timedelta(minutes=5):
-        raise RevenueCloseoutInputError("last_seen_at must not be in the future")
+    if feedback_cursor["through_at"] > datetime.now(timezone.utc) + timedelta(minutes=5):
+        raise RevenueCloseoutInputError("feedback cursor must not be in the future")
     settlement_url = raw.get("settlement_followup_url")
     if settlement_url is not None:
         if not isinstance(settlement_url, str):
@@ -183,7 +233,7 @@ def _validate_item(raw: Any) -> dict[str, Any]:
         "operator_login": operator_login.strip().casefold(),
         "advertised_amount": amount,
         "currency": currency,
-        "last_seen_at": last_seen,
+        "feedback_cursor": feedback_cursor,
         "settlement_followup_url": settlement_url,
         "expected_head_sha": expected_head,
     }
@@ -243,6 +293,7 @@ def _collect_feedback(
     endpoints = (
         ("review", f"https://api.github.com/repos/{repo}/pulls/{number}/reviews"),
         ("comment", f"https://api.github.com/repos/{repo}/issues/{number}/comments"),
+        ("review_comment", f"https://api.github.com/repos/{repo}/pulls/{number}/comments"),
     )
     for kind, url in endpoints:
         for page in range(1, max_pages + 1):
@@ -272,18 +323,31 @@ def _collect_feedback(
                     raise RevenueCloseoutError(
                         f"GitHub maintainer {kind} omitted a timestamp"
                     )
+                raw_id = event.get("id")
+                if isinstance(raw_id, bool) or not isinstance(raw_id, int) or raw_id <= 0:
+                    raise RevenueCloseoutError(
+                        f"GitHub maintainer {kind} omitted a stable numeric id"
+                    )
                 state = "COMMENTED"
                 if kind == "review":
                     raw_state = event.get("state")
                     if not isinstance(raw_state, str):
                         raise RevenueCloseoutError("GitHub review omitted state")
                     state = raw_state.upper()
+                identity = f"{kind}:{raw_id}"
+                version = (
+                    f"{state}|{_iso_or_none(timestamp)}"
+                    if kind == "review"
+                    else _iso_or_none(timestamp)
+                )
                 results.append(
                     {
                         "kind": kind,
                         "state": state,
                         "author": _safe_user_login(event.get("user")),
                         "at": timestamp,
+                        "event_identity": identity,
+                        "event_version": version,
                         "url": event.get("html_url")
                         if isinstance(event.get("html_url"), str)
                         else None,
@@ -295,7 +359,7 @@ def _collect_feedback(
             raise RevenueCloseoutError(
                 f"GitHub {kind} pagination exceeded max_pages for {repo}#{number}"
             )
-    results.sort(key=lambda item: item["at"])
+    results.sort(key=lambda item: (item["at"], item["event_identity"], item["event_version"]))
     return results
 
 
@@ -326,11 +390,18 @@ def scan_paid_pr(
     *,
     session: Any = requests,
     max_pages: int = 10,
+    scan_started_at: datetime | None = None,
 ) -> dict[str, Any]:
     """Read one paid-work PR and return a safe closeout action receipt."""
     item = _validate_item(raw_item)
     if isinstance(max_pages, bool) or not isinstance(max_pages, int) or max_pages <= 0:
         raise RevenueCloseoutInputError("max_pages must be positive")
+    if scan_started_at is None:
+        scan_started = datetime.now(timezone.utc)
+    elif not isinstance(scan_started_at, datetime) or scan_started_at.tzinfo is None or scan_started_at.utcoffset() is None:
+        raise RevenueCloseoutInputError("scan_started_at must be timezone-aware")
+    else:
+        scan_started = scan_started_at.astimezone(timezone.utc)
     token = token or GITHUB_TOKEN
     headers = _headers(token)
     repo = item["repo"]
@@ -375,6 +446,7 @@ def scan_paid_pr(
             "new_feedback_count": 0,
             "current_change_request_count": None,
             "latest_feedback": None,
+            "next_cursor": _cursor_payload(item["feedback_cursor"]),
             "settlement_followup_url": item["settlement_followup_url"],
             "cash_status": "not_inferred",
         }
@@ -408,17 +480,40 @@ def scan_paid_pr(
         for event in review_decisions.values()
         if event["state"] == "CHANGES_REQUESTED"
     ]
-    last_seen = item["last_seen_at"]
-    # A timestamp-only cursor cannot uniquely identify GitHub events.  Replay
-    # equality conservatively so two distinct events stamped at the same instant
-    # cannot cause one to be silently lost.
-    new_feedback = [event for event in feedback if event["at"] >= last_seen]
+    cursor = item["feedback_cursor"]
+    through_at = cursor["through_at"]
+    seen_events = cursor["seen_events"]
+
+    def is_new_feedback(event: dict[str, Any]) -> bool:
+        if event["at"] < through_at:
+            return False
+        prior = seen_events.get(event["event_identity"])
+        return prior is None or prior["at"] != event["at"] or prior["version"] != event["event_version"]
+
+    new_feedback = [event for event in feedback if is_new_feedback(event)]
     response_feedback = [
         event
         for event in new_feedback
-        if event["kind"] == "comment"
+        if event["kind"] in {"comment", "review_comment"}
         or (event["kind"] == "review" and event["state"] == "COMMENTED")
     ]
+
+    safe_cutoff = scan_started - _CURSOR_SAFETY_LAG
+    next_through = max(through_at, safe_cutoff)
+    next_seen: dict[str, dict[str, Any]] = {
+        identity: entry
+        for identity, entry in seen_events.items()
+        if entry["at"] >= next_through
+    }
+    for event in feedback:
+        if event["at"] >= next_through:
+            next_seen[event["event_identity"]] = {
+                "at": event["at"],
+                "version": event["event_version"],
+            }
+    if len(next_seen) > _MAX_CURSOR_SEEN_EVENTS:
+        raise RevenueCloseoutError("next feedback cursor would exceed the seen-event bound")
+    next_cursor = {"through_at": next_through, "seen_events": next_seen}
 
     if merged_at is not None:
         safe_state = "MERGED"
@@ -473,8 +568,10 @@ def scan_paid_pr(
             "state": latest["state"],
             "author": latest["author"],
             "at": _iso_or_none(latest["at"]),
+            "event_identity": latest["event_identity"],
             "url": latest["url"],
         },
+        "next_cursor": _cursor_payload(next_cursor),
         "settlement_followup_url": item["settlement_followup_url"],
         "cash_status": "not_inferred",
     }
@@ -486,12 +583,19 @@ def build_closeout_queue(
     *,
     session: Any = requests,
     max_pages: int = 10,
+    scan_started_at: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Scan and deterministically prioritize paid-work closeout items."""
     if not isinstance(items, list):
         raise RevenueCloseoutInputError("items must be a list")
     if isinstance(max_pages, bool) or not isinstance(max_pages, int) or max_pages <= 0:
         raise RevenueCloseoutInputError("max_pages must be positive")
+    if scan_started_at is None:
+        batch_scan_started = datetime.now(timezone.utc)
+    elif not isinstance(scan_started_at, datetime) or scan_started_at.tzinfo is None or scan_started_at.utcoffset() is None:
+        raise RevenueCloseoutInputError("scan_started_at must be timezone-aware")
+    else:
+        batch_scan_started = scan_started_at.astimezone(timezone.utc)
     seen: set[tuple[str, int]] = set()
     manifest_order: dict[tuple[str, int], int] = {}
     results: list[dict[str, Any]] = []
@@ -505,7 +609,13 @@ def build_closeout_queue(
         seen.add(identity)
         manifest_order[identity] = index
         results.append(
-            scan_paid_pr(raw, token, session=session, max_pages=max_pages)
+            scan_paid_pr(
+                raw,
+                token,
+                session=session,
+                max_pages=max_pages,
+                scan_started_at=batch_scan_started,
+            )
         )
 
     def sort_key(result: dict[str, Any]) -> tuple[int, int]:
