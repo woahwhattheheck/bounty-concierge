@@ -42,6 +42,8 @@ def _normalise_tags(raw: Dict) -> Dict[str, List[str]]:
     """
     result: Dict[str, List[str]] = {}
     for skill, value in raw.items():
+        if not isinstance(skill, str) or not skill.strip():
+            continue
         if isinstance(value, list):
             result[skill] = value
         elif isinstance(value, dict):
