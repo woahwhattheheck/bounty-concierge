@@ -193,7 +193,20 @@ class TestTransferRTC(unittest.TestCase):
         mock_post.return_value = {"status": "pending", "pending_id": "abc123"}
         result = wallet_helper.transfer_rtc("alice", "bob", 10.0, admin_key="secret")
         self.assertEqual(result["status"], "pending")
-        mock_post.assert_called_once()
+        mock_post.assert_called_once_with(
+            "/wallet/transfer",
+            data={"from_miner": "alice", "to_miner": "bob", "amount_rtc": 10.0},
+            headers={"X-Admin-Key": "secret"},
+        )
+
+    @patch("concierge.wallet_helper._post")
+    def test_invalid_amounts_fail_before_post(self, mock_post):
+        for amount in (0, -1, float("nan"), float("inf"), float("-inf"), True, "1", None):
+            with self.subTest(amount=repr(amount)):
+                result = wallet_helper.transfer_rtc("alice", "bob", amount, admin_key="secret")
+                self.assertIn("error", result)
+                self.assertIn("finite positive", result["error"])
+        mock_post.assert_not_called()
 
     @patch("concierge.wallet_helper._post")
     def test_transfer_with_env_key(self, mock_post):
