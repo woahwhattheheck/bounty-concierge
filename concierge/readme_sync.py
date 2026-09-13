@@ -200,7 +200,7 @@ def update_readme(readme_text: str, section: str) -> str:
     """Replace the contents between the unique sentinels with ``section``.
 
     Returns the updated text. Raises ValueError if either sentinel is
-    missing, duplicated, or out of order.
+    missing, duplicated, out of order, or injected by generated content.
     """
     start_count = readme_text.count(START_MARKER)
     end_count = readme_text.count(END_MARKER)
@@ -216,6 +216,10 @@ def update_readme(readme_text: str, section: str) -> str:
     if readme_text.index(START_MARKER) > readme_text.index(END_MARKER):
         raise ValueError(
             "README Open Bounties sentinels are out of order."
+        )
+    if START_MARKER in section or END_MARKER in section:
+        raise ValueError(
+            "Generated README section must not contain Open Bounties sentinels."
         )
 
     pattern = re.compile(
