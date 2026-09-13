@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from typing import Optional
 from unittest.mock import patch
 
 from concierge.portfolio_allocator import (
@@ -17,7 +18,7 @@ def row(
     effort: str,
     probability: str = "1",
     skill: str = "0.5",
-    rank: int | None = None,
+    rank: Optional[int] = None,
 ):
     if rank is None:
         rank = index + 1
@@ -40,7 +41,7 @@ def row(
     }
 
 
-def candidate(deadline: str, *, group: str | None = None, secret: str = ""):
+def candidate(deadline: str, *, group: Optional[str] = None, secret: str = ""):
     value = {
         "hours_until_deadline": deadline,
         "snapshot": {"body": secret},
