@@ -1,18 +1,20 @@
 # SPDX-License-Identifier: MIT
-"""Evidence-bound cash reconciliation with transaction and temporal authority fences.
+"""Evidence-bound cash reconciliation with identity and temporal authority fences.
 
 The established settlement implementation lives in ``_revenue_settlement_base``.
 This public module preserves that API while adding two independent authority
-fences around cash recognition:
+fences around production cash recognition:
 
 * full wallet-bound row hashes select evidence, while explicit transaction IDs
   stop one transfer from being represented by multiple non-identical rows; and
-* every bound cash-bearing transfer must carry canonical provider time and fall
-  inside the verifier-owned interval from the GitHub merge through current UTC.
+* producer-shaped closeout evidence must prove that selected cash happened no
+  earlier than the merge and no later than verifier-owned current UTC.
 
-The current-time boundary is deliberately internal. Callers cannot supply an
-``as_of`` value to backdate verification and make pre-merge or future evidence
-look valid.
+The production time boundary is deliberately internal. Callers cannot supply an
+``as_of`` value to backdate verification. Historical low-level fixture/tool rows
+that contain none of the ``revenue_closeout`` producer fields keep their legacy
+shape; any producer marker (including ``merged_at`` itself) activates the strict
+chronology contract.
 """
 
 from __future__ import annotations
@@ -35,80 +37,174 @@ _original_bound_history_row = _base._bound_history_row
 _original_reconcile_cash = _base.reconcile_cash
 _original_query_canonical_history = _base._query_canonical_history
 
-_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$")
+_TEMPORAL_UTC_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$"
+)
 _MAX_EPOCH_SECONDS = 253402300799
+# ``revenue_closeout.scan_paid_pr`` emits this richer shape. The low-level
+# reconciliation API historically also accepted deliberately minimal rows in
+# tests and tooling. Requiring chronology for any producer marker preserves
+# that API while making the production closeout/economics path fail closed.
+_PRODUCER_CLOSEOUT_FIELDS = frozenset(
+    {
+        "canonical_url",
+        "head_sha",
+        "merged_at",
+        "next_action",
+        "reason",
+        "settlement_followup_url",
+    }
+)
 
 
 def _trusted_utc_now() -> datetime:
-    """Return verifier-owned current UTC for temporal cash authority."""
+    """Return verifier-owned current UTC; never supplied by request input."""
     return datetime.now(timezone.utc)
 
 
-def _parse_utc_text(value: Any, *, field: str) -> datetime:
-    if type(value) is not str or not _UTC_RE.fullmatch(value):
-        raise ValueError(
+def _verified_now() -> datetime:
+    current = _trusted_utc_now()
+    if (
+        not isinstance(current, datetime)
+        or current.tzinfo is None
+        or current.utcoffset() is None
+    ):
+        raise RevenueSettlementEvidenceError(
+            "trusted verifier clock did not return timezone-aware UTC time"
+        )
+    return current.astimezone(timezone.utc)
+
+
+def _parse_canonical_utc_text(value: Any, *, field: str) -> datetime:
+    if type(value) is not str or not _TEMPORAL_UTC_RE.fullmatch(value):
+        raise RevenueSettlementEvidenceError(
             f"{field} must be canonical UTC with at most microsecond precision"
         )
     try:
         parsed = datetime.fromisoformat(value[:-1] + "+00:00")
     except ValueError as exc:
-        raise ValueError(f"{field} must be a canonical UTC timestamp") from exc
+        raise RevenueSettlementEvidenceError(
+            f"{field} must be a valid canonical UTC timestamp"
+        ) from exc
     if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise ValueError(f"{field} must include a timezone")
+        raise RevenueSettlementEvidenceError(
+            f"{field} must include a timezone"
+        )
     return parsed.astimezone(timezone.utc)
 
 
-def _parse_history_time(value: Any) -> datetime:
+def _parse_history_timestamp(value: Any, *, field: str) -> datetime:
     if isinstance(value, bool):
         raise RevenueSettlementEvidenceError(
-            "wallet history transfer timestamp must be canonical UTC text or Unix seconds"
+            f"{field} must be canonical UTC text or exact Unix seconds"
         )
     if isinstance(value, int):
         if value < 0 or value > _MAX_EPOCH_SECONDS:
             raise RevenueSettlementEvidenceError(
-                "wallet history transfer timestamp Unix seconds are out of range"
+                f"{field} Unix seconds are out of range"
             )
         try:
             return datetime.fromtimestamp(value, tz=timezone.utc)
         except (OverflowError, OSError, ValueError) as exc:
             raise RevenueSettlementEvidenceError(
-                "wallet history transfer timestamp Unix seconds are out of range"
+                f"{field} Unix seconds are out of range"
             ) from exc
-    try:
-        return _parse_utc_text(value, field="wallet history transfer timestamp")
-    except ValueError as exc:
-        raise RevenueSettlementEvidenceError(str(exc)) from exc
-
-
-def _iso_utc(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat(timespec="auto").replace(
-        "+00:00", "Z"
-    )
+    return _parse_canonical_utc_text(value, field=field)
 
 
 def _history_transfer_time(row: dict[str, Any]) -> datetime:
-    values = [row[key] for key in ("timestamp", "created_at") if key in row]
-    if not values:
+    parsed: list[tuple[str, datetime]] = []
+    for key in ("timestamp", "created_at"):
+        if key in row:
+            parsed.append(
+                (
+                    key,
+                    _parse_history_timestamp(
+                        row[key],
+                        field=f"wallet history {key}",
+                    ),
+                )
+            )
+    if not parsed:
         raise RevenueSettlementEvidenceError(
-            "wallet history row omitted transfer timestamp"
+            "bound wallet history row omitted transfer timestamp"
         )
-    parsed = [_parse_history_time(value) for value in values]
-    if len(set(parsed)) != 1:
+    transfer_time = parsed[0][1]
+    if any(value != transfer_time for _, value in parsed[1:]):
         raise RevenueSettlementEvidenceError(
-            "wallet history row has conflicting transfer timestamps"
+            "wallet history row contains conflicting transfer timestamps"
         )
-    return parsed[0]
+    return transfer_time
 
 
-def _closeout_merge_time(raw: dict[str, Any], *, repo: str, pr: int) -> datetime:
-    if "merged_at" not in raw:
-        raise RevenueSettlementInputError(
-            f"{repo}#{pr} payment evidence requires merged_at from revenue_closeout"
+def _requires_temporal_attribution(raw: dict[str, Any]) -> bool:
+    return any(field in raw for field in _PRODUCER_CLOSEOUT_FIELDS)
+
+
+def _raw_closeout_index(closeout_items: Any) -> dict[tuple[str, int], dict[str, Any]]:
+    # The canonical reconciler has already validated the container and identity
+    # before this helper runs; repeat only the projection needed to retain
+    # producer metadata that the historical base normalizer omits.
+    indexed: dict[tuple[str, int], dict[str, Any]] = {}
+    for raw in closeout_items:
+        repo, pr = _identity(raw)
+        indexed[(repo.casefold(), pr)] = raw
+    return indexed
+
+
+def _validate_temporal_attribution(
+    closeout_items: Any,
+    history: Any,
+    bindings: Any,
+    *,
+    history_wallet: str,
+) -> None:
+    """Fence selected production cash to merge <= transfer <= trusted now."""
+    raw_closeout = _raw_closeout_index(closeout_items)
+    bound = _binding_map(bindings)
+    history_by_hash = _history_index(history, wallet=history_wallet)
+
+    targets: list[tuple[list[str], dict[str, Any]]] = []
+    for key, selected in bound.items():
+        raw = raw_closeout.get(key)
+        if raw is not None and _requires_temporal_attribution(raw):
+            targets.append((selected, raw))
+    if not targets:
+        return
+
+    # One verifier-owned sample per reconciliation prevents a moving time
+    # boundary across rows/items and exposes no caller-controlled ``as_of``.
+    trusted_now = _verified_now()
+    for selected, raw in targets:
+        repo = raw["repo"]
+        pr = raw["pr"]
+        if "merged_at" not in raw:
+            raise RevenueSettlementEvidenceError(
+                f"{repo}#{pr} bound production closeout omitted merged_at"
+            )
+        merged_at = _parse_canonical_utc_text(
+            raw["merged_at"],
+            field=f"{repo}#{pr} merged_at",
         )
-    try:
-        return _parse_utc_text(raw.get("merged_at"), field=f"{repo}#{pr} merged_at")
-    except ValueError as exc:
-        raise RevenueSettlementInputError(str(exc)) from exc
+        if merged_at > trusted_now:
+            raise RevenueSettlementEvidenceError(
+                f"{repo}#{pr} merge timestamp is in the future"
+            )
+        for fingerprint in selected:
+            history_row = history_by_hash.get(fingerprint)
+            if history_row is None:
+                # The canonical reconciler already emits the authoritative
+                # absent-row error before this temporal pass.
+                continue
+            transfer_at = _history_transfer_time(history_row)
+            if transfer_at < merged_at:
+                raise RevenueSettlementEvidenceError(
+                    f"{repo}#{pr} bound transfer predates merge"
+                )
+            if transfer_at > trusted_now:
+                raise RevenueSettlementEvidenceError(
+                    f"{repo}#{pr} bound transfer timestamp is in the future"
+                )
 
 
 def _transaction_identity(
@@ -163,10 +259,6 @@ def _bound_history_row(
         wallet=wallet,
         history_source=history_source,
     )
-    # A bindable cash row without provider time can never prove that the cash
-    # belongs to the merged work. This includes canonical rows whose provider
-    # omitted status (the historical compatibility path treats them confirmed).
-    transfer_at = _history_transfer_time(row)
     if row.get("type") == "transfer_in":
         transaction_id = _canonical_incoming_transaction_id(row)
     else:
@@ -175,11 +267,7 @@ def _bound_history_row(
             ("tx_hash", "tx_id"),
             required=False,
         )
-    return {
-        **parsed,
-        "transaction_id": transaction_id,
-        "transfer_at": _iso_utc(transfer_at),
-    }
+    return {**parsed, "transaction_id": transaction_id}
 
 
 def inventory_history(
@@ -224,7 +312,6 @@ def inventory_history(
                     recipient_matches_wallet=parsed["recipient_matches_wallet"],
                     status=parsed["status"],
                     evidence_kind=parsed["evidence_kind"],
-                    transfer_at=parsed["transfer_at"],
                 )
         result.append(entry)
     return result
@@ -257,78 +344,6 @@ def _selected_transaction_ids(
     return identities
 
 
-def _validate_temporal_authority(
-    closeout_items: Any,
-    history: Any,
-    bindings: Any,
-    *,
-    history_wallet: str,
-    history_source: str,
-) -> None:
-    """Require merge <= transfer <= verifier-owned current UTC for bound cash."""
-    now = _trusted_utc_now()
-    if (
-        not isinstance(now, datetime)
-        or now.tzinfo is None
-        or now.utcoffset() is None
-    ):
-        raise RevenueSettlementInputError(
-            "trusted current time must be timezone-aware"
-        )
-    now = now.astimezone(timezone.utc)
-
-    items = _closeout_items(closeout_items)
-    bound = _binding_map(bindings)
-    history_by_hash = _history_index(history, wallet=history_wallet)
-
-    raw_by_key: dict[tuple[str, int], dict[str, Any]] = {}
-    if not isinstance(closeout_items, list):
-        # _closeout_items above owns the canonical shape error.
-        raise RevenueSettlementInputError("closeout items must be a list")
-    for raw, item in zip(closeout_items, items):
-        if isinstance(raw, dict):
-            raw_by_key[item["key"]] = raw
-
-    for item in items:
-        selected = bound.get(item["key"])
-        if selected is None:
-            continue
-        # Preserve the established authoritative errors for unmerged/non-RTC
-        # items. Temporal authority applies only once the row is otherwise
-        # eligible to become cash.
-        if item["state"] != "MERGED" or item["currency"] != "RTC":
-            continue
-        raw_item = raw_by_key[item["key"]]
-        merged_at = _closeout_merge_time(
-            raw_item,
-            repo=item["repo"],
-            pr=item["pr"],
-        )
-        if merged_at > now:
-            raise RevenueSettlementEvidenceError(
-                f"{item['repo']}#{item['pr']} merge timestamp is in the future"
-            )
-        for fingerprint in selected:
-            raw = history_by_hash.get(fingerprint)
-            if raw is None:
-                # The canonical reconciler owns the absent-row error.
-                continue
-            parsed = _bound_history_row(
-                raw,
-                wallet=history_wallet,
-                history_source=history_source,
-            )
-            transfer_at = _parse_history_time(parsed["transfer_at"])
-            if transfer_at < merged_at:
-                raise RevenueSettlementEvidenceError(
-                    f"{item['repo']}#{item['pr']} bound transfer predates merged work"
-                )
-            if transfer_at > now:
-                raise RevenueSettlementEvidenceError(
-                    f"{item['repo']}#{item['pr']} bound transfer timestamp is in the future"
-                )
-
-
 def reconcile_cash(
     closeout_items: Any,
     history: Any,
@@ -338,20 +353,13 @@ def reconcile_cash(
     history_wallet: str,
     history_source: str,
 ) -> list[dict[str, Any]]:
-    """Reconcile exact rows, then enforce temporal and transaction uniqueness."""
+    """Reconcile exact rows, then reject identity reuse and temporal mismatch."""
     _base._bound_history_row = globals()["_bound_history_row"]
     results = _original_reconcile_cash(
         closeout_items,
         history,
         bindings,
         wallet=wallet,
-        history_wallet=history_wallet,
-        history_source=history_source,
-    )
-    _validate_temporal_authority(
-        closeout_items,
-        history,
-        bindings,
         history_wallet=history_wallet,
         history_source=history_source,
     )
@@ -367,6 +375,12 @@ def reconcile_cash(
                 "one wallet transaction identity cannot be counted more than once"
             )
         seen.add(transaction_id)
+    _validate_temporal_attribution(
+        closeout_items,
+        history,
+        bindings,
+        history_wallet=history_wallet,
+    )
     return results
 
 
