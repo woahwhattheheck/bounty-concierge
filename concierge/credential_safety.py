@@ -38,14 +38,28 @@ _DIRECT_CUSTODY_PREFIX_RE = re.compile(
     r"(?i)\b(?:your|runner|github|account|wallet|session)"
     r"(?:[-_\s]+\w+){0,2}[-_\s]*$"
 )
+_NEGATION_PREFIX_RE = re.compile(
+    r"(?i)(?:"
+    r"do\s+not|don't|never|must\s+not|should\s+not|shall\s+not|"
+    r"cannot|can't|not\s+required\s+to|no\s+need\s+to|do\s+not\s+need\s+to"
+    r")\s+(?:\w+\s+){0,4}$"
+)
+
+
+def _has_unnegated_action(pattern: re.Pattern[str], text: str) -> bool:
+    for match in pattern.finditer(text):
+        prefix = text[max(0, match.start() - 80) : match.start()]
+        if not _NEGATION_PREFIX_RE.search(prefix):
+            return True
+    return False
 
 
 def credential_gate_signal_types(texts: Iterable[str]) -> list[str]:
     """Return generic unsafe-credential signal types without echoing input text.
 
     The detector deliberately distinguishes ordinary login/OAuth product prose
-    from contribution terms that ask a worker to disclose a credential or to
-    verify/authenticate credential material at an external destination.
+    and explicit credential prohibitions from contribution terms that ask a
+    worker to disclose a credential or verify credential material externally.
     """
     signals: set[str] = set()
     for text in texts:
@@ -59,10 +73,10 @@ def credential_gate_signal_types(texts: Iterable[str]) -> list[str]:
             start = max(0, match.start() - 140)
             end = min(len(text), match.end() + 220)
             window = text[start:end]
-            if _DISCLOSURE_ACTION_RE.search(window):
+            if _has_unnegated_action(_DISCLOSURE_ACTION_RE, window):
                 signals.add("credential_disclosure")
             if (
-                _VERIFICATION_ACTION_RE.search(window)
+                _has_unnegated_action(_VERIFICATION_ACTION_RE, window)
                 and (
                     _DOMAIN_RE.search(window)
                     or _EXTERNAL_DESTINATION_RE.search(window)
