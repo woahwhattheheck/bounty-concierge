@@ -16,6 +16,18 @@ class PayoutLookupError(RuntimeError):
     """Raised when payout status cannot be determined reliably."""
 
 
+def _validate_wallet_id(wallet_id: object) -> str:
+    """Return one unambiguous wallet identifier or fail before network I/O."""
+    if (
+        type(wallet_id) is not str
+        or not wallet_id
+        or wallet_id != wallet_id.strip()
+        or any(char.isspace() or not char.isprintable() for char in wallet_id)
+    ):
+        raise PayoutLookupError("wallet identifier was invalid")
+    return wallet_id
+
+
 def _payload_list(data, key: str) -> List[dict]:
     """Normalize supported API payload shapes without certifying bad data."""
     if isinstance(data, list):
@@ -55,6 +67,7 @@ def _check_transfers(
     node_url: str | None = None,
 ) -> List[dict]:
     """Fetch one payout endpoint, distinguishing empty data from failure."""
+    wallet_id = _validate_wallet_id(wallet_id)
     base = (node_url or config.RUSTCHAIN_NODE_URL).rstrip("/")
     url = f"{base}/wallet/{endpoint}"
     try:
