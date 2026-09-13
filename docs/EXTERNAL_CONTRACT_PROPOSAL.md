@@ -25,6 +25,14 @@ usable must build it from the original snapshot + qualification receipt at a
 trusted current time, which calls
 `verify_contract_qualification_receipt(...)` and re-evaluates freshness.
 
+The production CLI owns this clock boundary itself: it samples current UTC
+immediately before qualification verification and intentionally provides no
+`--as-of` override. Library callers may still call
+`build_external_contract_proposal(..., as_of=...)` for controlled integration
+and deterministic tests, but that value is authority-bearing and must come from
+a trusted host clock rather than marketplace/customer data or an end-user
+supplied timestamp.
+
 ## What is bound
 
 The builder refuses a stale or non-`ACTIONABLE` qualification and then binds:
@@ -98,12 +106,15 @@ python -m concierge.contract_proposal \
   qualification-snapshot.json \
   qualification-receipt.json \
   proposal-brief.json \
-  --as-of 2026-09-13T13:00:00Z \
   --json
 ```
 
-`--as-of` is passed into the qualification verifier as trusted current time.
-Production callers must not let an untrusted marketplace payload choose it.
+The CLI samples trusted current UTC from the running process and passes that
+value into the qualification verifier. It does not accept a caller-selected
+historical/future `--as-of` value, because doing so would let stale listing or
+availability evidence be replayed as current. If deterministic historical
+analysis is required, use the library API in a controlled context and treat the
+explicit `as_of` input as authority-bearing rather than as marketplace data.
 
 File inputs are read from already-opened regular-file descriptors with a 1 MiB
 cap. On platforms with `O_NOFOLLOW`, symlink opens are refused. Stdin is also
@@ -139,8 +150,9 @@ The builder fails closed for, among other cases:
 * duplicate proposal claims, deliverables or milestones;
 * deliverables omitted from milestones or assigned more than once;
 * milestone order regression or a due day beyond the qualified delivery window;
-* undeclared brief fields; and
-* malformed, oversized or non-regular CLI inputs.
+* undeclared brief fields;
+* malformed, oversized or non-regular CLI inputs; and
+* attempts to supply a caller-selected CLI verification clock.
 
 These fences are deliberate: the module should make the revenue pipeline faster
 without turning an internally consistent JSON blob into external authority.
