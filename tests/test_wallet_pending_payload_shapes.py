@@ -26,3 +26,15 @@ def test_pending_transfers_rejects_malformed_wrapped_shapes():
         result = _pending({"pending": value})
         assert result == []
         assert isinstance(result, list)
+
+
+def test_pending_transfers_rejects_non_object_list_entries():
+    malformed = [
+        ["not-an-object"],
+        [{"pending_id": "p1"}, 7],
+        {"pending": ["not-an-object"]},
+        {"pending": [{"pending_id": "p2"}, None]},
+    ]
+
+    for payload in malformed:
+        assert _pending(payload) == []
