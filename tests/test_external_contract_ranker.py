@@ -69,12 +69,15 @@ def good_verify(snapshot, rec, *, as_of):
 
 class ExternalContractRankerTests(unittest.TestCase):
     def setUp(self):
+        self.now_patch = mock.patch.object(ranker, "_current_utc", return_value="2026-09-13T12:40:00Z")
+        self.now_patch.start()
+        self.addCleanup(self.now_patch.stop)
         self.verify_patch = mock.patch.object(ranker, "verify_contract_qualification_receipt", side_effect=good_verify)
         self.verify = self.verify_patch.start()
         self.addCleanup(self.verify_patch.stop)
 
     def rank(self, rows):
-        return ranker.rank_external_contracts(rows, as_of="2026-09-13T12:40:00Z")
+        return ranker.rank_external_contracts(rows)
 
     def test_partitions_arbitrary_native_currencies_without_global_winner(self):
         result = self.rank([
@@ -199,11 +202,27 @@ class ExternalContractRankerTests(unittest.TestCase):
         with self.assertRaises(ranker.ExternalContractRankInputError):
             self.rank([{}] * 501)
 
-    def test_as_of_is_canonical_utc(self):
-        with self.assertRaises(ranker.ExternalContractRankInputError):
-            ranker.rank_external_contracts([], as_of="2026-09-13T08:40:00-04:00")
-        with self.assertRaises(ranker.ExternalContractRankInputError):
-            ranker.rank_external_contracts([], as_of="2026-09-13T12:40:00.123Z")
+    def test_public_api_rejects_caller_selected_as_of(self):
+        with self.assertRaises(TypeError):
+            ranker.rank_external_contracts([], as_of="2026-09-13T12:00:00Z")
+
+    def test_historical_timestamp_cannot_resurrect_stale_qualification(self):
+        self.verify_patch.stop()
+        def verifier(snapshot, rec, *, as_of):
+            if as_of != "2026-09-13T12:00:00Z":
+                raise ContractQualificationInputError("qualification no longer current")
+            return good_verify(snapshot, rec, as_of=as_of)
+        patch = mock.patch.object(ranker, "verify_contract_qualification_receipt", side_effect=verifier)
+        verifier_mock = patch.start(); self.addCleanup(patch.stop)
+        result = self.rank([candidate("https://market.example/expired")])
+        self.assertEqual(result["ranked_count"], 0)
+        self.assertEqual(result["excluded"][0]["reason_code"], "QUALIFICATION_INVALID_OR_STALE")
+        self.assertEqual(verifier_mock.call_args.kwargs["as_of"], "2026-09-13T12:40:00Z")
+        with self.assertRaises(TypeError):
+            ranker.rank_external_contracts(
+                [candidate("https://market.example/expired")],
+                as_of="2026-09-13T12:00:00Z",
+            )
 
     def test_ranking_digest_is_deterministic_and_estimate_sensitive(self):
         first = self.rank([candidate("https://market.example/a", effort="10")])
