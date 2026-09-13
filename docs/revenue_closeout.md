@@ -8,9 +8,13 @@ claiming new bounties.
 The scanner re-reads the canonical GitHub pull request, validates the expected author
 and optional exact head, then reads maintainer reviews and issue comments. It only
 routes new human feedback from OWNER, MEMBER, or COLLABORATOR accounts after the
-manifest's `last_seen_at` boundary. `CHANGES_REQUESTED` is prioritized as repair work;
-maintainer comments and COMMENTED reviews are routed for response; approvals do not
-create reply spam. A moved expected head fails closed before feedback is consumed.
+manifest's `last_seen_at` boundary for notification freshness. Review authority is
+separate: the latest decision-bearing review per maintainer is evaluated regardless of
+cursor age, so an unresolved `CHANGES_REQUESTED` remains repair work until that same
+maintainer later APPROVES or the review is DISMISSED. COMMENTED reviews do not clear a
+change request. Maintainer comments and COMMENTED reviews are routed for response only
+when new; approvals do not create reply spam. A moved expected head fails closed before
+feedback is consumed.
 
 Merged PRs are routed either to a missing settlement follow-up or to monitoring an
 already-recorded follow-up URL. Closed-unmerged PRs are routed for investigation.
