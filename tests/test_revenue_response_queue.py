@@ -100,12 +100,16 @@ class Fetcher:
 
 class RevenueResponseQueueTests(unittest.TestCase):
     def compile(self, rows, provider, **kwargs):
-        return module.compile_revenue_response_queue(
-            rows,
-            provider,
-            now=NOW,
-            **kwargs,
-        )
+        original_clock = module._current_utc
+        module._current_utc = lambda: NOW
+        try:
+            return module.compile_revenue_response_queue(
+                rows,
+                provider,
+                **kwargs,
+            )
+        finally:
+            module._current_utc = original_clock
 
     def test_human_reply_after_latest_outbound_is_top_action(self):
         provider = Fetcher({
@@ -681,6 +685,15 @@ class RevenueResponseQueueTests(unittest.TestCase):
         })
         with self.assertRaises(module.RevenueResponseQueueError):
             self.compile([manifest_row()], provider)
+
+    def test_public_api_does_not_accept_caller_selected_now(self):
+        provider = Fetcher({THREAD: snapshot(anchor())})
+        with self.assertRaises(TypeError):
+            module.compile_revenue_response_queue(
+                [manifest_row()],
+                provider,
+                now=NOW,
+            )
 
     def test_same_timestamp_order_uses_provider_sequence_not_lexical_id(self):
         provider = Fetcher({
