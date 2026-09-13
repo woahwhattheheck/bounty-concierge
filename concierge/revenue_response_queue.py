@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import re
-from typing import Any, Callable, Iterable
+from typing import Any, Callable
 
 
 class RevenueResponseQueueError(ValueError):
@@ -118,12 +118,13 @@ def _canonical_email(value: Any, *, field: str) -> str:
     return f"{local.casefold()}@{domain}"
 
 
-def _utc_now(value: Any) -> datetime:
-    if not isinstance(value, datetime):
-        raise RevenueResponseQueueError("now must be a datetime")
-    if value.tzinfo is None or value.utcoffset() is None:
-        raise RevenueResponseQueueError("now must include a timezone")
-    return value.astimezone(timezone.utc)
+def _current_utc() -> datetime:
+    """Return verifier-owned current UTC time.
+
+    Kept as a tiny private seam so tests can patch it without making production
+    freshness or SLA decisions caller-selectable.
+    """
+    return datetime.now(timezone.utc)
 
 
 def _timestamp(value: Any, *, field: str) -> datetime:
@@ -538,7 +539,6 @@ def compile_revenue_response_queue(
     manifest: Any,
     fetch_authenticated_thread: Callable[[str], Any],
     *,
-    now: datetime,
     max_snapshot_age_seconds: int = 300,
     auto_ack_grace_hours: int = 24,
 ) -> dict[str, Any]:
@@ -552,7 +552,10 @@ def compile_revenue_response_queue(
     """
     if not callable(fetch_authenticated_thread):
         raise RevenueResponseQueueError("fetch_authenticated_thread must be callable")
-    current = _utc_now(now)
+    current = _current_utc()
+    if not isinstance(current, datetime) or current.tzinfo is None or current.utcoffset() is None:
+        raise RevenueResponseQueueError("verifier clock must return an aware datetime")
+    current = current.astimezone(timezone.utc)
     max_age = _bounded_int(
         max_snapshot_age_seconds,
         field="max_snapshot_age_seconds",
