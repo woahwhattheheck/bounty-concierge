@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from concierge imporut_tracker
+from concierge import payout_tracker
 
 
 def _response(status_code=200, payload=None):
