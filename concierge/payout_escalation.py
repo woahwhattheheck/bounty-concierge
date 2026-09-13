@@ -16,8 +16,10 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation, localcontext
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
+import stat
 from urllib.parse import urlsplit
 from typing import Any, Mapping
 
@@ -398,12 +400,11 @@ def _parse_bound_row(row: dict[str, Any], *, wallet: str, merged_at: datetime, a
         status = "failed"
     else:
         raise PayoutEscalationEvidenceError("wallet history row has unknown payout status")
-    initiated_at = _row_timestamp(row, required=status != "confirmed")
-    if initiated_at is not None:
-        if initiated_at > as_of:
-            raise PayoutEscalationEvidenceError("wallet history row initiation timestamp is in the future")
-        if initiated_at < merged_at:
-            raise PayoutEscalationEvidenceError("bound transfer predates the merged work")
+    initiated_at = _row_timestamp(row, required=True)
+    if initiated_at > as_of:
+        raise PayoutEscalationEvidenceError("wallet history row initiation timestamp is in the future")
+    if initiated_at < merged_at:
+        raise PayoutEscalationEvidenceError("bound transfer predates the merged work")
     return {
         "status": status,
         "tx_hash": txid,
@@ -564,9 +565,23 @@ def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 
 def _load_json(path: str) -> Any:
-    text = Path(path).read_text(encoding="utf-8")
-    if len(text.encode("utf-8")) > _MAX_JSON_BYTES:
-        raise PayoutEscalationInputError("input JSON is too large")
+    flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, flags)
+    try:
+        metadata = os.fstat(fd)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise PayoutEscalationInputError("input JSON must be a regular file")
+        if metadata.st_size > _MAX_JSON_BYTES:
+            raise PayoutEscalationInputError("input JSON is too large")
+        data = os.read(fd, _MAX_JSON_BYTES + 1)
+        if len(data) > _MAX_JSON_BYTES:
+            raise PayoutEscalationInputError("input JSON is too large")
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise PayoutEscalationInputError("input JSON must be UTF-8") from exc
+    finally:
+        os.close(fd)
     return json.loads(text, object_pairs_hook=_reject_duplicate_keys)
 
 
