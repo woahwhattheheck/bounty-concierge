@@ -1,11 +1,10 @@
 # SPDX-License-Identifier: MIT
 """Evidence-bound gate for speculative/unpaid work with a concrete payoff path.
 
-The gate answers a deliberately narrow owner question: should another unpaid unit of
-work be considered when compensation is not yet secured?  It never estimates win
-probability, invents monetary value, authorizes outreach/submission, or recognizes
-cash/revenue.  READY means only that an owner has a current, evidence-bound path to
-review within a bounded free-work budget.
+The production gate requires append-only continuity evidence before a READY decision can
+survive beyond a bootstrap generation. Legacy v1 documents remain available only for
+explicit trusted-time historical replay; the production CLI fails them closed so an
+unchained packet cannot reset an unpaid-work budget.
 """
 
 from __future__ import annotations
@@ -21,9 +20,11 @@ from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import urlsplit
 
-WORK_SCHEMA = "payoff-path-work/v1"
-PACKET_SCHEMA = "payoff-path-gate/v1"
-RECEIPT_SCHEMA = "payoff-path-gate-receipt/v1"
+LEGACY_WORK_SCHEMA = "payoff-path-work/v1"
+WORK_SCHEMA = "payoff-path-work/v2"
+CONTINUITY_SCHEMA = "payoff-path-continuity/v1"
+PACKET_SCHEMA = "payoff-path-gate/v2"
+RECEIPT_SCHEMA = "payoff-path-gate-receipt/v2"
 
 MECHANISMS = {
     "BOUNTY",
@@ -48,9 +49,12 @@ STATES = {
     "HOLD_STALE_OR_INVALID",
     "STOP_UNPAID_WORK",
 }
+CONTINUITY_MODES = {"CHAINED", "LEGACY_REPLAY_ONLY", "MISSING_HISTORY_FAIL_CLOSED"}
+EVENT_KINDS = {"BUDGET_SET", "EFFORT"}
 
 _MAX_INPUT_BYTES = 4_000_000
 _MAX_ITEMS = 10_000
+_MAX_EVENTS = 100_000
 _MAX_ID = 128
 _MAX_URL = 2048
 _MAX_FREE_MINUTES = 10_000_000
@@ -195,7 +199,6 @@ def _normalize_value(raw: Any, name: str) -> dict[str, Any]:
     kind = _text(value["kind"], f"{name}.kind")
     if kind not in VALUE_KINDS:
         raise PayoffPathError(f"{name}.kind is unsupported")
-
     currency = value["currency"]
     amount = value["amount_minor"]
     if kind in {"FIXED", "POOL"}:
@@ -257,16 +260,11 @@ def _normalize_path(raw: Any, name: str) -> dict[str, Any] | None:
     }
 
 
-def _normalize_document(document: Any) -> dict[str, Any]:
-    root = _exact_keys(document, {"schema", "work_items"}, "document")
-    if root["schema"] != WORK_SCHEMA:
-        raise PayoffPathError(f"document.schema must be {WORK_SCHEMA}")
-    items = root["work_items"]
+def _normalize_work_items(items: Any) -> list[dict[str, Any]]:
     if type(items) is not list:
         raise PayoffPathError("document.work_items must be an array")
     if len(items) > _MAX_ITEMS:
         raise PayoffPathError("document.work_items exceeds item limit")
-
     normalized: list[dict[str, Any]] = []
     seen: set[str] = set()
     for index, raw in enumerate(items):
@@ -309,7 +307,294 @@ def _normalize_document(document: Any) -> dict[str, Any]:
             }
         )
     normalized.sort(key=lambda row: row["work_id"])
-    return {"schema": WORK_SCHEMA, "work_items": normalized}
+    return normalized
+
+
+def _normalize_continuity(raw: Any) -> dict[str, Any]:
+    continuity = _exact_keys(
+        raw,
+        {"schema", "ledger_id", "generation", "previous_receipt_sha256", "events"},
+        "document.continuity",
+    )
+    if continuity["schema"] != CONTINUITY_SCHEMA:
+        raise PayoffPathError(f"document.continuity.schema must be {CONTINUITY_SCHEMA}")
+    ledger_id = _opaque_ref(continuity["ledger_id"], "document.continuity.ledger_id")
+    generation = _int(continuity["generation"], "document.continuity.generation", minimum=0)
+    previous = continuity["previous_receipt_sha256"]
+    if generation == 0:
+        if previous is not None:
+            raise PayoffPathError("generation 0 must not name a previous receipt")
+    else:
+        previous = _sha(previous, "document.continuity.previous_receipt_sha256")
+
+    events = continuity["events"]
+    if type(events) is not list:
+        raise PayoffPathError("document.continuity.events must be an array")
+    if len(events) > _MAX_EVENTS:
+        raise PayoffPathError("document.continuity.events exceeds event limit")
+
+    normalized_events: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    budget_by_opp: dict[str, int] = {}
+    spent_by_opp: dict[str, int] = {}
+    previous_time: datetime | None = None
+    for index, raw_event in enumerate(events):
+        event = _exact_keys(
+            raw_event,
+            {"event_id", "kind", "opportunity_id", "work_id", "minutes", "occurred_at_utc"},
+            f"document.continuity.events[{index}]",
+        )
+        event_id = _opaque_ref(event["event_id"], f"document.continuity.events[{index}].event_id")
+        if event_id in seen_ids:
+            raise PayoffPathError(f"duplicate continuity event_id: {event_id}")
+        seen_ids.add(event_id)
+        kind = _text(event["kind"], f"document.continuity.events[{index}].kind")
+        if kind not in EVENT_KINDS:
+            raise PayoffPathError(f"document.continuity.events[{index}].kind is unsupported")
+        opportunity_id = _opaque_ref(
+            event["opportunity_id"], f"document.continuity.events[{index}].opportunity_id"
+        )
+        minutes = _int(
+            event["minutes"],
+            f"document.continuity.events[{index}].minutes",
+            minimum=1,
+            maximum=_MAX_FREE_MINUTES,
+        )
+        occurred = _timestamp(
+            event["occurred_at_utc"], f"document.continuity.events[{index}].occurred_at_utc"
+        )
+        if previous_time is not None and occurred < previous_time:
+            raise PayoffPathError("continuity event timestamps must be append-ordered")
+        previous_time = occurred
+        if kind == "BUDGET_SET":
+            if event["work_id"] is not None:
+                raise PayoffPathError("BUDGET_SET event work_id must be null")
+            if opportunity_id in budget_by_opp:
+                raise PayoffPathError(f"budget already declared for opportunity: {opportunity_id}")
+            budget_by_opp[opportunity_id] = minutes
+            spent_by_opp.setdefault(opportunity_id, 0)
+            work_id = None
+        else:
+            if opportunity_id not in budget_by_opp:
+                raise PayoffPathError(
+                    f"EFFORT event precedes budget declaration for opportunity: {opportunity_id}"
+                )
+            work_id = _opaque_ref(event["work_id"], f"document.continuity.events[{index}].work_id")
+            spent = spent_by_opp.get(opportunity_id, 0) + minutes
+            if spent > _MAX_FREE_MINUTES:
+                raise PayoffPathError(
+                    f"cumulative effort exceeds safe limit for opportunity: {opportunity_id}"
+                )
+            spent_by_opp[opportunity_id] = spent
+        normalized_events.append(
+            {
+                "event_id": event_id,
+                "kind": kind,
+                "opportunity_id": opportunity_id,
+                "work_id": work_id,
+                "minutes": minutes,
+                "occurred_at_utc": _render_timestamp(occurred),
+            }
+        )
+    return {
+        "schema": CONTINUITY_SCHEMA,
+        "ledger_id": ledger_id,
+        "generation": generation,
+        "previous_receipt_sha256": previous,
+        "events": normalized_events,
+    }
+
+
+def _normalize_document(document: Any) -> dict[str, Any]:
+    if type(document) is not dict:
+        raise PayoffPathError("document must be an object")
+    schema = document.get("schema")
+    if schema == LEGACY_WORK_SCHEMA:
+        root = _exact_keys(document, {"schema", "work_items"}, "document")
+        return {"schema": LEGACY_WORK_SCHEMA, "work_items": _normalize_work_items(root["work_items"])}
+    if schema == WORK_SCHEMA:
+        root = _exact_keys(document, {"schema", "continuity", "work_items"}, "document")
+        return {
+            "schema": WORK_SCHEMA,
+            "continuity": _normalize_continuity(root["continuity"]),
+            "work_items": _normalize_work_items(root["work_items"]),
+        }
+    raise PayoffPathError(
+        f"document.schema must be {WORK_SCHEMA} (or {LEGACY_WORK_SCHEMA} for historical replay)"
+    )
+
+
+def _ledger_root(events: list[dict[str, Any]]) -> str:
+    return _digest({"schema": CONTINUITY_SCHEMA, "events": events})
+
+
+def _normalize_receipt_anchor(receipt: Any, name: str = "previous_receipt") -> dict[str, Any]:
+    obj = _exact_keys(
+        receipt,
+        {"schema", "source_document_sha256", "packet_sha256", "markdown_sha256", "continuity"},
+        name,
+    )
+    if obj["schema"] != RECEIPT_SCHEMA:
+        raise PayoffPathError(f"{name}.schema must be {RECEIPT_SCHEMA}")
+    for field in ("source_document_sha256", "packet_sha256", "markdown_sha256"):
+        _sha(obj[field], f"{name}.{field}")
+    c = _exact_keys(
+        obj["continuity"],
+        {
+            "mode",
+            "ledger_id",
+            "generation",
+            "ledger_event_count",
+            "ledger_root_sha256",
+            "previous_receipt_sha256",
+        },
+        f"{name}.continuity",
+    )
+    mode = _text(c["mode"], f"{name}.continuity.mode")
+    if mode not in CONTINUITY_MODES:
+        raise PayoffPathError(f"{name}.continuity.mode is unsupported")
+    if mode == "CHAINED":
+        ledger_id = _opaque_ref(c["ledger_id"], f"{name}.continuity.ledger_id")
+        generation = _int(c["generation"], f"{name}.continuity.generation", minimum=0)
+        event_count = _int(
+            c["ledger_event_count"],
+            f"{name}.continuity.ledger_event_count",
+            minimum=0,
+            maximum=_MAX_EVENTS,
+        )
+        root_sha = _sha(c["ledger_root_sha256"], f"{name}.continuity.ledger_root_sha256")
+        prev_sha = c["previous_receipt_sha256"]
+        if generation == 0:
+            if prev_sha is not None:
+                raise PayoffPathError(f"{name} generation 0 must not name a previous receipt")
+        else:
+            prev_sha = _sha(prev_sha, f"{name}.continuity.previous_receipt_sha256")
+    else:
+        if any(
+            c[key] is not None
+            for key in (
+                "ledger_id",
+                "generation",
+                "ledger_event_count",
+                "ledger_root_sha256",
+                "previous_receipt_sha256",
+            )
+        ):
+            raise PayoffPathError(f"{name} legacy continuity metadata must be null")
+        ledger_id = generation = event_count = root_sha = prev_sha = None
+    return {
+        "schema": RECEIPT_SCHEMA,
+        "source_document_sha256": obj["source_document_sha256"],
+        "packet_sha256": obj["packet_sha256"],
+        "markdown_sha256": obj["markdown_sha256"],
+        "continuity": {
+            "mode": mode,
+            "ledger_id": ledger_id,
+            "generation": generation,
+            "ledger_event_count": event_count,
+            "ledger_root_sha256": root_sha,
+            "previous_receipt_sha256": prev_sha,
+        },
+    }
+
+
+def _continuity_summary(
+    normalized: dict[str, Any],
+    as_of: datetime,
+    previous_receipt: Any,
+    *,
+    legacy_replay: bool,
+) -> dict[str, Any]:
+    if normalized["schema"] == LEGACY_WORK_SCHEMA:
+        if previous_receipt is not None:
+            raise PayoffPathError("legacy v1 documents cannot bind a previous continuity receipt")
+        mode = "LEGACY_REPLAY_ONLY" if legacy_replay else "MISSING_HISTORY_FAIL_CLOSED"
+        return {
+            "mode": mode,
+            "ledger_id": None,
+            "generation": None,
+            "ledger_event_count": None,
+            "ledger_root_sha256": None,
+            "previous_receipt_sha256": None,
+        }
+
+    continuity = normalized["continuity"]
+    events = continuity["events"]
+    for event in events:
+        if _timestamp(
+            event["occurred_at_utc"], "normalized.continuity.event.occurred_at_utc"
+        ) > as_of:
+            raise PayoffPathError(f"continuity event {event['event_id']} is from the future")
+
+    generation = continuity["generation"]
+    if generation == 0:
+        if previous_receipt is not None:
+            raise PayoffPathError("generation 0 must not be compiled with a previous receipt")
+    else:
+        if previous_receipt is None:
+            raise PayoffPathError("previous receipt is required for nonzero continuity generation")
+        previous = _normalize_receipt_anchor(previous_receipt)
+        anchor = previous["continuity"]
+        if anchor["mode"] != "CHAINED":
+            raise PayoffPathError("previous receipt is not a chained continuity anchor")
+        if continuity["previous_receipt_sha256"] != _digest(previous):
+            raise PayoffPathError("previous receipt digest does not match continuity declaration")
+        if continuity["ledger_id"] != anchor["ledger_id"]:
+            raise PayoffPathError("continuity ledger_id changed between generations")
+        if generation != anchor["generation"] + 1:
+            raise PayoffPathError("continuity generation must advance exactly by one")
+        previous_count = anchor["ledger_event_count"]
+        if len(events) < previous_count:
+            raise PayoffPathError("continuity history is truncated")
+        if _ledger_root(events[:previous_count]) != anchor["ledger_root_sha256"]:
+            raise PayoffPathError("continuity history prefix does not match previous ledger root")
+
+    budget_by_opp: dict[str, int] = {}
+    spent_by_opp: dict[str, int] = {}
+    current_work = {row["work_id"]: row for row in normalized["work_items"]}
+    for event in events:
+        opp = event["opportunity_id"]
+        if event["kind"] == "BUDGET_SET":
+            budget_by_opp[opp] = event["minutes"]
+            spent_by_opp.setdefault(opp, 0)
+        else:
+            spent_by_opp[opp] = spent_by_opp.get(opp, 0) + event["minutes"]
+            work = current_work.get(event["work_id"])
+            if work is not None:
+                if work["opportunity_id"] != opp:
+                    raise PayoffPathError(
+                        f"continuity effort event {event['event_id']} binds work_id to a different opportunity"
+                    )
+                if _timestamp(event["occurred_at_utc"], "continuity effort time") < _timestamp(
+                    work["started_at_utc"], "work start"
+                ):
+                    raise PayoffPathError(
+                        f"continuity effort event {event['event_id']} predates its work start"
+                    )
+
+    for row in normalized["work_items"]:
+        opp = row["opportunity_id"]
+        if opp not in budget_by_opp:
+            raise PayoffPathError(f"missing continuity budget declaration for opportunity: {opp}")
+        expected_budget = budget_by_opp[opp]
+        expected_spent = spent_by_opp.get(opp, 0)
+        if row["free_work_budget_minutes"] != expected_budget:
+            raise PayoffPathError(
+                f"work item {row['work_id']} budget does not match immutable continuity budget"
+            )
+        if row["free_work_spent_minutes"] != expected_spent:
+            raise PayoffPathError(
+                f"work item {row['work_id']} spent minutes do not match cumulative continuity effort"
+            )
+
+    return {
+        "mode": "CHAINED",
+        "ledger_id": continuity["ledger_id"],
+        "generation": generation,
+        "ledger_event_count": len(events),
+        "ledger_root_sha256": _ledger_root(events),
+        "previous_receipt_sha256": continuity["previous_receipt_sha256"],
+    }
 
 
 def _evaluate_item(item: dict[str, Any], as_of: datetime) -> dict[str, Any]:
@@ -317,11 +602,9 @@ def _evaluate_item(item: dict[str, Any], as_of: datetime) -> dict[str, Any]:
     spent = item["free_work_spent_minutes"]
     remaining = max(budget - spent, 0)
     reasons: list[str] = []
-
     started_at = _timestamp(item["started_at_utc"], "normalized.started_at_utc")
     if started_at > as_of:
         reasons.append("WORK_STARTS_IN_FUTURE")
-
     path = item["payoff_path"]
     if spent >= budget:
         state = "STOP_UNPAID_WORK"
@@ -349,10 +632,8 @@ def _evaluate_item(item: dict[str, Any], as_of: datetime) -> dict[str, Any]:
         else:
             state = "READY_FOR_OWNER_SPECULATIVE_WORK_REVIEW"
             reasons.append("PAYOFF_PATH_CURRENT_AND_FREE_WORK_WITHIN_CAP")
-
-    if state not in STATES:  # defensive invariant
+    if state not in STATES:
         raise PayoffPathError("internal invalid state")
-
     path_summary: dict[str, Any] | None = None
     if path is not None:
         path_summary = {
@@ -367,7 +648,6 @@ def _evaluate_item(item: dict[str, Any], as_of: datetime) -> dict[str, Any]:
             "conversion_evidence_ref": path["conversion"]["evidence_ref"],
             "conversion_evidence_sha256": path["conversion"]["evidence_sha256"],
         }
-
     return {
         "work_id": item["work_id"],
         "opportunity_id": item["opportunity_id"],
@@ -378,6 +658,20 @@ def _evaluate_item(item: dict[str, Any], as_of: datetime) -> dict[str, Any]:
         "free_work_remaining_minutes": remaining,
         "payoff_path": path_summary,
     }
+
+
+def _apply_legacy_fail_closed(rows: list[dict[str, Any]], mode: str) -> None:
+    if mode != "MISSING_HISTORY_FAIL_CLOSED":
+        return
+    for row in rows:
+        if row["state"] == "READY_FOR_OWNER_SPECULATIVE_WORK_REVIEW":
+            row["state"] = "HOLD_STALE_OR_INVALID"
+            row["reasons"] = [
+                reason
+                for reason in row["reasons"]
+                if reason != "PAYOFF_PATH_CURRENT_AND_FREE_WORK_WITHIN_CAP"
+            ]
+            row["reasons"].append("CONTINUITY_HISTORY_REQUIRED")
 
 
 def _summary(rows: Iterable[dict[str, Any]]) -> dict[str, int]:
@@ -392,11 +686,24 @@ def _summary(rows: Iterable[dict[str, Any]]) -> dict[str, int]:
 def render_markdown(packet: dict[str, Any]) -> str:
     if type(packet) is not dict or packet.get("schema") != PACKET_SCHEMA:
         raise PayoffPathError(f"packet must be {PACKET_SCHEMA}")
+    continuity = packet["continuity"]
+    if continuity["mode"] == "CHAINED":
+        continuity_text = (
+            f"CHAINED ledger `{continuity['ledger_id']}` generation `{continuity['generation']}`; "
+            f"events `{continuity['ledger_event_count']}`; root `{continuity['ledger_root_sha256']}`"
+        )
+    elif continuity["mode"] == "LEGACY_REPLAY_ONLY":
+        continuity_text = (
+            "LEGACY_REPLAY_ONLY (explicit trusted-time historical/test replay; not production authority)"
+        )
+    else:
+        continuity_text = "MISSING_HISTORY_FAIL_CLOSED (legacy input cannot produce production READY)"
     lines = [
         "# Payoff Path Gate Review",
         "",
         f"Evaluated at: `{packet['evaluated_at_utc']}`",
         f"Source document SHA-256: `{packet['source_document_sha256']}`",
+        f"Continuity: {continuity_text}",
         "",
         "> READY means owner review only. It does not authorize outreach, submission, spend, delivery, payment action, or a revenue claim.",
         "",
@@ -435,21 +742,25 @@ def render_markdown(packet: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def compile_gate(document: Any, trusted_as_of: datetime | str | None = None) -> tuple[dict[str, Any], str, dict[str, Any]]:
-    """Compile deterministic owner-review evidence.
-
-    Production callers should omit ``trusted_as_of`` so process UTC is authoritative.
-    Tests and historical replay may inject an explicit trusted time through this library
-    function; the command-line compile path intentionally exposes no as-of override.
-    """
-
+def _compile_gate(
+    document: Any,
+    trusted_as_of: datetime | str | None,
+    previous_receipt: Any,
+    *,
+    legacy_replay: bool,
+) -> tuple[dict[str, Any], str, dict[str, Any]]:
     as_of = _trusted_now(trusted_as_of)
     normalized = _normalize_document(document)
+    continuity = _continuity_summary(
+        normalized, as_of, previous_receipt, legacy_replay=legacy_replay
+    )
     rows = [_evaluate_item(item, as_of) for item in normalized["work_items"]]
+    _apply_legacy_fail_closed(rows, continuity["mode"])
     packet = {
         "schema": PACKET_SCHEMA,
         "evaluated_at_utc": _render_timestamp(as_of),
         "source_document_sha256": _digest(normalized),
+        "continuity": continuity,
         "summary": _summary(rows),
         "results": rows,
         "authority": "OWNER_REVIEW_ONLY_NO_EXTERNAL_ACTION",
@@ -460,8 +771,32 @@ def compile_gate(document: Any, trusted_as_of: datetime | str | None = None) -> 
         "source_document_sha256": packet["source_document_sha256"],
         "packet_sha256": _digest(packet),
         "markdown_sha256": _sha256_bytes(markdown.encode("utf-8")),
+        "continuity": continuity,
     }
     return packet, markdown, receipt
+
+
+def compile_gate(
+    document: Any,
+    trusted_as_of: datetime | str | None = None,
+    previous_receipt: Any = None,
+) -> tuple[dict[str, Any], str, dict[str, Any]]:
+    """Compile deterministic owner-review evidence.
+
+    Production callers should omit ``trusted_as_of``. Explicit trusted time is reserved
+    for tests/historical replay and is the only context in which legacy v1 input can
+    reproduce historical READY semantics. Production v1 input fails closed.
+
+    v2 generation > 0 requires the exact previous receipt. The receipt anchors the
+    previous ledger generation/root, so history omission, rewrite, replay, or silent
+    budget reset fails closed before evaluation.
+    """
+    return _compile_gate(
+        document,
+        trusted_as_of,
+        previous_receipt,
+        legacy_replay=(trusted_as_of is not None),
+    )
 
 
 def verify_gate(
@@ -470,49 +805,59 @@ def verify_gate(
     markdown: Any,
     receipt: Any,
     trusted_now: datetime | str | None = None,
+    previous_receipt: Any = None,
 ) -> bool:
-    """Verify content-addressed evidence and re-check temporal validity at trusted now."""
-
+    """Verify content-addressed evidence, continuity, and current temporal validity."""
     now = _trusted_now(trusted_now)
     normalized = _normalize_document(document)
     packet_obj = _exact_keys(
         packet,
-        {"schema", "evaluated_at_utc", "source_document_sha256", "summary", "results", "authority"},
+        {
+            "schema",
+            "evaluated_at_utc",
+            "source_document_sha256",
+            "continuity",
+            "summary",
+            "results",
+            "authority",
+        },
         "packet",
     )
-    if packet_obj["schema"] != PACKET_SCHEMA or packet_obj["authority"] != "OWNER_REVIEW_ONLY_NO_EXTERNAL_ACTION":
+    if (
+        packet_obj["schema"] != PACKET_SCHEMA
+        or packet_obj["authority"] != "OWNER_REVIEW_ONLY_NO_EXTERNAL_ACTION"
+    ):
         raise PayoffPathError("packet schema or authority is invalid")
     evaluated = _timestamp(packet_obj["evaluated_at_utc"], "packet.evaluated_at_utc")
     if evaluated > now:
         raise PayoffPathError("packet evaluation time is in the future")
     if packet_obj["source_document_sha256"] != _digest(normalized):
         raise PayoffPathError("packet source document digest mismatch")
-
-    expected_packet, expected_markdown, expected_receipt = compile_gate(normalized, evaluated)
+    mode = (
+        packet_obj.get("continuity", {}).get("mode")
+        if type(packet_obj.get("continuity")) is dict
+        else None
+    )
+    legacy_replay = normalized["schema"] == LEGACY_WORK_SCHEMA and mode == "LEGACY_REPLAY_ONLY"
+    expected_packet, expected_markdown, expected_receipt = _compile_gate(
+        normalized, evaluated, previous_receipt, legacy_replay=legacy_replay
+    )
     if packet_obj != expected_packet:
         raise PayoffPathError("packet content does not match recompilation")
     if type(markdown) is not str or markdown != expected_markdown:
         raise PayoffPathError("Markdown content does not match recompilation")
-
-    receipt_obj = _exact_keys(
-        receipt,
-        {"schema", "source_document_sha256", "packet_sha256", "markdown_sha256"},
-        "receipt",
-    )
-    if receipt_obj["schema"] != RECEIPT_SCHEMA:
-        raise PayoffPathError("receipt schema is invalid")
-    for field in ("source_document_sha256", "packet_sha256", "markdown_sha256"):
-        _sha(receipt_obj[field], f"receipt.{field}")
+    receipt_obj = _normalize_receipt_anchor(receipt, "receipt")
     if receipt_obj != expected_receipt:
         raise PayoffPathError("receipt content does not match exact packet/Markdown")
-
-    # The original packet remains content-verifiable, but READY may not be treated as
-    # current if evidence or a conversion deadline has expired since compilation.
     current_rows = [_evaluate_item(item, now) for item in normalized["work_items"]]
+    _apply_legacy_fail_closed(current_rows, packet_obj["continuity"]["mode"])
     previous = {row["work_id"]: row for row in expected_packet["results"]}
     for row in current_rows:
         before = previous[row["work_id"]]
-        if before["state"] == "READY_FOR_OWNER_SPECULATIVE_WORK_REVIEW" and row["state"] != before["state"]:
+        if (
+            before["state"] == "READY_FOR_OWNER_SPECULATIVE_WORK_REVIEW"
+            and row["state"] != before["state"]
+        ):
             raise PayoffPathError(
                 f"previous READY item {row['work_id']} is no longer current at trusted verification time"
             )
@@ -590,9 +935,18 @@ def _publish_bundle(outputs: list[tuple[Path, str]]) -> None:
         raise
 
 
+def _load_optional_receipt(path: str | None) -> Any:
+    if path is None:
+        return None
+    return load_strict_json(_read_regular(Path(path)))
+
+
 def _compile_command(args: argparse.Namespace) -> int:
     document = load_strict_json(_read_regular(Path(args.input)))
-    packet, markdown, receipt = compile_gate(document)
+    previous_receipt = _load_optional_receipt(args.previous_receipt)
+    packet, markdown, receipt = _compile_gate(
+        document, None, previous_receipt, legacy_replay=False
+    )
     _publish_bundle(
         [
             (Path(args.packet), _canonical_json(packet) + "\n"),
@@ -609,7 +963,10 @@ def _verify_command(args: argparse.Namespace) -> int:
     packet = load_strict_json(_read_regular(Path(args.packet)))
     markdown = _read_regular(Path(args.markdown))
     receipt = load_strict_json(_read_regular(Path(args.receipt)))
-    verify_gate(document, packet, markdown, receipt)
+    previous_receipt = _load_optional_receipt(args.previous_receipt)
+    verify_gate(
+        document, packet, markdown, receipt, previous_receipt=previous_receipt
+    )
     print(_canonical_json({"verified": True, "packet_sha256": receipt["packet_sha256"]}))
     return 0
 
@@ -618,18 +975,25 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    compile_parser = sub.add_parser("compile", help="compile an owner-review payoff-path packet")
+    compile_parser = sub.add_parser(
+        "compile", help="compile an owner-review payoff-path packet"
+    )
     compile_parser.add_argument("--input", required=True)
     compile_parser.add_argument("--packet", required=True)
     compile_parser.add_argument("--markdown", required=True)
     compile_parser.add_argument("--receipt", required=True)
+    compile_parser.add_argument("--previous-receipt")
     compile_parser.set_defaults(func=_compile_command)
 
-    verify_parser = sub.add_parser("verify", help="verify exact inputs, packet, Markdown, receipt, and current temporal validity")
+    verify_parser = sub.add_parser(
+        "verify",
+        help="verify exact inputs, packet, Markdown, receipt, continuity, and current temporal validity",
+    )
     verify_parser.add_argument("--input", required=True)
     verify_parser.add_argument("--packet", required=True)
     verify_parser.add_argument("--markdown", required=True)
     verify_parser.add_argument("--receipt", required=True)
+    verify_parser.add_argument("--previous-receipt")
     verify_parser.set_defaults(func=_verify_command)
     return parser
 

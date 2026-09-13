@@ -6,6 +6,7 @@ on:
       - "concierge/payoff_path_gate.py"
       - "concierge/payoff_path_gate_core.py"
       - "tests/test_payoff_path_gate.py"
+      - "tests/test_payoff_path_continuity.py"
       - "tests/test_payoff_path_file_custody.py"
       - "docs/PAYOFF_PATH_GATE.md"
       - "docs/PAYOFF_PATH_FILE_CUSTODY.md"
@@ -17,6 +18,7 @@ on:
       - "concierge/payoff_path_gate.py"
       - "concierge/payoff_path_gate_core.py"
       - "tests/test_payoff_path_gate.py"
+      - "tests/test_payoff_path_continuity.py"
       - "tests/test_payoff_path_file_custody.py"
       - "docs/PAYOFF_PATH_GATE.md"
       - "docs/PAYOFF_PATH_FILE_CUSTODY.md"
@@ -54,8 +56,17 @@ jobs:
           concierge/payoff_path_gate.py
           concierge/payoff_path_gate_core.py
           tests/test_payoff_path_gate.py
+          tests/test_payoff_path_continuity.py
           tests/test_payoff_path_file_custody.py
       - name: Run payoff path hostile tests
-        run: python -m pytest -q tests/test_payoff_path_gate.py tests/test_payoff_path_file_custody.py
+        run: >-
+          python -m pytest -q
+          tests/test_payoff_path_gate.py
+          tests/test_payoff_path_continuity.py
+          tests/test_payoff_path_file_custody.py
       - name: Run optimized payoff path hostile tests
-        run: python -O -m pytest -q tests/test_payoff_path_gate.py tests/test_payoff_path_file_custody.py
+        run: >-
+          python -O -m pytest -q
+          tests/test_payoff_path_gate.py
+          tests/test_payoff_path_continuity.py
+          tests/test_payoff_path_file_custody.py
