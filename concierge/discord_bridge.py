@@ -98,9 +98,42 @@ def already_migrated(discord_id):
     return row is not None
 
 
+def _existing_migration_status(discord_id):
+    """Return prior migration status without creating or mutating tracking state.
+
+    ``wallet migrate --force`` intentionally bypasses :func:`already_migrated`.
+    The balance lookup therefore performs its own read-only preflight so an
+    unresolved migration cannot trigger another on-chain credit before the
+    prior Discord debit has been reconciled.
+    """
+    if not os.path.isfile(_TRACKING_DB):
+        return None, None
+
+    con = None
+    try:
+        con = sqlite3.connect(_TRACKING_DB)
+        row = con.execute(
+            "SELECT status FROM migrations WHERE discord_user_id = ?",
+            (str(discord_id),),
+        ).fetchone()
+    except sqlite3.Error:
+        return None, "Migration tracking state is unreadable; refusing balance preflight"
+    finally:
+        if con is not None:
+            con.close()
+
+    if row is None:
+        return None, None
+    status = row[0]
+    if not isinstance(status, str) or not status:
+        return None, "Migration tracking state is malformed; refusing balance preflight"
+    return status, None
+
+
 # ---------------------------------------------------------------------------
 # SSH queries to NAS Discord economy database
 # ---------------------------------------------------------------------------
+
 
 def _ssh_cmd():
     """Build the base SSH command list for connecting to the NAS."""
@@ -188,10 +221,27 @@ def _ssh_query(sql, params=()):
 def get_discord_balance(user_id):
     """Get the Discord economy balance for a single user.
 
+    An unresolved local migration record fails closed before the remote
+    balance is read.  This prevents a forced retry from issuing a second
+    on-chain credit after a prior credit succeeded but its Discord debit did
+    not complete.
+
     Returns:
         Dict with user_id, balance, total_earned, total_spent,
         or an error dict.
     """
+    migration_status, tracking_error = _existing_migration_status(user_id)
+    if tracking_error:
+        return {"error": tracking_error}
+    if migration_status is not None and migration_status != "completed":
+        return {
+            "error": (
+                f"Discord user {user_id} has unresolved migration state "
+                f"'{migration_status}'; reconcile the existing on-chain "
+                "transfer before retrying"
+            )
+        }
+
     sql = (
         "SELECT user_id, balance, total_earned, total_spent "
         "FROM balances WHERE user_id = ?"
