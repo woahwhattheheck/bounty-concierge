@@ -271,6 +271,10 @@ def _pump_logs(pipe, log_file):
             pipe.close()
         except Exception:
             pass
+        try:
+            log_file.close()
+        except Exception:
+            pass
 
 
 def start_managed_miner(command: List[str], log_path: str = "warthog_miner.log") -> ManagedMiner:
