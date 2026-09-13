@@ -54,7 +54,18 @@ def fetch_bounties(repos=None, token=None):
                 print(f"[warn] failed to fetch {repo}: {exc}", file=sys.stderr)
                 break
 
-            for issue in resp.json():
+            try:
+                issues = resp.json()
+            except ValueError as exc:
+                print(f"[warn] failed to decode {repo}: {exc}", file=sys.stderr)
+                break
+            if not isinstance(issues, list):
+                print(f"[warn] unsupported payload for {repo}: expected list", file=sys.stderr)
+                break
+
+            for issue in issues:
+                if not isinstance(issue, dict):
+                    continue
                 # Skip pull requests that come through the issues endpoint
                 if "pull_request" in issue:
                     continue
