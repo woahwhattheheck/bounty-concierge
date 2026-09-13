@@ -230,6 +230,18 @@ def _event_timestamp(event: dict[str, Any], *fields: str) -> datetime | None:
     return None
 
 
+def _feedback_source_id(kind: str, event: dict[str, Any]) -> tuple[str, int] | None:
+    """Return a stable GitHub feedback identity when the API supplied one."""
+    raw_id = event.get("id")
+    if raw_id is None:
+        if kind == "inline_comment":
+            raise RevenueCloseoutError("GitHub inline_comment omitted id")
+        return None
+    if isinstance(raw_id, bool) or not isinstance(raw_id, int) or raw_id <= 0:
+        raise RevenueCloseoutError(f"GitHub {kind} feedback item had invalid id")
+    return kind, raw_id
+
+
 def _collect_feedback(
     repo: str,
     number: int,
@@ -240,11 +252,25 @@ def _collect_feedback(
     max_pages: int,
 ) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
+    seen: dict[tuple[str, int], dict[str, Any]] = {}
     endpoints = (
-        ("review", f"https://api.github.com/repos/{repo}/pulls/{number}/reviews"),
-        ("comment", f"https://api.github.com/repos/{repo}/issues/{number}/comments"),
+        (
+            "review",
+            f"https://api.github.com/repos/{repo}/pulls/{number}/reviews",
+            ("submitted_at", "created_at"),
+        ),
+        (
+            "inline_comment",
+            f"https://api.github.com/repos/{repo}/pulls/{number}/comments",
+            ("updated_at", "created_at"),
+        ),
+        (
+            "comment",
+            f"https://api.github.com/repos/{repo}/issues/{number}/comments",
+            ("updated_at", "created_at"),
+        ),
     )
-    for kind, url in endpoints:
+    for kind, url, timestamp_fields in endpoints:
         for page in range(1, max_pages + 1):
             payload = _get_json(
                 session,
@@ -261,13 +287,22 @@ def _collect_feedback(
                     raise RevenueCloseoutError(
                         f"GitHub {kind} response contained a malformed item"
                     )
+                source_id = _feedback_source_id(kind, event)
+                parent_review_id = None
+                if kind == "inline_comment":
+                    raw_parent = event.get("pull_request_review_id")
+                    if (
+                        isinstance(raw_parent, bool)
+                        or not isinstance(raw_parent, int)
+                        or raw_parent <= 0
+                    ):
+                        raise RevenueCloseoutError(
+                            "GitHub inline_comment omitted valid pull_request_review_id"
+                        )
+                    parent_review_id = raw_parent
                 if not _external_maintainer(event, operator_login):
                     continue
-                timestamp = _event_timestamp(
-                    event,
-                    "submitted_at" if kind == "review" else "updated_at",
-                    "created_at",
-                )
+                timestamp = _event_timestamp(event, *timestamp_fields)
                 if timestamp is None:
                     raise RevenueCloseoutError(
                         f"GitHub maintainer {kind} omitted a timestamp"
@@ -278,25 +313,59 @@ def _collect_feedback(
                     if not isinstance(raw_state, str):
                         raise RevenueCloseoutError("GitHub review omitted state")
                     state = raw_state.upper()
-                results.append(
-                    {
-                        "kind": kind,
-                        "state": state,
-                        "author": _safe_user_login(event.get("user")),
-                        "at": timestamp,
-                        "url": event.get("html_url")
-                        if isinstance(event.get("html_url"), str)
-                        else None,
-                    }
-                )
+                normalized = {
+                    "kind": kind,
+                    "state": state,
+                    "author": _safe_user_login(event.get("user")),
+                    "at": timestamp,
+                    "url": event.get("html_url")
+                    if isinstance(event.get("html_url"), str)
+                    else None,
+                    "_source_id": source_id,
+                    "_parent_review_id": parent_review_id,
+                }
+                if source_id is not None:
+                    prior = seen.get(source_id)
+                    if prior is not None:
+                        if prior != normalized:
+                            raise RevenueCloseoutError(
+                                f"GitHub {kind} duplicate id changed across pagination"
+                            )
+                        continue
+                    seen[source_id] = normalized
+                results.append(normalized)
             if len(payload) < 100:
                 break
         else:
             raise RevenueCloseoutError(
                 f"GitHub {kind} pagination exceeded max_pages for {repo}#{number}"
             )
-    results.sort(key=lambda item: item["at"])
-    return results
+
+    # The reviews endpoint emits a COMMENTED parent review for line-level review
+    # comments.  When the inline-comments endpoint gave us those concrete child
+    # obligations, suppress only the overlapping parent notification so one
+    # maintainer action is not counted twice. Decision-bearing reviews remain.
+    inline_parent_review_ids = {
+        event["_parent_review_id"]
+        for event in results
+        if event["kind"] == "inline_comment"
+        and isinstance(event.get("_parent_review_id"), int)
+    }
+    deduped = []
+    for event in results:
+        source_id = event.get("_source_id")
+        if (
+            event["kind"] == "review"
+            and event["state"] == "COMMENTED"
+            and isinstance(source_id, tuple)
+            and len(source_id) == 2
+            and source_id[1] in inline_parent_review_ids
+        ):
+            continue
+        deduped.append(event)
+
+    deduped.sort(key=lambda item: item["at"])
+    return deduped
 
 
 def _current_review_decisions(
@@ -416,7 +485,7 @@ def scan_paid_pr(
     response_feedback = [
         event
         for event in new_feedback
-        if event["kind"] == "comment"
+        if event["kind"] in {"comment", "inline_comment"}
         or (event["kind"] == "review" and event["state"] == "COMMENTED")
     ]
 
