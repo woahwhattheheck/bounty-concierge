@@ -24,6 +24,9 @@ from concierge.config import GITHUB_TOKEN
 
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _CURRENCY_RE = re.compile(r"^[A-Z][A-Z0-9_.-]{1,11}$")
+_MAX_AMOUNT_SOURCE_CHARS = 64
+_MAX_AMOUNT_DIGITS = 30
+_MAX_AMOUNT_ABS_EXPONENT = 18
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
 _REVIEW_DECISION_STATES = frozenset({"CHANGES_REQUESTED", "APPROVED", "DISMISSED"})
 _ACTION_ORDER = {
@@ -105,14 +108,25 @@ def _iso_or_none(value: datetime | None) -> str | None:
 def _positive_amount(value: Any) -> Decimal:
     if isinstance(value, bool) or not isinstance(value, (str, int, Decimal)):
         raise RevenueCloseoutInputError("advertised_amount must be a positive decimal")
+    source = str(value)
+    if len(source) > _MAX_AMOUNT_SOURCE_CHARS:
+        raise RevenueCloseoutInputError("advertised_amount representation is too large")
     try:
-        amount = Decimal(str(value))
+        amount = Decimal(source)
     except (InvalidOperation, ValueError) as exc:
         raise RevenueCloseoutInputError(
             "advertised_amount must be a positive decimal"
         ) from exc
     if not amount.is_finite() or amount <= 0:
         raise RevenueCloseoutInputError("advertised_amount must be a positive decimal")
+    digits = amount.as_tuple().digits
+    exponent = amount.as_tuple().exponent
+    if (
+        len(digits) > _MAX_AMOUNT_DIGITS
+        or not isinstance(exponent, int)
+        or abs(exponent) > _MAX_AMOUNT_ABS_EXPONENT
+    ):
+        raise RevenueCloseoutInputError("advertised_amount representation is too large")
     return amount
 
 
@@ -395,41 +409,48 @@ def scan_paid_pr(
         if event["state"] == "CHANGES_REQUESTED"
     ]
     last_seen = item["last_seen_at"]
-    new_feedback = [event for event in feedback if event["at"] > last_seen]
+    # A timestamp-only cursor cannot uniquely identify GitHub events.  Replay
+    # equality conservatively so two distinct events stamped at the same instant
+    # cannot cause one to be silently lost.
+    new_feedback = [event for event in feedback if event["at"] >= last_seen]
+    response_feedback = [
+        event
+        for event in new_feedback
+        if event["kind"] == "comment"
+        or (event["kind"] == "review" and event["state"] == "COMMENTED")
+    ]
 
     if merged_at is not None:
+        safe_state = "MERGED"
+    elif state == "closed":
+        safe_state = "CLOSED_UNMERGED"
+    else:
+        safe_state = "OPEN"
+
+    # Maintainer obligations outrank lifecycle/settlement routing.  The cursor
+    # only controls notification freshness; it never clears a current blocker.
+    if current_change_requests:
+        next_action = "repair_requested"
+        reason = "current_maintainer_changes_requested"
+    elif response_feedback:
+        next_action = "respond_to_maintainer"
+        reason = "new_maintainer_feedback"
+    elif merged_at is not None:
         if item["settlement_followup_url"] is None:
             next_action = "route_settlement_followup"
             reason = "merged_without_settlement_followup_evidence"
         else:
             next_action = "monitor_settlement"
             reason = "merged_followup_already_routed"
-        safe_state = "MERGED"
     elif state == "closed":
         next_action = "investigate_closed_unmerged"
         reason = "pr_closed_unmerged"
-        safe_state = "CLOSED_UNMERGED"
-    elif current_change_requests:
-        next_action = "repair_requested"
-        reason = "current_maintainer_changes_requested"
-        safe_state = "OPEN"
+    elif new_feedback:
+        next_action = "await_acceptance"
+        reason = "new_nonactionable_maintainer_review"
     else:
-        response_feedback = [
-            event
-            for event in new_feedback
-            if event["kind"] == "comment"
-            or (event["kind"] == "review" and event["state"] == "COMMENTED")
-        ]
-        if response_feedback:
-            next_action = "respond_to_maintainer"
-            reason = "new_maintainer_feedback"
-        elif new_feedback:
-            next_action = "await_acceptance"
-            reason = "new_nonactionable_maintainer_review"
-        else:
-            next_action = "await_acceptance"
-            reason = "open_without_new_maintainer_feedback"
-        safe_state = "OPEN"
+        next_action = "await_acceptance"
+        reason = "open_without_new_maintainer_feedback"
 
     latest = new_feedback[-1] if new_feedback else None
     return {
