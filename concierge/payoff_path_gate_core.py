@@ -1,37 +1,30 @@
 # SPDX-License-Identifier: MIT
-"""Evidence-bound gate for speculative/unpaid work with a concrete payoff path.
+"""Continuity-safe payoff-path semantics for speculative/unpaid work.
 
-The gate answers a deliberately narrow owner question: should another unpaid unit of
-work be considered when compensation is not yet secured?  It never estimates win
-probability, invents monetary value, authorizes outreach/submission, or recognizes
-cash/revenue.  READY means only that an owner has a current, evidence-bound path to
-review within a bounded free-work budget.
+This module replaces caller-authored cumulative spend snapshots with immutable effort
+facts and hash-chained owner budget policy generations.  A successor document embeds
+the prior gate receipt; compilation rejects omitted or rewritten effort history,
+mutated same-generation caps, cross-work transplants, skipped policy generations, and
+implicit STOP -> READY resets.  Only an explicit successor owner-cap generation may
+reopen a previously exhausted work item, and that transition is surfaced in output.
 """
-
 from __future__ import annotations
 
-import argparse
 import hashlib
 import json
-import os
 import re
-import stat
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import urlsplit
 
-WORK_SCHEMA = "payoff-path-work/v1"
-PACKET_SCHEMA = "payoff-path-gate/v1"
-RECEIPT_SCHEMA = "payoff-path-gate-receipt/v1"
+WORK_SCHEMA = "payoff-path-work/v2"
+PACKET_SCHEMA = "payoff-path-gate/v2"
+RECEIPT_SCHEMA = "payoff-path-gate-receipt/v2"
+AUTHORITY = "OWNER_REVIEW_ONLY_NO_EXTERNAL_ACTION"
 
 MECHANISMS = {
-    "BOUNTY",
-    "COMPETITION_PRIZE",
-    "PAID_OFFER_OR_PILOT",
-    "PRIME_SUBCONTRACT",
-    "REFERRAL_COMMISSION",
-    "SPONSOR_OR_GRANT",
+    "BOUNTY", "COMPETITION_PRIZE", "PAID_OFFER_OR_PILOT",
+    "PRIME_SUBCONTRACT", "REFERRAL_COMMISSION", "SPONSOR_OR_GRANT",
 }
 EVENT_FOR_MECHANISM = {
     "BOUNTY": "SUBMIT_WORK",
@@ -51,6 +44,7 @@ STATES = {
 
 _MAX_INPUT_BYTES = 4_000_000
 _MAX_ITEMS = 10_000
+_MAX_EVENTS = 100_000
 _MAX_ID = 128
 _MAX_URL = 2048
 _MAX_FREE_MINUTES = 10_000_000
@@ -67,33 +61,7 @@ _SENSITIVE_REF = re.compile(
 
 
 class PayoffPathError(ValueError):
-    """Raised when payoff-path evidence is structurally unsafe or unverifiable."""
-
-
-def _pairs_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in result:
-            raise PayoffPathError(f"duplicate JSON key: {key}")
-        result[key] = value
-    return result
-
-
-def load_strict_json(text: str) -> Any:
-    if type(text) is not str or len(text.encode("utf-8")) > _MAX_INPUT_BYTES:
-        raise PayoffPathError("JSON input is missing or too large")
-    try:
-        return json.loads(
-            text,
-            object_pairs_hook=_pairs_object,
-            parse_constant=lambda value: (_ for _ in ()).throw(
-                PayoffPathError(f"non-finite JSON constant: {value}")
-            ),
-        )
-    except PayoffPathError:
-        raise
-    except (json.JSONDecodeError, TypeError, ValueError) as exc:
-        raise PayoffPathError("invalid JSON") from exc
+    """Raised when payoff-path evidence is structurally unsafe or continuity-invalid."""
 
 
 def _canonical_json(value: Any) -> str:
@@ -139,12 +107,25 @@ def _sha(value: Any, name: str) -> str:
     return _text(value, name, pattern=_HEX64, limit=64)
 
 
+def _nullable_sha(value: Any, name: str) -> str | None:
+    if value is None:
+        return None
+    return _sha(value, name)
+
+
 def _int(value: Any, name: str, *, minimum: int = 0, maximum: int = _SAFE_INT) -> int:
     if type(value) is not int:
         raise PayoffPathError(f"{name} must be an integer (bool is not accepted)")
     if value < minimum or value > maximum:
         raise PayoffPathError(f"{name} must be between {minimum} and {maximum}")
     return value
+
+
+def _render_timestamp(value: datetime) -> str:
+    if value.tzinfo is None:
+        raise PayoffPathError("trusted time must be timezone-aware")
+    utc = value.astimezone(timezone.utc)
+    return utc.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
 
 def _timestamp(value: Any, name: str) -> datetime:
@@ -160,13 +141,6 @@ def _timestamp(value: Any, name: str) -> datetime:
     return parsed
 
 
-def _render_timestamp(value: datetime) -> str:
-    if value.tzinfo is None:
-        raise PayoffPathError("trusted time must be timezone-aware")
-    utc = value.astimezone(timezone.utc)
-    return utc.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
-
-
 def _trusted_now(value: datetime | str | None) -> datetime:
     if value is None:
         value = datetime.now(timezone.utc)
@@ -174,8 +148,7 @@ def _trusted_now(value: datetime | str | None) -> datetime:
         return _timestamp(value, "trusted_as_of")
     if not isinstance(value, datetime) or value.tzinfo is None:
         raise PayoffPathError("trusted_as_of must be timezone-aware datetime or canonical UTC string")
-    rendered = _render_timestamp(value)
-    return _timestamp(rendered, "trusted_as_of")
+    return _timestamp(_render_timestamp(value), "trusted_as_of")
 
 
 def _https_url(value: Any, name: str) -> str:
@@ -195,7 +168,6 @@ def _normalize_value(raw: Any, name: str) -> dict[str, Any]:
     kind = _text(value["kind"], f"{name}.kind")
     if kind not in VALUE_KINDS:
         raise PayoffPathError(f"{name}.kind is unsupported")
-
     currency = value["currency"]
     amount = value["amount_minor"]
     if kind in {"FIXED", "POOL"}:
@@ -203,20 +175,14 @@ def _normalize_value(raw: Any, name: str) -> dict[str, Any]:
         amount = _int(amount, f"{name}.amount_minor", minimum=1)
     else:
         if currency is not None or amount is not None:
-            raise PayoffPathError(
-                f"{name} cannot attach invented numeric value to {kind}; currency and amount_minor must be null"
-            )
+            raise PayoffPathError(f"{name} cannot attach invented numeric value to {kind}")
         currency = None
         amount = None
     return {"kind": kind, "currency": currency, "amount_minor": amount}
 
 
 def _normalize_source(raw: Any, name: str) -> dict[str, Any]:
-    source = _exact_keys(
-        raw,
-        {"canonical_url", "evidence_ref", "evidence_sha256", "observed_at_utc", "max_age_days"},
-        name,
-    )
+    source = _exact_keys(raw, {"canonical_url", "evidence_ref", "evidence_sha256", "observed_at_utc", "max_age_days"}, name)
     return {
         "canonical_url": _https_url(source["canonical_url"], f"{name}.canonical_url"),
         "evidence_ref": _opaque_ref(source["evidence_ref"], f"{name}.evidence_ref"),
@@ -247,85 +213,278 @@ def _normalize_path(raw: Any, name: str) -> dict[str, Any] | None:
     mechanism = _text(path["mechanism"], f"{name}.mechanism")
     if mechanism not in MECHANISMS:
         raise PayoffPathError(f"{name}.mechanism is unsupported")
-    normalized_source = _normalize_source(path["source"], f"{name}.source")
-    normalized_conversion = _normalize_conversion(path["conversion"], f"{name}.conversion", mechanism)
     return {
         "mechanism": mechanism,
         "value": _normalize_value(path["value"], f"{name}.value"),
-        "source": normalized_source,
-        "conversion": normalized_conversion,
+        "source": _normalize_source(path["source"], f"{name}.source"),
+        "conversion": _normalize_conversion(path["conversion"], f"{name}.conversion", mechanism),
+    }
+
+
+def _normalize_policy(raw: Any, name: str) -> dict[str, Any]:
+    policy = _exact_keys(raw, {
+        "policy_id", "generation", "cap_minutes", "observed_at_utc",
+        "evidence_ref", "evidence_sha256", "predecessor_policy_sha256",
+        "supersedes_receipt_sha256",
+    }, name)
+    return {
+        "policy_id": _opaque_ref(policy["policy_id"], f"{name}.policy_id"),
+        "generation": _int(policy["generation"], f"{name}.generation", minimum=1, maximum=_MAX_ITEMS),
+        "cap_minutes": _int(policy["cap_minutes"], f"{name}.cap_minutes", minimum=1, maximum=_MAX_FREE_MINUTES),
+        "observed_at_utc": _render_timestamp(_timestamp(policy["observed_at_utc"], f"{name}.observed_at_utc")),
+        "evidence_ref": _opaque_ref(policy["evidence_ref"], f"{name}.evidence_ref"),
+        "evidence_sha256": _sha(policy["evidence_sha256"], f"{name}.evidence_sha256"),
+        "predecessor_policy_sha256": _nullable_sha(policy["predecessor_policy_sha256"], f"{name}.predecessor_policy_sha256"),
+        "supersedes_receipt_sha256": _nullable_sha(policy["supersedes_receipt_sha256"], f"{name}.supersedes_receipt_sha256"),
+    }
+
+
+def _normalize_event(raw: Any, name: str, work_id: str, opportunity_id: str) -> dict[str, Any]:
+    event = _exact_keys(raw, {"event_id", "work_id", "opportunity_id", "minutes", "observed_at_utc", "evidence_ref", "evidence_sha256"}, name)
+    normalized = {
+        "event_id": _opaque_ref(event["event_id"], f"{name}.event_id"),
+        "work_id": _opaque_ref(event["work_id"], f"{name}.work_id"),
+        "opportunity_id": _opaque_ref(event["opportunity_id"], f"{name}.opportunity_id"),
+        "minutes": _int(event["minutes"], f"{name}.minutes", minimum=1, maximum=_MAX_FREE_MINUTES),
+        "observed_at_utc": _render_timestamp(_timestamp(event["observed_at_utc"], f"{name}.observed_at_utc")),
+        "evidence_ref": _opaque_ref(event["evidence_ref"], f"{name}.evidence_ref"),
+        "evidence_sha256": _sha(event["evidence_sha256"], f"{name}.evidence_sha256"),
+    }
+    if normalized["work_id"] != work_id or normalized["opportunity_id"] != opportunity_id:
+        raise PayoffPathError(f"{name} identity does not match owning work/opportunity")
+    return normalized
+
+
+def _normalize_continuity_row(raw: Any, name: str) -> dict[str, Any]:
+    row = _exact_keys(raw, {
+        "work_id", "opportunity_id", "policy_generation", "policy_sha256",
+        "policy_history", "event_fingerprints", "spent_minutes", "terminal_stop",
+    }, name)
+    work_id = _opaque_ref(row["work_id"], f"{name}.work_id")
+    opportunity_id = _opaque_ref(row["opportunity_id"], f"{name}.opportunity_id")
+
+    history = row["policy_history"]
+    if type(history) is not list or not history or len(history) > _MAX_ITEMS:
+        raise PayoffPathError(f"{name}.policy_history must be a bounded non-empty array")
+    normalized_history = []
+    expected_generation = 1
+    for i, raw_policy in enumerate(history):
+        entry = _exact_keys(raw_policy, {"generation", "policy_sha256"}, f"{name}.policy_history[{i}]")
+        generation = _int(entry["generation"], f"{name}.policy_history[{i}].generation", minimum=1, maximum=_MAX_ITEMS)
+        if generation != expected_generation:
+            raise PayoffPathError(f"{name}.policy_history must contain contiguous generations from 1")
+        normalized_history.append({
+            "generation": generation,
+            "policy_sha256": _sha(entry["policy_sha256"], f"{name}.policy_history[{i}].policy_sha256"),
+        })
+        expected_generation += 1
+
+    fps = row["event_fingerprints"]
+    if type(fps) is not list or len(fps) > _MAX_EVENTS:
+        raise PayoffPathError(f"{name}.event_fingerprints must be a bounded array")
+    normalized_fps = []
+    seen = set()
+    for i, raw_fp in enumerate(fps):
+        fp = _exact_keys(raw_fp, {"event_id", "event_sha256"}, f"{name}.event_fingerprints[{i}]")
+        event_id = _opaque_ref(fp["event_id"], f"{name}.event_fingerprints[{i}].event_id")
+        if event_id in seen:
+            raise PayoffPathError(f"duplicate predecessor event_id: {event_id}")
+        seen.add(event_id)
+        normalized_fps.append({"event_id": event_id, "event_sha256": _sha(fp["event_sha256"], f"{name}.event_fingerprints[{i}].event_sha256")})
+    normalized_fps.sort(key=lambda value: value["event_id"])
+    if type(row["terminal_stop"]) is not bool:
+        raise PayoffPathError(f"{name}.terminal_stop must be boolean")
+    policy_generation = _int(row["policy_generation"], f"{name}.policy_generation", minimum=1, maximum=_MAX_ITEMS)
+    policy_sha256 = _sha(row["policy_sha256"], f"{name}.policy_sha256")
+    if normalized_history[-1] != {"generation": policy_generation, "policy_sha256": policy_sha256}:
+        raise PayoffPathError(f"{name}.policy_history must end at the current policy generation/digest")
+    return {
+        "work_id": work_id,
+        "opportunity_id": opportunity_id,
+        "policy_generation": policy_generation,
+        "policy_sha256": policy_sha256,
+        "policy_history": normalized_history,
+        "event_fingerprints": normalized_fps,
+        "spent_minutes": _int(row["spent_minutes"], f"{name}.spent_minutes", minimum=0, maximum=_SAFE_INT),
+        "terminal_stop": row["terminal_stop"],
+    }
+
+
+def _normalize_receipt(raw: Any, name: str = "predecessor_receipt") -> dict[str, Any]:
+    receipt = _exact_keys(raw, {"schema", "evaluated_at_utc", "source_document_sha256", "packet_sha256", "markdown_sha256", "predecessor_receipt_sha256", "continuity"}, name)
+    if receipt["schema"] != RECEIPT_SCHEMA:
+        raise PayoffPathError(f"{name}.schema must be {RECEIPT_SCHEMA}")
+    rows = receipt["continuity"]
+    if type(rows) is not list or len(rows) > _MAX_ITEMS:
+        raise PayoffPathError(f"{name}.continuity must be a bounded array")
+    normalized_rows = []
+    seen = set()
+    for i, raw_row in enumerate(rows):
+        row = _normalize_continuity_row(raw_row, f"{name}.continuity[{i}]")
+        if row["work_id"] in seen:
+            raise PayoffPathError(f"duplicate predecessor work_id: {row['work_id']}")
+        seen.add(row["work_id"])
+        normalized_rows.append(row)
+    normalized_rows.sort(key=lambda value: value["work_id"])
+    return {
+        "schema": RECEIPT_SCHEMA,
+        "evaluated_at_utc": _render_timestamp(_timestamp(receipt["evaluated_at_utc"], f"{name}.evaluated_at_utc")),
+        "source_document_sha256": _sha(receipt["source_document_sha256"], f"{name}.source_document_sha256"),
+        "packet_sha256": _sha(receipt["packet_sha256"], f"{name}.packet_sha256"),
+        "markdown_sha256": _sha(receipt["markdown_sha256"], f"{name}.markdown_sha256"),
+        "predecessor_receipt_sha256": _nullable_sha(receipt["predecessor_receipt_sha256"], f"{name}.predecessor_receipt_sha256"),
+        "continuity": normalized_rows,
     }
 
 
 def _normalize_document(document: Any) -> dict[str, Any]:
-    root = _exact_keys(document, {"schema", "work_items"}, "document")
+    if type(document) is dict and document.get("schema") == "payoff-path-work/v1":
+        raise PayoffPathError(
+            f"document.schema must be {WORK_SCHEMA}; legacy caller-authored spend snapshots are not accepted"
+        )
+    root = _exact_keys(document, {"schema", "predecessor_receipt", "work_items"}, "document")
     if root["schema"] != WORK_SCHEMA:
-        raise PayoffPathError(f"document.schema must be {WORK_SCHEMA}")
+        raise PayoffPathError(f"document.schema must be {WORK_SCHEMA}; legacy caller-authored spend snapshots are not accepted")
+    predecessor = None if root["predecessor_receipt"] is None else _normalize_receipt(root["predecessor_receipt"])
     items = root["work_items"]
-    if type(items) is not list:
-        raise PayoffPathError("document.work_items must be an array")
-    if len(items) > _MAX_ITEMS:
-        raise PayoffPathError("document.work_items exceeds item limit")
-
-    normalized: list[dict[str, Any]] = []
-    seen: set[str] = set()
+    if type(items) is not list or len(items) > _MAX_ITEMS:
+        raise PayoffPathError("document.work_items must be a bounded array")
+    normalized = []
+    seen_work = set()
     for index, raw in enumerate(items):
-        item = _exact_keys(
-            raw,
-            {
-                "work_id",
-                "opportunity_id",
-                "started_at_utc",
-                "free_work_budget_minutes",
-                "free_work_spent_minutes",
-                "payoff_path",
-            },
-            f"work_items[{index}]",
-        )
+        item = _exact_keys(raw, {"work_id", "opportunity_id", "started_at_utc", "budget_policy", "effort_events", "payoff_path"}, f"work_items[{index}]")
         work_id = _opaque_ref(item["work_id"], f"work_items[{index}].work_id")
-        if work_id in seen:
+        opportunity_id = _opaque_ref(item["opportunity_id"], f"work_items[{index}].opportunity_id")
+        if work_id in seen_work:
             raise PayoffPathError(f"duplicate work_id: {work_id}")
-        seen.add(work_id)
-        normalized.append(
-            {
-                "work_id": work_id,
-                "opportunity_id": _opaque_ref(item["opportunity_id"], f"work_items[{index}].opportunity_id"),
-                "started_at_utc": _render_timestamp(
-                    _timestamp(item["started_at_utc"], f"work_items[{index}].started_at_utc")
-                ),
-                "free_work_budget_minutes": _int(
-                    item["free_work_budget_minutes"],
-                    f"work_items[{index}].free_work_budget_minutes",
-                    minimum=1,
-                    maximum=_MAX_FREE_MINUTES,
-                ),
-                "free_work_spent_minutes": _int(
-                    item["free_work_spent_minutes"],
-                    f"work_items[{index}].free_work_spent_minutes",
-                    minimum=0,
-                    maximum=_MAX_FREE_MINUTES,
-                ),
-                "payoff_path": _normalize_path(item["payoff_path"], f"work_items[{index}].payoff_path"),
-            }
-        )
-    normalized.sort(key=lambda row: row["work_id"])
-    return {"schema": WORK_SCHEMA, "work_items": normalized}
+        seen_work.add(work_id)
+        events = item["effort_events"]
+        if type(events) is not list or len(events) > _MAX_EVENTS:
+            raise PayoffPathError(f"work_items[{index}].effort_events must be a bounded array")
+        normalized_events = []
+        seen_events = set()
+        total = 0
+        for event_index, raw_event in enumerate(events):
+            event = _normalize_event(raw_event, f"work_items[{index}].effort_events[{event_index}]", work_id, opportunity_id)
+            if event["event_id"] in seen_events:
+                raise PayoffPathError(f"duplicate effort event_id in {work_id}: {event['event_id']}")
+            seen_events.add(event["event_id"])
+            total += event["minutes"]
+            if total > _SAFE_INT:
+                raise PayoffPathError(f"derived effort total too large for {work_id}")
+            normalized_events.append(event)
+        normalized_events.sort(key=lambda value: value["event_id"])
+        normalized.append({
+            "work_id": work_id,
+            "opportunity_id": opportunity_id,
+            "started_at_utc": _render_timestamp(_timestamp(item["started_at_utc"], f"work_items[{index}].started_at_utc")),
+            "budget_policy": _normalize_policy(item["budget_policy"], f"work_items[{index}].budget_policy"),
+            "effort_events": normalized_events,
+            "payoff_path": _normalize_path(item["payoff_path"], f"work_items[{index}].payoff_path"),
+        })
+    normalized.sort(key=lambda value: value["work_id"])
+    return {"schema": WORK_SCHEMA, "predecessor_receipt": predecessor, "work_items": normalized}
 
 
-def _evaluate_item(item: dict[str, Any], as_of: datetime) -> dict[str, Any]:
-    budget = item["free_work_budget_minutes"]
-    spent = item["free_work_spent_minutes"]
+def _event_fingerprints(item: dict[str, Any]) -> list[dict[str, str]]:
+    return [{"event_id": event["event_id"], "event_sha256": _digest(event)} for event in item["effort_events"]]
+
+
+def _spent(item: dict[str, Any]) -> int:
+    return sum(event["minutes"] for event in item["effort_events"])
+
+
+def _enforce_continuity(document: dict[str, Any], as_of: datetime) -> set[str]:
+    """Validate the current immutable ledger against the embedded predecessor receipt.
+
+    Returns work IDs whose prior terminal STOP was explicitly superseded by a new
+    owner cap generation and whose new cap now exceeds cumulative effort.
+    """
+    predecessor = document["predecessor_receipt"]
+    items = {item["work_id"]: item for item in document["work_items"]}
+    reopened = set()
+
+    if predecessor is None:
+        for item in items.values():
+            policy = item["budget_policy"]
+            if policy["generation"] != 1 or policy["predecessor_policy_sha256"] is not None or policy["supersedes_receipt_sha256"] is not None:
+                raise PayoffPathError(f"initial work {item['work_id']} must start at policy generation 1 with null predecessor links")
+        return reopened
+
+    prior_time = _timestamp(predecessor["evaluated_at_utc"], "predecessor_receipt.evaluated_at_utc")
+    if prior_time > as_of:
+        raise PayoffPathError("predecessor receipt is from the future")
+    predecessor_digest = _digest(predecessor)
+    previous = {row["work_id"]: row for row in predecessor["continuity"]}
+    missing = sorted(set(previous) - set(items))
+    if missing:
+        raise PayoffPathError(f"successor omitted prior work continuity: {missing}")
+
+    for work_id, item in items.items():
+        policy = item["budget_policy"]
+        current_fps = {row["event_id"]: row["event_sha256"] for row in _event_fingerprints(item)}
+        prior = previous.get(work_id)
+        if prior is None:
+            if policy["generation"] != 1 or policy["predecessor_policy_sha256"] is not None or policy["supersedes_receipt_sha256"] is not None:
+                raise PayoffPathError(f"new work {work_id} must start at policy generation 1")
+            continue
+        if item["opportunity_id"] != prior["opportunity_id"]:
+            raise PayoffPathError(f"cross-opportunity receipt transplant for {work_id}")
+
+        for fingerprint in prior["event_fingerprints"]:
+            event_id = fingerprint["event_id"]
+            if event_id not in current_fps:
+                raise PayoffPathError(f"successor omitted prior effort event {work_id}/{event_id}")
+            if current_fps[event_id] != fingerprint["event_sha256"]:
+                raise PayoffPathError(f"successor mutated prior effort event {work_id}/{event_id}")
+        if _spent(item) < prior["spent_minutes"]:
+            raise PayoffPathError(f"successor reduced cumulative effort for {work_id}")
+
+        prior_ids = {row["event_id"] for row in prior["event_fingerprints"]}
+        for event in item["effort_events"]:
+            if event["event_id"] not in prior_ids and _timestamp(event["observed_at_utc"], "new effort observed_at_utc") <= prior_time:
+                raise PayoffPathError(f"new effort event backdates predecessor receipt for {work_id}/{event['event_id']}")
+
+        current_policy_digest = _digest(policy)
+        if policy["generation"] == prior["policy_generation"]:
+            if current_policy_digest != prior["policy_sha256"]:
+                raise PayoffPathError(f"same-generation owner budget policy changed for {work_id}")
+        elif policy["generation"] == prior["policy_generation"] + 1:
+            if policy["predecessor_policy_sha256"] != prior["policy_sha256"]:
+                raise PayoffPathError(f"owner budget policy predecessor mismatch for {work_id}")
+            if policy["supersedes_receipt_sha256"] != predecessor_digest:
+                raise PayoffPathError(f"owner budget policy does not supersede exact predecessor receipt for {work_id}")
+            if _timestamp(policy["observed_at_utc"], "successor policy observed_at_utc") <= prior_time:
+                raise PayoffPathError(f"successor owner budget policy predates predecessor receipt for {work_id}")
+            if prior["terminal_stop"] and _spent(item) < policy["cap_minutes"]:
+                reopened.add(work_id)
+        else:
+            raise PayoffPathError(f"owner budget policy generation must stay fixed or advance exactly once for {work_id}")
+    return reopened
+
+
+def _evaluate_item(item: dict[str, Any], as_of: datetime, reopened: bool = False) -> dict[str, Any]:
+    policy = item["budget_policy"]
+    budget = policy["cap_minutes"]
+    spent = _spent(item)
     remaining = max(budget - spent, 0)
-    reasons: list[str] = []
+    reasons = []
+    invalid = False
 
-    started_at = _timestamp(item["started_at_utc"], "normalized.started_at_utc")
-    if started_at > as_of:
-        reasons.append("WORK_STARTS_IN_FUTURE")
+    if _timestamp(item["started_at_utc"], "normalized.started_at_utc") > as_of:
+        reasons.append("WORK_STARTS_IN_FUTURE"); invalid = True
+    if _timestamp(policy["observed_at_utc"], "normalized.policy.observed_at_utc") > as_of:
+        reasons.append("OWNER_BUDGET_POLICY_FROM_FUTURE"); invalid = True
+    for event in item["effort_events"]:
+        if _timestamp(event["observed_at_utc"], "normalized.effort.observed_at_utc") > as_of:
+            reasons.append("EFFORT_EVENT_FROM_FUTURE"); invalid = True; break
 
     path = item["payoff_path"]
     if spent >= budget:
         state = "STOP_UNPAID_WORK"
         reasons.append("FREE_WORK_BUDGET_EXHAUSTED")
+    elif invalid:
+        state = "HOLD_STALE_OR_INVALID"
     elif path is None:
         state = "HOLD_NO_PAYOFF_PATH"
         reasons.append("NO_EVIDENCE_BACKED_COMPENSATION_PATH")
@@ -336,10 +495,8 @@ def _evaluate_item(item: dict[str, Any], as_of: datetime) -> dict[str, Any]:
         due = _timestamp(conversion["due_at_utc"], "normalized.conversion.due_at_utc")
         if observed > as_of:
             reasons.append("SOURCE_EVIDENCE_FROM_FUTURE")
-        else:
-            max_age = timedelta(days=source["max_age_days"])
-            if as_of - observed > max_age:
-                reasons.append("SOURCE_EVIDENCE_STALE")
+        elif as_of - observed > timedelta(days=source["max_age_days"]):
+            reasons.append("SOURCE_EVIDENCE_STALE")
         if due <= as_of:
             reasons.append("CONVERSION_DEADLINE_EXPIRED")
         if due <= observed:
@@ -348,16 +505,15 @@ def _evaluate_item(item: dict[str, Any], as_of: datetime) -> dict[str, Any]:
             state = "HOLD_STALE_OR_INVALID"
         else:
             state = "READY_FOR_OWNER_SPECULATIVE_WORK_REVIEW"
-            reasons.append("PAYOFF_PATH_CURRENT_AND_FREE_WORK_WITHIN_CAP")
+            reasons.append("PAYOFF_PATH_CURRENT_AND_DERIVED_EFFORT_WITHIN_OWNER_CAP")
 
-    if state not in STATES:  # defensive invariant
-        raise PayoffPathError("internal invalid state")
+    if reopened and "OWNER_CAP_GENERATION_EXPLICITLY_REOPENED_PREVIOUS_STOP" not in reasons:
+        reasons.append("OWNER_CAP_GENERATION_EXPLICITLY_REOPENED_PREVIOUS_STOP")
 
-    path_summary: dict[str, Any] | None = None
+    path_summary = None
     if path is not None:
         path_summary = {
-            "mechanism": path["mechanism"],
-            "value": path["value"],
+            "mechanism": path["mechanism"], "value": path["value"],
             "canonical_source_url": path["source"]["canonical_url"],
             "source_evidence_ref": path["source"]["evidence_ref"],
             "source_evidence_sha256": path["source"]["evidence_sha256"],
@@ -367,15 +523,17 @@ def _evaluate_item(item: dict[str, Any], as_of: datetime) -> dict[str, Any]:
             "conversion_evidence_ref": path["conversion"]["evidence_ref"],
             "conversion_evidence_sha256": path["conversion"]["evidence_sha256"],
         }
-
     return {
-        "work_id": item["work_id"],
-        "opportunity_id": item["opportunity_id"],
-        "state": state,
-        "reasons": reasons,
+        "work_id": item["work_id"], "opportunity_id": item["opportunity_id"],
+        "state": state, "reasons": reasons,
+        "budget_policy_id": policy["policy_id"],
+        "budget_policy_generation": policy["generation"],
+        "budget_policy_sha256": _digest(policy),
         "free_work_budget_minutes": budget,
         "free_work_spent_minutes": spent,
         "free_work_remaining_minutes": remaining,
+        "effort_event_count": len(item["effort_events"]),
+        "effort_ledger_sha256": _digest(_event_fingerprints(item)),
         "payoff_path": path_summary,
     }
 
@@ -384,8 +542,7 @@ def _summary(rows: Iterable[dict[str, Any]]) -> dict[str, int]:
     result = {state: 0 for state in sorted(STATES)}
     total = 0
     for row in rows:
-        total += 1
-        result[row["state"]] += 1
+        total += 1; result[row["state"]] += 1
     return {"total_items": total, **result}
 
 
@@ -393,133 +550,151 @@ def render_markdown(packet: dict[str, Any]) -> str:
     if type(packet) is not dict or packet.get("schema") != PACKET_SCHEMA:
         raise PayoffPathError(f"packet must be {PACKET_SCHEMA}")
     lines = [
-        "# Payoff Path Gate Review",
-        "",
+        "# Payoff Path Gate Review", "",
         f"Evaluated at: `{packet['evaluated_at_utc']}`",
         f"Source document SHA-256: `{packet['source_document_sha256']}`",
-        "",
-        "> READY means owner review only. It does not authorize outreach, submission, spend, delivery, payment action, or a revenue claim.",
-        "",
+        f"Predecessor receipt SHA-256: `{packet['predecessor_receipt_sha256'] or 'GENESIS'}`", "",
+        "> READY means owner review only. It does not authorize outreach, submission, spend, delivery, payment action, or a revenue claim.", "",
     ]
     if not packet["results"]:
         lines.append("No speculative work items were supplied.")
     for row in packet["results"]:
-        lines.extend(
-            [
-                f"## {row['work_id']}",
-                "",
-                f"- Opportunity: `{row['opportunity_id']}`",
-                f"- State: **{row['state']}**",
-                f"- Unpaid budget: `{row['free_work_budget_minutes']}` min; spent: `{row['free_work_spent_minutes']}` min; remaining: `{row['free_work_remaining_minutes']}` min",
-                f"- Reasons: {', '.join('`' + reason + '`' for reason in row['reasons'])}",
-            ]
-        )
+        lines.extend([
+            f"## {row['work_id']}", "",
+            f"- Opportunity: `{row['opportunity_id']}`",
+            f"- State: **{row['state']}**",
+            f"- Owner cap policy: `{row['budget_policy_id']}` generation `{row['budget_policy_generation']}` / `{row['budget_policy_sha256']}`",
+            f"- Unpaid cap: `{row['free_work_budget_minutes']}` min; derived immutable effort: `{row['free_work_spent_minutes']}` min; remaining: `{row['free_work_remaining_minutes']}` min",
+            f"- Effort ledger: `{row['effort_event_count']}` events / `{row['effort_ledger_sha256']}`",
+            f"- Reasons: {', '.join('`' + reason + '`' for reason in row['reasons'])}",
+        ])
         path = row["payoff_path"]
         if path is None:
             lines.append("- Payoff path: **none evidenced**")
         else:
             value = path["value"]
-            if value["kind"] in {"FIXED", "POOL"}:
-                value_text = f"{value['kind']} {value['currency']} {value['amount_minor']} minor units"
-            else:
-                value_text = value["kind"]
-            lines.extend(
-                [
-                    f"- Mechanism: `{path['mechanism']}`; source value state: `{value_text}`",
-                    f"- Source: `{path['canonical_source_url']}`",
-                    f"- Source evidence: `{path['source_evidence_ref']}` / `{path['source_evidence_sha256']}`",
-                    f"- Next conversion: `{path['conversion_event']}` by `{path['conversion_due_at_utc']}`",
-                ]
-            )
+            value_text = (f"{value['kind']} {value['currency']} {value['amount_minor']} minor units" if value["kind"] in {"FIXED", "POOL"} else value["kind"])
+            lines.extend([
+                f"- Mechanism: `{path['mechanism']}`; source value state: `{value_text}`",
+                f"- Source: `{path['canonical_source_url']}`",
+                f"- Source evidence: `{path['source_evidence_ref']}` / `{path['source_evidence_sha256']}`",
+                f"- Next conversion: `{path['conversion_event']}` by `{path['conversion_due_at_utc']}`",
+            ])
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
 
 def compile_gate(document: Any, trusted_as_of: datetime | str | None = None) -> tuple[dict[str, Any], str, dict[str, Any]]:
-    """Compile deterministic owner-review evidence.
-
-    Production callers should omit ``trusted_as_of`` so process UTC is authoritative.
-    Tests and historical replay may inject an explicit trusted time through this library
-    function; the command-line compile path intentionally exposes no as-of override.
-    """
-
     as_of = _trusted_now(trusted_as_of)
     normalized = _normalize_document(document)
-    rows = [_evaluate_item(item, as_of) for item in normalized["work_items"]]
+    reopened = _enforce_continuity(normalized, as_of)
+    rows = [_evaluate_item(item, as_of, item["work_id"] in reopened) for item in normalized["work_items"]]
+    predecessor = normalized["predecessor_receipt"]
+    predecessor_digest = None if predecessor is None else _digest(predecessor)
     packet = {
         "schema": PACKET_SCHEMA,
         "evaluated_at_utc": _render_timestamp(as_of),
         "source_document_sha256": _digest(normalized),
-        "summary": _summary(rows),
-        "results": rows,
-        "authority": "OWNER_REVIEW_ONLY_NO_EXTERNAL_ACTION",
+        "predecessor_receipt_sha256": predecessor_digest,
+        "summary": _summary(rows), "results": rows, "authority": AUTHORITY,
     }
     markdown = render_markdown(packet)
+    by_id = {item["work_id"]: item for item in normalized["work_items"]}
+    prior_rows = {} if predecessor is None else {row["work_id"]: row for row in predecessor["continuity"]}
+    continuity = []
+    for row in rows:
+        item = by_id[row["work_id"]]
+        prior_row = prior_rows.get(row["work_id"])
+        current_policy = {"generation": row["budget_policy_generation"], "policy_sha256": row["budget_policy_sha256"]}
+        if prior_row is None:
+            history = [current_policy]
+        elif prior_row["policy_generation"] == row["budget_policy_generation"]:
+            history = list(prior_row["policy_history"])
+        else:
+            history = [*prior_row["policy_history"], current_policy]
+        continuity.append({
+            "work_id": row["work_id"], "opportunity_id": row["opportunity_id"],
+            "policy_generation": row["budget_policy_generation"],
+            "policy_sha256": row["budget_policy_sha256"],
+            "policy_history": history,
+            "event_fingerprints": _event_fingerprints(item),
+            "spent_minutes": row["free_work_spent_minutes"],
+            "terminal_stop": row["state"] == "STOP_UNPAID_WORK",
+        })
     receipt = {
         "schema": RECEIPT_SCHEMA,
+        "evaluated_at_utc": packet["evaluated_at_utc"],
         "source_document_sha256": packet["source_document_sha256"],
         "packet_sha256": _digest(packet),
         "markdown_sha256": _sha256_bytes(markdown.encode("utf-8")),
+        "predecessor_receipt_sha256": predecessor_digest,
+        "continuity": continuity,
     }
     return packet, markdown, receipt
 
 
-def verify_gate(
-    document: Any,
-    packet: Any,
-    markdown: Any,
-    receipt: Any,
-    trusted_now: datetime | str | None = None,
-) -> bool:
-    """Verify content-addressed evidence and re-check temporal validity at trusted now."""
-
+def verify_gate(document: Any, packet: Any, markdown: Any, receipt: Any, trusted_now: datetime | str | None = None) -> bool:
     now = _trusted_now(trusted_now)
     normalized = _normalize_document(document)
-    packet_obj = _exact_keys(
-        packet,
-        {"schema", "evaluated_at_utc", "source_document_sha256", "summary", "results", "authority"},
-        "packet",
-    )
-    if packet_obj["schema"] != PACKET_SCHEMA or packet_obj["authority"] != "OWNER_REVIEW_ONLY_NO_EXTERNAL_ACTION":
+    packet_obj = _exact_keys(packet, {"schema", "evaluated_at_utc", "source_document_sha256", "predecessor_receipt_sha256", "summary", "results", "authority"}, "packet")
+    if packet_obj["schema"] != PACKET_SCHEMA or packet_obj["authority"] != AUTHORITY:
         raise PayoffPathError("packet schema or authority is invalid")
     evaluated = _timestamp(packet_obj["evaluated_at_utc"], "packet.evaluated_at_utc")
     if evaluated > now:
         raise PayoffPathError("packet evaluation time is in the future")
-    if packet_obj["source_document_sha256"] != _digest(normalized):
-        raise PayoffPathError("packet source document digest mismatch")
-
     expected_packet, expected_markdown, expected_receipt = compile_gate(normalized, evaluated)
     if packet_obj != expected_packet:
-        raise PayoffPathError("packet content does not match recompilation")
+        raise PayoffPathError("packet content does not match continuity-safe recompilation")
     if type(markdown) is not str or markdown != expected_markdown:
         raise PayoffPathError("Markdown content does not match recompilation")
-
-    receipt_obj = _exact_keys(
-        receipt,
-        {"schema", "source_document_sha256", "packet_sha256", "markdown_sha256"},
-        "receipt",
-    )
-    if receipt_obj["schema"] != RECEIPT_SCHEMA:
-        raise PayoffPathError("receipt schema is invalid")
-    for field in ("source_document_sha256", "packet_sha256", "markdown_sha256"):
-        _sha(receipt_obj[field], f"receipt.{field}")
+    receipt_obj = _normalize_receipt(receipt, "receipt")
     if receipt_obj != expected_receipt:
-        raise PayoffPathError("receipt content does not match exact packet/Markdown")
+        raise PayoffPathError("receipt content does not match exact packet/Markdown/continuity")
 
-    # The original packet remains content-verifiable, but READY may not be treated as
-    # current if evidence or a conversion deadline has expired since compilation.
-    current_rows = [_evaluate_item(item, now) for item in normalized["work_items"]]
+    reopened = _enforce_continuity(normalized, now)
+    current_rows = [_evaluate_item(item, now, item["work_id"] in reopened) for item in normalized["work_items"]]
     previous = {row["work_id"]: row for row in expected_packet["results"]}
     for row in current_rows:
         before = previous[row["work_id"]]
         if before["state"] == "READY_FOR_OWNER_SPECULATIVE_WORK_REVIEW" and row["state"] != before["state"]:
-            raise PayoffPathError(
-                f"previous READY item {row['work_id']} is no longer current at trusted verification time"
-            )
+            raise PayoffPathError(f"previous READY item {row['work_id']} is no longer current at trusted verification time")
     return True
 
 
-def _read_regular(path: Path) -> str:
+# Strict JSON + CLI/file boundary.  The public payoff_path_gate wrapper replaces the
+# four pathname primitives below with descriptor-bound equivalents; keeping these
+# hooks here preserves direct-library/CLI compatibility while semantics stay in this
+# continuity-safe core.
+def _pairs_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise PayoffPathError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def load_strict_json(text: str) -> Any:
+    if type(text) is not str or len(text.encode("utf-8")) > _MAX_INPUT_BYTES:
+        raise PayoffPathError("JSON input is missing or too large")
+    try:
+        return json.loads(
+            text,
+            object_pairs_hook=_pairs_object,
+            parse_constant=lambda value: (_ for _ in ()).throw(
+                PayoffPathError(f"non-finite JSON constant: {value}")
+            ),
+        )
+    except PayoffPathError:
+        raise
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        raise PayoffPathError("invalid JSON") from exc
+
+
+def _read_regular(path):
+    from pathlib import Path
+    import stat
+    path = Path(path)
     try:
         info = path.lstat()
     except OSError as exc:
@@ -534,19 +709,25 @@ def _read_regular(path: Path) -> str:
         raise PayoffPathError(f"cannot read UTF-8 input: {path}") from exc
 
 
-def _preflight_output(path: Path) -> None:
+def _preflight_output(path) -> None:
+    from pathlib import Path
+    path = Path(path)
     try:
         info = path.lstat()
     except FileNotFoundError:
         return
     except OSError as exc:
         raise PayoffPathError(f"cannot stat output: {path}") from exc
+    import stat
     if stat.S_ISLNK(info.st_mode):
         raise PayoffPathError(f"refusing final symlink output: {path}")
     raise PayoffPathError(f"refusing to overwrite existing output: {path}")
 
 
-def _exclusive_write(path: Path, text: str) -> None:
+def _exclusive_write(path, text: str) -> None:
+    from pathlib import Path
+    import os
+    path = Path(path)
     _preflight_output(path)
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     if hasattr(os, "O_NOFOLLOW"):
@@ -568,17 +749,21 @@ def _exclusive_write(path: Path, text: str) -> None:
         raise
 
 
-def _publish_bundle(outputs: list[tuple[Path, str]]) -> None:
-    destinations = [path.resolve(strict=False) for path, _ in outputs]
+def _publish_bundle(outputs) -> None:
+    from pathlib import Path
+    import os
+    destinations = [Path(path).resolve(strict=False) for path, _ in outputs]
     if len(set(destinations)) != len(destinations):
         raise PayoffPathError("output paths must be distinct")
     for path, _ in outputs:
+        path = Path(path)
         _preflight_output(path)
         if not path.parent.exists() or not path.parent.is_dir():
             raise PayoffPathError(f"output parent must be an existing directory: {path.parent}")
-    created: list[Path] = []
+    created = []
     try:
         for path, text in outputs:
+            path = Path(path)
             _exclusive_write(path, text)
             created.append(path)
     except Exception:
@@ -590,21 +775,21 @@ def _publish_bundle(outputs: list[tuple[Path, str]]) -> None:
         raise
 
 
-def _compile_command(args: argparse.Namespace) -> int:
+def _compile_command(args) -> int:
+    from pathlib import Path
     document = load_strict_json(_read_regular(Path(args.input)))
     packet, markdown, receipt = compile_gate(document)
-    _publish_bundle(
-        [
-            (Path(args.packet), _canonical_json(packet) + "\n"),
-            (Path(args.markdown), markdown),
-            (Path(args.receipt), _canonical_json(receipt) + "\n"),
-        ]
-    )
+    _publish_bundle([
+        (Path(args.packet), _canonical_json(packet) + "\n"),
+        (Path(args.markdown), markdown),
+        (Path(args.receipt), _canonical_json(receipt) + "\n"),
+    ])
     print(_canonical_json(receipt))
     return 0
 
 
-def _verify_command(args: argparse.Namespace) -> int:
+def _verify_command(args) -> int:
+    from pathlib import Path
     document = load_strict_json(_read_regular(Path(args.input)))
     packet = load_strict_json(_read_regular(Path(args.packet)))
     markdown = _read_regular(Path(args.markdown))
@@ -614,18 +799,17 @@ def _verify_command(args: argparse.Namespace) -> int:
     return 0
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser():
+    import argparse
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-
-    compile_parser = sub.add_parser("compile", help="compile an owner-review payoff-path packet")
+    compile_parser = sub.add_parser("compile", help="compile a continuity-safe owner-review payoff-path packet")
     compile_parser.add_argument("--input", required=True)
     compile_parser.add_argument("--packet", required=True)
     compile_parser.add_argument("--markdown", required=True)
     compile_parser.add_argument("--receipt", required=True)
     compile_parser.set_defaults(func=_compile_command)
-
-    verify_parser = sub.add_parser("verify", help="verify exact inputs, packet, Markdown, receipt, and current temporal validity")
+    verify_parser = sub.add_parser("verify", help="verify exact inputs, continuity, packet, Markdown, receipt, and temporal validity")
     verify_parser.add_argument("--input", required=True)
     verify_parser.add_argument("--packet", required=True)
     verify_parser.add_argument("--markdown", required=True)
