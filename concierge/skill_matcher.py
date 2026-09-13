@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Dict, List
 
 # Default skill tags.  Overridden at runtime if data/skill_tags.json exists.
@@ -85,6 +86,21 @@ def _bounty_text(bounty: dict) -> str:
     return " ".join(parts).lower()
 
 
+def _keyword_matches(text: str, keyword: str) -> bool:
+    """Return whether *keyword* occurs as a complete token or phrase.
+
+    Skill keywords are semantic labels, not arbitrary substrings.  Word
+    boundaries prevent short tags such as ``ci``, ``go``, or ``rust`` from
+    matching unrelated words such as ``specific``, ``django``, or
+    ``trustworthy`` while still allowing punctuation-delimited labels and
+    multi-word phrases.
+    """
+    if not isinstance(keyword, str) or not keyword.strip():
+        return False
+    normalized = keyword.casefold()
+    return re.search(rf"(?<!\w){re.escape(normalized)}(?!\w)", text.casefold()) is not None
+
+
 def match_skills(bounty: dict, skills: List[str]) -> float:
     """Score how well *bounty* matches the given *skills* (0.0 -- 1.0).
 
@@ -101,7 +117,7 @@ def match_skills(bounty: dict, skills: List[str]) -> float:
     matched = 0
     for skill in skills:
         keywords = SKILL_TAGS.get(skill.lower(), [skill.lower()])
-        if any(kw in text for kw in keywords):
+        if any(_keyword_matches(text, kw) for kw in keywords):
             matched += 1
 
     return matched / len(skills)
