@@ -1,6 +1,25 @@
 # Revenue settlement evidence
 
-`concierge.revenue_closeout` deliberately stops at `cash_status=not_inferred`: merge state and advertised reward are not payment evidence. `concierge.revenue_settlement` is the next custody boundary. It can turn that status into `partially_verified` or `verified_paid`, but only when an operator explicitly binds exact RustChain wallet-history rows to a merged closeout item.
+`concierge.revenue_closeout` deliberately stops at `cash_status=not_inferred`: merge state and advertised reward are not payment evidence. `concierge.revenue_settlement` is the next custody boundary. It can turn that status into `partially_verified` or `verified_paid`, but only when an operator explicitly binds exact RustChain wallet-history rows to one merged closeout item.
+
+## Wallet provenance is part of the evidence
+
+Current RustChain `/wallet/history` responses identify the queried wallet in the canonical envelope:
+
+```json
+{
+  "ok": true,
+  "miner_id": "aliceRTC",
+  "transactions": [
+    {"type": "transfer_in", "amount": 10, "from": "treasury", "tx_hash": "..."}
+  ],
+  "total": 1
+}
+```
+
+A canonical `transfer_in` does not need a row-level `to`: its recipient is the exact wallet already validated by the history envelope (`miner_id == queried wallet`). Settlement therefore binds every row fingerprint to both the raw row and that wallet provenance. Copying identical row JSON into a different wallet capture produces a different evidence identity.
+
+Canonical `reward`, `ledger`, and `transfer_out` rows are never incoming bounty-cash evidence. Legacy typeless history rows remain compatible only when the row itself explicitly names the expected recipient.
 
 ## Workflow
 
@@ -8,15 +27,28 @@
 
    `python -m concierge.revenue_closeout closeout-manifest.json --json > closeout.json`
 
-2. Capture wallet history, or allow the settlement command to read it through the existing authenticated payout tracker. A captured history file uses:
+2. Obtain wallet history. Online reconciliation performs a read-only canonical `/wallet/history` query using the payout tracker's existing node/TLS configuration, requests explicit `limit`/`offset` pages, requires one stable `total`, and preserves the validated `miner_id` instead of reducing the response to bare rows. Legacy online wrappers are refused for settlement because they do not carry provider wallet provenance. For offline reconciliation, preserve wallet provenance in one of these forms:
+
+   Saved canonical RustChain response:
 
    ```json
-   {"schema_version": 1, "items": [{"amount": 10, "to": "wallet-name", "timestamp": "..."}]}
+   {"ok": true, "miner_id": "aliceRTC", "transactions": [], "total": 0}
    ```
 
-   Mixed wallet history is expected. Mining rewards and other unrelated rows remain fingerprintable, but they are not treated as settlement evidence unless explicitly selected—and non-payment/outgoing rows remain unbindable.
+   Normalized capture:
 
-3. Fingerprint the exact history rows with `history_row_sha256()` and create an operator-owned binding file:
+   ```json
+   {
+     "schema_version": 1,
+     "source": "rustchain_wallet_history",
+     "wallet": "aliceRTC",
+     "items": []
+   }
+   ```
+
+   Historical `{schema_version: 1, items: [...]}` files without wallet/source provenance are intentionally refused. A free `--wallet` argument must not reinterpret an unbound capture.
+
+3. Fingerprint selected rows with `history_row_sha256(row, wallet=<captured-wallet>)` and create an operator-owned binding file:
 
    ```json
    {
@@ -31,16 +63,20 @@
    }
    ```
 
-4. Reconcile:
+4. Reconcile online:
 
-   `python -m concierge.revenue_settlement closeout.json bindings.json --wallet wallet-name --history history.json --json`
+   `python -m concierge.revenue_settlement closeout.json bindings.json --wallet aliceRTC --json`
 
-   Omit `--history` to query the configured RustChain node through `payout_tracker.check_history()`.
+   Or against an offline capture:
+
+   `python -m concierge.revenue_settlement closeout.json bindings.json --wallet aliceRTC --history history.json --json`
 
 ## Authority boundaries
 
-The reconciler never sends a transfer, contacts a sponsor, changes a claim, or treats merge state as cash. It does not guess matches by amount or timestamp. A history row is usable only when it is explicitly selected by SHA-256, is terminal/confirmed under the existing payout-history contract, targets the expected wallet, is not an outgoing or self-funded transfer, and contributes no more than the advertised RTC amount. The same history row cannot settle two closeout items.
+The reconciler never sends a transfer, contacts a sponsor, changes a claim, or treats merge state as cash. It does not guess matches by amount or timestamp. A selected row is usable only when its evidence fingerprint is bound to the exact wallet, the history provenance equals the settlement wallet, the row is a canonical incoming transfer (or an offline/legacy typeless row with an explicit matching recipient), the row is terminal/confirmed, it is not outgoing or self-funded, and its exact RTC amount fits within the advertised amount. One row cannot settle two closeout items in the same reconciliation. Online settlement additionally rejects provider wallet mismatch, total drift, incomplete pages, and duplicate indistinguishable rows across the canonical pagination snapshot.
 
-Unrelated history rows do not have to satisfy payment semantics merely to coexist in a real wallet ledger. Payment semantics are enforced only for rows an operator explicitly binds to paid work; this avoids both false rejection of normal reward rows and heuristic attribution of unrelated cash.
+Mixed wallet history is expected. Unrelated reward/ledger/outgoing rows stay fingerprintable for audit but are classified unbindable instead of poisoning valid incoming evidence elsewhere in the same history.
 
-`verified_paid` means only that the explicitly bound wallet-history evidence exactly matches the advertised RTC amount. It does not infer contract acceptance, tax treatment, fiat value, or profit.
+Settlement sums and cash summaries use bounded high-precision local decimal arithmetic rather than Python's ambient 28-digit context, so accepted 30-digit values and 18 fractional places are compared and aggregated exactly.
+
+`verified_paid` means only that explicitly bound wallet-history evidence exactly matches the advertised RTC amount under these rules. It does not infer contract acceptance, tax treatment, fiat value, profit, or cryptographic authenticity of an operator-supplied offline capture.
