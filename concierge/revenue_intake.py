@@ -32,6 +32,16 @@ class RevenueIntakeInputError(ValueError):
 
 
 _DISPOSITION_RANK = {"ACTIONABLE": 0, "HOLD": 1, "REJECT": 2}
+_LIVE_SATURATION_THRESHOLD = 4
+
+
+def _effective_live_saturation_threshold(requested: int) -> int:
+    """Bind live dispatch to policy while permitting caller-only tightening."""
+    if isinstance(requested, bool) or not isinstance(requested, int) or requested <= 0:
+        raise RevenueIntakeInputError(
+            "live saturation_threshold must be a positive integer"
+        )
+    return min(requested, _LIVE_SATURATION_THRESHOLD)
 
 
 def _combined_disposition(*values: str) -> str:
@@ -154,10 +164,15 @@ def qualify_live_revenue_intake(
     pressure reads. The returned canonical issue URL is then used as reward
     evidence for provenance; reward *presence* still comes from the live
     qualification result, so a bare issue URL cannot manufacture a paid offer.
+
+    The live saturation policy is authoritative: callers may request a lower
+    threshold to tighten dispatch, but cannot raise the policy ceiling.
     """
     kwargs: dict[str, Any] = {
         "max_pages": max_pages,
-        "saturation_threshold": saturation_threshold,
+        "saturation_threshold": _effective_live_saturation_threshold(
+            saturation_threshold
+        ),
     }
     if session is not None:
         kwargs["session"] = session
@@ -250,7 +265,10 @@ def main(argv: list[str] | None = None) -> int:
         "--saturation-threshold",
         type=int,
         default=4,
-        help="hold dispatch at this many attempts/open PRs (default: 4)",
+        help=(
+            "snapshot/replay threshold; live mode may tighten below 4 but cannot "
+            "raise the authoritative ceiling of 4"
+        ),
     )
     parser.add_argument("--json", action="store_true", help="emit full result JSON")
     args = parser.parse_args(argv)
