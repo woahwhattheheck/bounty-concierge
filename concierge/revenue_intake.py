@@ -179,7 +179,7 @@ def qualify_live_revenue_intake(
 
     provenance = verify_source_provenance(
         {
-            "listing_url": listing_url or canonical_url,
+            "listing_url": canonical_url if listing_url is None else listing_url,
             "reward_evidence_urls": [canonical_url],
             "canonical_audit": audit,
         }
