@@ -36,7 +36,27 @@ _AMOUNT_BEFORE_REWARD_RE = re.compile(
 _LABEL_REWARD_RE = re.compile(
     r"(?<![\w.])\$([0-9][0-9,]*(?:\.[0-9]{1,2})?)\b"
 )
+
+_RTC_NUMBER = r"(?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(?:\.[0-9]+)?"
+_RTC_TOKEN_RE = re.compile(
+    rf"(?i)(?<![\w.,])({_RTC_NUMBER})\s*RTC\b"
+)
+_RTC_RANGE_RE = re.compile(
+    rf"(?i)(?<![\w.,])({_RTC_NUMBER})\s*[-–—]\s*({_RTC_NUMBER})\s*RTC\b"
+)
+_RTC_KEYWORD_REWARD_RE = re.compile(
+    rf"(?i)\b(?:bounty|reward)(?:\s+(?:amount|payout))?"
+    rf"\s*(?::|=|-|\bis\b|\bof\b)?\s*\**\s*({_RTC_NUMBER})\s*RTC\b"
+)
+_RTC_AMOUNT_BEFORE_REWARD_RE = re.compile(
+    rf"(?i)(?<![\w.,])({_RTC_NUMBER})\s*RTC\s+(?:bounty|reward)\b"
+)
+_RTC_SPEC_RE = re.compile(
+    rf"(?im)^\s*reward_rtc\s*:\s*({_RTC_NUMBER})\s*(?:#.*)?$"
+)
+
 _REWARDED_LABEL_RE = re.compile(r"\brewarded\b", re.IGNORECASE)
+_BOUNTY_WORD_RE = re.compile(r"\b(?:bounty|reward)\b", re.IGNORECASE)
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
 
 _PRIVATE_CONTEXT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
@@ -83,11 +103,53 @@ def _amount_strings(values: set[Decimal]) -> list[str]:
 
 
 def _advertised_rewards(text: str) -> set[Decimal]:
-    """Extract high-confidence sponsor-advertised reward amounts from one field."""
+    """Extract high-confidence sponsor-advertised USD amounts from one field."""
     values = {_amount(match) for match in _BODY_BOUNTY_RE.findall(text)}
     values.update(_amount(match) for match in _KEYWORD_REWARD_RE.findall(text))
     values.update(_amount(match) for match in _AMOUNT_BEFORE_REWARD_RE.findall(text))
     return values
+
+
+def _has_bounty_label(labels: list[str]) -> bool:
+    return any(label.strip().casefold() == "bounty" for label in labels)
+
+
+def _title_rtc_rewards(title: str, labels: list[str]) -> set[Decimal]:
+    """Return the sponsor-authoritative RTC figure encoded in an issue title.
+
+    Elyan Labs currently declares the title figure authoritative when older
+    issue bodies retain pre-adjustment amounts.  A range is deliberately kept
+    as two values so dispatch fails closed as ambiguous; otherwise the first RTC
+    figure is the title reward, matching the existing bounty-index ordering.
+    """
+    if not title or not (_BOUNTY_WORD_RE.search(title) or _has_bounty_label(labels)):
+        return set()
+
+    range_match = _RTC_RANGE_RE.search(title)
+    if range_match:
+        return {_amount(range_match.group(1)), _amount(range_match.group(2))}
+
+    match = _RTC_TOKEN_RE.search(title)
+    if match:
+        return {_amount(match.group(1))}
+    return set()
+
+
+def _body_rtc_rewards(body: str) -> set[Decimal]:
+    """Extract high-confidence RTC reward declarations from an issue body."""
+    values = {_amount(match) for match in _RTC_KEYWORD_REWARD_RE.findall(body)}
+    values.update(_amount(match) for match in _RTC_AMOUNT_BEFORE_REWARD_RE.findall(body))
+    values.update(_amount(match) for match in _RTC_SPEC_RE.findall(body))
+    return values
+
+
+def _label_rtc_rewards(labels: list[str]) -> set[Decimal]:
+    """Extract explicit RTC amounts from live labels."""
+    return {
+        _amount(match)
+        for label in labels
+        for match in _RTC_TOKEN_RE.findall(label)
+    }
 
 
 def _title_value(snapshot: dict[str, Any]) -> str:
@@ -201,6 +263,10 @@ def qualify_dispatch(
     The result is safe to log: source issue/comment text is never copied into it.
     Raw comment text can affect the decision only when the snapshot supplies an
     OWNER/MEMBER/COLLABORATOR ``author_association`` for that comment.
+
+    USD and RTC are independent native reward currencies here.  RTC is never
+    converted to USD.  For RTC, a title amount is sponsor-authoritative and a
+    body amount is only a fallback when the title carries no RTC figure.
     """
     if not isinstance(snapshot, dict):
         raise QualificationInputError("snapshot must be an object")
@@ -222,6 +288,23 @@ def qualify_dispatch(
     label_rewards = {
         _amount(match) for label in labels for match in _LABEL_REWARD_RE.findall(label)
     }
+
+    title_rtc_rewards = _title_rtc_rewards(title, labels)
+    body_rtc_rewards = _body_rtc_rewards(texts[0])
+    label_rtc_rewards = _label_rtc_rewards(labels)
+    if title_rtc_rewards:
+        advertised_rtc_rewards = title_rtc_rewards
+        rtc_reward_source = "title"
+    elif body_rtc_rewards:
+        advertised_rtc_rewards = body_rtc_rewards
+        rtc_reward_source = "body"
+    elif label_rtc_rewards:
+        advertised_rtc_rewards = set()
+        rtc_reward_source = "label"
+    else:
+        advertised_rtc_rewards = set()
+        rtc_reward_source = None
+
     private_signal_types = sorted(
         {
             name
@@ -278,7 +361,12 @@ def qualify_dispatch(
             "HOLD",
             "Canonical issue/competition audit is missing or incomplete.",
         )
-    if not advertised_rewards and not label_rewards:
+    if (
+        not advertised_rewards
+        and not label_rewards
+        and not advertised_rtc_rewards
+        and not label_rtc_rewards
+    ):
         add(
             "REWARD_NOT_ADVERTISED",
             "HOLD",
@@ -288,9 +376,15 @@ def qualify_dispatch(
         add(
             "AMBIGUOUS_ADVERTISED_REWARD",
             "HOLD",
-            "Issue title/body contains more than one distinct advertised reward amount.",
+            "Issue title/body contains more than one distinct advertised USD reward amount.",
         )
-    if len(label_rewards) > 1:
+    if len(advertised_rtc_rewards) > 1:
+        add(
+            "AMBIGUOUS_ADVERTISED_REWARD",
+            "HOLD",
+            "Authoritative RTC reward source contains more than one distinct amount.",
+        )
+    if len(label_rewards) > 1 or len(label_rtc_rewards) > 1:
         add(
             "AMBIGUOUS_LIVE_REWARD",
             "HOLD",
@@ -300,7 +394,17 @@ def qualify_dispatch(
         add(
             "REWARD_MISMATCH",
             "HOLD",
-            "Advertised title/body reward and live label reward disagree.",
+            "Advertised USD reward and live USD label reward disagree.",
+        )
+    if (
+        advertised_rtc_rewards
+        and label_rtc_rewards
+        and advertised_rtc_rewards != label_rtc_rewards
+    ):
+        add(
+            "REWARD_MISMATCH",
+            "HOLD",
+            "Authoritative RTC reward and live RTC label reward disagree.",
         )
 
     saturated_by_attempts = (
@@ -345,6 +449,11 @@ def qualify_dispatch(
             "title_reward_usd": _amount_strings(title_rewards),
             "advertised_reward_usd": _amount_strings(advertised_rewards),
             "live_label_reward_usd": _amount_strings(label_rewards),
+            "body_reward_rtc": _amount_strings(body_rtc_rewards),
+            "title_reward_rtc": _amount_strings(title_rtc_rewards),
+            "advertised_reward_rtc": _amount_strings(advertised_rtc_rewards),
+            "live_label_reward_rtc": _amount_strings(label_rtc_rewards),
+            "rtc_reward_source": rtc_reward_source,
             "already_rewarded": already_rewarded,
             "attempt_count": attempt_count,
             "open_pr_count": open_pr_count,
