@@ -2,8 +2,8 @@
 """Canonical GitHub audit signals for bounty triage.
 
 Bounty platforms and issue labels can lag canonical repository state.  This
-module cross-checks an issue against pull requests that explicitly reference it
-and reports competition plus a conservative stale-listing signal.
+module cross-checks an issue against pull requests that explicitly reference it,
+solver-intent commands in issue comments, and conservative stale-listing signals.
 """
 
 from __future__ import annotations
@@ -32,6 +32,15 @@ _MAINTAINER_EXPIRY_PATTERNS = (
         r"(?:^|[.!:]\s+)(?:this|the)\s+bounty\s+is\s+no\s+longer\s+(?:active|available|offered)\b(?![^.!\n]*\?)",
         re.IGNORECASE,
     ),
+)
+
+# High-precision solver-intent commands used by common bounty routers.  These
+# are matched only as real comment lines (not quotes or fenced examples) and
+# deduplicated by commenter, so repeated bot commands do not inflate pressure.
+_CLAIM_SIGNAL_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("attempt", re.compile(r"^/attempt(?:[ \t]|$)", re.IGNORECASE)),
+    ("opire_try", re.compile(r"^/opire[ \t]+try(?:[ \t]|$)", re.IGNORECASE)),
+    ("claim", re.compile(r"^/claim(?:[ \t]|$)", re.IGNORECASE)),
 )
 
 
@@ -103,16 +112,40 @@ def _is_explicit_maintainer_expiry(comment: dict[str, Any]) -> bool:
     return any(pattern.search(body) for pattern in _MAINTAINER_EXPIRY_PATTERNS)
 
 
-def _maintainer_expiry_evidence(
+def _claim_signal_types(body: Any) -> list[str]:
+    """Return solver-intent command types without echoing source comment text."""
+    if not isinstance(body, str):
+        return []
+
+    signals: set[str] = set()
+    in_fence = False
+    for raw_line in body.splitlines():
+        line = raw_line.lstrip()
+        if line.startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence or line.startswith(">"):
+            continue
+        for name, pattern in _CLAIM_SIGNAL_PATTERNS:
+            if pattern.match(line):
+                signals.add(name)
+    return sorted(signals)
+
+
+def _issue_comment_evidence(
     session: Any,
     repo: str,
     number: int,
     *,
     headers: dict[str, str],
     max_pages: int,
-) -> tuple[list[dict[str, Any]], bool]:
-    evidence: list[dict[str, Any]] = []
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], bool]:
+    """Collect maintainer expiry plus unique claimant evidence in one pass."""
+    expiry_evidence: list[dict[str, Any]] = []
+    attempt_evidence: list[dict[str, Any]] = []
+    claimants: set[str] = set()
     comments_url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
+
     for page in range(1, max_pages + 1):
         payload = _get_json(
             session,
@@ -121,26 +154,51 @@ def _maintainer_expiry_evidence(
             params={"per_page": 100, "page": page},
         )
         if not isinstance(payload, list):
-            raise BountyAuditError(f"GitHub issue comments response was not a list for {repo}#{number}")
+            raise BountyAuditError(
+                f"GitHub issue comments response was not a list for {repo}#{number}"
+            )
         for comment in payload:
             if not isinstance(comment, dict):
-                raise BountyAuditError(f"GitHub issue comments response contained a malformed item for {repo}#{number}")
-            if not _is_explicit_maintainer_expiry(comment):
-                continue
+                raise BountyAuditError(
+                    f"GitHub issue comments response contained a malformed item for {repo}#{number}"
+                )
+
             user = comment.get("user")
             login = user.get("login") if isinstance(user, dict) else None
-            evidence.append(
-                {
-                    "url": comment.get("html_url") or "",
-                    "author_association": str(comment.get("author_association") or "").upper(),
-                    "author": login or "",
-                    "created_at": comment.get("created_at"),
-                    "body": comment.get("body") or "",
-                }
-            )
+            association = str(comment.get("author_association") or "").upper()
+
+            if _is_explicit_maintainer_expiry(comment):
+                expiry_evidence.append(
+                    {
+                        "url": comment.get("html_url") or "",
+                        "author_association": association,
+                        "author": login or "",
+                        "created_at": comment.get("created_at"),
+                        "body": comment.get("body") or "",
+                    }
+                )
+
+            claim_signals = _claim_signal_types(comment.get("body"))
+            if (
+                claim_signals
+                and isinstance(login, str)
+                and login
+                and association not in _MAINTAINER_ASSOCIATIONS
+            ):
+                claimants.add(login)
+                attempt_evidence.append(
+                    {
+                        "url": comment.get("html_url") or "",
+                        "author": login,
+                        "created_at": comment.get("created_at"),
+                        "signals": claim_signals,
+                    }
+                )
+
         if len(payload) < 100:
-            return evidence, False
-    return evidence, True
+            return expiry_evidence, attempt_evidence, sorted(claimants), False
+
+    return expiry_evidence, attempt_evidence, sorted(claimants), True
 
 
 def audit_bounty(repo: str, number: int, token: str | None = None, *, session: Any = requests, max_pages: int = 10) -> dict[str, Any]:
@@ -231,9 +289,16 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
     issue_state = issue.get("state") or "unknown"
 
     maintainer_expiry_comments: list[dict[str, Any]] = []
+    attempt_comments: list[dict[str, Any]] = []
+    attempt_claimants: list[str] = []
     comments_truncated = False
     if issue_state == "open":
-        maintainer_expiry_comments, comments_truncated = _maintainer_expiry_evidence(
+        (
+            maintainer_expiry_comments,
+            attempt_comments,
+            attempt_claimants,
+            comments_truncated,
+        ) = _issue_comment_evidence(
             session,
             repo,
             number,
@@ -242,6 +307,7 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
         )
     search_truncated = search_truncated or comments_truncated
     maintainer_expiry_signal = bool(maintainer_expiry_comments)
+    attempt_count = len(attempt_claimants)
 
     return {
         "repo": repo,
@@ -252,7 +318,11 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
         "open_pr_count": open_pr_count,
         "merged_pr_count": merged_pr_count,
         "closed_unmerged_pr_count": closed_unmerged_pr_count,
-        "competition_level": _competition_level(open_pr_count),
+        "attempt_count": attempt_count,
+        "attempt_comment_count": len(attempt_comments),
+        "attempt_claimants": attempt_claimants,
+        "attempt_comments": attempt_comments,
+        "competition_level": _competition_level(max(open_pr_count, attempt_count)),
         "maintainer_expiry_signal": maintainer_expiry_signal,
         "maintainer_expiry_comment_count": len(maintainer_expiry_comments),
         "maintainer_expiry_comments": maintainer_expiry_comments,
@@ -274,6 +344,10 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
             session=session,
             max_pages=max_pages,
         )
+        # The dispatch gate already understands top-level ``attempt_count``.
+        # Populate it from canonical comments when an upstream source has not
+        # supplied an explicit count of its own.
+        row.setdefault("attempt_count", row["canonical_audit"]["attempt_count"])
         audited.append(row)
     return audited
 
@@ -286,6 +360,7 @@ def format_summary(audit: dict[str, Any]) -> str:
     return (
         f"{audit['repo']}#{audit['number']} issue={audit['issue_state']} "
         f"linked_prs={audit['linked_pr_count']} open={audit['open_pr_count']} "
+        f"attempts={audit.get('attempt_count', 0)} "
         f"merged={audit['merged_pr_count']} closed_unmerged={audit['closed_unmerged_pr_count']} "
         f"competition={audit['competition_level']} maintainer_expiry_signal={maintainer_signal} "
         f"stale_listing_signal={signal}{truncation}"
@@ -296,7 +371,7 @@ def main(argv: list[str] | None = None) -> int:
     """Run a one-issue canonical audit from the command line."""
     parser = argparse.ArgumentParser(
         prog="python -m concierge.bounty_audit",
-        description="Cross-check a bounty issue against canonical linked GitHub PR state.",
+        description="Cross-check a bounty issue against canonical GitHub PR/comment competition state.",
     )
     parser.add_argument("repo", help="Repository in owner/name form")
     parser.add_argument("issue", type=int, help="Bounty issue number")
