@@ -1,323 +1,155 @@
 # SPDX-License-Identifier: MIT
-"""Live, read-only acceptance and settlement closeout queue for paid PRs.
+"""Paid-work closeout with evidence-bound settlement-contact state.
 
-The module turns a small operator-owned manifest of paid-work PRs into an
-action queue backed by current GitHub PR/review/comment state.  It deliberately
-does not infer sponsor acceptance, earned money, or payment from a merge.
+The historical closeout implementation is preserved byte-for-byte in
+``revenue_closeout_core``.  This public module closes one authority gap in that
+implementation: a configured ``settlement_followup_url`` is only route metadata;
+it does not prove that a collection/follow-up message was sent.
+
+A merged item therefore remains actionable until an explicit send receipt is
+bound to the same repository, PR, exact settlement route, and post-merge time.
+The receipt is evidence supplied to this read-only compiler; this module never
+contacts a sponsor, sends mail, mutates a provider, or infers cash/revenue.
 """
 
 from __future__ import annotations
 
-import argparse
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal, InvalidOperation
-import json
+import hashlib
 import re
-from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
 
-import requests
-
-from concierge.config import GITHUB_TOKEN
+from concierge import revenue_closeout_core as _core
 
 
-_REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
-_CURRENCY_RE = re.compile(r"^[A-Z][A-Z0-9_.-]{1,11}$")
-_MAX_AMOUNT_SOURCE_CHARS = 64
-_MAX_AMOUNT_DIGITS = 30
-_MAX_AMOUNT_ABS_EXPONENT = 18
-_MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
-_REVIEW_DECISION_STATES = frozenset({"CHANGES_REQUESTED", "APPROVED", "DISMISSED"})
-_ACTION_ORDER = {
-    "repair_requested": 0,
-    "respond_to_maintainer": 1,
-    "investigate_closed_unmerged": 2,
-    "route_settlement_followup": 3,
-    "monitor_settlement": 4,
-    "await_acceptance": 5,
-}
+# Preserve the established public/test-facing API.  Only the validation and
+# closeout decision seams below are replaced.
+for _export_name in dir(_core):
+    if not _export_name.startswith("__"):
+        globals()[_export_name] = getattr(_core, _export_name)
 
 
-class RevenueCloseoutError(RuntimeError):
-    """Raised when live closeout state cannot be read reliably."""
+_original_validate_item = _core._validate_item
+_original_scan_paid_pr = _core.scan_paid_pr
+
+_CONTACT_KEYS = frozenset(
+    {
+        "repo",
+        "pr",
+        "provider",
+        "receipt_ref",
+        "receipt_sha256",
+        "sent_at",
+        "settlement_route_sha256",
+    }
+)
+_PROVIDER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+_RECEIPT_REF_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$")
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
-class RevenueCloseoutInputError(ValueError):
-    """Raised when the operator manifest is structurally unreliable."""
+def _route_sha256(route: str) -> str:
+    return hashlib.sha256(route.encode("utf-8")).hexdigest()
 
 
-def _headers(token: str | None) -> dict[str, str]:
-    headers = {"Accept": "application/vnd.github+json"}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    return headers
-
-
-def _get_json(
-    session: Any,
-    url: str,
+def _contact_evidence(
+    raw: Any,
     *,
-    headers: dict[str, str],
-    params: dict[str, Any] | None = None,
-) -> Any:
-    try:
-        response = session.get(url, headers=headers, params=params, timeout=15)
-        response.raise_for_status()
-    except requests.RequestException as exc:
-        raise RevenueCloseoutError(f"GitHub request failed for {url}: {exc}") from exc
-    try:
-        return response.json()
-    except (TypeError, ValueError) as exc:
-        raise RevenueCloseoutError(
-            f"GitHub response was not valid JSON for {url}"
-        ) from exc
-
-
-def _object(value: Any, context: str) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise RevenueCloseoutError(f"GitHub {context} response was not an object")
-    return value
-
-
-def _parse_timestamp(value: Any, *, field: str, allow_none: bool = True) -> datetime | None:
-    if value is None and allow_none:
+    repo: str,
+    pr: int,
+    settlement_route: str | None,
+) -> dict[str, Any] | None:
+    if raw is None:
         return None
-    if not isinstance(value, str) or not value.strip():
-        raise RevenueCloseoutInputError(f"{field} must be an ISO-8601 timestamp")
-    text = value.strip()
-    if text.endswith("Z"):
-        text = text[:-1] + "+00:00"
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError as exc:
+    if type(raw) is not dict or set(raw) != _CONTACT_KEYS:
         raise RevenueCloseoutInputError(
-            f"{field} must be an ISO-8601 timestamp"
-        ) from exc
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise RevenueCloseoutInputError(f"{field} must include a timezone")
-    return parsed.astimezone(timezone.utc)
-
-
-def _iso_or_none(value: datetime | None) -> str | None:
-    if value is None:
-        return None
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def _positive_amount(value: Any) -> Decimal:
-    if isinstance(value, bool) or not isinstance(value, (str, int, Decimal)):
-        raise RevenueCloseoutInputError("advertised_amount must be a positive decimal")
-    source = str(value)
-    if len(source) > _MAX_AMOUNT_SOURCE_CHARS:
-        raise RevenueCloseoutInputError("advertised_amount representation is too large")
-    try:
-        amount = Decimal(source)
-    except (InvalidOperation, ValueError) as exc:
-        raise RevenueCloseoutInputError(
-            "advertised_amount must be a positive decimal"
-        ) from exc
-    if not amount.is_finite() or amount <= 0:
-        raise RevenueCloseoutInputError("advertised_amount must be a positive decimal")
-    digits = amount.as_tuple().digits
-    exponent = amount.as_tuple().exponent
-    if (
-        len(digits) > _MAX_AMOUNT_DIGITS
-        or not isinstance(exponent, int)
-        or abs(exponent) > _MAX_AMOUNT_ABS_EXPONENT
-    ):
-        raise RevenueCloseoutInputError("advertised_amount representation is too large")
-    return amount
-
-
-def _validate_item(raw: Any) -> dict[str, Any]:
-    if not isinstance(raw, dict):
-        raise RevenueCloseoutInputError("each closeout item must be an object")
-    repo = raw.get("repo")
-    if not isinstance(repo, str) or not _REPO_RE.fullmatch(repo):
-        raise RevenueCloseoutInputError("repo must be in owner/name form")
-    owner, name = repo.split("/", 1)
-    if owner in {".", ".."} or name in {".", ".."}:
-        raise RevenueCloseoutInputError("repo must not contain dot path segments")
-    number = raw.get("pr")
-    if isinstance(number, bool) or not isinstance(number, int) or number <= 0:
-        raise RevenueCloseoutInputError("pr must be a positive integer")
-    operator_login = raw.get("operator_login")
-    if not isinstance(operator_login, str) or not operator_login.strip():
-        raise RevenueCloseoutInputError("operator_login must be a non-empty string")
-    currency = raw.get("currency")
-    if not isinstance(currency, str) or not _CURRENCY_RE.fullmatch(currency):
-        raise RevenueCloseoutInputError(
-            "currency must be an uppercase 2-12 character code"
+            "settlement_followup_evidence must contain exact receipt-binding keys"
         )
-    amount = _positive_amount(raw.get("advertised_amount"))
-    last_seen = _parse_timestamp(
-        raw.get("last_seen_at"), field="last_seen_at", allow_none=False
+    if raw["repo"] != repo or raw["pr"] != pr:
+        raise RevenueCloseoutInputError(
+            "settlement_followup_evidence cannot be transplanted across PR identities"
+        )
+    if settlement_route is None:
+        raise RevenueCloseoutInputError(
+            "settlement_followup_evidence requires settlement_followup_url route metadata"
+        )
+
+    provider = raw["provider"]
+    if type(provider) is not str or not _PROVIDER_RE.fullmatch(provider):
+        raise RevenueCloseoutInputError(
+            "settlement_followup_evidence.provider must be a bounded provider token"
+        )
+    receipt_ref = raw["receipt_ref"]
+    if type(receipt_ref) is not str or not _RECEIPT_REF_RE.fullmatch(receipt_ref):
+        raise RevenueCloseoutInputError(
+            "settlement_followup_evidence.receipt_ref must be one bounded opaque reference"
+        )
+    receipt_sha = raw["receipt_sha256"]
+    if type(receipt_sha) is not str or not _SHA256_RE.fullmatch(receipt_sha):
+        raise RevenueCloseoutInputError(
+            "settlement_followup_evidence.receipt_sha256 must be lowercase SHA-256"
+        )
+    route_sha = raw["settlement_route_sha256"]
+    if type(route_sha) is not str or not _SHA256_RE.fullmatch(route_sha):
+        raise RevenueCloseoutInputError(
+            "settlement_followup_evidence.settlement_route_sha256 must be lowercase SHA-256"
+        )
+    expected_route_sha = _route_sha256(settlement_route)
+    if route_sha != expected_route_sha:
+        raise RevenueCloseoutInputError(
+            "settlement_followup_evidence is not bound to the configured settlement route"
+        )
+    sent_at = _parse_timestamp(
+        raw["sent_at"],
+        field="settlement_followup_evidence.sent_at",
+        allow_none=False,
     )
-    if last_seen > datetime.now(timezone.utc) + timedelta(minutes=5):
-        raise RevenueCloseoutInputError("last_seen_at must not be in the future")
-    settlement_url = raw.get("settlement_followup_url")
-    if settlement_url is not None:
-        if not isinstance(settlement_url, str):
-            raise RevenueCloseoutInputError(
-                "settlement_followup_url must be an absolute HTTP(S) URL"
-            )
-        parsed_url = urlsplit(settlement_url)
-        if parsed_url.scheme not in {"https", "http"} or not parsed_url.netloc:
-            raise RevenueCloseoutInputError(
-                "settlement_followup_url must be an absolute HTTP(S) URL"
-            )
-    expected_head = raw.get("expected_head_sha")
-    if expected_head is not None:
-        if (
-            not isinstance(expected_head, str)
-            or not re.fullmatch(r"[0-9a-fA-F]{40}", expected_head)
-        ):
-            raise RevenueCloseoutInputError(
-                "expected_head_sha must be a 40-hex commit SHA"
-            )
-        expected_head = expected_head.lower()
     return {
         "repo": repo,
-        "pr": number,
-        "operator_login": operator_login.strip().casefold(),
-        "advertised_amount": amount,
-        "currency": currency,
-        "last_seen_at": last_seen,
-        "settlement_followup_url": settlement_url,
-        "expected_head_sha": expected_head,
+        "pr": pr,
+        "provider": provider,
+        "receipt_ref": receipt_ref,
+        "receipt_sha256": receipt_sha,
+        "sent_at": _iso_or_none(sent_at),
+        "settlement_route_sha256": route_sha,
     }
 
 
-def _safe_user_login(value: Any) -> str | None:
-    if not isinstance(value, dict):
-        return None
-    login = value.get("login")
-    if not isinstance(login, str) or not login.strip():
-        return None
-    return login.strip()
-
-
-def _external_maintainer(event: dict[str, Any], operator_login: str) -> bool:
-    user = event.get("user")
-    login = _safe_user_login(user)
-    if login is None or login.casefold() == operator_login:
-        return False
-    if isinstance(user, dict):
-        user_type = user.get("type")
-        if (
-            isinstance(user_type, str) and user_type.casefold() == "bot"
-        ) or login.casefold().endswith("[bot]"):
-            return False
-    association = event.get("author_association")
-    return (
-        isinstance(association, str)
-        and association.upper() in _MAINTAINER_ASSOCIATIONS
+def _validate_item(raw: Any) -> dict[str, Any]:
+    item = _original_validate_item(raw)
+    evidence = _contact_evidence(
+        raw.get("settlement_followup_evidence") if type(raw) is dict else None,
+        repo=item["repo"],
+        pr=item["pr"],
+        settlement_route=item["settlement_followup_url"],
     )
+    return {**item, "settlement_followup_evidence": evidence}
 
 
-def _event_timestamp(event: dict[str, Any], *fields: str) -> datetime | None:
-    for field in fields:
-        value = event.get(field)
-        if value is None:
-            continue
-        try:
-            return _parse_timestamp(value, field=field, allow_none=False)
-        except RevenueCloseoutInputError as exc:
-            raise RevenueCloseoutError(
-                f"GitHub feedback item had invalid {field}"
-            ) from exc
-    return None
-
-
-def _collect_feedback(
-    repo: str,
-    number: int,
-    operator_login: str,
-    *,
-    session: Any,
-    headers: dict[str, str],
-    max_pages: int,
-) -> list[dict[str, Any]]:
-    results: list[dict[str, Any]] = []
-    endpoints = (
-        ("review", f"https://api.github.com/repos/{repo}/pulls/{number}/reviews"),
-        ("comment", f"https://api.github.com/repos/{repo}/issues/{number}/comments"),
+def _validate_contact_chronology(
+    result: dict[str, Any], evidence: dict[str, Any]
+) -> None:
+    if result["state"] != "MERGED":
+        raise RevenueCloseoutInputError(
+            "settlement_followup_evidence is only valid for currently merged work"
+        )
+    merged_at = _parse_timestamp(
+        result.get("merged_at"), field="merged_at", allow_none=False
     )
-    for kind, url in endpoints:
-        for page in range(1, max_pages + 1):
-            payload = _get_json(
-                session,
-                url,
-                headers=headers,
-                params={"per_page": 100, "page": page},
-            )
-            if not isinstance(payload, list):
-                raise RevenueCloseoutError(
-                    f"GitHub {kind} response was not a list for {repo}#{number}"
-                )
-            for event in payload:
-                if not isinstance(event, dict):
-                    raise RevenueCloseoutError(
-                        f"GitHub {kind} response contained a malformed item"
-                    )
-                if not _external_maintainer(event, operator_login):
-                    continue
-                timestamp = _event_timestamp(
-                    event,
-                    "submitted_at" if kind == "review" else "updated_at",
-                    "created_at",
-                )
-                if timestamp is None:
-                    raise RevenueCloseoutError(
-                        f"GitHub maintainer {kind} omitted a timestamp"
-                    )
-                state = "COMMENTED"
-                if kind == "review":
-                    raw_state = event.get("state")
-                    if not isinstance(raw_state, str):
-                        raise RevenueCloseoutError("GitHub review omitted state")
-                    state = raw_state.upper()
-                results.append(
-                    {
-                        "kind": kind,
-                        "state": state,
-                        "author": _safe_user_login(event.get("user")),
-                        "at": timestamp,
-                        "url": event.get("html_url")
-                        if isinstance(event.get("html_url"), str)
-                        else None,
-                    }
-                )
-            if len(payload) < 100:
-                break
-        else:
-            raise RevenueCloseoutError(
-                f"GitHub {kind} pagination exceeded max_pages for {repo}#{number}"
-            )
-    results.sort(key=lambda item: item["at"])
-    return results
-
-
-def _current_review_decisions(
-    feedback: list[dict[str, Any]],
-) -> dict[str, dict[str, Any]]:
-    """Return each maintainer's latest decision-bearing review.
-
-    COMMENTED reviews are notification events, not decision transitions, so they
-    never clear an earlier CHANGES_REQUESTED.  APPROVED and DISMISSED do clear a
-    prior change request from the same maintainer.  ``feedback`` is already
-    chronological and contains only external human maintainers.
-    """
-    decisions: dict[str, dict[str, Any]] = {}
-    for event in feedback:
-        if event["kind"] != "review" or event["state"] not in _REVIEW_DECISION_STATES:
-            continue
-        author = event["author"]
-        if not isinstance(author, str) or not author:
-            raise RevenueCloseoutError("GitHub maintainer review omitted author")
-        decisions[author.casefold()] = event
-    return decisions
+    sent_at = _parse_timestamp(
+        evidence["sent_at"],
+        field="settlement_followup_evidence.sent_at",
+        allow_none=False,
+    )
+    now = datetime.now(timezone.utc)
+    if sent_at < merged_at:
+        raise RevenueCloseoutInputError(
+            "settlement follow-up send evidence cannot predate the merge"
+        )
+    if sent_at > now + timedelta(minutes=5):
+        raise RevenueCloseoutInputError(
+            "settlement follow-up send evidence cannot be in the future"
+        )
 
 
 def scan_paid_pr(
@@ -327,253 +159,50 @@ def scan_paid_pr(
     session: Any = requests,
     max_pages: int = 10,
 ) -> dict[str, Any]:
-    """Read one paid-work PR and return a safe closeout action receipt."""
+    """Read one paid-work PR without confusing a route with proof of contact."""
     item = _validate_item(raw_item)
-    if isinstance(max_pages, bool) or not isinstance(max_pages, int) or max_pages <= 0:
-        raise RevenueCloseoutInputError("max_pages must be positive")
-    token = token or GITHUB_TOKEN
-    headers = _headers(token)
-    repo = item["repo"]
-    number = item["pr"]
-    pr = _object(
-        _get_json(
-            session,
-            f"https://api.github.com/repos/{repo}/pulls/{number}",
-            headers=headers,
-        ),
-        f"pull request {repo}#{number}",
-    )
 
-    canonical_url = f"https://github.com/{repo}/pull/{number}"
-    if pr.get("html_url") != canonical_url:
-        raise RevenueCloseoutError(
-            f"GitHub PR identity mismatch for {repo}#{number}"
-        )
-    author = _safe_user_login(pr.get("user"))
-    if author is None or author.casefold() != item["operator_login"]:
-        raise RevenueCloseoutInputError(
-            f"{repo}#{number} is not authored by operator_login"
-        )
-    head = pr.get("head")
-    if not isinstance(head, dict) or not isinstance(head.get("sha"), str):
-        raise RevenueCloseoutError(f"GitHub PR omitted head SHA for {repo}#{number}")
-    head_sha = head["sha"].lower()
-    if not re.fullmatch(r"[0-9a-f]{40}", head_sha):
-        raise RevenueCloseoutError(f"GitHub PR returned invalid head SHA for {repo}#{number}")
-    expected_head = item["expected_head_sha"]
-    if expected_head is not None and expected_head != head_sha:
-        return {
-            "repo": repo,
-            "pr": number,
-            "canonical_url": canonical_url,
-            "head_sha": head_sha,
-            "advertised_amount": format(item["advertised_amount"], "f"),
-            "currency": item["currency"],
-            "state": "HEAD_MOVED",
-            "next_action": "repair_requested",
-            "reason": "expected_head_moved",
-            "new_feedback_count": 0,
-            "current_change_request_count": None,
-            "latest_feedback": None,
-            "settlement_followup_url": item["settlement_followup_url"],
-            "cash_status": "not_inferred",
-        }
-
-    merged_at_raw = pr.get("merged_at")
-    merged_at = None
-    if merged_at_raw is not None:
-        try:
-            merged_at = _parse_timestamp(
-                merged_at_raw, field="merged_at", allow_none=False
-            )
-        except RevenueCloseoutInputError as exc:
-            raise RevenueCloseoutError(
-                f"GitHub PR returned invalid merged_at for {repo}#{number}"
-            ) from exc
-    state = pr.get("state")
-    if state not in {"open", "closed"}:
-        raise RevenueCloseoutError(f"GitHub PR returned invalid state for {repo}#{number}")
-
-    feedback = _collect_feedback(
-        repo,
-        number,
-        item["operator_login"],
+    # The core scanner resolves its validator dynamically.  Keep it pointed at
+    # this stricter validator so direct and queue callers share one contract.
+    _core._validate_item = globals()["_validate_item"]
+    result = _original_scan_paid_pr(
+        raw_item,
+        token,
         session=session,
-        headers=headers,
         max_pages=max_pages,
     )
-    review_decisions = _current_review_decisions(feedback)
-    current_change_requests = [
-        event
-        for event in review_decisions.values()
-        if event["state"] == "CHANGES_REQUESTED"
-    ]
-    last_seen = item["last_seen_at"]
-    # A timestamp-only cursor cannot uniquely identify GitHub events.  Replay
-    # equality conservatively so two distinct events stamped at the same instant
-    # cannot cause one to be silently lost.
-    new_feedback = [event for event in feedback if event["at"] >= last_seen]
-    response_feedback = [
-        event
-        for event in new_feedback
-        if event["kind"] == "comment"
-        or (event["kind"] == "review" and event["state"] == "COMMENTED")
-    ]
 
-    if merged_at is not None:
-        safe_state = "MERGED"
-    elif state == "closed":
-        safe_state = "CLOSED_UNMERGED"
-    else:
-        safe_state = "OPEN"
+    evidence = item["settlement_followup_evidence"]
+    if evidence is not None and result["state"] != "HEAD_MOVED":
+        _validate_contact_chronology(result, evidence)
 
-    # Maintainer obligations outrank lifecycle/settlement routing.  The cursor
-    # only controls notification freshness; it never clears a current blocker.
-    if current_change_requests:
-        next_action = "repair_requested"
-        reason = "current_maintainer_changes_requested"
-    elif response_feedback:
-        next_action = "respond_to_maintainer"
-        reason = "new_maintainer_feedback"
-    elif merged_at is not None:
-        if item["settlement_followup_url"] is None:
-            next_action = "route_settlement_followup"
-            reason = "merged_without_settlement_followup_evidence"
+    # Maintainer repair/response continues to outrank settlement routing.  Only
+    # the core's settlement decision pair is refined here.
+    if result["state"] == "MERGED" and result["next_action"] in {
+        "route_settlement_followup",
+        "monitor_settlement",
+    }:
+        if evidence is None:
+            result["next_action"] = "route_settlement_followup"
+            if result.get("settlement_followup_url") is None:
+                result["reason"] = "merged_without_settlement_route"
+            else:
+                result["reason"] = "merged_route_metadata_without_send_evidence"
         else:
-            next_action = "monitor_settlement"
-            reason = "merged_followup_already_routed"
-    elif state == "closed":
-        next_action = "investigate_closed_unmerged"
-        reason = "pr_closed_unmerged"
-    elif new_feedback:
-        next_action = "await_acceptance"
-        reason = "new_nonactionable_maintainer_review"
-    else:
-        next_action = "await_acceptance"
-        reason = "open_without_new_maintainer_feedback"
+            result["next_action"] = "monitor_settlement"
+            result["reason"] = "merged_followup_send_evidenced"
 
-    latest = new_feedback[-1] if new_feedback else None
-    return {
-        "repo": repo,
-        "pr": number,
-        "canonical_url": canonical_url,
-        "head_sha": head_sha,
-        "advertised_amount": format(item["advertised_amount"], "f"),
-        "currency": item["currency"],
-        "state": safe_state,
-        "merged_at": _iso_or_none(merged_at),
-        "next_action": next_action,
-        "reason": reason,
-        "new_feedback_count": len(new_feedback),
-        "current_change_request_count": len(current_change_requests),
-        "latest_feedback": None
-        if latest is None
-        else {
-            "kind": latest["kind"],
-            "state": latest["state"],
-            "author": latest["author"],
-            "at": _iso_or_none(latest["at"]),
-            "url": latest["url"],
-        },
-        "settlement_followup_url": item["settlement_followup_url"],
-        "cash_status": "not_inferred",
-    }
+    result["settlement_followup_send_evidenced"] = evidence is not None
+    result["settlement_followup_evidence"] = evidence
+    result["settlement_route_proves_prior_contact"] = False
+    return result
 
 
-def build_closeout_queue(
-    items: list[dict[str, Any]],
-    token: str | None = None,
-    *,
-    session: Any = requests,
-    max_pages: int = 10,
-) -> list[dict[str, Any]]:
-    """Scan and deterministically prioritize paid-work closeout items."""
-    if not isinstance(items, list):
-        raise RevenueCloseoutInputError("items must be a list")
-    if isinstance(max_pages, bool) or not isinstance(max_pages, int) or max_pages <= 0:
-        raise RevenueCloseoutInputError("max_pages must be positive")
-    seen: set[tuple[str, int]] = set()
-    manifest_order: dict[tuple[str, int], int] = {}
-    results: list[dict[str, Any]] = []
-    for index, raw in enumerate(items):
-        validated = _validate_item(raw)
-        identity = (validated["repo"].casefold(), validated["pr"])
-        if identity in seen:
-            raise RevenueCloseoutInputError(
-                f"duplicate closeout item: {validated['repo']}#{validated['pr']}"
-            )
-        seen.add(identity)
-        manifest_order[identity] = index
-        results.append(
-            scan_paid_pr(raw, token, session=session, max_pages=max_pages)
-        )
-
-    def sort_key(result: dict[str, Any]) -> tuple[int, int]:
-        identity = (result["repo"].casefold(), result["pr"])
-        return (
-            _ACTION_ORDER[result["next_action"]],
-            manifest_order[identity],
-        )
-
-    results.sort(key=sort_key)
-    return results
-
-
-def _load_manifest(path: str) -> dict[str, Any]:
-    if path == "-":
-        payload = json.load(__import__("sys").stdin)
-    else:
-        payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise RevenueCloseoutInputError("manifest must be an object")
-    if payload.get("schema_version") != 1:
-        raise RevenueCloseoutInputError("manifest schema_version must be 1")
-    items = payload.get("items")
-    if not isinstance(items, list):
-        raise RevenueCloseoutInputError("manifest items must be a list")
-    return payload
-
-
-def format_summary(results: list[dict[str, Any]]) -> str:
-    lines = []
-    for row in results:
-        lines.append(
-            f"{row['repo']}#{row['pr']} {row['currency']} {row['advertised_amount']} "
-            f"{row['state']} -> {row['next_action']} ({row['reason']})"
-        )
-    return "\n".join(lines)
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        prog="python -m concierge.revenue_closeout",
-        description=(
-            "Read current GitHub PR/review state and prioritize paid-work acceptance "
-            "and settlement follow-through without inferring earned or paid cash."
-        ),
-    )
-    parser.add_argument("manifest", help="JSON manifest path, or - for stdin")
-    parser.add_argument("--max-pages", type=int, default=10)
-    parser.add_argument("--json", action="store_true", help="emit full safe JSON")
-    args = parser.parse_args(argv)
-    try:
-        payload = _load_manifest(args.manifest)
-        results = build_closeout_queue(
-            payload["items"],
-            max_pages=args.max_pages,
-        )
-    except (
-        OSError,
-        json.JSONDecodeError,
-        RevenueCloseoutError,
-        RevenueCloseoutInputError,
-    ) as exc:
-        parser.error(str(exc))
-    if args.json:
-        print(json.dumps({"schema_version": 1, "items": results}, indent=2, sort_keys=True))
-    else:
-        print(format_summary(results))
-    return 0
+# Core-defined functions resolve collaborators through the core module's global
+# namespace.  Patch the two guarded seams so build_closeout_queue() and main()
+# automatically use the evidence-bound behavior while preserving their APIs.
+_core._validate_item = _validate_item
+_core.scan_paid_pr = scan_paid_pr
 
 
 if __name__ == "__main__":
