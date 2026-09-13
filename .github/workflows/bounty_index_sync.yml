@@ -1,6 +1,11 @@
 name: Sync Bounty Index
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/bounty_index_sync.yml"
   schedule:
     - cron: "0 6 * * *"   # Daily at 06:00 UTC
   workflow_dispatch:        # Allow manual trigger
@@ -33,7 +38,7 @@ jobs:
         run: python -m concierge.bounty_index_publish --output data/bounty_index.json
 
       - name: Refresh README Open Bounties table
-        run: python -m concierge.readme_sync
+        run: python -m concierge.readme_sync --require-fresh
 
       - name: Auto-commit updated index and README
         uses: stefanzweifel/git-auto-commit-action@v7
