@@ -25,6 +25,7 @@ from concierge.config import GITHUB_TOKEN
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _CURRENCY_RE = re.compile(r"^[A-Z][A-Z0-9_.-]{1,11}$")
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
+_REVIEW_DECISION_STATES = frozenset({"CHANGES_REQUESTED", "APPROVED", "DISMISSED"})
 _ACTION_ORDER = {
     "repair_requested": 0,
     "respond_to_maintainer": 1,
@@ -284,6 +285,27 @@ def _collect_feedback(
     return results
 
 
+def _current_review_decisions(
+    feedback: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Return each maintainer's latest decision-bearing review.
+
+    COMMENTED reviews are notification events, not decision transitions, so they
+    never clear an earlier CHANGES_REQUESTED.  APPROVED and DISMISSED do clear a
+    prior change request from the same maintainer.  ``feedback`` is already
+    chronological and contains only external human maintainers.
+    """
+    decisions: dict[str, dict[str, Any]] = {}
+    for event in feedback:
+        if event["kind"] != "review" or event["state"] not in _REVIEW_DECISION_STATES:
+            continue
+        author = event["author"]
+        if not isinstance(author, str) or not author:
+            raise RevenueCloseoutError("GitHub maintainer review omitted author")
+        decisions[author.casefold()] = event
+    return decisions
+
+
 def scan_paid_pr(
     raw_item: dict[str, Any],
     token: str | None = None,
@@ -337,6 +359,7 @@ def scan_paid_pr(
             "next_action": "repair_requested",
             "reason": "expected_head_moved",
             "new_feedback_count": 0,
+            "current_change_request_count": None,
             "latest_feedback": None,
             "settlement_followup_url": item["settlement_followup_url"],
             "cash_status": "not_inferred",
@@ -365,13 +388,14 @@ def scan_paid_pr(
         headers=headers,
         max_pages=max_pages,
     )
+    review_decisions = _current_review_decisions(feedback)
+    current_change_requests = [
+        event
+        for event in review_decisions.values()
+        if event["state"] == "CHANGES_REQUESTED"
+    ]
     last_seen = item["last_seen_at"]
-    new_feedback = [
-        event for event in feedback if last_seen is None or event["at"] > last_seen
-    ]
-    change_requests = [
-        event for event in new_feedback if event["kind"] == "review" and event["state"] == "CHANGES_REQUESTED"
-    ]
+    new_feedback = [event for event in feedback if event["at"] > last_seen]
 
     if merged_at is not None:
         if item["settlement_followup_url"] is None:
@@ -385,9 +409,9 @@ def scan_paid_pr(
         next_action = "investigate_closed_unmerged"
         reason = "pr_closed_unmerged"
         safe_state = "CLOSED_UNMERGED"
-    elif change_requests:
+    elif current_change_requests:
         next_action = "repair_requested"
-        reason = "new_maintainer_changes_requested"
+        reason = "current_maintainer_changes_requested"
         safe_state = "OPEN"
     else:
         response_feedback = [
@@ -420,6 +444,7 @@ def scan_paid_pr(
         "next_action": next_action,
         "reason": reason,
         "new_feedback_count": len(new_feedback),
+        "current_change_request_count": len(current_change_requests),
         "latest_feedback": None
         if latest is None
         else {
