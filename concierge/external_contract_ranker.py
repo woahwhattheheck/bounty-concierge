@@ -71,6 +71,16 @@ def _reject_constant(value: str) -> None:
     raise ExternalContractRankInputError(f"non-standard JSON numeric constant: {value}")
 
 
+def _strict_int(value: str) -> int:
+    digits = value[1:] if value.startswith("-") else value
+    if len(digits) > _MAX_DECIMAL_TEXT:
+        raise ExternalContractRankInputError("JSON integer exceeds supported digit boundary")
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise ExternalContractRankInputError("JSON integer is invalid") from exc
+
+
 def loads_strict_json(payload: Union[bytes, str]) -> Any:
     if isinstance(payload, bytes):
         try:
@@ -86,8 +96,11 @@ def loads_strict_json(payload: Union[bytes, str]) -> Any:
             text,
             object_pairs_hook=_strict_object_pairs,
             parse_constant=_reject_constant,
+            parse_int=_strict_int,
         )
-    except json.JSONDecodeError as exc:
+    except ExternalContractRankInputError:
+        raise
+    except (json.JSONDecodeError, ValueError) as exc:
         raise ExternalContractRankInputError("request JSON is invalid") from exc
 
 
@@ -104,7 +117,14 @@ def _exact_decimal(
     if isinstance(value, Decimal):
         raw = format(value, "f")
     elif type(value) is int:
-        raw = str(value)
+        # Avoid Python 3.11+'s process-global int-to-string digit limit leaking a
+        # raw ValueError through the public library API for attacker-sized ints.
+        if value.bit_length() > 256:
+            raise ExternalContractRankInputError(f"{name} is too long")
+        try:
+            raw = str(value)
+        except ValueError as exc:
+            raise ExternalContractRankInputError(f"{name} is too long") from exc
     elif type(value) is str:
         raw = value.strip()
         if raw != value or not raw:
@@ -190,8 +210,8 @@ def _verified_identity(
     source_digest = _digest(receipt.get("source_digest"), "source_digest")
     qualification_digest = _digest(receipt.get("qualification_digest"), "qualification_digest")
     currency = _text(receipt.get("native_currency"), "native_currency", limit=3)
-    if len(currency) != 3 or not currency.isalpha() or currency != currency.upper():
-        raise ExternalContractRankInputError("native_currency must be a three-letter uppercase code")
+    if len(currency) != 3 or any(char < "A" or char > "Z" for char in currency):
+        raise ExternalContractRankInputError("native_currency must be exactly three ASCII uppercase letters")
     bid = receipt.get("bid")
     if type(bid) is not dict or set(bid) != {"currency", "amount", "delivery_days"}:
         raise ExternalContractRankInputError("qualification bid shape mismatch")

@@ -17,7 +17,7 @@ The production CLI **and public library API** own current UTC. Neither accepts a
 
 ## Ranking contract
 
-Qualified rows are partitioned by the qualification receipt's validated three-letter native currency. Ranking happens **only inside one currency partition**.
+Qualified rows are partitioned by the qualification receipt's native currency only after the ranker rechecks that identity as exactly three ASCII uppercase letters (`[A-Z]{3}`). Ranking happens **only inside one currency partition**. This ranker-side check remains mandatory even after upstream qualification verification so Unicode lookalikes such as a Cyrillic-letter `UЅD` cannot form a visually deceptive partition distinct from `USD`.
 
 Within a partition the order is:
 
@@ -51,7 +51,7 @@ The CLI accepts one strict JSON object with exactly one `candidates` key. Each c
 
 Operator estimates must be exact decimal strings or integers. Binary floats and boolean aliases fail closed. Effort must be positive; award probability must be between 0 and 1 inclusive.
 
-Duplicate JSON keys are rejected at every nesting level. `NaN`/`Infinity` are rejected. File input is size-bounded and must resolve to a regular file; final-component symlinks are refused on platforms with `O_NOFOLLOW`.
+Duplicate JSON keys are rejected at every nesting level. `NaN`/`Infinity` are rejected. JSON integer tokens are bounded before integer conversion, and direct-library integer estimates/bid amounts are bounded before string formatting, so runtime-specific large-integer conversion limits cannot escape the module's `ExternalContractRankInputError` boundary. File input is size-bounded and must resolve to a regular file; final-component symlinks are refused on platforms with `O_NOFOLLOW`.
 
 Example:
 
