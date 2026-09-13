@@ -1,0 +1,40 @@
+name: Payout Dispute
+
+on:
+  pull_request:
+    paths:
+      - "concierge/payout_dispute.py"
+      - "tests/test_payout_dispute.py"
+      - "docs/PAYOUT_DISPUTE.md"
+      - ".github/workflows/payout-dispute.yml"
+  push:
+    branches: [main]
+    paths:
+      - "concierge/payout_dispute.py"
+      - "tests/test_payout_dispute.py"
+      - "docs/PAYOUT_DISPUTE.md"
+      - ".github/workflows/payout-dispute.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hostile-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Normal semantics
+        run: python -m unittest -v tests.test_payout_dispute
+      - name: Optimized semantics
+        run: python -O -m unittest -v tests.test_payout_dispute
+      - name: Compile
+        run: python -m py_compile concierge/payout_dispute.py tests/test_payout_dispute.py
