@@ -236,6 +236,18 @@ def _bounded_response_bytes(response: Any, *, name: str) -> bytes:
     return bytes(raw)
 
 
+def _reject_duplicate_object_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject ambiguous JSON objects instead of accepting the last duplicate key."""
+    out: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in out:
+            raise SuperteamProviderError(
+                f"Superteam response contains duplicate JSON object key {key!r}"
+            )
+        out[key] = value
+    return out
+
+
 def _response_json(response: Any, *, name: str) -> Any:
     close = getattr(response, "close", None)
     try:
@@ -257,7 +269,13 @@ def _response_json(response: Any, *, name: str) -> Any:
         except UnicodeDecodeError as exc:
             raise SuperteamProviderError(f"{name} response is not UTF-8") from exc
         try:
-            return json.loads(text, parse_float=Decimal)
+            return json.loads(
+                text,
+                parse_float=Decimal,
+                object_pairs_hook=_reject_duplicate_object_pairs,
+            )
+        except SuperteamProviderError:
+            raise
         except (json.JSONDecodeError, InvalidOperation, ValueError) as exc:
             raise SuperteamProviderError(f"{name} returned invalid JSON") from exc
     finally:
@@ -594,13 +612,79 @@ def fetch_live_opportunities(
     }
 
 
+def _verify_current_live_identity(
+    core: Mapping[str, Any],
+    *,
+    api_key: str,
+    session: Any,
+    as_of: datetime | None,
+) -> dict[str, str]:
+    """Bind details to an exact row in the bounded first-party live feed."""
+    live = fetch_live_opportunities(
+        api_key=api_key,
+        listing_type=core["listing_type"],
+        take=50,
+        max_batches=MAX_BATCHES,
+        as_of=as_of,
+        session=session,
+    )
+    expected_id = core["external_id"]
+    expected_slug = core["slug"]
+    id_matches = [
+        item for item in live["opportunities"] if item["external_id"] == expected_id
+    ]
+    slug_matches = [
+        item for item in live["opportunities"] if item["slug"] == expected_slug
+    ]
+    exact = [
+        item
+        for item in id_matches
+        if item["slug"] == expected_slug
+    ]
+
+    if len(id_matches) > 1 or len(slug_matches) > 1:
+        raise SuperteamProviderError(
+            "Superteam live feed returned ambiguous listing identity"
+        )
+    if id_matches and not exact:
+        raise SuperteamProviderError(
+            "Superteam live feed external id maps to a different slug"
+        )
+    if slug_matches and not exact:
+        raise SuperteamProviderError(
+            "Superteam live feed slug maps to a different external id"
+        )
+    if len(exact) == 1:
+        live_row = exact[0]
+        # Identity is exact; also require the live row's critical discovery
+        # state to match the details row so details cannot widen stale scope.
+        for key in ("listing_type", "status", "agent_access"):
+            if live_row[key] != core[key]:
+                raise SuperteamProviderError(
+                    f"Superteam live/details {key} evidence conflicts"
+                )
+        return {
+            "source": LIVE_LISTINGS_URL,
+            "external_id": expected_id,
+            "slug": expected_slug,
+        }
+    if live["truncated"]:
+        raise SuperteamProviderError(
+            "Superteam live feed was truncated before listing identity could be proven"
+        )
+    raise SuperteamProviderError(
+        "Superteam listing is not present in the current live agent feed"
+    )
+
+
 def fetch_listing_details(
     slug: str,
     *,
     api_key: str | None = None,
+    as_of: datetime | None = None,
     session: Any = requests,
 ) -> dict[str, Any]:
-    """Fetch the first-party public contract for one agent-eligible listing."""
+    """Fetch scope only after exact identity appears in the current live feed."""
     key = _api_key(api_key)
     slug = _text(slug, "slug", max_chars=200)
     assert slug is not None
@@ -626,11 +710,14 @@ def fetch_listing_details(
         )
 
     # The details endpoint is broader than the live-feed query. Reapply the
-    # public/published boundary locally before exposing it as discoverable work.
+    # public/published boundary locally, and explicitly reject archived detail
+    # evidence when the provider supplies that field.
     if payload.get("isPrivate") is not False or payload.get("isPublished") is not True:
         raise SuperteamProviderError(
             "Superteam listing details are not public and published"
         )
+    if payload.get("isArchived") is True:
+        raise SuperteamProviderError("Superteam listing details are archived")
 
     core = normalize_live_listing(
         {
@@ -651,18 +738,30 @@ def fetch_listing_details(
         allow_none=True,
         allow_newlines=True,
     )
+    skills = _skills(payload.get("skills"))
+    eligibility = _eligibility(payload.get("eligibility"))
+    region = _optional_text(payload.get("region"), "region", max_chars=128)
+    foundation_paying = _optional_bool(
+        payload.get("isFndnPaying"), "isFndnPaying"
+    )
+
+    live_identity = _verify_current_live_identity(
+        core,
+        api_key=key,
+        session=session,
+        as_of=as_of,
+    )
+
     return {
         "schema": "superteam-agent-listing-details/v1",
         "listing": core,
         "public_contract": {
-            "skills": _skills(payload.get("skills")),
-            "eligibility": _eligibility(payload.get("eligibility")),
-            "region": _optional_text(payload.get("region"), "region", max_chars=128),
+            "skills": skills,
+            "eligibility": eligibility,
+            "region": region,
             "is_private": False,
             "is_published": True,
-            "foundation_paying": _optional_bool(
-                payload.get("isFndnPaying"), "isFndnPaying"
-            ),
+            "foundation_paying": foundation_paying,
             # Sponsor-authored text is data to evaluate, not instruction
             # authority for the local runtime.
             "untrusted_scope": {
@@ -672,6 +771,7 @@ def fetch_listing_details(
         },
         "authority": {
             "source": "first_party_agent_details",
+            "live_identity": live_identity,
             "scope_text": "sponsor_supplied_untrusted_data",
             "dispatch": False,
             "submission": False,
@@ -711,7 +811,7 @@ def main(argv: list[str] | None = None) -> int:
     list_parser.add_argument("--json", action="store_true")
 
     detail_parser = sub.add_parser(
-        "details", help="read one agent-eligible listing contract"
+        "details", help="read one currently-live agent-eligible listing contract"
     )
     detail_parser.add_argument("slug")
     detail_parser.add_argument("--json", action="store_true")
