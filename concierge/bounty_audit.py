@@ -67,9 +67,9 @@ def _object_payload(value: Any, context: str) -> dict[str, Any]:
 
 def _issue_reference_pattern(repo: str, number: int) -> re.Pattern[str]:
     owner, name = repo.split("/", 1)
-    full_url = rf"https?://github\.com/{re.escape(owner)}/{re.escape(name)}/issues/{number}(?!\d)"
-    qualified_ref = rf"(?<![A-Za-z0-9_.-]){re.escape(owner)}/{re.escape(name)}#{number}(?!\d)"
-    short_ref = rf"(?<![A-Za-z0-9_.-])#{number}(?!\d)"
+    full_url = rf"https?://github\.com/{re.escape(owner)}/{re.escape(name)}/issues/{number}(?!\w)"
+    qualified_ref = rf"(?<![A-Za-z0-9_.-]){re.escape(owner)}/{re.escape(name)}#{number}(?!\w)"
+    short_ref = rf"(?<![A-Za-z0-9_.-])#{number}(?!\w)"
     return re.compile(rf"(?:{full_url}|{qualified_ref}|{short_ref})", re.IGNORECASE)
 
 

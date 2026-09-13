@@ -148,14 +148,18 @@ def get_pending_transfers(name):
     """
     result = _get("/wallet/pending", params={"miner_id": name})
     if isinstance(result, list):
-        return result
-    if isinstance(result, dict):
+        pending = result
+    elif isinstance(result, dict):
         if "error" in result:
             return []
         pending = result.get("pending", [])
-        if isinstance(pending, list):
-            return pending
-    return []
+        if not isinstance(pending, list):
+            return []
+    else:
+        return []
+    if any(not isinstance(item, dict) for item in pending):
+        return []
+    return pending
 
 
 def register_wallet_guide(name):

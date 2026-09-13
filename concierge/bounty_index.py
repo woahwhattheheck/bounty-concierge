@@ -290,12 +290,14 @@ def format_markdown(bounties):
         "|---|------|-------|-----|------|--------|",
     ]
     for b in bounties:
-        repo_short = b["repo"].split("/")[-1]
-        skills = ", ".join(b["skills"]) if b["skills"] else "-"
+        repo_short = _markdown_cell(b["repo"].split("/")[-1])
+        skill_text = ", ".join(b["skills"]) if b["skills"] else "-"
+        skills = _markdown_cell(skill_text)
+        difficulty = _markdown_cell(b["difficulty"])
         title_short = _markdown_cell(b["title"][:60])
         lines.append(
             f"| {b['number']} | {repo_short} | {title_short} | "
-            f"{b['reward_rtc']:.1f} | {b['difficulty']} | {skills} |"
+            f"{b['reward_rtc']:.1f} | {difficulty} | {skills} |"
         )
     return "\n".join(lines)
 
