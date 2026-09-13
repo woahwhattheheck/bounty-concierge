@@ -118,6 +118,20 @@ class LiveRevenueIntakeTests(unittest.TestCase):
         self.assertTrue(result["provenance"]["dispatch"])
 
     @patch("concierge.revenue_intake.preflight_bounty")
+    def test_explicit_empty_listing_url_fails_closed(self, mocked):
+        mocked.return_value = live_preflight()
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "listing_url must be non-empty",
+        ):
+            qualify_live_revenue_intake(
+                "acme/widgets",
+                17,
+                listing_url="",
+            )
+
+    @patch("concierge.revenue_intake.preflight_bounty")
     def test_live_mode_fails_closed_without_canonical_issue_url(self, mocked):
         value = live_preflight()
         value["canonical_audit"]["issue_url"] = None
