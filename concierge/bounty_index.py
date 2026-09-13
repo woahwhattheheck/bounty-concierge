@@ -39,44 +39,68 @@ def fetch_bounties(repos=None, token=None):
         headers["Authorization"] = f"Bearer {token}"
 
     bounties = []
+    per_page = 100
     for repo in repos:
         api_url = f"https://api.github.com/repos/{repo}/issues"
-        params = {"labels": "bounty", "state": "open", "per_page": 100}
+        repo_bounties = []
+        page = 1
+        repo_failed = False
 
-        try:
-            resp = requests.get(api_url, headers=headers, params=params, timeout=15)
-            if resp.status_code == 404:
-                continue
-            resp.raise_for_status()
-        except requests.RequestException as exc:
-            print(f"[warn] failed to fetch {repo}: {exc}", file=sys.stderr)
-            continue
+        while True:
+            params = {
+                "labels": "bounty",
+                "state": "open",
+                "per_page": per_page,
+                "page": page,
+            }
 
-        for issue in resp.json():
-            # Skip pull requests that come through the issues endpoint
-            if "pull_request" in issue:
-                continue
+            try:
+                resp = requests.get(api_url, headers=headers, params=params, timeout=15)
+                if resp.status_code == 404:
+                    repo_failed = True
+                    break
+                resp.raise_for_status()
+            except requests.RequestException as exc:
+                print(
+                    f"[warn] failed to fetch {repo} page {page}: {exc}",
+                    file=sys.stderr,
+                )
+                repo_failed = True
+                break
 
-            title = issue.get("title", "")
-            body = issue.get("body", "") or ""
-            label_names = [lb["name"] for lb in issue.get("labels", [])]
+            issues = resp.json()
+            for issue in issues:
+                # Skip pull requests that come through the issues endpoint
+                if "pull_request" in issue:
+                    continue
 
-            reward = parse_reward(title, body)
-            difficulty = estimate_difficulty(title, label_names, reward)
-            skills = tag_skills(title, body)
+                title = issue.get("title", "")
+                body = issue.get("body", "") or ""
+                label_names = [lb["name"] for lb in issue.get("labels", [])]
 
-            bounties.append({
-                "repo": repo,
-                "number": issue["number"],
-                "title": title,
-                "body": body,
-                "url": issue["html_url"],
-                "labels": label_names,
-                "created_at": issue.get("created_at", ""),
-                "reward_rtc": reward,
-                "difficulty": difficulty,
-                "skills": skills,
-            })
+                reward = parse_reward(title, body)
+                difficulty = estimate_difficulty(title, label_names, reward)
+                skills = tag_skills(title, body)
+
+                repo_bounties.append({
+                    "repo": repo,
+                    "number": issue["number"],
+                    "title": title,
+                    "body": body,
+                    "url": issue["html_url"],
+                    "labels": label_names,
+                    "created_at": issue.get("created_at", ""),
+                    "reward_rtc": reward,
+                    "difficulty": difficulty,
+                    "skills": skills,
+                })
+
+            if len(issues) < per_page:
+                break
+            page += 1
+
+        if not repo_failed:
+            bounties.extend(repo_bounties)
 
     return bounties
 
@@ -225,7 +249,6 @@ def format_markdown(bounties):
 # ---------------------------------------------------------------------------
 # Standalone entry point
 # ---------------------------------------------------------------------------
-
 if __name__ == "__main__":
     data = aggregate()
     print(json.dumps(data, indent=2, default=str))
