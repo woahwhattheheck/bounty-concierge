@@ -256,6 +256,50 @@ class RevenueCloseoutTests(unittest.TestCase):
         with self.assertRaises(RevenueCloseoutInputError):
             scan_paid_pr(item(pr=True), session=FakeSession({}))
 
+
+    def test_missing_or_future_last_seen_rejects_before_network(self):
+        with self.assertRaisesRegex(RevenueCloseoutInputError, "last_seen_at"):
+            scan_paid_pr(item(last_seen_at=None), session=FakeSession({}))
+        with self.assertRaisesRegex(RevenueCloseoutInputError, "must not be in the future"):
+            scan_paid_pr(
+                item(last_seen_at="2099-01-01T00:00:00Z"),
+                session=FakeSession({}),
+            )
+
+    def test_dot_segment_repo_rejects_before_network(self):
+        for repo in ("../widgets", "acme/.."):
+            with self.subTest(repo=repo):
+                with self.assertRaises(RevenueCloseoutInputError):
+                    scan_paid_pr(item(repo=repo), session=FakeSession({}))
+
+    def test_same_action_mixed_currency_preserves_manifest_order(self):
+        base = "https://api.github.com/repos"
+        session_routes = {}
+        inputs = []
+        for repo, number, amount, currency in (
+            ("alpha/one", 1, "1", "USD"),
+            ("beta/two", 2, "999999", "RTC"),
+        ):
+            session_routes[f"{base}/{repo}/pulls/{number}"] = {
+                "html_url": f"https://github.com/{repo}/pull/{number}",
+                "state": "open",
+                "merged_at": None,
+                "user": {"login": "builder"},
+                "head": {"sha": SHA},
+            }
+            session_routes[(f"{base}/{repo}/pulls/{number}/reviews", (("page", 1), ("per_page", 100)))] = []
+            session_routes[(f"{base}/{repo}/issues/{number}/comments", (("page", 1), ("per_page", 100)))] = []
+            inputs.append({
+                "repo": repo,
+                "pr": number,
+                "operator_login": "builder",
+                "advertised_amount": amount,
+                "currency": currency,
+                "last_seen_at": "2026-09-13T00:00:00Z",
+            })
+        result = build_closeout_queue(inputs, session=FakeSession(session_routes))
+        self.assertEqual([row["repo"] for row in result], ["alpha/one", "beta/two"])
+
     def test_naive_last_seen_rejects(self):
         with self.assertRaisesRegex(RevenueCloseoutInputError, "include a timezone"):
             scan_paid_pr(
@@ -269,7 +313,7 @@ class RevenueCloseoutTests(unittest.TestCase):
             build_closeout_queue([item(), item()], session=session)
         self.assertEqual(len(session.calls), 3)
 
-    def test_queue_prioritizes_action_then_advertised_value(self):
+    def test_queue_prioritizes_action_without_cross_currency_value_claims(self):
         base = "https://api.github.com/repos"
         session_routes = {}
         inputs = []
