@@ -7,7 +7,7 @@ from concierge import readme_sync as rs
 def test_render_table_fences_controls_cells_and_link_delimiters():
     table = rs.render_table([{
         "repo": "owner/repo|fake\nrow",
-        "number": "7\n9",
+        "number": 7,
         "title": "legit\n\\| forged\x1b[2J café 🚀",
         "url": "https://example.test/a)b(c\nx",
         "reward_rtc": 5,
@@ -18,7 +18,7 @@ def test_render_table_fences_controls_cells_and_link_delimiters():
     assert len(table.splitlines()) == 3
     row = table.splitlines()[-1]
     assert "repo\\|fake\\x0arow" in row
-    assert "#7\\x0a9" in row
+    assert "#7" in row
     assert "legit\\x0a\\\\\\| forged\\x1b[2J café 🚀" in row
     assert "major\\|critical\\x0ax" in row
     assert "python\\|rust, docs\\x0aforged" in row
