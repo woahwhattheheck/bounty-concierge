@@ -1,0 +1,34 @@
+name: Cash Close Board
+
+on:
+  pull_request:
+    paths:
+      - 'concierge/cash_close_board.py'
+      - 'tests/test_cash_close_board.py'
+      - 'docs/BOUNTY_CASH_CLOSE_BOARD.md'
+      - '.github/workflows/cash-close-board.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'concierge/cash_close_board.py'
+      - 'tests/test_cash_close_board.py'
+      - 'docs/BOUNTY_CASH_CLOSE_BOARD.md'
+      - '.github/workflows/cash-close-board.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  cash-close-board:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - name: Syntax
+        run: python -m py_compile concierge/cash_close_board.py tests/test_cash_close_board.py
+      - name: Unit tests
+        run: python -m unittest -q tests.test_cash_close_board
+      - name: Optimized unit tests
+        run: python -O -m unittest -q tests.test_cash_close_board
