@@ -7,6 +7,8 @@ GitHub competition/staleness signals, while this gate combines those signals
 with live reward metadata and contribution-term boundaries.
 
 The returned result intentionally never includes source body/comment text.
+Raw comment bodies are accepted only with explicit GitHub author-association
+metadata; only OWNER/MEMBER/COLLABORATOR comments are authoritative terms.
 """
 
 from __future__ import annotations
@@ -35,6 +37,7 @@ _LABEL_REWARD_RE = re.compile(
     r"(?<![\w.])\$([0-9][0-9,]*(?:\.[0-9]{1,2})?)\b"
 )
 _REWARDED_LABEL_RE = re.compile(r"\brewarded\b", re.IGNORECASE)
+_MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
 
 _PRIVATE_CONTEXT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("system_prompt", re.compile(r"\bsystem\s+prompt\b", re.IGNORECASE)),
@@ -115,7 +118,15 @@ def _label_names(snapshot: dict[str, Any]) -> list[str]:
     return names
 
 
-def _text_values(snapshot: dict[str, Any]) -> list[str]:
+def _text_values(snapshot: dict[str, Any]) -> tuple[list[str], int, int]:
+    """Return trusted term text plus safe comment-authority counters.
+
+    ``body``, ``contribution_terms``, and ``requirements`` are normalized caller
+    fields. Raw ``comments`` sit on a different trust boundary: every comment
+    must carry GitHub ``author_association`` metadata and only maintainer-authority
+    comments may influence private-context rejection. External comments are
+    ignored rather than allowed to suppress otherwise valid paid work.
+    """
     texts: list[str] = []
     body = snapshot.get("body", "")
     if body is None:
@@ -135,20 +146,32 @@ def _text_values(snapshot: dict[str, Any]) -> list[str]:
         else:
             raise QualificationInputError(f"{key} must be a string or list of strings")
 
+    trusted_comment_count = 0
+    ignored_untrusted_comment_count = 0
     comments = snapshot.get("comments")
     if comments is not None:
         if not isinstance(comments, list):
             raise QualificationInputError("comments must be a list")
         for comment in comments:
-            if isinstance(comment, str):
-                texts.append(comment)
-            elif isinstance(comment, dict) and isinstance(comment.get("body"), str):
-                texts.append(comment["body"])
-            else:
+            if not isinstance(comment, dict):
                 raise QualificationInputError(
-                    "each comment must be a string or an object with a string body"
+                    "each comment must be an object with string body and author_association"
                 )
-    return texts
+            comment_body = comment.get("body")
+            association = comment.get("author_association")
+            if not isinstance(comment_body, str):
+                raise QualificationInputError("each comment body must be a string")
+            if not isinstance(association, str) or not association.strip():
+                raise QualificationInputError(
+                    "each comment author_association must be a non-empty string"
+                )
+            if association.strip().upper() in _MAINTAINER_ASSOCIATIONS:
+                texts.append(comment_body)
+                trusted_comment_count += 1
+            else:
+                ignored_untrusted_comment_count += 1
+
+    return texts, trusted_comment_count, ignored_untrusted_comment_count
 
 
 def _nonnegative_int(value: Any, name: str) -> int | None:
@@ -176,6 +199,8 @@ def qualify_dispatch(
 
     Decision precedence is ``REJECT`` > ``HOLD`` > ``ACTIONABLE``.
     The result is safe to log: source issue/comment text is never copied into it.
+    Raw comment text can affect the decision only when the snapshot supplies an
+    OWNER/MEMBER/COLLABORATOR ``author_association`` for that comment.
     """
     if not isinstance(snapshot, dict):
         raise QualificationInputError("snapshot must be an object")
@@ -188,7 +213,7 @@ def qualify_dispatch(
 
     title = _title_value(snapshot)
     labels = _label_names(snapshot)
-    texts = _text_values(snapshot)
+    texts, trusted_comment_count, ignored_untrusted_comment_count = _text_values(snapshot)
     audit, audit_complete = _canonical_audit(snapshot)
 
     body_rewards = _advertised_rewards(texts[0])
@@ -324,6 +349,8 @@ def qualify_dispatch(
             "attempt_count": attempt_count,
             "open_pr_count": open_pr_count,
             "private_context_signal_types": private_signal_types,
+            "trusted_comment_count": trusted_comment_count,
+            "ignored_untrusted_comment_count": ignored_untrusted_comment_count,
             "stale_listing_signal": stale_listing,
             "search_truncated": search_truncated,
             "canonical_audit_complete": audit_complete,
