@@ -4,7 +4,7 @@
 ``bounty_audit`` establishes canonical issue/PR state and
 ``bounty_qualification`` decides whether work is safe to dispatch.  This module
 fills the missing ``attempt_count`` input from canonical GitHub issue comments
-without letting arbitrary commenters influence contribution-term rejection.
+while authority-binding maintainer contribution terms for credential safety.
 """
 
 from __future__ import annotations
@@ -22,6 +22,10 @@ from concierge.bounty_qualification import (
     qualify_dispatch,
 )
 from concierge.config import GITHUB_TOKEN
+from concierge.credential_safety import (
+    apply_credential_gate,
+    credential_gate_signal_types,
+)
 
 
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
@@ -70,9 +74,16 @@ def _object_payload(value: Any, context: str) -> dict[str, Any]:
     return value
 
 
+def _has_maintainer_authority(item: dict[str, Any]) -> bool:
+    association = item.get("author_association")
+    return (
+        isinstance(association, str)
+        and association.upper() in _MAINTAINER_ASSOCIATIONS
+    )
+
+
 def _is_external_human(comment: dict[str, Any]) -> tuple[bool, str]:
-    association = comment.get("author_association")
-    if isinstance(association, str) and association.upper() in _MAINTAINER_ASSOCIATIONS:
+    if _has_maintainer_authority(comment):
         return False, ""
     user = comment.get("user")
     if not isinstance(user, dict):
@@ -107,10 +118,10 @@ def collect_issue_context(
 ) -> dict[str, Any]:
     """Collect safe qualification inputs plus conservative claim pressure.
 
-    Issue comments contribute only to ``attempt_count``.  Raw comment text is
-    never forwarded into qualification, so neither an arbitrary claimant nor a
-    negated maintainer remark can inject a lexical private-context phrase and
-    force a terminal rejection.
+    External comments contribute only to ``attempt_count``. Raw external comment
+    text is never forwarded into qualification. OWNER/MEMBER/COLLABORATOR terms
+    are reduced immediately to generic credential-safety signals, so raw
+    maintainer comment text does not leave the collection loop either.
     """
     if "/" not in repo or not repo.split("/", 1)[0] or not repo.split("/", 1)[1]:
         raise ValueError("repo must be in owner/name form")
@@ -133,11 +144,22 @@ def collect_issue_context(
     if "pull_request" in issue:
         raise ValueError(f"{repo}#{number} is a pull request, not an issue")
 
+    issue_body = issue.get("body")
+    if issue_body is None:
+        issue_body = ""
+    if not isinstance(issue_body, str):
+        raise BountyPreflightError(
+            f"GitHub issue body was not a string for {repo}#{number}"
+        )
+
     claimant_logins: set[str] = set()
     attempt_signal_count = 0
     comments_truncated = False
-    comments_url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
+    credential_signals: set[str] = set()
+    if _has_maintainer_authority(issue):
+        credential_signals.update(credential_gate_signal_types([issue_body]))
 
+    comments_url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
     for page in range(1, max_pages + 1):
         payload = _get_json(
             session,
@@ -160,6 +182,8 @@ def collect_issue_context(
                     f"GitHub issue comment body was not a string for {repo}#{number}"
                 )
             body = body or ""
+            if _has_maintainer_authority(comment) and body.strip():
+                credential_signals.update(credential_gate_signal_types([body]))
             external_human, login = _is_external_human(comment)
             if external_human and _signals_attempt(body, repo):
                 attempt_signal_count += 1
@@ -171,11 +195,12 @@ def collect_issue_context(
 
     return {
         "title": issue.get("title") if issue.get("title") is not None else "",
-        "body": issue.get("body") if issue.get("body") is not None else "",
+        "body": issue_body,
         "labels": issue.get("labels") if issue.get("labels") is not None else [],
         "attempt_count": len(claimant_logins),
         "attempt_signal_count": attempt_signal_count,
         "comments_truncated": comments_truncated,
+        "credential_gate_signal_types": sorted(credential_signals),
     }
 
 
@@ -220,6 +245,11 @@ def preflight_bounty(
         snapshot,
         saturation_threshold=saturation_threshold,
     )
+    qualification = apply_credential_gate(
+        qualification,
+        context["credential_gate_signal_types"],
+    )
+
     return {
         "repo": repo,
         "number": number,
