@@ -21,15 +21,15 @@ from concierge.config import GITHUB_TOKEN
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
 _MAINTAINER_EXPIRY_PATTERNS = (
     re.compile(
-        r"\b(?:this|the)\s+bounty\s+(?:has\s+been\s+expired|has\s+expired|is\s+expired|expired)\b",
+        r"(?:^|[.!:]\s+)(?:this|the)\s+bounty\s+(?:has\s+been\s+expired|has\s+expired|is\s+expired|expired)\b",
         re.IGNORECASE,
     ),
     re.compile(
-        r"\b(?:this|the)\s+bounty\s+(?:has\s+been\s+|has\s+|is\s+|was\s+)?cancel(?:l)?ed\b",
+        r"(?:^|[.!:]\s+)(?:this|the)\s+bounty\s+(?:has\s+been\s+|has\s+|is\s+|was\s+)?cancel(?:l)?ed\b",
         re.IGNORECASE,
     ),
     re.compile(
-        r"\b(?:this|the)\s+bounty\s+is\s+no\s+longer\s+(?:active|available|offered)\b",
+        r"(?:^|[.!:]\s+)(?:this|the)\s+bounty\s+is\s+no\s+longer\s+(?:active|available|offered)\b",
         re.IGNORECASE,
     ),
 )
