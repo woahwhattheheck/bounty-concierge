@@ -178,7 +178,7 @@ class PortfolioAllocatorTests(unittest.TestCase):
     def test_ranker_exclusions_are_preserved_without_raw_fields(self):
         excluded = [
             {
-                "input_index": 7,
+                "input_index": 1,
                 "canonical_source_url": "https://github.com/acme/x/issues/8",
                 "reason_code": "INTAKE_NOT_ACTIONABLE",
                 "private_extra": "DO NOT ECHO",
@@ -193,7 +193,7 @@ class PortfolioAllocatorTests(unittest.TestCase):
             result["intake_excluded"],
             [
                 {
-                    "input_index": 7,
+                    "input_index": 1,
                     "canonical_source_url": "https://github.com/acme/x/issues/8",
                     "reason_code": "INTAKE_NOT_ACTIONABLE",
                 }
@@ -259,6 +259,27 @@ class PortfolioAllocatorTests(unittest.TestCase):
         with self.assertRaisesRegex(PortfolioAllocationError, "resource bound"):
             allocate_ranked_portfolio(
                 ranking(*rows), available_hours="1000", max_active=8
+            )
+
+    def test_extreme_decimal_precision_is_rejected(self):
+        value = ranking(ranked_row(1))
+        with self.assertRaisesRegex(PortfolioAllocationError, "bounded decimal precision"):
+            allocate_ranked_portfolio(
+                value, available_hours="1e-1000000", max_active=1
+            )
+
+        row = ranked_row(1)
+        row["advertised_reward_usd"] = "1e1000000"
+        with self.assertRaisesRegex(PortfolioAllocationError, "bounded decimal precision"):
+            allocate_ranked_portfolio(
+                ranking(row), available_hours="10", max_active=1
+            )
+
+    def test_receipt_indices_must_cover_candidate_batch_exactly(self):
+        row = ranked_row(1, input_index=9)
+        with self.assertRaisesRegex(PortfolioAllocationError, "cover the candidate batch"):
+            allocate_ranked_portfolio(
+                ranking(row), available_hours="10", max_active=1
             )
 
     def test_capacity_input_validation(self):
