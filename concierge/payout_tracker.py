@@ -12,17 +12,22 @@ import requests
 from concierge import config
 
 
+class PayoutLookupError(RuntimeError):
+    """Raised when payout status cannot be determined reliably."""
+
+
 def _payload_list(data, key: str) -> List[dict]:
-    """Normalize supported API payload shapes to the public list contract."""
+    """Normalize supported API payload shapes without certifying bad data."""
     if isinstance(data, list):
         items = data
-    elif isinstance(data, dict):
-        items = data.get(key, [])
+    elif isinstance(data, dict) and key in data:
+        items = data[key]
     else:
-        return []
-    if not isinstance(items, list):
-        return []
-    return [item for item in items if isinstance(item, dict)]
+        raise PayoutLookupError(f"{key} payout response was malformed")
+
+    if not isinstance(items, list) or any(not isinstance(item, dict) for item in items):
+        raise PayoutLookupError(f"{key} payout response was malformed")
+    return items
 
 
 def _terminal_text(value) -> str:
@@ -43,14 +48,15 @@ def _terminal_text(value) -> str:
     return "".join(escaped)
 
 
-def check_pending(wallet_id: str, node_url: str | None = None) -> List[dict]:
-    """Return pending transfers for *wallet_id*.
-
-    Queries ``GET {node_url}/wallet/pending?miner_id={wallet_id}``.
-    Returns an empty list on 404, connection errors, or unsupported payloads.
-    """
+def _check_transfers(
+    wallet_id: str,
+    endpoint: str,
+    payload_key: str,
+    node_url: str | None = None,
+) -> List[dict]:
+    """Fetch one payout endpoint, distinguishing empty data from failure."""
     base = (node_url or config.RUSTCHAIN_NODE_URL).rstrip("/")
-    url = f"{base}/wallet/pending"
+    url = f"{base}/wallet/{endpoint}"
     try:
         resp = requests.get(
             url,
@@ -61,32 +67,41 @@ def check_pending(wallet_id: str, node_url: str | None = None) -> List[dict]:
         if resp.status_code == 404:
             return []
         resp.raise_for_status()
-        return _payload_list(resp.json(), "pending")
-    except requests.RequestException:
-        return []
+        try:
+            data = resp.json()
+        except (TypeError, ValueError) as exc:
+            raise PayoutLookupError(
+                f"{payload_key} payout response was not valid JSON"
+            ) from exc
+        return _payload_list(data, payload_key)
+    except PayoutLookupError:
+        raise
+    except requests.RequestException as exc:
+        raise PayoutLookupError(
+            f"{payload_key} payout request failed"
+        ) from exc
+
+
+def check_pending(wallet_id: str, node_url: str | None = None) -> List[dict]:
+    """Return pending transfers for *wallet_id*.
+
+    Queries ``GET {node_url}/wallet/pending?miner_id={wallet_id}``.
+    A genuine 404 remains an empty result. Transport, HTTP, JSON, and payload
+    failures raise :class:`PayoutLookupError` rather than masquerading as no
+    pending transfers.
+    """
+    return _check_transfers(wallet_id, "pending", "pending", node_url)
 
 
 def check_history(wallet_id: str, node_url: str | None = None) -> List[dict]:
     """Return recent transfer history for *wallet_id*.
 
     Queries ``GET {node_url}/wallet/history?miner_id={wallet_id}``.
-    Returns an empty list on 404, connection errors, or unsupported payloads.
+    A genuine 404 remains an empty result. Transport, HTTP, JSON, and payload
+    failures raise :class:`PayoutLookupError` rather than masquerading as no
+    transfer history.
     """
-    base = (node_url or config.RUSTCHAIN_NODE_URL).rstrip("/")
-    url = f"{base}/wallet/history"
-    try:
-        resp = requests.get(
-            url,
-            params={"miner_id": wallet_id},
-            timeout=15,
-            verify=False,
-        )
-        if resp.status_code == 404:
-            return []
-        resp.raise_for_status()
-        return _payload_list(resp.json(), "history")
-    except requests.RequestException:
-        return []
+    return _check_transfers(wallet_id, "history", "history", node_url)
 
 
 def format_payout_status(pending: List[dict], history: List[dict]) -> str:

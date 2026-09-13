@@ -5,6 +5,7 @@ import pathlib
 import sys
 from unittest.mock import MagicMock, patch
 
+import pytest
 import requests
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -54,10 +55,26 @@ class TestCheckPending:
         assert payout_tracker.check_pending("alice", node_url="https://node") == []
 
     @patch("concierge.payout_tracker.requests.get")
-    def test_pending_network_error_returns_empty_list(self, mock_get):
-        mock_get.side_effect = requests.RequestException("connection failed")
+    def test_pending_network_error_is_not_reported_as_empty(self, mock_get):
+        mock_get.side_effect = requests.RequestException("secret upstream detail")
 
-        assert payout_tracker.check_pending("alice", node_url="https://node") == []
+        with pytest.raises(
+            payout_tracker.PayoutLookupError,
+            match="^pending payout request failed$",
+        ):
+            payout_tracker.check_pending("alice", node_url="https://node")
+
+    @patch("concierge.payout_tracker.requests.get")
+    def test_pending_invalid_json_is_not_reported_as_empty(self, mock_get):
+        response = _response(payload=[])
+        response.json.side_effect = ValueError("raw response bytes")
+        mock_get.return_value = response
+
+        with pytest.raises(
+            payout_tracker.PayoutLookupError,
+            match="^pending payout response was not valid JSON$",
+        ):
+            payout_tracker.check_pending("alice", node_url="https://node")
 
 
 class TestCheckHistory:
@@ -76,16 +93,36 @@ class TestCheckHistory:
         )
 
     @patch("concierge.payout_tracker.requests.get")
-    def test_history_unexpected_dict_without_history_returns_empty(self, mock_get):
+    def test_history_unexpected_dict_is_not_reported_as_empty(self, mock_get):
         mock_get.return_value = _response(payload={"status": "ok"})
 
-        assert payout_tracker.check_history("alice", node_url="https://node") == []
+        with pytest.raises(
+            payout_tracker.PayoutLookupError,
+            match="^history payout response was malformed$",
+        ):
+            payout_tracker.check_history("alice", node_url="https://node")
 
     @patch("concierge.payout_tracker.requests.get")
-    def test_history_http_error_returns_empty_list(self, mock_get):
+    def test_history_mixed_rows_are_not_silently_filtered(self, mock_get):
+        mock_get.return_value = _response(
+            payload={"history": [{"tx": "abc"}, "corrupt-row"]}
+        )
+
+        with pytest.raises(
+            payout_tracker.PayoutLookupError,
+            match="^history payout response was malformed$",
+        ):
+            payout_tracker.check_history("alice", node_url="https://node")
+
+    @patch("concierge.payout_tracker.requests.get")
+    def test_history_http_error_is_not_reported_as_empty(self, mock_get):
         mock_get.return_value = _response(status_code=500, payload={"error": "boom"})
 
-        assert payout_tracker.check_history("alice", node_url="https://node") == []
+        with pytest.raises(
+            payout_tracker.PayoutLookupError,
+            match="^history payout request failed$",
+        ):
+            payout_tracker.check_history("alice", node_url="https://node")
 
 
 class TestFormatPayoutStatus:

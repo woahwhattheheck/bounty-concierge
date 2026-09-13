@@ -1,4 +1,4 @@
 # SPDX-License-Identifier: MIT
-from concierge.cli import main
+from concierge.entrypoint import main
 
 main()

@@ -12,5 +12,5 @@ authors = [{name = "Elyan Labs", email = "scott@elyanlabs.ai"}]
 dependencies = ["requests>=2.32.5"]
 
 [project.scripts]
-concierge = "concierge.cli:main"
-clawrtc = "concierge.cli:main"
+concierge = "concierge.entrypoint:main"
+clawrtc = "concierge.entrypoint:main"
