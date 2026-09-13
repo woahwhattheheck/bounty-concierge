@@ -24,6 +24,8 @@ class PortfolioAllocationError(ValueError):
 
 _METRIC_QUANTUM = Decimal("0.000001")
 _MAX_EXACT_COMBINATIONS = 2_000_000
+_MAX_DECIMAL_DIGITS = 64
+_MAX_ABS_DECIMAL_EXPONENT = 64
 
 
 def _exact_decimal(value: Any, name: str) -> Decimal:
@@ -43,12 +45,20 @@ def _exact_decimal(value: Any, name: str) -> Decimal:
         raise PortfolioAllocationError(f"{name} must be a finite decimal") from exc
     if not parsed.is_finite():
         raise PortfolioAllocationError(f"{name} must be a finite decimal")
+    decimal_tuple = parsed.as_tuple()
+    if (
+        len(decimal_tuple.digits) > _MAX_DECIMAL_DIGITS
+        or abs(decimal_tuple.exponent) > _MAX_ABS_DECIMAL_EXPONENT
+    ):
+        raise PortfolioAllocationError(f"{name} exceeds bounded decimal precision")
     return parsed
 
 
 def _format_decimal(value: Decimal, *, metric: bool = False) -> str:
     if metric:
-        value = value.quantize(_METRIC_QUANTUM, rounding=ROUND_HALF_UP)
+        with localcontext() as context:
+            context.prec = 96
+            value = value.quantize(_METRIC_QUANTUM, rounding=ROUND_HALF_UP)
     text = format(value, "f")
     if "." in text:
         text = text.rstrip("0").rstrip(".")
@@ -56,7 +66,13 @@ def _format_decimal(value: Decimal, *, metric: bool = False) -> str:
 
 
 def _metric_matches(observed: Decimal, exact: Decimal) -> bool:
-    return observed == exact.quantize(_METRIC_QUANTUM, rounding=ROUND_HALF_UP)
+    try:
+        with localcontext() as context:
+            context.prec = 96
+            expected = exact.quantize(_METRIC_QUANTUM, rounding=ROUND_HALF_UP)
+    except InvalidOperation:
+        return False
+    return observed == expected
 
 
 def _validate_ranked_row(row: Any, expected_rank: int) -> dict[str, Any]:
@@ -216,6 +232,10 @@ def _validate_ranking(ranking: Any) -> tuple[list[dict[str, Any]], list[dict[str
                 "canonical_source_url": source,
                 "reason_code": reason_code,
             }
+        )
+    if ranked_indices | excluded_indices != set(range(candidate_count)):
+        raise PortfolioAllocationError(
+            "ranking input indices do not cover the candidate batch exactly"
         )
     return ranked, safe_excluded
 
