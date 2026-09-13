@@ -91,14 +91,21 @@ def fetch_bounties(repos=None, token=None):
 # Parsing helpers
 # ---------------------------------------------------------------------------
 
-_RTC_PATTERN = re.compile(r"(?<![A-Za-z0-9])(\d+(?:[.,]\d+)?)\s*RTC\b", re.IGNORECASE)
+_RTC_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_.,])"
+    r"((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)"
+    r"\s*RTC\b",
+    re.IGNORECASE,
+)
 
 
 def parse_reward(title, body):
     """Extract the first RTC reward amount from a title or body string.
 
-    Looks for patterns like '150 RTC', '1,000 RTC', '0.5 RTC'.
-    Returns the amount as a float, or 0.0 if nothing found.
+    Looks for patterns like '150 RTC', '1,000 RTC', '1,000,000 RTC',
+    '1,234.5 RTC', and '0.5 RTC'.  Commas are accepted only as canonical
+    three-digit thousands separators.  Returns the amount as a float, or 0.0
+    if nothing valid is found.
     """
     for text in (title, body):
         match = _RTC_PATTERN.search(text)
