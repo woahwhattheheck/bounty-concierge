@@ -46,6 +46,14 @@ class FakeSession:
             value = self.routes[key]
         elif url in self.routes:
             value = self.routes[url]
+        elif (
+            "/pulls/" in url
+            and url.endswith("/comments")
+            and params == {"per_page": 100, "page": 1}
+        ):
+            # Legacy fixtures predate the inline review-comment surface. Keep
+            # them explicit-empty while focused inline tests provide real rows.
+            value = []
         else:
             raise AssertionError(f"unexpected GET {url} params={params}")
         return value if isinstance(value, FakeResponse) else FakeResponse(value)
@@ -310,7 +318,6 @@ class RevenueCloseoutTests(unittest.TestCase):
         with self.assertRaises(RevenueCloseoutInputError):
             scan_paid_pr(item(pr=True), session=FakeSession({}))
 
-
     def test_missing_or_future_last_seen_rejects_before_network(self):
         with self.assertRaisesRegex(RevenueCloseoutInputError, "last_seen_at"):
             scan_paid_pr(item(last_seen_at=None), session=FakeSession({}))
@@ -365,7 +372,7 @@ class RevenueCloseoutTests(unittest.TestCase):
         session = FakeSession(routes())
         with self.assertRaisesRegex(RevenueCloseoutInputError, "duplicate closeout item"):
             build_closeout_queue([item(), item()], session=session)
-        self.assertEqual(len(session.calls), 3)
+        self.assertEqual(len(session.calls), 4)
 
     def test_queue_prioritizes_action_without_cross_currency_value_claims(self):
         base = "https://api.github.com/repos"
