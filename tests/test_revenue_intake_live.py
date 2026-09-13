@@ -89,7 +89,7 @@ class LiveRevenueIntakeTests(unittest.TestCase):
             17,
             None,
             max_pages=3,
-            saturation_threshold=6,
+            saturation_threshold=4,
             session=sentinel.session,
         )
         self.assertEqual(result["disposition"], "ACTIONABLE")
