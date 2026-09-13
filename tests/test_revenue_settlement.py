@@ -24,7 +24,7 @@ from concierge.revenue_settlement import (
 
 
 def closeout(*, pr=7, amount="10", state="MERGED", currency="RTC"):
-    return {
+    row = {
         "repo": "Sponsor/project",
         "pr": pr,
         "state": state,
@@ -32,14 +32,22 @@ def closeout(*, pr=7, amount="10", state="MERGED", currency="RTC"):
         "advertised_amount": amount,
         "cash_status": "not_inferred",
     }
+    if state == "MERGED":
+        row["merged_at"] = "1970-01-01T00:00:00Z"
+    return row
 
 
 def payment(*, amount=10, sender="treasury", status=None, tag="a"):
+    timestamp = (
+        "2026-09-13T00:00:01Z"
+        if tag == "a"
+        else f"2026-09-13T00:00:0{tag}Z"
+    )
     row = {
         "type": "transfer_in",
         "amount": amount,
         "from": sender,
-        "timestamp": f"2026-09-13T00:00:0{tag}Z",
+        "timestamp": timestamp,
         "tx_hash": f"tx-{tag}",
     }
     if status is not None:
@@ -48,11 +56,16 @@ def payment(*, amount=10, sender="treasury", status=None, tag="a"):
 
 
 def legacy_payment(*, amount=10, sender="treasury", to="alice", tag="a"):
+    created_at = (
+        "2026-09-13T00:00:01Z"
+        if tag == "a"
+        else f"2026-09-13T00:00:0{tag}Z"
+    )
     return {
         "amount_rtc": amount,
         "from": sender,
         "to": to,
-        "created_at": f"2026-09-13T00:00:0{tag}Z",
+        "created_at": created_at,
         "tx_hash": f"legacy-{tag}",
     }
 
@@ -74,6 +87,26 @@ def reconcile(items, history, bindings, *, wallet="alice", history_wallet=None, 
         history_wallet=wallet if history_wallet is None else history_wallet,
         history_source=source,
     )
+
+
+def test_default_helpers_remain_valid_under_temporal_authority():
+    canonical_item = closeout(pr=70)
+    canonical = payment()
+    canonical_result = reconcile(
+        [canonical_item],
+        [canonical],
+        [bind(canonical_item, canonical)],
+    )
+    assert canonical_result[0]["cash_status"] == "verified_paid"
+
+    legacy_item = closeout(pr=71)
+    legacy = legacy_payment()
+    legacy_result = reconcile(
+        [legacy_item],
+        [legacy],
+        [bind(legacy_item, legacy)],
+    )
+    assert legacy_result[0]["cash_status"] == "verified_paid"
 
 
 def test_unbound_merge_does_not_become_cash():
