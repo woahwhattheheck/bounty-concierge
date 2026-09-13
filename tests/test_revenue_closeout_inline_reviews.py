@@ -32,10 +32,27 @@ class FakeSession:
         self.routes = routes
 
     def get(self, url, *, headers=None, params=None, timeout=None):
-        key = (url, None if params is None else tuple(sorted(params.items())))
-        if key not in self.routes:
+        key_value = (url, None if params is None else tuple(sorted(params.items())))
+        if key_value not in self.routes:
             raise AssertionError(f"unexpected GET {url} params={params}")
-        return FakeResponse(self.routes[key])
+        return FakeResponse(self.routes[key_value])
+
+
+class SequenceSession:
+    """Return successive provider snapshots to exercise closeout race fences."""
+
+    def __init__(self, sequences):
+        self.sequences = {key_value: list(values) for key_value, values in sequences.items()}
+
+    def get(self, url, *, headers=None, params=None, timeout=None):
+        key_value = (url, None if params is None else tuple(sorted(params.items())))
+        if key_value not in self.sequences:
+            raise AssertionError(f"unexpected GET {url} params={params}")
+        values = self.sequences[key_value]
+        if not values:
+            raise AssertionError(f"exhausted GET {url} params={params}")
+        payload = values.pop(0) if len(values) > 1 else values[0]
+        return FakeResponse(payload)
 
 
 def item(**overrides):
@@ -51,14 +68,17 @@ def item(**overrides):
     return value
 
 
-def pr_payload(*, merged=False):
-    return {
+def pr_payload(*, merged=False, head_sha=SHA, updated_at=None):
+    value = {
         "html_url": PR_URL,
         "state": "closed" if merged else "open",
         "merged_at": "2026-09-13T03:00:00Z" if merged else None,
         "user": {"login": "builder"},
-        "head": {"sha": SHA},
+        "head": {"sha": head_sha},
     }
+    if updated_at is not None:
+        value["updated_at"] = updated_at
+    return value
 
 
 def key(url, page=1):
@@ -71,6 +91,15 @@ def session_routes(*, pr=None, reviews=None, inline=None, comments=None):
         key(f"{BASE}/pulls/17/reviews"): reviews or [],
         key(f"{BASE}/pulls/17/comments"): inline or [],
         key(f"{BASE}/issues/17/comments"): comments or [],
+    }
+
+
+def sequence_routes(*, prs, reviews=None, inline=None, comments=None):
+    return {
+        (f"{BASE}/pulls/17", None): prs,
+        key(f"{BASE}/pulls/17/reviews"): reviews or [[]],
+        key(f"{BASE}/pulls/17/comments"): inline or [[]],
+        key(f"{BASE}/issues/17/comments"): comments or [[]],
     }
 
 
@@ -93,6 +122,20 @@ def inline_comment(
     }
 
 
+def commented_review(*, review_id=11, at="2026-09-13T02:00:00Z", body=None):
+    value = {
+        "id": review_id,
+        "state": "COMMENTED",
+        "submitted_at": at,
+        "author_association": "MEMBER",
+        "user": {"login": "maintainer", "type": "User"},
+        "html_url": PR_URL + f"#pullrequestreview-{review_id}",
+    }
+    if body is not None:
+        value["body"] = body
+    return value
+
+
 class InlineReviewCloseoutTests(unittest.TestCase):
     def test_merged_pr_with_fresh_inline_maintainer_feedback_routes_response(self):
         session = FakeSession(
@@ -106,14 +149,7 @@ class InlineReviewCloseoutTests(unittest.TestCase):
         self.assertEqual(result["latest_feedback"]["kind"], "inline_comment")
 
     def test_inline_child_suppresses_overlapping_commented_parent_review(self):
-        review = {
-            "id": 11,
-            "state": "COMMENTED",
-            "submitted_at": "2026-09-13T02:00:00Z",
-            "author_association": "MEMBER",
-            "user": {"login": "maintainer", "type": "User"},
-            "html_url": PR_URL + "#pullrequestreview-11",
-        }
+        review = commented_review()
         result = scan_paid_pr(
             item(),
             session=FakeSession(
@@ -123,6 +159,73 @@ class InlineReviewCloseoutTests(unittest.TestCase):
         self.assertEqual(result["next_action"], "respond_to_maintainer")
         self.assertEqual(result["new_feedback_count"], 1)
         self.assertEqual(result["latest_feedback"]["kind"], "inline_comment")
+
+    def test_fresh_parent_review_is_not_erased_by_stale_pending_child(self):
+        review = commented_review(at="2026-09-13T02:00:00Z")
+        child = inline_comment(at="2026-09-13T01:00:00Z")
+        result = scan_paid_pr(
+            item(last_seen_at="2026-09-13T01:30:00Z"),
+            session=FakeSession(
+                session_routes(pr=pr_payload(merged=True), reviews=[review], inline=[child])
+            ),
+        )
+        self.assertEqual(result["state"], "MERGED")
+        self.assertEqual(result["next_action"], "respond_to_maintainer")
+        self.assertEqual(result["new_feedback_count"], 1)
+        self.assertEqual(result["latest_feedback"]["kind"], "review")
+
+    def test_parent_review_with_distinct_body_is_never_suppressed(self):
+        review = commented_review(body="Please also update the public contract.")
+        result = scan_paid_pr(
+            item(),
+            session=FakeSession(
+                session_routes(reviews=[review], inline=[inline_comment()])
+            ),
+        )
+        self.assertEqual(result["next_action"], "respond_to_maintainer")
+        self.assertEqual(result["new_feedback_count"], 2)
+
+    def test_mutating_feedback_inventory_retries_to_coherent_generation(self):
+        fresh = inline_comment(comment_id=44, review_id=33, at="2026-09-13T02:10:00Z")
+        session = SequenceSession(
+            sequence_routes(
+                prs=[pr_payload(merged=True)],
+                inline=[[], [fresh], [fresh], [fresh]],
+            )
+        )
+        result = scan_paid_pr(item(), session=session)
+        self.assertEqual(result["state"], "MERGED")
+        self.assertEqual(result["next_action"], "respond_to_maintainer")
+        self.assertEqual(result["new_feedback_count"], 1)
+
+    def test_perpetually_mutating_feedback_fails_closed(self):
+        fresh = inline_comment(comment_id=44, review_id=33, at="2026-09-13T02:10:00Z")
+        session = SequenceSession(
+            sequence_routes(
+                prs=[pr_payload(merged=True)],
+                inline=[[], [fresh], [], [fresh]],
+            )
+        )
+        with self.assertRaisesRegex(RevenueCloseoutError, "generation changed"):
+            scan_paid_pr(item(), session=session)
+
+    def test_expected_head_move_during_collection_returns_head_moved(self):
+        moved = "b" * 40
+        session = SequenceSession(
+            sequence_routes(
+                prs=[
+                    pr_payload(),
+                    pr_payload(),
+                    pr_payload(head_sha=moved),
+                    pr_payload(head_sha=moved),
+                    pr_payload(head_sha=moved),
+                ]
+            )
+        )
+        result = scan_paid_pr(item(expected_head_sha=SHA), session=session)
+        self.assertEqual(result["state"], "HEAD_MOVED")
+        self.assertEqual(result["next_action"], "repair_requested")
+        self.assertEqual(result["head_sha"], moved)
 
     def test_identical_inline_comment_replayed_across_pages_is_deduplicated(self):
         first = inline_comment()
