@@ -7,11 +7,14 @@ on:
       - "concierge/payoff_path_gate.py"
       - "concierge/payoff_path_gate_core.py"
       - "concierge/payoff_path_policy_v3.py"
+      - "concierge/payoff_path_policy_authority.py"
       - "tests/test_payoff_path_gate.py"
       - "tests/test_payoff_path_continuity.py"
       - "tests/test_payoff_path_policy_v3.py"
+      - "tests/test_payoff_path_policy_authority.py"
       - "tests/test_payoff_path_file_custody.py"
       - "docs/PAYOFF_PATH_GATE.md"
+      - "docs/PAYOFF_PATH_POLICY_AUTHORITY.md"
       - "docs/PAYOFF_PATH_FILE_CUSTODY.md"
       - ".github/workflows/payoff-path-gate.yml"
   push:
@@ -22,11 +25,14 @@ on:
       - "concierge/payoff_path_gate.py"
       - "concierge/payoff_path_gate_core.py"
       - "concierge/payoff_path_policy_v3.py"
+      - "concierge/payoff_path_policy_authority.py"
       - "tests/test_payoff_path_gate.py"
       - "tests/test_payoff_path_continuity.py"
       - "tests/test_payoff_path_policy_v3.py"
+      - "tests/test_payoff_path_policy_authority.py"
       - "tests/test_payoff_path_file_custody.py"
       - "docs/PAYOFF_PATH_GATE.md"
+      - "docs/PAYOFF_PATH_POLICY_AUTHORITY.md"
       - "docs/PAYOFF_PATH_FILE_CUSTODY.md"
       - ".github/workflows/payoff-path-gate.yml"
 
@@ -63,9 +69,11 @@ jobs:
           concierge/payoff_path_gate.py
           concierge/payoff_path_gate_core.py
           concierge/payoff_path_policy_v3.py
+          concierge/payoff_path_policy_authority.py
           tests/test_payoff_path_gate.py
           tests/test_payoff_path_continuity.py
           tests/test_payoff_path_policy_v3.py
+          tests/test_payoff_path_policy_authority.py
           tests/test_payoff_path_file_custody.py
       - name: Run payoff path hostile tests
         run: >-
@@ -73,6 +81,7 @@ jobs:
           tests/test_payoff_path_gate.py
           tests/test_payoff_path_continuity.py
           tests/test_payoff_path_policy_v3.py
+          tests/test_payoff_path_policy_authority.py
           tests/test_payoff_path_file_custody.py
       - name: Run optimized payoff path hostile tests
         run: >-
@@ -80,4 +89,5 @@ jobs:
           tests/test_payoff_path_gate.py
           tests/test_payoff_path_continuity.py
           tests/test_payoff_path_policy_v3.py
+          tests/test_payoff_path_policy_authority.py
           tests/test_payoff_path_file_custody.py
