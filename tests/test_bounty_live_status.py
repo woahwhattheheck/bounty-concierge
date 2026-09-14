@@ -83,8 +83,7 @@ class LiveStatusTests(unittest.TestCase):
         )
         self.assertEqual(result["schema"], "bounty-live-status/v2")
         self.assertEqual(result["live"]["classification"], "OPEN")
-        self.assertTrue(result["live"]["snapshot_clear_for_further_qualification"])
-        self.assertNotIn("clear_for_further_qualification", result["live"])
+        self.assertFalse(any("clear_for_further_qualification" in key for key in result["live"]))
         self.assertFalse(result["authority"]["clear_is_dispatch_authority"])
         self.assertTrue(result["authority"]["clear_requires_currentness_check"])
         self.assertTrue(verify_receipt(result))
@@ -147,7 +146,6 @@ class LiveStatusTests(unittest.TestCase):
             session=Session(Response(issue(state="closed"))),
         )
         self.assertEqual(result["live"]["classification"], "CLOSED")
-        self.assertFalse(result["live"]["snapshot_clear_for_further_qualification"])
         self.assertFalse(is_clear_for_further_qualification(result))
         self.assertEqual(result["discovery"]["advertised_state"], "OPEN")
 
