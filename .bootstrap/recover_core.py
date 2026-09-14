@@ -39,7 +39,7 @@ stages = {
     "decoded": 0,
     "length": 0,
     "prefix": 0,
-    "tail": 0,
+    "terminal_newline": 0,
     "utf8": 0,
     "compiled": 0,
     "markers": 0,
@@ -60,9 +60,8 @@ for deletion_index, deleted_character in enumerate(encoded):
     if not decoded.startswith(b"# SPDX-License-Identifier: MIT\n"):
         continue
     stages["prefix"] += 1
-    if not decoded.endswith(b"\n"):
-        continue
-    stages["tail"] += 1
+    if decoded.endswith(b"\n"):
+        stages["terminal_newline"] += 1
     try:
         source = decoded.decode("utf-8")
     except UnicodeDecodeError:
