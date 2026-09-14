@@ -1,5 +1,7 @@
 from .common import *
+from .authority import bind_report_generation
 from .schema import _validate_manifest
+
 
 def _new_unit(unit_id: str) -> Dict[str, Any]:
     return {
@@ -252,7 +254,7 @@ def compile_manifest(manifest: Any) -> Dict[str, Any]:
         "cash_recognized": False,
     }
 
-    report_core = {
+    report_projection = {
         "schema_version": OUTPUT_SCHEMA_VERSION,
         "program": deepcopy(normalized["program"]),
         "summary": summary,
@@ -261,6 +263,9 @@ def compile_manifest(manifest: Any) -> Dict[str, Any]:
         "sponsor_events": event_rows,
         "authority_ceiling": deepcopy(AUTHORITY_CEILING),
     }
+    binding = bind_report_generation(normalized["program"], report_projection) if event_rows else None
+    report_core = deepcopy(report_projection)
+    report_core["sponsor_authority_binding"] = binding
     report = deepcopy(report_core)
     report["report_sha256"] = _sha256_obj(report_core)
     return report
