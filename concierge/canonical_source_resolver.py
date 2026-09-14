@@ -27,10 +27,13 @@ _ISSUE_PATH_RE = re.compile(
 )
 # Free-text extraction must admit only complete canonical-looking tokens, never
 # a valid-looking prefix/suffix embedded inside attacker-controlled mirror text.
-# The same continuation alphabet is therefore rejected on both token edges.
+# The left edge rejects every token continuation. On the right edge a lone '.'
+# may terminate prose, but a dot followed by another token character is still
+# contamination (for example ``17.evil``, ``17..evil``, or ``17.#fragment``).
 _TEXT_REF_TOKEN_CHARS = r"A-Za-z0-9_./?#%=&+~-"
+_TEXT_REF_NON_DOT_TOKEN_CHARS = r"A-Za-z0-9_/?#%=&+~-"
 _TEXT_REF_PREFIX_GUARD = rf"(?<![{_TEXT_REF_TOKEN_CHARS}])"
-_TEXT_REF_SUFFIX_GUARD = rf"(?![{_TEXT_REF_TOKEN_CHARS}])"
+_TEXT_REF_SUFFIX_GUARD = rf"(?![{_TEXT_REF_NON_DOT_TOKEN_CHARS}]|\.[{_TEXT_REF_TOKEN_CHARS}])"
 _FULL_ISSUE_URL_RE = re.compile(
     _TEXT_REF_PREFIX_GUARD
     + r"(https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/[1-9][0-9]*"
