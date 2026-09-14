@@ -4,7 +4,7 @@
 
 ## Why this exists
 
-The repository's cash-cycle capabilities grew as deliberately isolated modules (`payoff_path_gate`, collection custody/request, receivables aging, payout dispute/escalation, settlement/closeout, and related controls). Those modules are directly runnable with `python -m`, but operators otherwise need to remember internal Python paths. The control-plane gives them stable, product-level names while preserving the canonical module as the only source of truth.
+The repository's cash-cycle capabilities grew as deliberately isolated modules (`payoff_path_gate`, collection custody/request, receivables aging, payout dispute/escalation, settlement/closeout, and related controls). Executable authorities are directly runnable with `python -m`, but operators otherwise need to remember internal Python paths. The control-plane gives those executable authorities stable, product-level names while preserving each canonical module as the only source of truth.
 
 ## Discovery
 
@@ -37,7 +37,6 @@ The target's own parser remains authoritative for its arguments, compile/verify 
 | --- | --- |
 | `cash-cycle` | `concierge.cash_cycle_review` |
 | `closeout` | `concierge.revenue_closeout` |
-| `collection-custody` | `concierge.collection_custody` |
 | `collection-request` | `concierge.collection_request` |
 | `contract-qualification` | `concierge.contract_qualification` |
 | `distribution-fulfillment` | `concierge.distribution_fulfillment` |
@@ -47,7 +46,8 @@ The target's own parser remains authoritative for its arguments, compile/verify 
 | `realized-economics` | `concierge.realized_unit_economics` |
 | `receivables-aging` | `concierge.receivables_aging` |
 | `settlement` | `concierge.revenue_settlement` |
-| `submission-custody` | `concierge.submission_custody` |
+
+`collection_custody` and `submission_custody` are intentionally **not** listed: they are library authorities and do not expose a `main(argv)` CLI contract. The control-plane never advertises a target it cannot execute.
 
 ## Boundary and failure behavior
 
