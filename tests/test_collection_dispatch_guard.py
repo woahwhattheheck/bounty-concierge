@@ -20,7 +20,7 @@ OWNER = "ZSM-U7P5"
 RECIPIENT = "payables@example.com"
 
 
-def _packet(*, accepted: bool = False, payout_handle: str = "bryce-main", repo: str = "Acme/Widget"):
+def _packet(*, accepted: bool = False, payout_handle: str = "bryce-main", repo: str = "Acme/Widget", sponsor: str = "Acme Sponsor"):
     acceptance = {
         "kind": "AWARDED" if accepted else "NONE",
         "evidence_ref": "https://example.com/award/7" if accepted else None,
@@ -28,7 +28,7 @@ def _packet(*, accepted: bool = False, payout_handle: str = "bryce-main", repo: 
     }
     payload = {
         "schema": "bounty-collection-request-input/v1",
-        "sponsor_name": "Acme Sponsor",
+        "sponsor_name": sponsor,
         "work": {
             "repo": repo,
             "pr": 7,
@@ -191,6 +191,22 @@ def test_repo_case_cannot_mint_second_operation_key():
     first = derive_collection_dispatch_identity(_packet(repo="Acme/Widget"))
     second = derive_collection_dispatch_identity(_packet(repo="acme/widget"))
     assert first["operation_key"] == second["operation_key"]
+
+
+def test_sponsor_presentation_normalizes_without_minting_second_writer():
+    first = derive_collection_dispatch_identity(_packet(sponsor="Acme Sponsor"))
+    second = derive_collection_dispatch_identity(_packet(sponsor="ＡＣＭＥ SPONSOR"))
+    assert first["sponsor_id"] == second["sponsor_id"]
+    assert first["offer_key"] == second["offer_key"]
+    assert first["operation_key"] == second["operation_key"]
+
+
+def test_distinct_sponsors_keep_independent_collection_authority():
+    first = derive_collection_dispatch_identity(_packet(sponsor="Acme Sponsor"))
+    second = derive_collection_dispatch_identity(_packet(sponsor="Cloud Bonus Fund"))
+    assert first["sponsor_id"] != second["sponsor_id"]
+    assert first["offer_key"] != second["offer_key"]
+    assert first["operation_key"] != second["operation_key"]
 
 
 def test_assessment_and_payment_have_distinct_operation_keys():
