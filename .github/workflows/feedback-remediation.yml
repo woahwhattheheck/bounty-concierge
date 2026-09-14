@@ -1,0 +1,37 @@
+name: Feedback Remediation
+
+on:
+  pull_request:
+    paths:
+      - "concierge/feedback_remediation.py"
+      - "tests/test_feedback_remediation.py"
+      - "tests/test_feedback_remediation_chain.py"
+      - "docs/FEEDBACK_REMEDIATION.md"
+      - ".github/workflows/feedback-remediation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "concierge/feedback_remediation.py"
+      - "tests/test_feedback_remediation.py"
+      - "tests/test_feedback_remediation_chain.py"
+      - "docs/FEEDBACK_REMEDIATION.md"
+      - ".github/workflows/feedback-remediation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  focused-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m py_compile concierge/feedback_remediation.py tests/test_feedback_remediation.py tests/test_feedback_remediation_chain.py
+      - run: python -m unittest tests.test_feedback_remediation tests.test_feedback_remediation_chain
+      - run: python -O -m unittest tests.test_feedback_remediation tests.test_feedback_remediation_chain
