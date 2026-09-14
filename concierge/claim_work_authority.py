@@ -413,14 +413,13 @@ def _github_headers() -> dict[str, str]:
 def _live_pull(
     work: Mapping[str, Any],
     *,
-    session: Any,
     now: datetime,
 ) -> dict[str, str | int]:
     repo = work["repo"]
     pr = work["pr"]
     api_url = f"https://api.github.com/repos/{repo}/pulls/{pr}"
     try:
-        response = session.get(
+        response = requests.get(
             api_url,
             headers=_github_headers(),
             timeout=15,
@@ -526,13 +525,11 @@ def _assemble_receipt(
 
 def bind_claim_work(
     payload: Any,
-    *,
-    session: Any = requests,
 ) -> dict[str, Any]:
     """Mint one durable receipt only after fresh host relation + GitHub merge proof."""
     _report, unit, context, work, relation, authority = _normalize_input(payload)
     now = _now_utc()
-    live_work = _live_pull(work, session=session, now=now)
+    live_work = _live_pull(work, now=now)
     observed_at = now.replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
     return _assemble_receipt(
         unit=unit,
@@ -623,14 +620,12 @@ def _stable_projection(receipt: Mapping[str, Any]) -> dict[str, Any]:
 def verify_claim_work_current(
     payload: Any,
     receipt: Any,
-    *,
-    session: Any = requests,
 ) -> bool:
     """Reacquire current authority/readback and compare the stable bound generation."""
     if not verify_claim_work_receipt(receipt):
         return False
     try:
-        fresh = bind_claim_work(payload, session=session)
+        fresh = bind_claim_work(payload)
         return _stable_projection(fresh) == _stable_projection(receipt)
     except ClaimWorkAuthorityError:
         return False
