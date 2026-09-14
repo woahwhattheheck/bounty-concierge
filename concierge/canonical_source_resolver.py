@@ -14,6 +14,7 @@ still pass ``revenue_intake.qualify_live_revenue_intake`` before dispatch.
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any
 from urllib.parse import SplitResult, urlsplit
 
@@ -25,11 +26,10 @@ class CanonicalSourceInputError(ValueError):
 _ISSUE_PATH_RE = re.compile(
     r"\A/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)/?\Z"
 )
-# Free-text extraction must admit only complete canonical-looking tokens, never
-# a valid-looking prefix/suffix embedded inside attacker-controlled mirror text.
-# The left edge rejects every token continuation. On the right edge a lone '.'
-# may terminate prose, but a dot followed by another token character is still
-# contamination (for example ``17.evil``, ``17..evil``, or ``17.#fragment``).
+# Regex guards cheaply reject ASCII token smuggling. A second Unicode-aware
+# boundary check below is authoritative for free-text candidates, because Python
+# character classes that enumerate ASCII cannot recognize letters/marks such as
+# ``é``, ``α``, combining marks, or zero-width joiners as token continuations.
 _TEXT_REF_TOKEN_CHARS = r"A-Za-z0-9_./?#%=&+~-"
 _TEXT_REF_NON_DOT_TOKEN_CHARS = r"A-Za-z0-9_/?#%=&+~-"
 _TEXT_REF_PREFIX_GUARD = rf"(?<![{_TEXT_REF_TOKEN_CHARS}])"
@@ -46,8 +46,36 @@ _QUALIFIED_REF_RE = re.compile(
     + r"([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)#([1-9][0-9]*)"
     + _TEXT_REF_SUFFIX_GUARD
 )
+_TEXT_REF_ASCII_TOKEN_PUNCT = frozenset("./?#%=&+~-")
 _MAX_TEXT_CHARS = 250_000
 _MAX_SOURCE_URLS = 100
+
+
+def _is_text_token_char(char: str) -> bool:
+    """Return whether one adjacent character can continue a reference token.
+
+    Unicode letters, marks, numbers, connector punctuation, and format joiners
+    are conservatively treated as token continuations. This prevents extracting
+    an ASCII GitHub-looking substring from a larger Unicode token.
+    """
+    if char in _TEXT_REF_ASCII_TOKEN_PUNCT:
+        return True
+    category = unicodedata.category(char)
+    return category[0] in {"L", "M", "N"} or category in {"Pc", "Cf"}
+
+
+def _text_match_has_safe_boundaries(text: str, start: int, end: int) -> bool:
+    if start > 0 and _is_text_token_char(text[start - 1]):
+        return False
+    if end >= len(text):
+        return True
+
+    right = text[end]
+    if right == ".":
+        # A lone sentence-ending period is a delimiter. A period that leads
+        # straight into another token component remains contamination.
+        return end + 1 >= len(text) or not _is_text_token_char(text[end + 1])
+    return not _is_text_token_char(right)
 
 
 def _exact_string(value: Any, name: str, *, nonempty: bool = True) -> str:
@@ -107,6 +135,8 @@ def _github_issue_identity(parsed: SplitResult) -> tuple[str, int, str] | None:
 def _identities_from_text(text: str) -> set[tuple[str, int, str]]:
     identities: set[tuple[str, int, str]] = set()
     for match in _FULL_ISSUE_URL_RE.finditer(text):
+        if not _text_match_has_safe_boundaries(text, match.start(), match.end()):
+            continue
         # Reuse the exact structural URL validator used for direct listings and
         # explicit sources instead of trusting regex captures as authority.
         parsed = _https_url(match.group(1), "text_issue_url")
@@ -114,6 +144,8 @@ def _identities_from_text(text: str) -> set[tuple[str, int, str]]:
         if identity is not None:
             identities.add(identity)
     for match in _QUALIFIED_REF_RE.finditer(text):
+        if not _text_match_has_safe_boundaries(text, match.start(), match.end()):
+            continue
         identities.add(_identity(match.group(1), match.group(2), match.group(3)))
     return identities
 
