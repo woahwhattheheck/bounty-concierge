@@ -2,8 +2,10 @@
 """Fail-closed live status preflight for bounty leads.
 
 Aggregator state is discovery metadata only. This module resolves the canonical
-GitHub issue identity through GitHub's API and reports a short-lived snapshot of
-the current issue state before a lead may advance to deeper qualification gates.
+GitHub issue identity through GitHub's API and records a self-integrity audit
+receipt. A retained receipt is never current qualification authority: the only
+positive qualification path is :func:`preflight_further_qualification`, which
+performs a fresh request through code-owned transport in the same call.
 """
 
 from __future__ import annotations
@@ -20,7 +22,10 @@ import requests
 
 from concierge.config import GITHUB_TOKEN
 
-_SCHEMA = "bounty-live-status/v2"
+_RECEIPT_SCHEMA = "bounty-live-status/v3"
+_DECISION_SCHEMA = "bounty-live-qualification-decision/v1"
+# Compatibility alias for code that inspected the former private constant.
+_SCHEMA = _RECEIPT_SCHEMA
 _MAX_CURRENT_AGE_SECONDS = 300
 _REPO_PART = r"[A-Za-z0-9_.-]+"
 _WEB_ISSUE_RE = re.compile(
@@ -45,6 +50,15 @@ def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _current_utc() -> datetime:
+    value = _now_utc()
+    if not isinstance(value, datetime):
+        raise RuntimeError("UTC clock returned a non-datetime value")
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise RuntimeError("UTC clock returned a naive datetime")
+    return value.astimezone(timezone.utc)
+
+
 def _format_utc(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
@@ -63,18 +77,30 @@ def _parse_utc(value: Any) -> datetime | None:
 
 def _canonical_json(value: Any) -> bytes:
     return json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
     ).encode("utf-8")
 
 
 def _seal(receipt: dict[str, Any]) -> dict[str, Any]:
+    """Add an unkeyed audit-integrity digest.
+
+    This helper intentionally does not create qualification authority. Public
+    callers can recompute this digest, which is why no retained receipt accessor
+    is permitted to return a positive decision.
+    """
+
     sealed = deepcopy(receipt)
     sealed["receipt_sha256"] = hashlib.sha256(_canonical_json(receipt)).hexdigest()
     return sealed
 
 
 def verify_receipt(receipt: dict[str, Any]) -> bool:
-    """Verify receipt self-integrity only; this is not a currentness check."""
+    """Verify receipt self-integrity only; never infer current authority."""
+
     if not isinstance(receipt, dict):
         return False
     digest = receipt.get("receipt_sha256")
@@ -90,35 +116,17 @@ def verify_receipt(receipt: dict[str, Any]) -> bool:
 
 
 def is_clear_for_further_qualification(receipt: dict[str, Any]) -> bool:
-    """Return True only for an intact, unexpired OPEN snapshot.
+    """Fail closed for every retained receipt.
 
-    Currentness uses process-owned UTC and the code-owned five-minute ceiling;
-    callers cannot extend the lifetime or supply a historical evaluation clock.
-    A false result requires a fresh ``inspect_live_status`` call before work may
-    advance.
+    Version 2 incorrectly let caller bytes become current qualification
+    authority after only a public SHA-256 self-integrity check. Retained receipts
+    are audit evidence only. Call :func:`preflight_further_qualification` to
+    perform a fresh, code-owned provider acquisition and receive an immediate
+    non-durable decision.
     """
-    if not verify_receipt(receipt) or receipt.get("schema") != _SCHEMA:
-        return False
-    live = receipt.get("live")
-    authority = receipt.get("authority")
-    if not isinstance(live, dict) or not isinstance(authority, dict):
-        return False
-    if authority.get("clear_requires_currentness_check") is not True:
-        return False
-    if live.get("classification") != "OPEN":
-        return False
-    verified_at = _parse_utc(live.get("verified_at"))
-    fresh_until = _parse_utc(live.get("fresh_until"))
-    if verified_at is None or fresh_until is None:
-        return False
-    if fresh_until - verified_at != timedelta(seconds=_MAX_CURRENT_AGE_SECONDS):
-        return False
 
-    now = _now_utc()
-    if now.tzinfo is None or now.utcoffset() is None:
-        return False
-    now = now.astimezone(timezone.utc)
-    return verified_at <= now <= fresh_until
+    del receipt
+    return False
 
 
 def _parse_issue_url(issue_url: str) -> tuple[str, int, str]:
@@ -128,8 +136,14 @@ def _parse_issue_url(issue_url: str) -> tuple[str, int, str]:
     if len(raw) > 2048:
         raise ValueError("issue_url is too long")
     parts = urlsplit(raw)
-    if parts.scheme.casefold() != "https" or parts.username or parts.password:
-        raise ValueError("issue_url must use credential-free HTTPS")
+    if (
+        parts.scheme.casefold() != "https"
+        or parts.username
+        or parts.password
+        or parts.query
+        or parts.fragment
+    ):
+        raise ValueError("issue_url must use credential-free HTTPS without query or fragment")
     try:
         port = parts.port
     except ValueError as exc:
@@ -211,6 +225,21 @@ def _headers(token: str | None) -> dict[str, str]:
     return headers
 
 
+def _github_get(url: str, *, headers: dict[str, str]):
+    """Code-owned GitHub transport seam.
+
+    Production callers cannot supply or select this transport through a public
+    API parameter. Tests may replace this private seam inside the test process.
+    """
+
+    return requests.get(
+        url,
+        headers=headers,
+        timeout=15,
+        allow_redirects=True,
+    )
+
+
 def _result(
     *,
     requested_url: str,
@@ -219,20 +248,23 @@ def _result(
     discovery: dict[str, Any],
     classification: str,
     reason_code: str,
+    provider_response_code_owned: bool,
+    provider_state_authoritative: bool = False,
     canonical_repo: str | None = None,
     issue_state: str | None = None,
     issue_updated_at: str | None = None,
     repository_redirected: bool = False,
-) -> dict[str, Any]:
+    clear_at_capture: bool = False,
+) -> tuple[dict[str, Any], bool]:
     canonical_url = (
         f"https://github.com/{canonical_repo}/issues/{number}"
         if canonical_repo is not None
         else None
     )
-    captured_at = _now_utc().astimezone(timezone.utc)
+    captured_at = _current_utc()
     fresh_until = captured_at + timedelta(seconds=_MAX_CURRENT_AGE_SECONDS)
     receipt = {
-        "schema": _SCHEMA,
+        "schema": _RECEIPT_SCHEMA,
         "requested_issue_url": requested_url,
         "requested_identity": {"repo": requested_repo, "number": number},
         "canonical_issue": (
@@ -252,17 +284,26 @@ def _result(
         },
         "discovery": discovery,
         "authority": {
-            "github_live_state_is_authoritative_at_capture": True,
+            "provider_response_code_owned": provider_response_code_owned,
+            "github_live_state_is_authoritative_at_capture": provider_state_authoritative,
+            "retained_receipt_is_qualification_authority": False,
+            "clear_requires_fresh_code_owned_acquisition": True,
             "discovery_state_is_authoritative": False,
             "discovery_amount_is_payout_proof": False,
             "discovery_solver_count_is_claim_authority": False,
-            "clear_requires_currentness_check": True,
             "clear_is_dispatch_authority": False,
             "next_gate_required": True,
             "network_fetches_discovery_source_url": False,
         },
     }
-    return _seal(receipt)
+    immediate_clear = bool(
+        clear_at_capture
+        and provider_response_code_owned
+        and provider_state_authoritative
+        and classification == "OPEN"
+        and reason_code == "GITHUB_ISSUE_OPEN"
+    )
+    return _seal(receipt), immediate_clear
 
 
 def _final_api_identity(final_url: str) -> tuple[str, int] | None:
@@ -273,7 +314,17 @@ def _final_api_identity(final_url: str) -> tuple[str, int] | None:
     if (
         parts.scheme.casefold() != "https"
         or (parts.hostname or "").casefold() != "api.github.com"
+        or parts.username
+        or parts.password
+        or parts.query
+        or parts.fragment
     ):
+        return None
+    try:
+        port = parts.port
+    except ValueError:
+        return None
+    if port not in (None, 443):
         return None
     match = _API_ISSUE_RE.fullmatch(parts.path)
     if match is None:
@@ -281,32 +332,18 @@ def _final_api_identity(final_url: str) -> tuple[str, int] | None:
     return f"{match.group('owner')}/{match.group('repo')}", int(match.group("number"))
 
 
-def inspect_live_status(
+def _acquire_live_status(
     issue_url: str,
-    discovery: dict[str, Any] | None = None,
-    token: str | None = None,
-    *,
-    session: Any = requests,
-) -> dict[str, Any]:
-    """Return a sealed, fail-closed live-status snapshot.
-
-    ``discovery`` is retained only for provenance. Its advertised state, amount,
-    and solver count never affect the authoritative classification. ``None``
-    means use the configured ambient GitHub token; an explicit empty token means
-    make the request without Authorization.
-    """
+    discovery: dict[str, Any] | None,
+    token: str | None,
+) -> tuple[dict[str, Any], bool]:
     requested_repo, number, normalized_url = _parse_issue_url(issue_url)
     discovery_data = _sanitize_discovery(discovery)
     api_url = f"https://api.github.com/repos/{requested_repo}/issues/{number}"
     resolved_token = GITHUB_TOKEN if token is None else token
 
     try:
-        response = session.get(
-            api_url,
-            headers=_headers(resolved_token),
-            timeout=15,
-            allow_redirects=True,
-        )
+        response = _github_get(api_url, headers=_headers(resolved_token))
     except requests.RequestException:
         return _result(
             requested_url=normalized_url,
@@ -315,6 +352,7 @@ def inspect_live_status(
             discovery=discovery_data,
             classification="UNVERIFIABLE",
             reason_code="GITHUB_REQUEST_FAILED",
+            provider_response_code_owned=True,
         )
 
     status = getattr(response, "status_code", None)
@@ -331,6 +369,7 @@ def inspect_live_status(
             discovery=discovery_data,
             classification="UNVERIFIABLE",
             reason_code="MALFORMED_HTTP_RESPONSE",
+            provider_response_code_owned=True,
         )
 
     final_identity = _final_api_identity(final_url)
@@ -342,6 +381,7 @@ def inspect_live_status(
             discovery=discovery_data,
             classification="UNVERIFIABLE",
             reason_code="AMBIGUOUS_OR_CROSS_HOST_REDIRECT",
+            provider_response_code_owned=True,
         )
 
     final_repo, final_number = final_identity
@@ -353,6 +393,7 @@ def inspect_live_status(
             discovery=discovery_data,
             classification="UNVERIFIABLE",
             reason_code="REDIRECT_ISSUE_NUMBER_CHANGED",
+            provider_response_code_owned=True,
         )
 
     redirected = final_repo.casefold() != requested_repo.casefold()
@@ -364,6 +405,8 @@ def inspect_live_status(
             discovery=discovery_data,
             classification="UNVERIFIABLE",
             reason_code="GITHUB_NOT_FOUND_OR_INACCESSIBLE",
+            provider_response_code_owned=True,
+            provider_state_authoritative=True,
             canonical_repo=final_repo,
             repository_redirected=redirected,
         )
@@ -375,6 +418,8 @@ def inspect_live_status(
             discovery=discovery_data,
             classification="DELETED_OR_MOVED",
             reason_code="GITHUB_GONE",
+            provider_response_code_owned=True,
+            provider_state_authoritative=True,
             canonical_repo=final_repo,
             repository_redirected=redirected,
         )
@@ -386,6 +431,7 @@ def inspect_live_status(
             discovery=discovery_data,
             classification="UNVERIFIABLE",
             reason_code=f"GITHUB_HTTP_{status}",
+            provider_response_code_owned=True,
             canonical_repo=final_repo,
             repository_redirected=redirected,
         )
@@ -402,6 +448,7 @@ def inspect_live_status(
             discovery=discovery_data,
             classification="UNVERIFIABLE",
             reason_code="MALFORMED_GITHUB_JSON",
+            provider_response_code_owned=True,
             canonical_repo=final_repo,
             repository_redirected=redirected,
         )
@@ -413,6 +460,8 @@ def inspect_live_status(
             discovery=discovery_data,
             classification="UNVERIFIABLE",
             reason_code="TARGET_BECAME_PULL_REQUEST",
+            provider_response_code_owned=True,
+            provider_state_authoritative=True,
             canonical_repo=final_repo,
             repository_redirected=redirected,
         )
@@ -427,8 +476,7 @@ def inspect_live_status(
         or raw_number != number
         or not isinstance(state, str)
         or state.casefold() not in {"open", "closed"}
-        or not isinstance(updated_at, str)
-        or not updated_at
+        or _parse_utc(updated_at) is None
         or not isinstance(html_url, str)
     ):
         return _result(
@@ -438,6 +486,7 @@ def inspect_live_status(
             discovery=discovery_data,
             classification="UNVERIFIABLE",
             reason_code="MALFORMED_ISSUE_IDENTITY_OR_STATE",
+            provider_response_code_owned=True,
             canonical_repo=final_repo,
             repository_redirected=redirected,
         )
@@ -452,6 +501,7 @@ def inspect_live_status(
             discovery=discovery_data,
             classification="UNVERIFIABLE",
             reason_code="MALFORMED_CANONICAL_HTML_URL",
+            provider_response_code_owned=True,
             canonical_repo=final_repo,
             repository_redirected=redirected,
         )
@@ -463,6 +513,8 @@ def inspect_live_status(
             discovery=discovery_data,
             classification="UNVERIFIABLE",
             reason_code="CANONICAL_IDENTITY_CONFLICT",
+            provider_response_code_owned=True,
+            provider_state_authoritative=True,
             canonical_repo=final_repo,
             repository_redirected=redirected,
         )
@@ -477,8 +529,58 @@ def inspect_live_status(
         reason_code=(
             "GITHUB_ISSUE_OPEN" if classification == "OPEN" else "GITHUB_ISSUE_CLOSED"
         ),
+        provider_response_code_owned=True,
+        provider_state_authoritative=True,
         canonical_repo=final_repo,
         issue_state=state.casefold(),
         issue_updated_at=updated_at,
         repository_redirected=redirected,
+        clear_at_capture=classification == "OPEN",
     )
+
+
+def inspect_live_status(
+    issue_url: str,
+    discovery: dict[str, Any] | None = None,
+    token: str | None = None,
+) -> dict[str, Any]:
+    """Acquire and return a self-integrity audit receipt.
+
+    The HTTP transport is code-owned. The returned receipt is not qualification
+    authority and :func:`is_clear_for_further_qualification` always fails closed.
+    Use :func:`preflight_further_qualification` for a positive current decision.
+    ``None`` uses the configured ambient GitHub token; an explicit empty token
+    suppresses Authorization.
+    """
+
+    receipt, _ = _acquire_live_status(issue_url, discovery, token)
+    return receipt
+
+
+def preflight_further_qualification(
+    issue_url: str,
+    discovery: dict[str, Any] | None = None,
+    token: str | None = None,
+) -> dict[str, Any]:
+    """Perform one fresh provider acquisition and return an immediate decision.
+
+    The positive bit exists only in the direct return value of this function. It
+    is intentionally not HMAC/seal-verifiable, durable, replayable, dispatch
+    authority, payment authority, or revenue recognition. Callers needing a
+    later action must call this function again immediately before that action.
+    """
+
+    receipt, clear = _acquire_live_status(issue_url, discovery, token)
+    return {
+        "schema": _DECISION_SCHEMA,
+        "clear_for_further_qualification": clear,
+        "receipt": receipt,
+        "authority": {
+            "fresh_code_owned_acquisition_in_this_call": True,
+            "decision_is_durable_or_replayable": False,
+            "retained_receipt_is_qualification_authority": False,
+            "decision_is_dispatch_authority": False,
+            "decision_is_payment_or_revenue_authority": False,
+            "next_gate_required": True,
+        },
+    }
