@@ -37,7 +37,7 @@ Ordinary/public compile and verify read these values only from host environment:
 
 The key, authorized identity, capture time, and signature are **not** accepted as work-document fields or CLI arguments. The ordinary work submitter must not control the credential-host environment.
 
-`sign_current_policy_authority_for_host_fixture(...)` is available to a trusted host adapter/test harness. It still requires the HMAC key and authorized identity to already exist in host environment and returns only the detached capture/signature fields; it does not expose the key.
+`sign_current_policy_authority_for_host_fixture(...)` is available only to trusted host-adapter/test code. It still requires the HMAC key and authorized identity to already exist in host environment and returns only the detached capture/signature fields; it does not expose the key. It is not a CLI option or an unsigned path.
 
 ## Freshness
 
@@ -45,15 +45,11 @@ Current authority is short lived. The capture must not be in the future and must
 
 A stale or missing authorization fails closed.
 
-## Test-only unsigned semantic fixtures
+## Historical semantic fixtures
 
-The predecessor v3 state-machine tests need deterministic historical timestamps and intentionally exercise semantics below the new host-authentication boundary. They may set:
+The predecessor v3 state-machine tests need deterministic historical timestamps and intentionally exercise semantics below the new host-authentication boundary. They do this by mocking `verify_current_policy_authority` **inside the unittest process only**.
 
-- `BOUNTY_PAYOFF_POLICY_TEST_ONLY_ALLOW_UNSIGNED=1`
-
-This is an explicit **test-only host switch**, mirroring the repository's sponsor-authority test pattern. Production entrypoints and adapters must leave it unset. A caller-selected `trusted_as_of` or `trusted_now` value does **not** bypass owner-policy authentication.
-
-The production CLI continues to expose no `--as-of` override.
+Production-imported code contains no environment variable, CLI flag, document field, clock argument, or other configuration switch that disables owner-policy authentication. A caller-selected `trusted_as_of` or `trusted_now` value still requires detached host authority. The production CLI continues to expose no `--as-of` override.
 
 ## Authority ceiling
 
