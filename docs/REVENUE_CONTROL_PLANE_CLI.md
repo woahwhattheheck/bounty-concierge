@@ -51,7 +51,7 @@ The target's own parser remains authoritative for its arguments, compile/verify 
 
 ## Boundary and failure behavior
 
-The launcher constructs one fixed routing generation at module initialization. Its exported `COMMANDS` inspection view is immutable, and dispatch/discovery close over that original generation rather than consulting a caller-rebindable public mapping. Adding, replacing, deleting, or rebinding the exported registry therefore cannot add an executable target or redirect an existing target. User input is never interpreted as an arbitrary Python module path.
+The launcher constructs one fixed routing generation at module initialization from immutable primitive `(target, module, summary)` tuples. Dispatch and machine-readable discovery close over those primitives. The exported `COMMANDS` inspection view is built separately from immutable `RevenueCommand` tuple records, so public discovery never shares a mutable object identity with executable routing. Adding, replacing, deleting, or rebinding the exported registry cannot add or redirect a route, and even low-level attribute mutation attempts against an exported command record fail. User input is never interpreted as an arbitrary Python module path.
 
 Targets are imported lazily only after a known target is selected. Unknown targets, missing modules, modules without callable `main(argv)`, and ordinary exceptions raised while importing or resolving the target entrypoint fail closed with exit code `2`. Import/entrypoint-resolution exception text is not echoed because nested exceptions can contain machine paths or credential-like environment data. `BaseException` control flow such as `SystemExit` remains unsuppressed.
 
