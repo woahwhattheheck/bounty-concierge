@@ -19,6 +19,27 @@ def _authority_projection(verified: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _verify_zero_event_semantics(verified: Dict[str, Any]) -> None:
+    if verified["sponsor_events"]:
+        return
+    if verified["claim_units"]:
+        raise AdjudicationError("report without sponsor events may not contain sponsor claim units")
+    summary = verified["summary"]
+    if (
+        summary.get("sponsor_event_count") != 0
+        or summary.get("claim_unit_count") != 0
+        or summary.get("sponsor_verified_finding_count") != 0
+    ):
+        raise AdjudicationError("report without sponsor events has sponsor-derived summary posture")
+    for finding in verified["findings"]:
+        if (
+            finding.get("status") != "submitted"
+            or finding.get("action") != "OWNER_REVIEW"
+            or finding.get("canonical_claim_unit_id") is not None
+        ):
+            raise AdjudicationError("report without sponsor events has sponsor-derived finding posture")
+
+
 def verify_report(report: Any) -> Dict[str, Any]:
     """Verify report integrity plus exact historical host-authority generation."""
     verified = _verify_report_integrity(report)
@@ -28,6 +49,7 @@ def verify_report(report: Any) -> Dict[str, Any]:
         verified["sponsor_authority_binding"],
         _authority_projection(verified),
     )
+    _verify_zero_event_semantics(verified)
     return verified
 
 
