@@ -26,6 +26,7 @@ def closeout_row(*, pr=101, state="MERGED", amount="10", repo=REPO):
         "currency": "RTC",
         "advertised_amount": amount,
         "cash_status": "not_inferred",
+        "merged_at": "2026-09-12T23:00:00Z" if state == "MERGED" else None,
     }
 
 
@@ -168,6 +169,25 @@ def test_live_github_and_live_wallet_reacquired_before_probability_moves(monkeyp
     assert result["portfolio"]["selected_count"] == 1
     assert result["portfolio"]["selected"][0]["estimated_win_probability"] == "0.5"
     assert result["portfolio"]["optimizer"]["mode"] == "exact"
+
+
+def test_pre_merge_bound_transfer_cannot_become_positive_terminal(monkeypatch):
+    paid = closeout_row(pr=101)
+    paid["merged_at"] = "2026-09-13T01:00:00Z"
+    lost_one = closeout_row(pr=102, state="CLOSED_UNMERGED")
+    lost_two = closeout_row(pr=103, state="CLOSED_UNMERGED")
+    transfer = payment(pr=101)
+
+    with pytest.raises(
+        settlement.RevenueSettlementEvidenceError,
+        match="bound transfer predates merged work",
+    ):
+        run_live(
+            monkeypatch,
+            [paid, lost_one, lost_two],
+            [transfer],
+            [binding(paid, transfer)],
+        )
 
 
 def test_public_api_has_no_standalone_receipt_history_or_precomputed_closeout_input():
