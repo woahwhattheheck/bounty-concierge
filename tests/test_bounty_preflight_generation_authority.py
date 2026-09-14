@@ -30,13 +30,19 @@ def issue():
     }
 
 
-def comment(*, body="Watching this one.", association="NONE", login="carol"):
+def comment(
+    *,
+    body="Watching this one.",
+    association="NONE",
+    login="carol",
+    user_type="User",
+):
     return {
         "id": 1803,
         "updated_at": _GENERATION_TIME,
         "body": body,
         "author_association": association,
-        "user": {"login": login, "type": "User"},
+        "user": {"login": login, "type": user_type},
     }
 
 
@@ -75,9 +81,7 @@ class EditingSession:
         raise AssertionError(f"unexpected URL: {url}")
 
 
-def test_same_timestamp_claim_body_edit_holds_actionable_dispatch(monkeypatch):
-    initial = comment(body="Watching this one.")
-    changed = comment(body="I'm working on this bounty.")
+def assert_generation_edit_holds(monkeypatch, initial, changed):
     session = EditingSession(initial, changed)
     monkeypatch.setattr(bp, "audit_bounty", actionable_audit)
     monkeypatch.setattr(bp, "qualify_dispatch", actionable_qualification)
@@ -91,18 +95,36 @@ def test_same_timestamp_claim_body_edit_holds_actionable_dispatch(monkeypatch):
     assert session.comment_reads == 2
 
 
+def test_same_timestamp_claim_body_edit_holds_actionable_dispatch(monkeypatch):
+    assert_generation_edit_holds(
+        monkeypatch,
+        comment(body="Watching this one."),
+        comment(body="I'm working on this bounty."),
+    )
+
+
 def test_same_timestamp_authority_association_edit_holds(monkeypatch):
-    initial = comment(body="Ordinary note.", association="NONE")
-    changed = comment(body="Ordinary note.", association="MEMBER")
-    session = EditingSession(initial, changed)
-    monkeypatch.setattr(bp, "audit_bounty", actionable_audit)
-    monkeypatch.setattr(bp, "qualify_dispatch", actionable_qualification)
+    assert_generation_edit_holds(
+        monkeypatch,
+        comment(body="Ordinary note.", association="NONE"),
+        comment(body="Ordinary note.", association="MEMBER"),
+    )
 
-    result = bp.preflight_bounty("acme/repo", 18, session=session)
 
-    assert result["qualification"]["disposition"] == "HOLD"
-    assert result["qualification"]["dispatch"] is False
-    assert result["qualification"]["signals"]["canonical_generation_stable"] is False
+def test_same_timestamp_comment_login_edit_holds(monkeypatch):
+    assert_generation_edit_holds(
+        monkeypatch,
+        comment(body="Claiming this bounty.", login="carol"),
+        comment(body="Claiming this bounty.", login="dave"),
+    )
+
+
+def test_same_timestamp_user_type_edit_holds(monkeypatch):
+    assert_generation_edit_holds(
+        monkeypatch,
+        comment(body="Claiming this bounty.", user_type="User"),
+        comment(body="Claiming this bounty.", user_type="Bot"),
+    )
 
 
 def test_generation_marker_is_content_bound_without_retaining_identity_or_body():
