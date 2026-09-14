@@ -25,13 +25,19 @@ class CanonicalSourceInputError(ValueError):
 _ISSUE_PATH_RE = re.compile(
     r"\A/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)/?\Z"
 )
+# Text extraction must not accept a valid-looking prefix of a longer URL or
+# identifier. The suffix guard blocks common URL/identifier continuations while
+# still permitting prose delimiters such as whitespace, comma, or a closing
+# parenthesis after an issue reference.
+_TEXT_REF_SUFFIX_GUARD = r"(?![A-Za-z0-9_./?#%=&+~-])"
 _FULL_ISSUE_URL_RE = re.compile(
     r"https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)"
-    r"(?:#issuecomment-[1-9][0-9]*)?",
+    r"(?:#issuecomment-[1-9][0-9]*)?" + _TEXT_REF_SUFFIX_GUARD,
     re.IGNORECASE,
 )
 _QUALIFIED_REF_RE = re.compile(
-    r"(?<![A-Za-z0-9_.-])([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)#([1-9][0-9]*)(?![0-9])"
+    r"(?<![A-Za-z0-9_.-])([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)#([1-9][0-9]*)"
+    + _TEXT_REF_SUFFIX_GUARD
 )
 _MAX_TEXT_CHARS = 250_000
 _MAX_SOURCE_URLS = 100
@@ -66,8 +72,9 @@ def _https_url(value: Any, name: str) -> SplitResult:
 
 
 def _identity(owner: str, repo: str, number_text: str) -> tuple[str, int, str]:
+    """Return GitHub's case-insensitive repo identity in one stable form."""
     number = int(number_text)
-    canonical_repo = f"{owner}/{repo}"
+    canonical_repo = f"{owner.casefold()}/{repo.casefold()}"
     return (
         canonical_repo,
         number,
