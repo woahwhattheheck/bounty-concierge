@@ -20,8 +20,8 @@ providers before either primary dispatch reached `collection_custody`.
 
 ## Invariant
 
-For one GitHub `repo + PR + collection phase`, there is exactly one provider-
-neutral operation identity.
+For one normalized `sponsor + GitHub repo + PR + collection phase`, there is
+exactly one provider-neutral operation identity.
 
 The identity deliberately ignores:
 
@@ -29,15 +29,18 @@ The identity deliberately ignores:
 - exact recipient address;
 - payout route;
 - regenerated collection packet receipt; and
-- sponsor-name presentation.
+- sponsor-name casing / Unicode-width presentation.
 
 That means changing Gmail to another provider, using another contact address, or
 regenerating a packet cannot manufacture another writer. Repository identity is
-case-folded because GitHub repository names are case-insensitive.
+case-folded because GitHub repository names are case-insensitive. Sponsor identity
+is NFKC-normalized and case-folded, so case/width presentation changes do not
+mint another writer. Distinct sponsor names intentionally receive distinct
+identities so legitimate multi-sponsor / stacked-prize collection is not blocked.
 
 Assessment and payment are different phases. A merged contribution can therefore
 have one assessment request and, after real acceptance/award evidence exists, one
-payment request without weakening duplicate protection.
+payment request per sponsor without weakening duplicate protection.
 
 ## Required pre-send sequence
 
