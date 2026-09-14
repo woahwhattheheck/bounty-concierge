@@ -14,3 +14,4 @@ dependencies = ["requests>=2.32.5"]
 [project.scripts]
 concierge = "concierge.entrypoint:main"
 clawrtc = "concierge.entrypoint:main"
+concierge-revenue = "concierge.revenue_cli:main"
