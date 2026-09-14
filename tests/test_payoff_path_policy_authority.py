@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from concierge import payoff_path_gate as gate
+from concierge import payoff_path_policy_authority as policy_authority
 from concierge import payoff_path_policy_v3 as v3
 
 SHA_A = "a" * 64
@@ -152,7 +153,7 @@ class PayoffPathPolicyAuthorityTests(unittest.TestCase):
         os.environ.pop(FORMER_UNSIGNED_ENV, None)
 
     def _authorize(self, doc, captured=None):
-        values = gate.sign_current_policy_authority_for_host_fixture(
+        values = policy_authority._sign_current_policy_authority_for_host_fixture(
             doc,
             captured_at_utc=stamp(captured or self.now),
         )
@@ -190,6 +191,9 @@ class PayoffPathPolicyAuthorityTests(unittest.TestCase):
     def test_current_v3_rejects_without_detached_host_signature(self):
         with self.assertRaisesRegex(gate.PayoffPathError, "detached host authority"):
             gate.compile_gate(self.doc0)
+
+    def test_fixture_signer_is_not_exported_through_gate(self):
+        self.assertFalse(hasattr(gate, "sign_current_policy_authority_for_host_fixture"))
 
     def test_removed_unsigned_env_name_cannot_disable_authority(self):
         os.environ[FORMER_UNSIGNED_ENV] = "1"
