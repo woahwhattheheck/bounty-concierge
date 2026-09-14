@@ -421,25 +421,32 @@ def _classify(row: dict[str, Any], snapshot: dict[str, Any], *, now: datetime, a
         event = max(linked_unbound_human, key=_order_key); state = "HUMAN_REVIEW_REQUIRED"; reasons = ["LINKED_HUMAN_REPLY_FROM_UNBOUND_ROUTE"]
     elif bounces:
         event = max(bounces, key=_order_key); state = "ROUTE_REPAIR"; reasons = ["LATEST_OUTBOUND_BOUNCED"]
-    elif ambiguous:
-        event = max(ambiguous, key=_order_key); state = "HUMAN_REVIEW_REQUIRED"; reasons = ["UNLINKED_OR_AMBIGUOUS_SAME_THREAD_ACTIVITY"]
-    elif row["contact_policy"] == "wait_for_buyer_event":
-        if linked_auto:
-            event = max(linked_auto, key=_order_key); reasons.append("LINKED_AUTOMATED_ACK_PRESENT")
-        state = "WAIT_BUYER_EVENT"; reasons.append("OPERATOR_POLICY_DNR_UNTIL_BUYER_EVENT")
-    else:
-        follow_up_due_at = baseline["occurred_at"] + timedelta(hours=row["follow_up_after_hours"])
-        if linked_auto:
-            event = max(linked_auto, key=_order_key)
-            follow_up_due_at = max(follow_up_due_at, event["occurred_at"] + timedelta(hours=auto_ack_grace_hours))
-            if now < follow_up_due_at:
-                state = "WAIT_AUTO_ACK"; reasons = ["LINKED_AUTOMATED_ACK_GRACE_ACTIVE"]
-            else:
-                state = "FOLLOW_UP_DUE"; reasons = ["FOLLOW_UP_THRESHOLD_REACHED", "LINKED_AUTOMATED_ACK_GRACE_EXPIRED"]
-        elif now >= follow_up_due_at:
-            state = "FOLLOW_UP_DUE"; reasons = ["FOLLOW_UP_THRESHOLD_REACHED"]
+
+    if ambiguous:
+        latest_ambiguous = max(ambiguous, key=_order_key)
+        if event is None or _order_key(latest_ambiguous) > _order_key(event):
+            event = latest_ambiguous
+            state = "HUMAN_REVIEW_REQUIRED"
+            reasons = ["UNLINKED_OR_AMBIGUOUS_SAME_THREAD_ACTIVITY"]
+
+    if event is None:
+        if row["contact_policy"] == "wait_for_buyer_event":
+            if linked_auto:
+                event = max(linked_auto, key=_order_key); reasons.append("LINKED_AUTOMATED_ACK_PRESENT")
+            state = "WAIT_BUYER_EVENT"; reasons.append("OPERATOR_POLICY_DNR_UNTIL_BUYER_EVENT")
         else:
-            state = "WAIT"; reasons = ["FOLLOW_UP_THRESHOLD_NOT_REACHED"]
+            follow_up_due_at = baseline["occurred_at"] + timedelta(hours=row["follow_up_after_hours"])
+            if linked_auto:
+                event = max(linked_auto, key=_order_key)
+                follow_up_due_at = max(follow_up_due_at, event["occurred_at"] + timedelta(hours=auto_ack_grace_hours))
+                if now < follow_up_due_at:
+                    state = "WAIT_AUTO_ACK"; reasons = ["LINKED_AUTOMATED_ACK_GRACE_ACTIVE"]
+                else:
+                    state = "FOLLOW_UP_DUE"; reasons = ["FOLLOW_UP_THRESHOLD_REACHED", "LINKED_AUTOMATED_ACK_GRACE_EXPIRED"]
+            elif now >= follow_up_due_at:
+                state = "FOLLOW_UP_DUE"; reasons = ["FOLLOW_UP_THRESHOLD_REACHED"]
+            else:
+                state = "WAIT"; reasons = ["FOLLOW_UP_THRESHOLD_NOT_REACHED"]
 
     latest = max(messages, key=_order_key, default=baseline)
     route_hashes = sorted(_hash_text(route) for route in row["authorized_reply_routes"])
