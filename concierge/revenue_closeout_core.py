@@ -2,7 +2,7 @@
 """Live, read-only acceptance and settlement closeout queue for paid PRs.
 
 The module turns a small operator-owned manifest of paid-work PRs into an
-action queue backed by current GitHub PR/review/comment state.  It deliberately
+action queue backed by current GitHub PR/review/comment state. It deliberately
 does not infer sponsor acceptance, earned money, or payment from a merge.
 """
 
@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -21,7 +22,6 @@ import requests
 
 from concierge.config import GITHUB_TOKEN
 
-
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _CURRENCY_RE = re.compile(r"^[A-Z][A-Z0-9_.-]{1,11}$")
 _MAX_AMOUNT_SOURCE_CHARS = 64
@@ -29,6 +29,7 @@ _MAX_AMOUNT_DIGITS = 30
 _MAX_AMOUNT_ABS_EXPONENT = 18
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
 _REVIEW_DECISION_STATES = frozenset({"CHANGES_REQUESTED", "APPROVED", "DISMISSED"})
+_COHERENCE_ATTEMPTS = 2
 _ACTION_ORDER = {
     "repair_requested": 0,
     "respond_to_maintainer": 1,
@@ -230,6 +231,27 @@ def _event_timestamp(event: dict[str, Any], *fields: str) -> datetime | None:
     return None
 
 
+def _feedback_source_id(kind: str, event: dict[str, Any]) -> tuple[str, int] | None:
+    raw_id = event.get("id")
+    if raw_id is None:
+        if kind == "inline_comment":
+            raise RevenueCloseoutError("GitHub inline_comment omitted id")
+        return None
+    if isinstance(raw_id, bool) or not isinstance(raw_id, int) or raw_id <= 0:
+        raise RevenueCloseoutError(f"GitHub {kind} feedback item had invalid id")
+    return kind, raw_id
+
+
+def _body_evidence(event: dict[str, Any], kind: str) -> tuple[bool, str | None]:
+    body = event.get("body")
+    if body is None:
+        return False, None
+    if not isinstance(body, str):
+        raise RevenueCloseoutError(f"GitHub {kind} feedback item had invalid body")
+    digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
+    return bool(body.strip()), digest
+
+
 def _collect_feedback(
     repo: str,
     number: int,
@@ -240,11 +262,25 @@ def _collect_feedback(
     max_pages: int,
 ) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
+    seen: dict[tuple[str, int], dict[str, Any]] = {}
     endpoints = (
-        ("review", f"https://api.github.com/repos/{repo}/pulls/{number}/reviews"),
-        ("comment", f"https://api.github.com/repos/{repo}/issues/{number}/comments"),
+        (
+            "review",
+            f"https://api.github.com/repos/{repo}/pulls/{number}/reviews",
+            ("submitted_at", "created_at"),
+        ),
+        (
+            "inline_comment",
+            f"https://api.github.com/repos/{repo}/pulls/{number}/comments",
+            ("updated_at", "created_at"),
+        ),
+        (
+            "comment",
+            f"https://api.github.com/repos/{repo}/issues/{number}/comments",
+            ("updated_at", "created_at"),
+        ),
     )
-    for kind, url in endpoints:
+    for kind, url, timestamp_fields in endpoints:
         for page in range(1, max_pages + 1):
             payload = _get_json(
                 session,
@@ -261,13 +297,22 @@ def _collect_feedback(
                     raise RevenueCloseoutError(
                         f"GitHub {kind} response contained a malformed item"
                     )
+                source_id = _feedback_source_id(kind, event)
+                parent_review_id = None
+                if kind == "inline_comment":
+                    raw_parent = event.get("pull_request_review_id")
+                    if (
+                        isinstance(raw_parent, bool)
+                        or not isinstance(raw_parent, int)
+                        or raw_parent <= 0
+                    ):
+                        raise RevenueCloseoutError(
+                            "GitHub inline_comment omitted valid pull_request_review_id"
+                        )
+                    parent_review_id = raw_parent
                 if not _external_maintainer(event, operator_login):
                     continue
-                timestamp = _event_timestamp(
-                    event,
-                    "submitted_at" if kind == "review" else "updated_at",
-                    "created_at",
-                )
+                timestamp = _event_timestamp(event, *timestamp_fields)
                 if timestamp is None:
                     raise RevenueCloseoutError(
                         f"GitHub maintainer {kind} omitted a timestamp"
@@ -278,37 +323,71 @@ def _collect_feedback(
                     if not isinstance(raw_state, str):
                         raise RevenueCloseoutError("GitHub review omitted state")
                     state = raw_state.upper()
-                results.append(
-                    {
-                        "kind": kind,
-                        "state": state,
-                        "author": _safe_user_login(event.get("user")),
-                        "at": timestamp,
-                        "url": event.get("html_url")
-                        if isinstance(event.get("html_url"), str)
-                        else None,
-                    }
-                )
+                has_body, body_digest = _body_evidence(event, kind)
+                normalized = {
+                    "kind": kind,
+                    "state": state,
+                    "author": _safe_user_login(event.get("user")),
+                    "at": timestamp,
+                    "url": event.get("html_url")
+                    if isinstance(event.get("html_url"), str)
+                    else None,
+                    "_source_id": source_id,
+                    "_parent_review_id": parent_review_id,
+                    "_has_body": has_body,
+                    "_body_digest": body_digest,
+                }
+                if source_id is not None:
+                    prior = seen.get(source_id)
+                    if prior is not None:
+                        if prior != normalized:
+                            raise RevenueCloseoutError(
+                                f"GitHub {kind} duplicate id changed across pagination"
+                            )
+                        continue
+                    seen[source_id] = normalized
+                results.append(normalized)
             if len(payload) < 100:
                 break
         else:
             raise RevenueCloseoutError(
                 f"GitHub {kind} pagination exceeded max_pages for {repo}#{number}"
             )
-    results.sort(key=lambda item: item["at"])
-    return results
+
+    # A pending review can own inline children before the COMMENTED parent is
+    # submitted. Suppress a parent only when it has no distinct body and a child
+    # for that review is at least as new as the parent notification.
+    child_latest: dict[int, datetime] = {}
+    for event in results:
+        parent_id = event.get("_parent_review_id")
+        if event["kind"] == "inline_comment" and isinstance(parent_id, int):
+            current = child_latest.get(parent_id)
+            if current is None or event["at"] > current:
+                child_latest[parent_id] = event["at"]
+
+    deduped: list[dict[str, Any]] = []
+    for event in results:
+        source_id = event.get("_source_id")
+        parent_covered = False
+        if (
+            event["kind"] == "review"
+            and event["state"] == "COMMENTED"
+            and not event["_has_body"]
+            and isinstance(source_id, tuple)
+            and len(source_id) == 2
+        ):
+            newest_child = child_latest.get(source_id[1])
+            parent_covered = newest_child is not None and newest_child >= event["at"]
+        if not parent_covered:
+            deduped.append(event)
+
+    deduped.sort(key=lambda item: item["at"])
+    return deduped
 
 
 def _current_review_decisions(
     feedback: list[dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
-    """Return each maintainer's latest decision-bearing review.
-
-    COMMENTED reviews are notification events, not decision transitions, so they
-    never clear an earlier CHANGES_REQUESTED.  APPROVED and DISMISSED do clear a
-    prior change request from the same maintainer.  ``feedback`` is already
-    chronological and contains only external human maintainers.
-    """
     decisions: dict[str, dict[str, Any]] = {}
     for event in feedback:
         if event["kind"] != "review" or event["state"] not in _REVIEW_DECISION_STATES:
@@ -318,6 +397,151 @@ def _current_review_decisions(
             raise RevenueCloseoutError("GitHub maintainer review omitted author")
         decisions[author.casefold()] = event
     return decisions
+
+
+def _fetch_pr(
+    repo: str,
+    number: int,
+    *,
+    session: Any,
+    headers: dict[str, str],
+) -> dict[str, Any]:
+    return _object(
+        _get_json(
+            session,
+            f"https://api.github.com/repos/{repo}/pulls/{number}",
+            headers=headers,
+        ),
+        f"pull request {repo}#{number}",
+    )
+
+
+def _validate_pr_snapshot(
+    pr: dict[str, Any], item: dict[str, Any]
+) -> dict[str, Any]:
+    repo = item["repo"]
+    number = item["pr"]
+    canonical_url = f"https://github.com/{repo}/pull/{number}"
+    if pr.get("html_url") != canonical_url:
+        raise RevenueCloseoutError(
+            f"GitHub PR identity mismatch for {repo}#{number}"
+        )
+    author = _safe_user_login(pr.get("user"))
+    if author is None or author.casefold() != item["operator_login"]:
+        raise RevenueCloseoutInputError(
+            f"{repo}#{number} is not authored by operator_login"
+        )
+    head = pr.get("head")
+    if not isinstance(head, dict) or not isinstance(head.get("sha"), str):
+        raise RevenueCloseoutError(f"GitHub PR omitted head SHA for {repo}#{number}")
+    head_sha = head["sha"].lower()
+    if not re.fullmatch(r"[0-9a-f]{40}", head_sha):
+        raise RevenueCloseoutError(
+            f"GitHub PR returned invalid head SHA for {repo}#{number}"
+        )
+    state = pr.get("state")
+    if state not in {"open", "closed"}:
+        raise RevenueCloseoutError(
+            f"GitHub PR returned invalid state for {repo}#{number}"
+        )
+    merged_at_raw = pr.get("merged_at")
+    merged_at = None
+    if merged_at_raw is not None:
+        try:
+            merged_at = _parse_timestamp(
+                merged_at_raw, field="merged_at", allow_none=False
+            )
+        except RevenueCloseoutInputError as exc:
+            raise RevenueCloseoutError(
+                f"GitHub PR returned invalid merged_at for {repo}#{number}"
+            ) from exc
+    updated_at = pr.get("updated_at")
+    if updated_at is not None and not isinstance(updated_at, str):
+        raise RevenueCloseoutError(
+            f"GitHub PR returned invalid updated_at for {repo}#{number}"
+        )
+    generation = (
+        canonical_url,
+        author.casefold(),
+        head_sha,
+        state,
+        _iso_or_none(merged_at),
+        updated_at,
+    )
+    return {
+        "canonical_url": canonical_url,
+        "head_sha": head_sha,
+        "state": state,
+        "merged_at": merged_at,
+        "generation": generation,
+    }
+
+
+def _head_moved_result(item: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "repo": item["repo"],
+        "pr": item["pr"],
+        "canonical_url": snapshot["canonical_url"],
+        "head_sha": snapshot["head_sha"],
+        "advertised_amount": format(item["advertised_amount"], "f"),
+        "currency": item["currency"],
+        "state": "HEAD_MOVED",
+        "next_action": "repair_requested",
+        "reason": "expected_head_moved",
+        "new_feedback_count": 0,
+        "current_change_request_count": None,
+        "latest_feedback": None,
+        "settlement_followup_url": item["settlement_followup_url"],
+        "cash_status": "not_inferred",
+    }
+
+
+def _coherent_lifecycle_snapshot(
+    item: dict[str, Any],
+    *,
+    session: Any,
+    headers: dict[str, str],
+    max_pages: int,
+) -> tuple[dict[str, Any], list[dict[str, Any]]] | dict[str, Any]:
+    """Return a bounded coherent PR+feedback snapshot for risky closeout routing."""
+    repo = item["repo"]
+    number = item["pr"]
+    expected_head = item["expected_head_sha"]
+    for _ in range(_COHERENCE_ATTEMPTS):
+        pr1 = _fetch_pr(repo, number, session=session, headers=headers)
+        snap1 = _validate_pr_snapshot(pr1, item)
+        if expected_head is not None and expected_head != snap1["head_sha"]:
+            return _head_moved_result(item, snap1)
+        feedback1 = _collect_feedback(
+            repo,
+            number,
+            item["operator_login"],
+            session=session,
+            headers=headers,
+            max_pages=max_pages,
+        )
+        pr2 = _fetch_pr(repo, number, session=session, headers=headers)
+        snap2 = _validate_pr_snapshot(pr2, item)
+        feedback2 = _collect_feedback(
+            repo,
+            number,
+            item["operator_login"],
+            session=session,
+            headers=headers,
+            max_pages=max_pages,
+        )
+        pr3 = _fetch_pr(repo, number, session=session, headers=headers)
+        snap3 = _validate_pr_snapshot(pr3, item)
+        if (
+            snap1["generation"] == snap2["generation"] == snap3["generation"]
+            and feedback1 == feedback2
+        ):
+            if expected_head is not None and expected_head != snap3["head_sha"]:
+                return _head_moved_result(item, snap3)
+            return snap3, feedback2
+    raise RevenueCloseoutError(
+        f"GitHub PR/feedback generation changed during closeout scan for {repo}#{number}"
+    )
 
 
 def scan_paid_pr(
@@ -335,73 +559,43 @@ def scan_paid_pr(
     headers = _headers(token)
     repo = item["repo"]
     number = item["pr"]
-    pr = _object(
-        _get_json(
-            session,
-            f"https://api.github.com/repos/{repo}/pulls/{number}",
-            headers=headers,
-        ),
-        f"pull request {repo}#{number}",
-    )
 
-    canonical_url = f"https://github.com/{repo}/pull/{number}"
-    if pr.get("html_url") != canonical_url:
-        raise RevenueCloseoutError(
-            f"GitHub PR identity mismatch for {repo}#{number}"
-        )
-    author = _safe_user_login(pr.get("user"))
-    if author is None or author.casefold() != item["operator_login"]:
-        raise RevenueCloseoutInputError(
-            f"{repo}#{number} is not authored by operator_login"
-        )
-    head = pr.get("head")
-    if not isinstance(head, dict) or not isinstance(head.get("sha"), str):
-        raise RevenueCloseoutError(f"GitHub PR omitted head SHA for {repo}#{number}")
-    head_sha = head["sha"].lower()
-    if not re.fullmatch(r"[0-9a-f]{40}", head_sha):
-        raise RevenueCloseoutError(f"GitHub PR returned invalid head SHA for {repo}#{number}")
+    # One initial read keeps obvious expected-head movement cheap. Closed PRs
+    # and all expected-head scans then use a bounded double-collection fence,
+    # because those paths can authorize lifecycle/settlement conclusions or
+    # otherwise promise an exact source generation.
+    initial_pr = _fetch_pr(repo, number, session=session, headers=headers)
+    initial = _validate_pr_snapshot(initial_pr, item)
     expected_head = item["expected_head_sha"]
-    if expected_head is not None and expected_head != head_sha:
-        return {
-            "repo": repo,
-            "pr": number,
-            "canonical_url": canonical_url,
-            "head_sha": head_sha,
-            "advertised_amount": format(item["advertised_amount"], "f"),
-            "currency": item["currency"],
-            "state": "HEAD_MOVED",
-            "next_action": "repair_requested",
-            "reason": "expected_head_moved",
-            "new_feedback_count": 0,
-            "current_change_request_count": None,
-            "latest_feedback": None,
-            "settlement_followup_url": item["settlement_followup_url"],
-            "cash_status": "not_inferred",
-        }
+    if expected_head is not None and expected_head != initial["head_sha"]:
+        return _head_moved_result(item, initial)
 
-    merged_at_raw = pr.get("merged_at")
-    merged_at = None
-    if merged_at_raw is not None:
-        try:
-            merged_at = _parse_timestamp(
-                merged_at_raw, field="merged_at", allow_none=False
-            )
-        except RevenueCloseoutInputError as exc:
-            raise RevenueCloseoutError(
-                f"GitHub PR returned invalid merged_at for {repo}#{number}"
-            ) from exc
-    state = pr.get("state")
-    if state not in {"open", "closed"}:
-        raise RevenueCloseoutError(f"GitHub PR returned invalid state for {repo}#{number}")
+    if initial["state"] == "closed" or expected_head is not None:
+        coherent = _coherent_lifecycle_snapshot(
+            item,
+            session=session,
+            headers=headers,
+            max_pages=max_pages,
+        )
+        if isinstance(coherent, dict):
+            return coherent
+        snapshot, feedback = coherent
+    else:
+        snapshot = initial
+        feedback = _collect_feedback(
+            repo,
+            number,
+            item["operator_login"],
+            session=session,
+            headers=headers,
+            max_pages=max_pages,
+        )
 
-    feedback = _collect_feedback(
-        repo,
-        number,
-        item["operator_login"],
-        session=session,
-        headers=headers,
-        max_pages=max_pages,
-    )
+    merged_at = snapshot["merged_at"]
+    state = snapshot["state"]
+    head_sha = snapshot["head_sha"]
+    canonical_url = snapshot["canonical_url"]
+
     review_decisions = _current_review_decisions(feedback)
     current_change_requests = [
         event
@@ -409,14 +603,11 @@ def scan_paid_pr(
         if event["state"] == "CHANGES_REQUESTED"
     ]
     last_seen = item["last_seen_at"]
-    # A timestamp-only cursor cannot uniquely identify GitHub events.  Replay
-    # equality conservatively so two distinct events stamped at the same instant
-    # cannot cause one to be silently lost.
     new_feedback = [event for event in feedback if event["at"] >= last_seen]
     response_feedback = [
         event
         for event in new_feedback
-        if event["kind"] == "comment"
+        if event["kind"] in {"comment", "inline_comment"}
         or (event["kind"] == "review" and event["state"] == "COMMENTED")
     ]
 
@@ -427,8 +618,6 @@ def scan_paid_pr(
     else:
         safe_state = "OPEN"
 
-    # Maintainer obligations outrank lifecycle/settlement routing.  The cursor
-    # only controls notification freshness; it never clears a current blocker.
     if current_change_requests:
         next_action = "repair_requested"
         reason = "current_maintainer_changes_requested"
@@ -504,18 +693,14 @@ def build_closeout_queue(
             )
         seen.add(identity)
         manifest_order[identity] = index
-        results.append(
-            scan_paid_pr(raw, token, session=session, max_pages=max_pages)
-        )
+        results.append(scan_paid_pr(raw, token, session=session, max_pages=max_pages))
 
-    def sort_key(result: dict[str, Any]) -> tuple[int, int]:
-        identity = (result["repo"].casefold(), result["pr"])
-        return (
+    results.sort(
+        key=lambda result: (
             _ACTION_ORDER[result["next_action"]],
-            manifest_order[identity],
+            manifest_order[(result["repo"].casefold(), result["pr"])],
         )
-
-    results.sort(key=sort_key)
+    )
     return results
 
 
@@ -528,20 +713,17 @@ def _load_manifest(path: str) -> dict[str, Any]:
         raise RevenueCloseoutInputError("manifest must be an object")
     if payload.get("schema_version") != 1:
         raise RevenueCloseoutInputError("manifest schema_version must be 1")
-    items = payload.get("items")
-    if not isinstance(items, list):
+    if not isinstance(payload.get("items"), list):
         raise RevenueCloseoutInputError("manifest items must be a list")
     return payload
 
 
 def format_summary(results: list[dict[str, Any]]) -> str:
-    lines = []
-    for row in results:
-        lines.append(
-            f"{row['repo']}#{row['pr']} {row['currency']} {row['advertised_amount']} "
-            f"{row['state']} -> {row['next_action']} ({row['reason']})"
-        )
-    return "\n".join(lines)
+    return "\n".join(
+        f"{row['repo']}#{row['pr']} {row['currency']} {row['advertised_amount']} "
+        f"{row['state']} -> {row['next_action']} ({row['reason']})"
+        for row in results
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -558,10 +740,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         payload = _load_manifest(args.manifest)
-        results = build_closeout_queue(
-            payload["items"],
-            max_pages=args.max_pages,
-        )
+        results = build_closeout_queue(payload["items"], max_pages=args.max_pages)
     except (
         OSError,
         json.JSONDecodeError,

@@ -6,12 +6,12 @@
 
 A configured `settlement_followup_url` tells an operator **where** a payment or settlement follow-up can be routed. It does not prove that anybody actually contacted the sponsor, maintainer, payer, or provider. Treating route presence as prior-contact truth can suppress the next collection action indefinitely.
 
-The public closeout module therefore preserves the landed implementation as `concierge.revenue_closeout_core` and adds one authority fence:
+The public closeout module therefore adds a separate settlement-contact authority fence on top of the coherent GitHub lifecycle/feedback scanner:
 
 - no route: merged work remains `route_settlement_followup` with `merged_without_settlement_route`;
 - route present, no send receipt: merged work remains `route_settlement_followup` with `merged_route_metadata_without_send_evidence`;
 - route present plus a valid post-merge send receipt: merged work may become `monitor_settlement` with `merged_followup_send_evidenced`;
-- active maintainer change requests and new maintainer response work still outrank settlement routing.
+- active maintainer change requests, unacknowledged mutable review-summary generations, and new maintainer response work still outrank settlement routing.
 
 This is a read-only owner queue. It does not send a follow-up, prove sponsor acceptance, create a debt or receivable, mutate a wallet/provider, or recognize revenue.
 
@@ -44,7 +44,7 @@ The compiler enforces:
 
 ## Output authority
 
-Every result now includes:
+Every result includes:
 
 - `settlement_followup_send_evidenced`: whether a valid bound send receipt was supplied;
 - `settlement_followup_evidence`: the normalized evidence object or `null`;
@@ -52,8 +52,10 @@ Every result now includes:
 
 The last field is deliberately explicit so downstream products cannot regress to the old inference that configuring a URL proves contact.
 
+Mutable non-empty `COMMENTED` review summaries use a separate exact-generation acknowledgement fence. See `REVENUE_CLOSEOUT_REVIEW_BODY_ACK.md` for the manifest and output receipt contract.
+
 ## Compatibility
 
-Existing manifests remain structurally accepted. The intended behavior change is that an existing `settlement_followup_url` no longer suppresses the follow-up action by itself. To move a merged item to `monitor_settlement`, add the evidence object after the actual provider send has occurred and a receipt has been captured.
+Existing manifests remain structurally accepted. The intended settlement behavior remains that an existing `settlement_followup_url` does not suppress the follow-up action by itself. To move a merged item to `monitor_settlement`, add the evidence object after the actual provider send has occurred and a receipt has been captured.
 
-The original closeout source is retained byte-for-byte in `concierge/revenue_closeout_core.py`; the public module is a narrow evidence/decision wrapper so existing GitHub lifecycle, review-state, pagination, money parsing, and prioritization behavior stays intact.
+`concierge.revenue_closeout_core.py` now carries the previously reviewed inline-comment pagination, parent/child review deduplication, and bounded PR+feedback coherence fence from the stale #91 repair line. The public wrapper composes that lifecycle authority with settlement-send evidence and mutable review-body generation acknowledgements. Existing queue/CLI entry points remain unchanged.
