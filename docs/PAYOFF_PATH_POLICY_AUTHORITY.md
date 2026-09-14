@@ -37,7 +37,7 @@ Ordinary/public compile and verify read these values only from host environment:
 
 The key, authorized identity, capture time, and signature are **not** accepted as work-document fields or CLI arguments. The ordinary work submitter must not control the credential-host environment.
 
-`sign_current_policy_authority_for_host_fixture(...)` is available only to trusted host-adapter/test code. It still requires the HMAC key and authorized identity to already exist in host environment and returns only the detached capture/signature fields; it does not expose the key. It is not a CLI option or an unsigned path.
+The normal `payoff_path_gate` compatibility surface deliberately exposes no signing helper. A trusted credential-host adapter may compute the documented canonical policy scope and detached signature outside the ordinary gate call. The repository's private test fixture signer exists only in the authority implementation module for deterministic tests and is not re-exported through the gate API or CLI.
 
 ## Freshness
 
