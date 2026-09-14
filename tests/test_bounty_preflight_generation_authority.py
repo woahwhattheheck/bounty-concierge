@@ -92,8 +92,8 @@ def test_same_timestamp_claim_body_edit_holds_actionable_dispatch(monkeypatch):
 
 
 def test_same_timestamp_authority_association_edit_holds(monkeypatch):
-    initial = comment(body="No private credentials needed.", association="NONE")
-    changed = comment(body="No private credentials needed.", association="MEMBER")
+    initial = comment(body="Ordinary note.", association="NONE")
+    changed = comment(body="Ordinary note.", association="MEMBER")
     session = EditingSession(initial, changed)
     monkeypatch.setattr(bp, "audit_bounty", actionable_audit)
     monkeypatch.setattr(bp, "qualify_dispatch", actionable_qualification)
