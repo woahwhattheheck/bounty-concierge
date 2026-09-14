@@ -12,6 +12,26 @@ A merged PR is useful completion evidence, but merge alone does not prove sponso
 
 The module does **not** send email, post GitHub comments, mutate wallets/providers, invoice anyone, or recognize revenue. A human or separately authorized sender owns transmission.
 
+## Regular-file custody
+
+Both the input document and the optional `--verify` packet are captured through the same fail-closed file boundary before JSON parsing.
+
+The reader:
+
+- inspects the caller-visible path with `lstat`;
+- rejects symlinks, FIFOs, directories, sockets, devices, and every other non-regular input before semantic parsing;
+- opens once with nonblocking, close-on-exec, binary, and no-follow flags where the host exposes them;
+- requires a stable nonzero inode identity;
+- binds device, inode, mode, link count, size, modification time, and change time across the pathname and retained descriptor;
+- refuses an initial size above 1 MiB;
+- reads at most 1 MiB plus one byte, so a lying or growing source cannot cause an unbounded allocation;
+- rejects premature EOF, growth, truncation, metadata drift, path replacement, and same-inode generation mutation during capture;
+- takes a final descriptor snapshot after the final pathname snapshot.
+
+This is **finite capture evidence**, not a claim that the namespace remains immutable forever after `load_json()` returns. The contract is that the accepted bytes came from one bounded regular-file generation and that the caller-visible path named that same generation at the final custody snapshot.
+
+Unsafe file errors do not echo file contents. JSON decoding still rejects invalid UTF-8, duplicate object keys, non-finite constants, malformed syntax, and oversized canonical output.
+
 ## Example: merged bug-bounty contribution
 
 ```json
