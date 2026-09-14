@@ -119,6 +119,17 @@ class RevenueCliTests(unittest.TestCase):
             with self.assertRaisesRegex(TypeError, "downstream bug"):
                 revenue_cli.run(["closeout"])
 
+    def test_downstream_typeerror_matching_launcher_text_still_propagates(self):
+        message = "target main(argv) must return int or None"
+
+        def downstream(_argv):
+            raise TypeError(message)
+
+        fake = types.SimpleNamespace(main=downstream)
+        with mock.patch.object(revenue_cli.importlib, "import_module", return_value=fake):
+            with self.assertRaisesRegex(TypeError, r"target main\(argv\) must return int or None"):
+                revenue_cli.run(["closeout"])
+
 
 if __name__ == "__main__":
     unittest.main()
