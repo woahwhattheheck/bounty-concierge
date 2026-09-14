@@ -32,10 +32,6 @@ COMMANDS: Mapping[str, RevenueCommand] = {
         "concierge.revenue_closeout",
         "Compile/verify revenue closeout authority.",
     ),
-    "collection-custody": RevenueCommand(
-        "concierge.collection_custody",
-        "Bind collection ownership/custody without inventing payment authority.",
-    ),
     "collection-request": RevenueCommand(
         "concierge.collection_request",
         "Compile/verify collection request packets.",
@@ -71,10 +67,6 @@ COMMANDS: Mapping[str, RevenueCommand] = {
     "settlement": RevenueCommand(
         "concierge.revenue_settlement",
         "Compile/verify revenue settlement authority.",
-    ),
-    "submission-custody": RevenueCommand(
-        "concierge.submission_custody",
-        "Bind submission custody and duplicate-prevention authority.",
     ),
 }
 
