@@ -1,4 +1,5 @@
 name: Cash-Calibrated Portfolio
+# Validation carrier touch only: source/test product blobs are inherited unchanged from PR #180 exact head.
 
 on:
   pull_request:
