@@ -51,7 +51,9 @@ The target's own parser remains authoritative for its arguments, compile/verify 
 
 ## Boundary and failure behavior
 
-The launcher uses a fixed registry; user input is never interpreted as an arbitrary Python module path. Targets are imported lazily only after a known target is selected. Unknown targets, missing modules, and modules without callable `main(argv)` fail closed with exit code `2`. Import exception text is not echoed because nested exceptions can contain machine paths or credential-like environment data.
+The routing authority is captured as a private tuple containing only immutable string primitives: target name, module path, and summary. Lookup helpers capture that primitive tuple as their default table and construct a fresh tuple-backed `RevenueCommand` only after a target matches. The exported `COMMANDS` object is a separately materialized read-only `MappingProxyType` whose values are immutable `NamedTuple` records; it shares no command object with the routing table trusted by `run()`. Assignment, deletion, public-view rebinding, and `object.__setattr__` against a public record therefore cannot alter the module path used for routing. User input is never interpreted as an arbitrary Python module path.
+
+Targets are imported lazily only after a known target is selected. Unknown targets, missing modules, modules without callable `main(argv)`, and ordinary exceptions raised during module import or entrypoint resolution fail closed with exit code `2`. Import/resolution exception text is not echoed because module initializers and import hooks can include machine paths or credential-like environment data. This sanitizing boundary ends before the target is invoked.
 
 A target may return an integer exit code or `None` (normalized to `0`). Other return shapes fail closed. A target's own `SystemExit` propagates so its argparse help/errors retain exact semantics. Other target exceptions are not hidden by the launcher.
 
