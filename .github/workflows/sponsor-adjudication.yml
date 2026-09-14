@@ -4,14 +4,14 @@ on:
   pull_request:
     paths:
       - "concierge/sponsor_adjudication/**"
-      - "tests/test_sponsor_adjudication.py"
+      - "tests/test_sponsor_adjudication*.py"
       - "docs/SPONSOR_ADJUDICATION.md"
       - ".github/workflows/sponsor-adjudication.yml"
   push:
     branches: [main]
     paths:
       - "concierge/sponsor_adjudication/**"
-      - "tests/test_sponsor_adjudication.py"
+      - "tests/test_sponsor_adjudication*.py"
       - "docs/SPONSOR_ADJUDICATION.md"
       - ".github/workflows/sponsor-adjudication.yml"
   workflow_dispatch:
@@ -33,8 +33,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Normal semantics
-        run: python -m unittest -v tests.test_sponsor_adjudication
+        run: python -m unittest -v tests.test_sponsor_adjudication tests.test_sponsor_adjudication_hardening
       - name: Optimized semantics
-        run: python -O -m unittest -v tests.test_sponsor_adjudication
+        run: python -O -m unittest -v tests.test_sponsor_adjudication tests.test_sponsor_adjudication_hardening
       - name: Compile
-        run: python -m py_compile concierge/sponsor_adjudication/*.py tests/test_sponsor_adjudication.py
+        run: python -m py_compile concierge/sponsor_adjudication/*.py tests/test_sponsor_adjudication.py tests/test_sponsor_adjudication_hardening.py

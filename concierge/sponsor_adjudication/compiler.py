@@ -70,6 +70,8 @@ def compile_manifest(manifest: Any) -> Dict[str, Any]:
             target = units.get(unit_id)
             if target is None:
                 raise AdjudicationError(f"collapse {event['event_id']}: target unit {unit_id} does not exist")
+            if target["reward_amount"] is not None:
+                raise AdjudicationError(f"collapse {event['event_id']}: target unit {unit_id} already has reward authority")
             _require_chronology(event, target, submissions)
             for source_id in event["collapsed_claim_unit_ids"]:
                 if source_id == unit_id:
@@ -89,6 +91,9 @@ def compile_manifest(manifest: Any) -> Dict[str, Any]:
                 target["submission_ids"] = sorted(set(target["submission_ids"]) | set(source["submission_ids"]))
                 target["sponsor_received"] = bool(target["sponsor_received"] or source["sponsor_received"])
                 target["sponsor_verified"] = bool(target["sponsor_verified"] or source["sponsor_verified"])
+                if source["first_sponsor_event_at"] is not None:
+                    if target["first_sponsor_event_at"] is None or source["first_sponsor_event_at"] < target["first_sponsor_event_at"]:
+                        target["first_sponsor_event_at"] = source["first_sponsor_event_at"]
                 pre_reward_rank = {"submitted": 0, "sponsor_verified": 1, "adjudicating": 2}
                 if target["status"] in pre_reward_rank and source["status"] in pre_reward_rank:
                     if pre_reward_rank[source["status"]] > pre_reward_rank[target["status"]]:

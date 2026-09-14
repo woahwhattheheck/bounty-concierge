@@ -47,7 +47,7 @@ Findings, submissions, and sponsor claim units are separate identities.
 
 A sponsor may bind three findings from two separate emails to one claim unit. The output keeps all three finding fingerprints and both submission receipts, while the sponsor-unit count remains one. A later attempt to silently bind one finding to a second active unit fails closed; an explicit later `DUPLICATE_COLLAPSED` event is required to merge already-created units.
 
-A collapse is refused after a source unit already has reward authority. That forces ambiguous money-bearing dedupe changes into manual review instead of silently moving value between units.
+A collapse is refused if either the source unit or target unit already has reward authority. That forces ambiguous money-bearing dedupe changes into manual review instead of silently changing which findings an offered amount appears to cover.
 
 ## States and actions
 
