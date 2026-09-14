@@ -261,13 +261,15 @@ class RevenueCloseoutTests(unittest.TestCase):
         self.assertEqual(result["next_action"], "route_settlement_followup")
         self.assertEqual(result["cash_status"], "not_inferred")
 
-    def test_existing_settlement_followup_is_not_duplicated(self):
+    def test_settlement_route_metadata_stays_actionable_without_send_evidence(self):
         pr = pr_payload(state="closed", merged_at="2026-09-13T03:00:00Z")
         result = scan_paid_pr(
             item(settlement_followup_url="https://example.test/followup/17"),
             session=FakeSession(routes(pr=pr)),
         )
-        self.assertEqual(result["next_action"], "monitor_settlement")
+        self.assertEqual(result["next_action"], "route_settlement_followup")
+        self.assertEqual(result["reason"], "merged_route_metadata_without_send_evidence")
+        self.assertFalse(result["settlement_route_proves_prior_contact"])
 
     def test_closed_unmerged_is_fail_closed(self):
         pr = pr_payload(state="closed", merged_at=None)
@@ -309,7 +311,6 @@ class RevenueCloseoutTests(unittest.TestCase):
                     )
         with self.assertRaises(RevenueCloseoutInputError):
             scan_paid_pr(item(pr=True), session=FakeSession({}))
-
 
     def test_missing_or_future_last_seen_rejects_before_network(self):
         with self.assertRaisesRegex(RevenueCloseoutInputError, "last_seen_at"):
