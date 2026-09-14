@@ -11,83 +11,118 @@ from __future__ import annotations
 import importlib
 import json
 import sys
-from dataclasses import dataclass
-from typing import Callable, Mapping, Sequence, TextIO
+from types import MappingProxyType
+from typing import Callable, Mapping, NamedTuple, Sequence, TextIO
 
 
-@dataclass(frozen=True)
-class RevenueCommand:
+class RevenueCommand(NamedTuple):
     """One public launcher target backed by one canonical authority module."""
 
     module: str
     summary: str
 
 
-COMMANDS: Mapping[str, RevenueCommand] = {
-    "cash-cycle": RevenueCommand(
+# Routing authority is captured as primitive immutable triples only. Public
+# discovery records are materialized separately below and share no mutable
+# command object with the data trusted by run().
+_COMMAND_TABLE: tuple[tuple[str, str, str], ...] = (
+    (
+        "cash-cycle",
         "concierge.cash_cycle_review",
         "Compile/verify evidence-bound cash-cycle owner review receipts.",
     ),
-    "closeout": RevenueCommand(
+    (
+        "closeout",
         "concierge.revenue_closeout",
         "Compile/verify revenue closeout authority.",
     ),
-    "collection-request": RevenueCommand(
+    (
+        "collection-request",
         "concierge.collection_request",
         "Compile/verify collection request packets.",
     ),
-    "contract-qualification": RevenueCommand(
+    (
+        "contract-qualification",
         "concierge.contract_qualification",
         "Qualify source-backed external paid-contract opportunities.",
     ),
-    "distribution-fulfillment": RevenueCommand(
+    (
+        "distribution-fulfillment",
         "concierge.distribution_fulfillment",
         "Compile/verify distribution fulfillment evidence.",
     ),
-    "payoff-path": RevenueCommand(
+    (
+        "payoff-path",
         "concierge.payoff_path_gate",
         "Gate speculative work on an evidence-backed route to compensation.",
     ),
-    "payout-dispute": RevenueCommand(
+    (
+        "payout-dispute",
         "concierge.payout_dispute",
         "Compile/verify payout dispute evidence and owner review state.",
     ),
-    "payout-escalation": RevenueCommand(
+    (
+        "payout-escalation",
         "concierge.payout_escalation",
         "Compile/verify evidence-bound payout escalation state.",
     ),
-    "realized-economics": RevenueCommand(
+    (
+        "realized-economics",
         "concierge.realized_unit_economics",
         "Compute/verify realized unit economics from bound evidence.",
     ),
-    "receivables-aging": RevenueCommand(
+    (
+        "receivables-aging",
         "concierge.receivables_aging",
         "Compile/verify receivables aging and collection priority evidence.",
     ),
-    "settlement": RevenueCommand(
+    (
+        "settlement",
         "concierge.revenue_settlement",
         "Compile/verify revenue settlement authority.",
     ),
-}
+)
+
+COMMANDS: Mapping[str, RevenueCommand] = MappingProxyType(
+    {
+        target: RevenueCommand(module, summary)
+        for target, module, summary in _COMMAND_TABLE
+    }
+)
 
 
-def _command_rows() -> list[dict[str, str]]:
+def _lookup_command(
+    target: str,
+    table: tuple[tuple[str, str, str], ...] = _COMMAND_TABLE,
+) -> RevenueCommand | None:
+    for name, module, summary in table:
+        if name == target:
+            # Return a fresh tuple-backed record constructed from captured
+            # primitive routing data, never an object reachable via COMMANDS.
+            return RevenueCommand(module, summary)
+    return None
+
+
+def _command_rows(
+    table: tuple[tuple[str, str, str], ...] = _COMMAND_TABLE,
+) -> list[dict[str, str]]:
     return [
-        {"target": target, "module": command.module, "summary": command.summary}
-        for target, command in sorted(COMMANDS.items())
+        {"target": target, "module": module, "summary": summary}
+        for target, module, summary in sorted(table)
     ]
 
 
 def _print_help(stream: TextIO) -> None:
+    rows = _command_rows()
     print("usage: concierge-revenue TARGET [TARGET_ARGS ...]", file=stream)
     print("", file=stream)
     print("Revenue control-plane launcher. It delegates to existing canonical", file=stream)
     print("authority modules; this launcher itself performs no provider action.", file=stream)
     print("", file=stream)
     print("targets:", file=stream)
-    width = max(len(name) for name in COMMANDS)
-    for name, command in sorted(COMMANDS.items()):
-        print(f"  {name:<{width}}  {command.summary}", file=stream)
+    width = max(len(row["target"]) for row in rows)
+    for row in rows:
+        print(f"  {row['target']:<{width}}  {row['summary']}", file=stream)
     print("", file=stream)
     print("control-plane options:", file=stream)
     print("  -h, --help   show this help", file=stream)
@@ -129,8 +164,8 @@ def run(
         return 0
 
     if args[0] == "--list":
-        for target in sorted(COMMANDS):
-            print(target, file=stdout)
+        for row in _command_rows():
+            print(row["target"], file=stdout)
         return 0
 
     if args[0] == "--list-json":
@@ -138,25 +173,26 @@ def run(
         return 0
 
     target = args[0]
-    command = COMMANDS.get(target)
+    command = _lookup_command(target)
     if command is None:
         print(f"Error: unknown revenue target: {target}", file=stderr)
         print("Run 'concierge-revenue --list' for supported targets.", file=stderr)
         return 2
 
-    # Only fixed registry entries can reach importlib: user input is never used
-    # as a module path. Keep import failure output source-text-free because
-    # nested exception strings can include environment paths or credentials.
+    # Only fixed table entries can reach importlib: user input is never used as
+    # a module path. Resolve/import inside a narrow exception boundary and keep
+    # ordinary exception text source-free because import hooks and module
+    # initializers can include machine paths or credential-like environment data.
     try:
         entrypoint = _load_main(command)
-    except (ImportError, AttributeError):
+    except Exception:
         print(
             f"Error: revenue target unavailable: {target} ({command.module})",
             file=stderr,
         )
         return 2
 
-    # Invoke outside the launcher's return-contract handler. Downstream
+    # Invoke outside the launcher's import/return-contract handlers. Downstream
     # exceptions (including a TypeError with identical text) remain the target's
     # own semantics and are never reclassified by this wrapper.
     result = entrypoint(args[1:])
