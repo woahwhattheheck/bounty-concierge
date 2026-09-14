@@ -25,18 +25,22 @@ class CanonicalSourceInputError(ValueError):
 _ISSUE_PATH_RE = re.compile(
     r"\A/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)/?\Z"
 )
-# Text extraction must not accept a valid-looking prefix of a longer URL or
-# identifier. The suffix guard blocks common URL/identifier continuations while
-# still permitting prose delimiters such as whitespace, comma, or a closing
-# parenthesis after an issue reference.
-_TEXT_REF_SUFFIX_GUARD = r"(?![A-Za-z0-9_./?#%=&+~-])"
+# Free-text extraction must admit only complete canonical-looking tokens, never
+# a valid-looking prefix/suffix embedded inside attacker-controlled mirror text.
+# The same continuation alphabet is therefore rejected on both token edges.
+_TEXT_REF_TOKEN_CHARS = r"A-Za-z0-9_./?#%=&+~-"
+_TEXT_REF_PREFIX_GUARD = rf"(?<![{_TEXT_REF_TOKEN_CHARS}])"
+_TEXT_REF_SUFFIX_GUARD = rf"(?![{_TEXT_REF_TOKEN_CHARS}])"
 _FULL_ISSUE_URL_RE = re.compile(
-    r"https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)"
-    r"(?:#issuecomment-[1-9][0-9]*)?" + _TEXT_REF_SUFFIX_GUARD,
+    _TEXT_REF_PREFIX_GUARD
+    + r"(https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/[1-9][0-9]*"
+    + r"(?:#issuecomment-[1-9][0-9]*)?)"
+    + _TEXT_REF_SUFFIX_GUARD,
     re.IGNORECASE,
 )
 _QUALIFIED_REF_RE = re.compile(
-    r"(?<![A-Za-z0-9_.-])([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)#([1-9][0-9]*)"
+    _TEXT_REF_PREFIX_GUARD
+    + r"([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)#([1-9][0-9]*)"
     + _TEXT_REF_SUFFIX_GUARD
 )
 _MAX_TEXT_CHARS = 250_000
@@ -100,7 +104,12 @@ def _github_issue_identity(parsed: SplitResult) -> tuple[str, int, str] | None:
 def _identities_from_text(text: str) -> set[tuple[str, int, str]]:
     identities: set[tuple[str, int, str]] = set()
     for match in _FULL_ISSUE_URL_RE.finditer(text):
-        identities.add(_identity(match.group(1), match.group(2), match.group(3)))
+        # Reuse the exact structural URL validator used for direct listings and
+        # explicit sources instead of trusting regex captures as authority.
+        parsed = _https_url(match.group(1), "text_issue_url")
+        identity = _github_issue_identity(parsed)
+        if identity is not None:
+            identities.add(identity)
     for match in _QUALIFIED_REF_RE.finditer(text):
         identities.add(_identity(match.group(1), match.group(2), match.group(3)))
     return identities

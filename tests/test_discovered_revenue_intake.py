@@ -93,6 +93,29 @@ class DiscoveredRevenueIntakeTests(unittest.TestCase):
         live.assert_not_called()
 
     @patch("concierge.discovered_revenue_intake.qualify_live_revenue_intake")
+    def test_left_decorated_text_holds_without_live_dispatch_read(self, live):
+        hostile = (
+            "evilhttps://github.com/acme/widgets/issues/17",
+            "foo/https://github.com/acme/widgets/issues/17",
+            "evil/acme/widgets#17",
+        )
+        for body in hostile:
+            with self.subTest(body=body):
+                result = qualify_discovered_revenue_intake(
+                    {
+                        "listing_url": "https://bounties.example/tasks/hostile",
+                        "body": body,
+                    }
+                )
+                self.assertFalse(result["dispatch"])
+                self.assertEqual(result["disposition"], "HOLD")
+                self.assertEqual(
+                    result["reason_codes"],
+                    ["RESOLVER:CANONICAL_SOURCE_MISSING"],
+                )
+        live.assert_not_called()
+
+    @patch("concierge.discovered_revenue_intake.qualify_live_revenue_intake")
     def test_session_and_tighter_threshold_are_forwarded(self, live):
         live.return_value = {
             "disposition": "REJECT",
