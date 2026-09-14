@@ -1,0 +1,40 @@
+name: Sponsor Adjudication Custody
+
+on:
+  pull_request:
+    paths:
+      - "concierge/sponsor_adjudication/**"
+      - "tests/test_sponsor_adjudication.py"
+      - "docs/SPONSOR_ADJUDICATION.md"
+      - ".github/workflows/sponsor-adjudication.yml"
+  push:
+    branches: [main]
+    paths:
+      - "concierge/sponsor_adjudication/**"
+      - "tests/test_sponsor_adjudication.py"
+      - "docs/SPONSOR_ADJUDICATION.md"
+      - ".github/workflows/sponsor-adjudication.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hostile-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Normal semantics
+        run: python -m unittest -v tests.test_sponsor_adjudication
+      - name: Optimized semantics
+        run: python -O -m unittest -v tests.test_sponsor_adjudication
+      - name: Compile
+        run: python -m py_compile concierge/sponsor_adjudication/*.py tests/test_sponsor_adjudication.py
