@@ -11,120 +11,104 @@ from __future__ import annotations
 import importlib
 import json
 import sys
-from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Callable, Mapping, Sequence, TextIO
+from typing import Callable, Mapping, NamedTuple, Sequence, TextIO
 
 
-@dataclass(frozen=True)
-class RevenueCommand:
+class RevenueCommand(NamedTuple):
     """One public launcher target backed by one canonical authority module."""
 
     module: str
     summary: str
 
 
-# The routing authority is a tuple of frozen values captured by lookup helpers.
-# COMMANDS is a read-only discovery view, not the mutable object trusted by run().
-_COMMAND_TABLE: tuple[tuple[str, RevenueCommand], ...] = (
+# Routing authority is captured as primitive immutable triples only. Public
+# discovery records are materialized separately below and share no mutable
+# command object with the data trusted by run().
+_COMMAND_TABLE: tuple[tuple[str, str, str], ...] = (
     (
         "cash-cycle",
-        RevenueCommand(
-            "concierge.cash_cycle_review",
-            "Compile/verify evidence-bound cash-cycle owner review receipts.",
-        ),
+        "concierge.cash_cycle_review",
+        "Compile/verify evidence-bound cash-cycle owner review receipts.",
     ),
     (
         "closeout",
-        RevenueCommand(
-            "concierge.revenue_closeout",
-            "Compile/verify revenue closeout authority.",
-        ),
+        "concierge.revenue_closeout",
+        "Compile/verify revenue closeout authority.",
     ),
     (
         "collection-request",
-        RevenueCommand(
-            "concierge.collection_request",
-            "Compile/verify collection request packets.",
-        ),
+        "concierge.collection_request",
+        "Compile/verify collection request packets.",
     ),
     (
         "contract-qualification",
-        RevenueCommand(
-            "concierge.contract_qualification",
-            "Qualify source-backed external paid-contract opportunities.",
-        ),
+        "concierge.contract_qualification",
+        "Qualify source-backed external paid-contract opportunities.",
     ),
     (
         "distribution-fulfillment",
-        RevenueCommand(
-            "concierge.distribution_fulfillment",
-            "Compile/verify distribution fulfillment evidence.",
-        ),
+        "concierge.distribution_fulfillment",
+        "Compile/verify distribution fulfillment evidence.",
     ),
     (
         "payoff-path",
-        RevenueCommand(
-            "concierge.payoff_path_gate",
-            "Gate speculative work on an evidence-backed route to compensation.",
-        ),
+        "concierge.payoff_path_gate",
+        "Gate speculative work on an evidence-backed route to compensation.",
     ),
     (
         "payout-dispute",
-        RevenueCommand(
-            "concierge.payout_dispute",
-            "Compile/verify payout dispute evidence and owner review state.",
-        ),
+        "concierge.payout_dispute",
+        "Compile/verify payout dispute evidence and owner review state.",
     ),
     (
         "payout-escalation",
-        RevenueCommand(
-            "concierge.payout_escalation",
-            "Compile/verify evidence-bound payout escalation state.",
-        ),
+        "concierge.payout_escalation",
+        "Compile/verify evidence-bound payout escalation state.",
     ),
     (
         "realized-economics",
-        RevenueCommand(
-            "concierge.realized_unit_economics",
-            "Compute/verify realized unit economics from bound evidence.",
-        ),
+        "concierge.realized_unit_economics",
+        "Compute/verify realized unit economics from bound evidence.",
     ),
     (
         "receivables-aging",
-        RevenueCommand(
-            "concierge.receivables_aging",
-            "Compile/verify receivables aging and collection priority evidence.",
-        ),
+        "concierge.receivables_aging",
+        "Compile/verify receivables aging and collection priority evidence.",
     ),
     (
         "settlement",
-        RevenueCommand(
-            "concierge.revenue_settlement",
-            "Compile/verify revenue settlement authority.",
-        ),
+        "concierge.revenue_settlement",
+        "Compile/verify revenue settlement authority.",
     ),
 )
 
-COMMANDS: Mapping[str, RevenueCommand] = MappingProxyType(dict(_COMMAND_TABLE))
+COMMANDS: Mapping[str, RevenueCommand] = MappingProxyType(
+    {
+        target: RevenueCommand(module, summary)
+        for target, module, summary in _COMMAND_TABLE
+    }
+)
 
 
 def _lookup_command(
     target: str,
-    table: tuple[tuple[str, RevenueCommand], ...] = _COMMAND_TABLE,
+    table: tuple[tuple[str, str, str], ...] = _COMMAND_TABLE,
 ) -> RevenueCommand | None:
-    for name, command in table:
+    for name, module, summary in table:
         if name == target:
-            return command
+            # Return a fresh tuple-backed record constructed from captured
+            # primitive routing data, never an object reachable via COMMANDS.
+            return RevenueCommand(module, summary)
     return None
 
 
 def _command_rows(
-    table: tuple[tuple[str, RevenueCommand], ...] = _COMMAND_TABLE,
+    table: tuple[tuple[str, str, str], ...] = _COMMAND_TABLE,
 ) -> list[dict[str, str]]:
     return [
-        {"target": target, "module": command.module, "summary": command.summary}
-        for target, command in sorted(table)
+        {"target": target, "module": module, "summary": summary}
+        for target, module, summary in sorted(table)
     ]
 
 
