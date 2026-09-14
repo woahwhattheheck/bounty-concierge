@@ -43,6 +43,7 @@ RESOURCE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,511}$")
 NAMESPACE_RE = re.compile(r"^[a-z0-9][a-z0-9._:-]{0,127}$")
 KEY_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 HEX_KEY_RE = re.compile(r"^[0-9a-f]{64}$")
+REWARD_RE = re.compile(r"^(?:0|[1-9][0-9]{0,63})(?:\.[0-9]{1,64})?$")
 BLOCKED_HOSTS = {"github.com", "www.github.com", "gist.github.com"}
 MAX_AGE_SECONDS = 7 * 24 * 60 * 60
 REQUEST_SCHEMA = "distribution-fulfillment-request/v1"
@@ -123,16 +124,19 @@ def _trusted_now(value: Optional[str]) -> tuple[str, datetime]:
     return value, _ts(value, "trusted_at")
 
 
-def _reward(value: Any) -> Decimal:
-    if type(value) is not str or not value or len(value) > 128:
-        raise DistributionFulfillmentError("advertised_reward must be a bounded decimal string")
+def _reward(value: Any) -> tuple[Decimal, str]:
+    if type(value) is not str or not value or len(value) > 128 or not REWARD_RE.fullmatch(value):
+        raise DistributionFulfillmentError("advertised_reward must be a bounded plain decimal string")
     try:
         parsed = Decimal(value)
     except InvalidOperation as exc:
         raise DistributionFulfillmentError("advertised_reward must be a decimal string") from exc
-    if not parsed.is_finite() or parsed < 0 or len(parsed.as_tuple().digits) > 64:
+    # REWARD_RE excludes exponent notation before Decimal formatting, preventing
+    # attacker-sized fixed-point expansion such as 1e100000000.
+    canonical = format(parsed, "f")
+    if not parsed.is_finite() or parsed < 0 or len(parsed.as_tuple().digits) > 64 or len(canonical) > 128:
         raise DistributionFulfillmentError("advertised_reward must be finite, non-negative, and bounded")
-    return parsed
+    return parsed, canonical
 
 
 def _issue(value: Any) -> str:
@@ -140,7 +144,11 @@ def _issue(value: Any) -> str:
     match = ISSUE_RE.fullmatch(text)
     if not match or any(part in {".", ".."} for part in match.groups()[:2]):
         raise DistributionFulfillmentError("canonical_source_url is not canonical")
-    return text
+    owner, repo, issue = match.groups()
+    # GitHub owner/repository routing is case-insensitive.  Normalize that
+    # identity before retained-record hashing, queue dedupe, and receipts so
+    # case aliases cannot represent one bounty as multiple claim units.
+    return f"https://github.com/{owner.casefold()}/{repo.casefold()}/issues/{issue}"
 
 
 def _comment(value: Any, source: str) -> str:
@@ -150,7 +158,7 @@ def _comment(value: Any, source: str) -> str:
         raise DistributionFulfillmentError("maintainer rule comment URL is not canonical")
     if tuple(x.casefold() for x in match.groups()[:3]) != tuple(x.casefold() for x in src.groups()):
         raise DistributionFulfillmentError("maintainer rule comment must belong to source issue")
-    return text
+    return f"{source}#issuecomment-{match.group(4)}"
 
 
 def _host(value: Any, name: str) -> str:
@@ -244,7 +252,7 @@ def _packet(raw: Any, url: str) -> dict[str, Any]:
     raw = _obj(raw, {"schema", "canonical_source_url", "disposition", "packet_sha256", "authority"}, "submission_packet")
     if raw["schema"] != "bounty-submission-packet-item/v1":
         raise DistributionFulfillmentError("submission_packet schema is unsupported")
-    if raw["canonical_source_url"] != url:
+    if _issue(raw["canonical_source_url"]) != url:
         raise DistributionFulfillmentError("submission_packet source does not match canonical source")
     if raw["disposition"] not in {"READY_FOR_HUMAN_SUBMISSION", "HOLD"}:
         raise DistributionFulfillmentError("submission_packet disposition is invalid")
@@ -283,7 +291,7 @@ def _capture(raw: Any, url: str) -> dict[str, Any]:
         "verifier",
     }
     raw = _obj(raw, keys, "live_capture")
-    if raw["canonical_source_url"] != url:
+    if _issue(raw["canonical_source_url"]) != url:
         raise DistributionFulfillmentError("live capture source mismatch")
     live, live_host = _live_url(raw["live_url"], "live_capture.live_url")
     resolved, resolved_host = _live_url(raw["resolved_url"], "live_capture.resolved_url")
@@ -313,7 +321,7 @@ def _capture(raw: Any, url: str) -> dict[str, Any]:
     return {**core, "capture_sha256": digest, "_live_host": live_host, "_resolved_host": resolved_host}
 
 
-def _normalize_request(request: Any) -> tuple[str, Decimal, dict[str, Any], dict[str, Any], dict[str, Any], Optional[dict[str, Any]]]:
+def _normalize_request(request: Any) -> tuple[str, Decimal, str, dict[str, Any], dict[str, Any], dict[str, Any], Optional[dict[str, Any]]]:
     request = _obj(
         request,
         {"schema", "canonical_source_url", "advertised_reward", "source", "maintainer_rule", "submission_packet", "live_capture"},
@@ -322,17 +330,18 @@ def _normalize_request(request: Any) -> tuple[str, Decimal, dict[str, Any], dict
     if request["schema"] != REQUEST_SCHEMA:
         raise DistributionFulfillmentError("request schema is unsupported")
     url = _issue(request["canonical_source_url"])
-    reward = _reward(request["advertised_reward"])
+    reward, reward_text = _reward(request["advertised_reward"])
     source = _source(request["source"], url)
     rule = _rule(request["maintainer_rule"], url)
     packet = _packet(request["submission_packet"], url)
     capture = None if request["live_capture"] is None else _capture(request["live_capture"], url)
-    return url, reward, source, rule, packet, capture
+    return url, reward, reward_text, source, rule, packet, capture
 
 
 def _authority_unsigned(
     *,
     url: str,
+    advertised_reward: str,
     source: dict[str, Any],
     rule: dict[str, Any],
     packet: dict[str, Any],
@@ -361,6 +370,7 @@ def _authority_unsigned(
     return {
         "schema": AUTHORITY_SCHEMA,
         "canonical_source_url": url,
+        "advertised_reward": advertised_reward,
         "source_decision_sha256": _hash(source),
         "maintainer_rule_decision_sha256": _hash(rule),
         "submission_packet_decision_sha256": _hash(packet),
@@ -394,9 +404,10 @@ def issue_authority_record(
     This function requires the host verifier secret explicitly.  The production
     CLI deliberately exposes no signing command and never accepts a caller key.
     """
-    url, _reward_value, source, rule, packet, capture = _normalize_request(request)
+    url, _reward_value, reward_text, source, rule, packet, capture = _normalize_request(request)
     unsigned = _authority_unsigned(
         url=url,
+        advertised_reward=reward_text,
         source=source,
         rule=rule,
         packet=packet,
@@ -412,6 +423,7 @@ def _verify_authority(
     raw: Any,
     *,
     url: str,
+    advertised_reward: str,
     source: dict[str, Any],
     rule: dict[str, Any],
     packet: dict[str, Any],
@@ -423,6 +435,7 @@ def _verify_authority(
     keys = {
         "schema",
         "canonical_source_url",
+        "advertised_reward",
         "source_decision_sha256",
         "maintainer_rule_decision_sha256",
         "submission_packet_decision_sha256",
@@ -446,6 +459,7 @@ def _verify_authority(
 
     expected = _authority_unsigned(
         url=url,
+        advertised_reward=advertised_reward,
         source=source,
         rule=rule,
         packet=packet,
@@ -459,6 +473,7 @@ def _verify_authority(
         raise DistributionFulfillmentError("authority MAC authentication failed")
 
     for key in (
+        "advertised_reward",
         "source_decision_sha256",
         "maintainer_rule_decision_sha256",
         "submission_packet_decision_sha256",
@@ -481,11 +496,12 @@ def _evaluate(
     trusted_key_id: str,
     trusted_at: str,
 ) -> dict[str, Any]:
-    url, reward, source, rule, packet, capture = _normalize_request(request)
+    url, reward, reward_text, source, rule, packet, capture = _normalize_request(request)
     now = _ts(trusted_at, "trusted_at")
     retained = _verify_authority(
         authority,
         url=url,
+        advertised_reward=reward_text,
         source=source,
         rule=rule,
         packet=packet,
@@ -555,7 +571,7 @@ def _evaluate(
     core = {
         "schema": RECEIPT_SCHEMA,
         "canonical_source_url": url,
-        "advertised_reward": format(reward, "f"),
+        "advertised_reward": reward_text,
         "evaluated_at": trusted_at,
         "valid_until": _fmt(valid_until),
         "disposition": "READY_FOR_HUMAN_DISTRIBUTION_SUBMISSION" if not reasons else "HOLD",
@@ -763,7 +779,7 @@ def verify_queue(
         )
         if not _exact_json(expected, queue):
             return False
-        request_by_source = {request["canonical_source_url"]: request for request in requests}
+        request_by_source = {_issue(request["canonical_source_url"]): request for request in requests}
         for item in queue["ready"] + queue["hold"]:
             source = item["canonical_source_url"]
             if source not in request_by_source:
@@ -805,17 +821,70 @@ def _load(path: str) -> Any:
     return _loads(text, name="input")
 
 
+def _trusted_parent_fd(parent: Path, *, name: str) -> int:
+    """Open one trusted parent generation and retain it for child acquisition.
+
+    The authority store is deliberately POSIX-only: O_NOFOLLOW + dir_fd lets
+    the verifier bind reads to one directory generation rather than checking a
+    pathname and then reopening attacker-rebindable text.
+    """
+    if os.name != "posix":
+        raise DistributionFulfillmentError(f"{name} retained authority requires POSIX descriptor semantics")
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
+    try:
+        fd = os.open(parent, flags)
+    except OSError as exc:
+        raise DistributionFulfillmentError(f"{name} trusted parent cannot be opened safely") from exc
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISDIR(info.st_mode):
+            raise DistributionFulfillmentError(f"{name} trusted parent must be a directory")
+        if info.st_uid not in {0, os.geteuid()}:
+            raise DistributionFulfillmentError(f"{name} trusted parent has an untrusted owner")
+        if stat.S_IMODE(info.st_mode) & 0o022:
+            raise DistributionFulfillmentError(f"{name} trusted parent must not be group/other writable")
+        return fd
+    except Exception:
+        os.close(fd)
+        raise
+
+
 def _read_private_file(path: Path, *, name: str, limit: int = 64 * 1024) -> str:
-    if path.is_symlink():
-        raise DistributionFulfillmentError(f"{name} must not be a symlink")
-    info = path.stat()
-    if not stat.S_ISREG(info.st_mode):
-        raise DistributionFulfillmentError(f"{name} must be a regular file")
-    if info.st_size > limit:
-        raise DistributionFulfillmentError(f"{name} is too large")
-    if os.name == "posix" and stat.S_IMODE(info.st_mode) & 0o077:
-        raise DistributionFulfillmentError(f"{name} permissions must exclude group/other access")
-    return path.read_text(encoding="utf-8")
+    parent_fd = _trusted_parent_fd(path.parent, name=name)
+    fd = -1
+    try:
+        flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
+        try:
+            fd = os.open(path.name, flags, dir_fd=parent_fd)
+        except OSError as exc:
+            raise DistributionFulfillmentError(f"{name} must be a non-symlink regular file") from exc
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode):
+            raise DistributionFulfillmentError(f"{name} must be a regular file")
+        if info.st_uid not in {0, os.geteuid()}:
+            raise DistributionFulfillmentError(f"{name} has an untrusted owner")
+        if info.st_size > limit:
+            raise DistributionFulfillmentError(f"{name} is too large")
+        if stat.S_IMODE(info.st_mode) & 0o077:
+            raise DistributionFulfillmentError(f"{name} permissions must exclude group/other access")
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = os.read(fd, min(65536, limit + 1 - total))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+            if total > limit:
+                raise DistributionFulfillmentError(f"{name} is too large")
+        try:
+            return b"".join(chunks).decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise DistributionFulfillmentError(f"{name} is not UTF-8") from exc
+    finally:
+        if fd >= 0:
+            os.close(fd)
+        os.close(parent_fd)
 
 
 def _load_trusted_key(path: Path = DEFAULT_AUTHORITY_KEY_PATH) -> tuple[str, bytes]:
