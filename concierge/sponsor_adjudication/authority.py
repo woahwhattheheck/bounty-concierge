@@ -6,6 +6,12 @@ verification, reward, or payment posture.  A non-empty sponsor-event generation
 must be attested by the credential-owning host with a key and identity supplied
 through host environment, never caller arguments.
 
+Historical reports carry a second host HMAC over the complete compiled report
+projection.  That binding chains the exact retained report bytes back to the
+signed authority-free manifest generation, so a caller cannot edit a derived
+status/action or other non-event output, recompute the public report hash, and
+keep sponsor authority.
+
 The test-only unsigned switch exists solely so the predecessor semantic suite can
 exercise its historical state machine.  It is an explicit host-environment
 choice; production entrypoints must leave it unset.
@@ -33,6 +39,8 @@ from .common import (
 
 AUTHORITY_SCHEMA_VERSION = 1
 AUTHORITY_PURPOSE = "bounty-sponsor-adjudication-event-authority/v1"
+REPORT_BINDING_SCHEMA_VERSION = 1
+REPORT_BINDING_PURPOSE = "bounty-sponsor-adjudication-report-generation-authority/v1"
 MAX_AUTHORITY_AGE_SECONDS = 300
 KEY_ENV = "BOUNTY_SPONSOR_ADJUDICATION_HMAC_KEY_HEX"
 PROVIDER_ENV = "BOUNTY_SPONSOR_ADJUDICATION_AUTHORIZED_PROVIDER"
@@ -178,6 +186,45 @@ def _require_fresh(authority: Mapping[str, Any]) -> None:
         raise AdjudicationError("sponsor authority capture is stale")
 
 
+def _normalize_report_binding(value: Any) -> Dict[str, Any]:
+    obj = _require_dict(value, where="sponsor_authority_binding")
+    _require_exact_keys(
+        obj,
+        [
+            "schema_version",
+            "purpose",
+            "manifest_sha256",
+            "authority_sha256",
+            "report_projection_sha256",
+            "signature_sha256",
+        ],
+        where="sponsor_authority_binding",
+    )
+    if type(obj["schema_version"]) is not int or obj["schema_version"] != REPORT_BINDING_SCHEMA_VERSION:
+        raise AdjudicationError("sponsor_authority_binding.schema_version mismatch")
+    if obj["purpose"] != REPORT_BINDING_PURPOSE:
+        raise AdjudicationError("sponsor_authority_binding.purpose mismatch")
+    return {
+        "schema_version": REPORT_BINDING_SCHEMA_VERSION,
+        "purpose": REPORT_BINDING_PURPOSE,
+        "manifest_sha256": _require_hex64(obj["manifest_sha256"], where="sponsor_authority_binding.manifest_sha256"),
+        "authority_sha256": _require_hex64(obj["authority_sha256"], where="sponsor_authority_binding.authority_sha256"),
+        "report_projection_sha256": _require_hex64(obj["report_projection_sha256"], where="sponsor_authority_binding.report_projection_sha256"),
+        "signature_sha256": _require_hex64(obj["signature_sha256"], where="sponsor_authority_binding.signature_sha256"),
+    }
+
+
+def _report_binding_signature_core(binding: Mapping[str, Any]) -> Dict[str, Any]:
+    return {key: deepcopy(value) for key, value in binding.items() if key != "signature_sha256"}
+
+
+def _verify_report_binding_signature(binding: Mapping[str, Any]) -> None:
+    key, _, _ = _host_config()
+    expected = hmac.new(key, _canonical_bytes(_report_binding_signature_core(binding)), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(binding["signature_sha256"], expected):
+        raise AdjudicationError("sponsor report generation HMAC mismatch")
+
+
 def verify_manifest_authority(
     manifest: Mapping[str, Any],
     program: Mapping[str, Any],
@@ -205,11 +252,41 @@ def verify_manifest_authority(
     return authority
 
 
-def verify_report_authority(program: Mapping[str, Any], events: Sequence[Mapping[str, Any]]) -> Dict[str, Any] | None:
-    """Verify retained authority historically; does not impose current freshness."""
+def bind_report_generation(program: Mapping[str, Any], report_projection: Mapping[str, Any]) -> Dict[str, Any] | None:
+    """Bind a compiled report projection to the exact signed input generation."""
+    if _test_unsigned_enabled():
+        return None
+    authority = _normalize_authority(program.get("sponsor_authority"))
+    _verify_signature(authority)
+    key, _, _ = _host_config()
+    binding = {
+        "schema_version": REPORT_BINDING_SCHEMA_VERSION,
+        "purpose": REPORT_BINDING_PURPOSE,
+        "manifest_sha256": authority["manifest_sha256"],
+        "authority_sha256": _sha256_obj(authority),
+        "report_projection_sha256": _sha256_obj(report_projection),
+    }
+    binding["signature_sha256"] = hmac.new(key, _canonical_bytes(binding), hashlib.sha256).hexdigest()
+    return binding
+
+
+def verify_report_authority(
+    program: Mapping[str, Any],
+    events: Sequence[Mapping[str, Any]],
+    report_binding_value: Any,
+    report_projection: Mapping[str, Any],
+) -> Dict[str, Any] | None:
+    """Verify retained sponsor authority and the exact historical report generation.
+
+    Historical verification intentionally does not impose current freshness on the
+    original provider capture.  It does, however, require both the original host
+    HMAC and the host HMAC over the complete compiled report projection.
+    """
     if not events:
         if "sponsor_authority" in program:
             raise AdjudicationError("report has sponsor authority without sponsor events")
+        if report_binding_value is not None:
+            raise AdjudicationError("report has sponsor authority binding without sponsor events")
         return None
     if _test_unsigned_enabled():
         return None
@@ -218,6 +295,17 @@ def verify_report_authority(program: Mapping[str, Any], events: Sequence[Mapping
     if not hmac.compare_digest(authority["event_scope_sha256"], expected_scope):
         raise AdjudicationError("retained sponsor authority event scope mismatch")
     _verify_signature(authority)
+
+    binding = _normalize_report_binding(report_binding_value)
+    if not hmac.compare_digest(binding["manifest_sha256"], authority["manifest_sha256"]):
+        raise AdjudicationError("retained sponsor report manifest binding mismatch")
+    expected_authority_sha = _sha256_obj(authority)
+    if not hmac.compare_digest(binding["authority_sha256"], expected_authority_sha):
+        raise AdjudicationError("retained sponsor report authority binding mismatch")
+    expected_projection_sha = _sha256_obj(report_projection)
+    if not hmac.compare_digest(binding["report_projection_sha256"], expected_projection_sha):
+        raise AdjudicationError("retained sponsor report generation binding mismatch")
+    _verify_report_binding_signature(binding)
     return authority
 
 
@@ -252,6 +340,8 @@ def sign_for_test_or_host_fixture(
 __all__ = [
     "AUTHORITY_SCHEMA_VERSION",
     "AUTHORITY_PURPOSE",
+    "REPORT_BINDING_SCHEMA_VERSION",
+    "REPORT_BINDING_PURPOSE",
     "MAX_AUTHORITY_AGE_SECONDS",
     "KEY_ENV",
     "PROVIDER_ENV",
@@ -261,6 +351,7 @@ __all__ = [
     "event_scope_sha256",
     "authority_free_manifest_sha256",
     "verify_manifest_authority",
+    "bind_report_generation",
     "verify_report_authority",
     "sign_for_test_or_host_fixture",
 ]
