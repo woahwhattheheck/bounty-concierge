@@ -154,6 +154,8 @@ The same rule applies to inbound evidence:
 - a bounce must link to the current baseline to become `ROUTE_REPAIR`;
 - only a linked automated acknowledgement may extend the follow-up grace window.
 
+Provider order also governs conflicts between otherwise decisive evidence and ambiguity. The classifier first selects the same linked positive/bounce decision it would have made without ambiguity, then compares it with the newest ambiguous same-thread event. If ambiguity is newer, it overrides the stale positive/bounce state and emits `HUMAN_REVIEW_REQUIRED`. If the ambiguity is older and a later correctly linked human reply (or other otherwise-selected linked decision) arrives, the later linked evidence may remain authoritative. This prevents an older reply from masking a newer unlinked outbound/inbound while avoiding a permanent review lock after ambiguity has been resolved by newer provider-grounded evidence.
+
 This prevents activity for a second offer in a long-lived buyer thread from consuming or delaying the first offer.
 
 ## Queue states
@@ -167,6 +169,8 @@ Priority order is:
 5. `WAIT_AUTO_ACK`
 6. `WAIT_BUYER_EVENT`
 7. `WAIT`
+
+This priority controls queue sorting; it does **not** let an older high-priority classification outrank newer provider evidence inside one engagement generation.
 
 `wait_for_buyer_event` requires `follow_up_after_hours: null`, so time alone cannot convert a one-touch/DNR motion into a follow-up recommendation.
 
@@ -213,7 +217,7 @@ Compilation refuses to emit an authoritative queue when, among other things:
 - schemas contain unexpected fields;
 - manifest collision fences fail.
 
-Ambiguous same-thread commercial activity does not fail the entire queue; it is represented as `HUMAN_REVIEW_REQUIRED` while retaining the last proven generation baseline.
+Ambiguous same-thread commercial activity does not fail the entire queue; it is represented as `HUMAN_REVIEW_REQUIRED` while retaining the last proven generation baseline. When positive/bounce and ambiguous evidence coexist, provider order determines whether the ambiguity is still active; newer ambiguity fails the engagement closed to review.
 
 ## Validation
 
@@ -226,6 +230,9 @@ The hostile suite runs normally and under `python -O` and covers:
 - buyer/authorized-route receipt binding;
 - post-read clock/freshness and exact thread sets;
 - linked vs unlinked human attribution;
+- linked human followed by newer unlinked outbound/inbound ambiguity failing to `HUMAN_REVIEW_REQUIRED`;
+- linked bounce followed by newer ambiguity failing to `HUMAN_REVIEW_REQUIRED`;
+- older ambiguity followed by a newer correctly linked human resolving to `HUMAN_REPLY`;
 - bounce binding;
 - unrelated same-thread outbound not resetting the offer clock;
 - positively linked successor outbound advancing the generation;
