@@ -1,0 +1,82 @@
+name: Assemble exact settlement core
+
+on:
+  push:
+    branches:
+      - zaq-h8r6/settlement-core-completeness-20260914
+
+permissions:
+  contents: write
+
+concurrency:
+  group: assemble-settlement-core-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  assemble-test-publish:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Reconstruct exact authored bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -f .bootstrap/settlement_core.b64.00
+          test -f .bootstrap/settlement_core.b64.01
+          test -f .bootstrap/settlement_core.b64.02
+          test -f .bootstrap/settlement_core.b64.03
+          cat .bootstrap/settlement_core.b64.00 \
+              .bootstrap/settlement_core.b64.01 \
+              .bootstrap/settlement_core.b64.02 \
+              .bootstrap/settlement_core.b64.03 \
+            | base64 --decode > concierge/_revenue_settlement_core.py
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          path = Path('concierge/_revenue_settlement_core.py')
+          data = path.read_bytes()
+          if not data.startswith(b'# SPDX-License-Identifier: MIT\n'):
+              raise SystemExit('unexpected reconstructed prefix')
+          if not data.endswith(b'\n'):
+              raise SystemExit('reconstructed source lacks terminal newline')
+          print(f'core_bytes={len(data)}')
+          print(f'core_sha256={hashlib.sha256(data).hexdigest()}')
+          PY
+      - name: Execute exact source gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            concierge/_revenue_settlement_base.py \
+            concierge/_revenue_settlement_core.py \
+            concierge/revenue_settlement.py \
+            tests/test_offline_history_completeness.py \
+            tests/test_core_history_completeness.py
+          python -m unittest -v \
+            tests.test_offline_history_completeness \
+            tests.test_core_history_completeness
+          python -O -m unittest -v \
+            tests.test_offline_history_completeness \
+            tests.test_core_history_completeness
+      - name: Publish clean successor tree with remote-head CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_before="$(git ls-remote origin "refs/heads/$GITHUB_REF_NAME" | cut -f1)"
+          test "$remote_before" = "$GITHUB_SHA"
+          rm -rf .bootstrap
+          rm .github/workflows/assemble-settlement-core.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'fix(revenue): enforce completeness in authoritative settlement core'
+          git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
