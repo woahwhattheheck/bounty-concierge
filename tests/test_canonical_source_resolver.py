@@ -130,6 +130,10 @@ class CanonicalSourceResolverTests(unittest.TestCase):
             "acme/widgets#17\u0301",
             "\u200dhttps://github.com/acme/widgets/issues/17",
             "acme/widgets#17\u200d",
+            "·https://github.com/acme/widgets/issues/17",
+            "https://github.com/acme/widgets/issues/17·",
+            "·acme/widgets#17",
+            "acme/widgets#17·",
         )
         for body in hostile:
             with self.subTest(body=body):
