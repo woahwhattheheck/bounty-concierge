@@ -2,7 +2,7 @@
 
 `payoff-path-work/v3` has an append-only continuity ledger, evidence-bound effort facts, and versioned `BUDGET_POLICY` generations. Those controls prevent reset, omission, replay-with-changed-bytes, receipt-prefix rollback, and work-scope transplant. They do **not**, by themselves, prove that a caller-authored higher budget cap was actually approved by the owner.
 
-Current production compilation therefore has a second authority boundary: the exact canonical owner-policy scope must be approved by a credential-owning host through a detached HMAC authorization.
+Every ordinary/public v3 compilation and verification therefore has a second authority boundary: the exact canonical owner-policy scope must be approved by a credential-owning host through a detached HMAC authorization.
 
 ## Why this exists
 
@@ -27,7 +27,7 @@ The signed payload additionally binds the host-authorized provider, principal SH
 
 ## Host environment
 
-Production/current compile and verify read these values only from host environment:
+Ordinary/public compile and verify read these values only from host environment:
 
 - `BOUNTY_PAYOFF_POLICY_HMAC_KEY_HEX` — at least 32 bytes encoded as hex;
 - `BOUNTY_PAYOFF_POLICY_AUTHORIZED_PROVIDER` — credential-host/provider identity;
@@ -41,15 +41,19 @@ The key, authorized identity, capture time, and signature are **not** accepted a
 
 ## Freshness
 
-Current authority is short lived. The capture must not be in the future and must be no more than 300 seconds old when current compile/verify runs. Verification reacquires the detached host authority instead of assuming that a packet was current merely because it was previously compiled.
+Current authority is short lived. The capture must not be in the future and must be no more than 300 seconds old when compile/verify runs. Verification reacquires the detached host authority instead of assuming that a packet was current merely because it was previously compiled.
 
 A stale or missing authorization fails closed.
 
-## Current versus historical replay
+## Test-only unsigned semantic fixtures
 
-The production CLI supplies no caller-selected clock. A normal v3 `compile`/`verify` therefore follows process UTC and requires detached host authority.
+The predecessor v3 state-machine tests need deterministic historical timestamps and intentionally exercise semantics below the new host-authentication boundary. They may set:
 
-The existing library-level explicit `trusted_as_of` / `trusted_now` parameters are retained for deterministic historical/migration replay of earlier semantic fixtures. They are not current owner authority and must not be exposed as a production clock override. The CLI continues to reject `--as-of`.
+- `BOUNTY_PAYOFF_POLICY_TEST_ONLY_ALLOW_UNSIGNED=1`
+
+This is an explicit **test-only host switch**, mirroring the repository's sponsor-authority test pattern. Production entrypoints and adapters must leave it unset. A caller-selected `trusted_as_of` or `trusted_now` value does **not** bypass owner-policy authentication.
+
+The production CLI continues to expose no `--as-of` override.
 
 ## Authority ceiling
 
