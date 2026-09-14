@@ -1,9 +1,13 @@
 import copy
 import json
+import os
+import signal
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
+import concierge.collection_request as collection_request
 from concierge.collection_request import (
     CollectionRequestInputError,
     compile_collection_request,
@@ -184,6 +188,202 @@ class CollectionRequestTests(unittest.TestCase):
         packet = compile_collection_request(payload)
         encoded = json.dumps(packet, sort_keys=True)
         self.assertTrue(verify_collection_request(payload, json.loads(encoded)))
+
+    def test_valid_regular_file_control(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "x.json"
+            p.write_text('{"a":1}', encoding="utf-8")
+            self.assertEqual(load_json(p), {"a": 1})
+
+    def test_invalid_utf8_fails_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "x.json"
+            p.write_bytes(b'{"a":"\xff"}')
+            with self.assertRaisesRegex(CollectionRequestInputError, "UTF-8"):
+                load_json(p)
+
+    def test_directory_fails_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            with self.assertRaisesRegex(CollectionRequestInputError, "regular file"):
+                load_json(Path(td))
+
+    @unittest.skipUnless(hasattr(os, "symlink"), "symlink unavailable")
+    def test_symlink_fails_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "target.json"
+            link = Path(td) / "link.json"
+            target.write_text('{"a":1}', encoding="utf-8")
+            try:
+                link.symlink_to(target)
+            except (OSError, NotImplementedError) as exc:
+                self.skipTest(f"symlink unavailable: {exc}")
+            with self.assertRaisesRegex(CollectionRequestInputError, "regular file"):
+                load_json(link)
+
+    @unittest.skipUnless(
+        hasattr(os, "mkfifo") and hasattr(signal, "SIGALRM"),
+        "FIFO/alarm unavailable",
+    )
+    def test_fifo_is_rejected_without_blocking(self):
+        with tempfile.TemporaryDirectory() as td:
+            fifo = Path(td) / "input.fifo"
+            os.mkfifo(fifo)
+
+            def timed_out(_signum, _frame):
+                raise TimeoutError("FIFO read blocked")
+
+            previous = signal.signal(signal.SIGALRM, timed_out)
+            signal.alarm(2)
+            try:
+                with self.assertRaisesRegex(CollectionRequestInputError, "regular file"):
+                    load_json(fifo)
+            finally:
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, previous)
+
+    @unittest.skipUnless(Path("/dev/null").exists(), "device control unavailable")
+    def test_character_device_fails_closed(self):
+        with self.assertRaisesRegex(CollectionRequestInputError, "regular file"):
+            load_json(Path("/dev/null"))
+
+    def test_oversized_sparse_file_is_rejected_before_read(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "oversized.json"
+            with p.open("wb") as handle:
+                handle.truncate(collection_request._MAX_JSON_BYTES + 1)
+            with mock.patch.object(
+                collection_request.os,
+                "read",
+                side_effect=AssertionError("oversized file must not be read"),
+            ):
+                with self.assertRaisesRegex(CollectionRequestInputError, "too large"):
+                    load_json(p)
+
+    def test_growth_during_read_fails_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "growing.json"
+            p.write_text('{"a":1}', encoding="utf-8")
+            real_read = collection_request.os.read
+            mutated = False
+
+            def read_then_grow(fd, amount):
+                nonlocal mutated
+                chunk = real_read(fd, amount)
+                if not mutated:
+                    mutated = True
+                    with p.open("ab") as handle:
+                        handle.write(b" ")
+                return chunk
+
+            with mock.patch.object(collection_request.os, "read", side_effect=read_then_grow):
+                with self.assertRaisesRegex(CollectionRequestInputError, "changed while reading"):
+                    load_json(p)
+
+    @unittest.skipUnless(hasattr(os, "link"), "hard links unavailable")
+    def test_same_inode_same_size_alias_mutation_after_read_fails_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "input.json"
+            alias = Path(td) / "alias.json"
+            p.write_text('{"a":1}', encoding="utf-8")
+            try:
+                os.link(p, alias)
+            except OSError as exc:
+                self.skipTest(f"hard links unavailable: {exc}")
+            real_lstat = collection_request._lstat
+            calls = 0
+
+            def mutate_before_final_path_snapshot(path):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    alias.write_text('{"b":2}', encoding="utf-8")
+                return real_lstat(path)
+
+            with mock.patch.object(
+                collection_request,
+                "_lstat",
+                side_effect=mutate_before_final_path_snapshot,
+            ):
+                with self.assertRaisesRegex(CollectionRequestInputError, "path changed while reading"):
+                    load_json(p)
+            self.assertEqual(p.read_text(encoding="utf-8"), '{"b":2}')
+
+    def test_foreign_inode_path_replacement_after_read_fails_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "input.json"
+            replacement = Path(td) / "replacement.json"
+            p.write_text('{"a":1}', encoding="utf-8")
+            replacement.write_text('{"b":2}', encoding="utf-8")
+            real_lstat = collection_request._lstat
+            calls = 0
+
+            def replace_before_final_path_snapshot(path):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    os.replace(replacement, p)
+                return real_lstat(path)
+
+            with mock.patch.object(
+                collection_request,
+                "_lstat",
+                side_effect=replace_before_final_path_snapshot,
+            ):
+                with self.assertRaisesRegex(CollectionRequestInputError, "path changed while reading"):
+                    load_json(p)
+            self.assertEqual(p.read_text(encoding="utf-8"), '{"b":2}')
+
+    def test_mutation_after_final_path_snapshot_is_caught_by_final_fstat(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "input.json"
+            p.write_text('{"a":1}', encoding="utf-8")
+            real_lstat = collection_request._lstat
+            calls = 0
+
+            def return_snapshot_then_mutate(path):
+                nonlocal calls
+                calls += 1
+                snapshot = real_lstat(path)
+                if calls == 2:
+                    p.write_text('{"b":2}', encoding="utf-8")
+                return snapshot
+
+            with mock.patch.object(
+                collection_request,
+                "_lstat",
+                side_effect=return_snapshot_then_mutate,
+            ):
+                with self.assertRaisesRegex(
+                    CollectionRequestInputError,
+                    "changed during final path validation",
+                ):
+                    load_json(p)
+            self.assertEqual(p.read_text(encoding="utf-8"), '{"b":2}')
+
+    def test_path_disappearance_before_final_snapshot_fails_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "input.json"
+            p.write_text('{"a":1}', encoding="utf-8")
+            real_lstat = collection_request._lstat
+            calls = 0
+
+            def remove_before_final_path_snapshot(path):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    p.unlink()
+                return real_lstat(path)
+
+            with mock.patch.object(
+                collection_request,
+                "_lstat",
+                side_effect=remove_before_final_path_snapshot,
+            ):
+                with self.assertRaisesRegex(
+                    CollectionRequestInputError,
+                    "could not be inspected safely",
+                ):
+                    load_json(p)
 
 
 if __name__ == "__main__":

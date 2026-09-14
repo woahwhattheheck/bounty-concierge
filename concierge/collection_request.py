@@ -12,7 +12,9 @@ import argparse
 from decimal import Decimal, InvalidOperation
 import hashlib
 import json
+import os
 import re
+import stat
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -27,6 +29,7 @@ _ROUTE_TYPES = frozenset({"HOSTED_HANDLE", "PAYMENT_LINK", "WALLET", "OTHER"})
 _ACCEPTANCE_KINDS = frozenset({"NONE", "SPONSOR_ACCEPTED", "AWARDED"})
 _MAX_JSON_BYTES = 1024 * 1024
 _MAX_TEXT = 4096
+_READ_CHUNK_BYTES = 64 * 1024
 
 
 class CollectionRequestInputError(ValueError):
@@ -230,10 +233,115 @@ def _reject_duplicate_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return out
 
 
+def _lstat(path: Path) -> os.stat_result:
+    try:
+        return path.lstat()
+    except OSError as exc:
+        raise CollectionRequestInputError("input path could not be inspected safely") from exc
+
+
+def _stat_generation(value: os.stat_result) -> tuple[int, ...]:
+    """Return the mutation-sensitive regular-file generation used for custody."""
+    fields = (
+        value.st_dev,
+        value.st_ino,
+        value.st_mode,
+        value.st_nlink,
+        value.st_size,
+        getattr(value, "st_mtime_ns", int(value.st_mtime * 1_000_000_000)),
+        getattr(value, "st_ctime_ns", int(value.st_ctime * 1_000_000_000)),
+    )
+    if any(isinstance(item, bool) or not isinstance(item, int) for item in fields):
+        raise CollectionRequestInputError("input file generation metadata is unavailable")
+    if value.st_ino == 0 or value.st_nlink <= 0 or value.st_size < 0:
+        raise CollectionRequestInputError("input file lacks stable regular-file identity")
+    return fields
+
+
+def _require_regular(value: os.stat_result) -> tuple[int, ...]:
+    if not stat.S_ISREG(value.st_mode):
+        raise CollectionRequestInputError("input path must name a regular file")
+    return _stat_generation(value)
+
+
+def _open_regular_file(path: Path) -> int:
+    flags = os.O_RDONLY
+    for name in ("O_CLOEXEC", "O_NONBLOCK", "O_NOFOLLOW", "O_BINARY"):
+        flags |= getattr(os, name, 0)
+    try:
+        return os.open(path, flags)
+    except OSError as exc:
+        raise CollectionRequestInputError("input path could not be opened safely") from exc
+
+
+def _read_regular_file(path: Path) -> bytes:
+    """Capture one bounded, stable caller-visible regular-file generation."""
+    before_path = _lstat(path)
+    before_path_generation = _require_regular(before_path)
+
+    descriptor = _open_regular_file(path)
+    try:
+        try:
+            before_descriptor = os.fstat(descriptor)
+        except OSError as exc:
+            raise CollectionRequestInputError("input file descriptor could not be inspected") from exc
+        before_descriptor_generation = _require_regular(before_descriptor)
+        if before_descriptor_generation != before_path_generation:
+            raise CollectionRequestInputError("input path changed while opening")
+        if before_descriptor.st_size > _MAX_JSON_BYTES:
+            raise CollectionRequestInputError("input file is too large")
+
+        chunks: list[bytes] = []
+        total = 0
+        while total < _MAX_JSON_BYTES + 1:
+            try:
+                chunk = os.read(
+                    descriptor,
+                    min(_READ_CHUNK_BYTES, _MAX_JSON_BYTES + 1 - total),
+                )
+            except OSError as exc:
+                raise CollectionRequestInputError("input file could not be read safely") from exc
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+
+        if total > _MAX_JSON_BYTES:
+            raise CollectionRequestInputError("input file is too large")
+        raw = b"".join(chunks)
+
+        try:
+            after_descriptor = os.fstat(descriptor)
+        except OSError as exc:
+            raise CollectionRequestInputError("input file descriptor could not be re-inspected") from exc
+        after_descriptor_generation = _require_regular(after_descriptor)
+        if after_descriptor_generation != before_descriptor_generation:
+            raise CollectionRequestInputError("input file changed while reading")
+        if len(raw) != after_descriptor.st_size:
+            raise CollectionRequestInputError("input file length changed while reading")
+
+        after_path = _lstat(path)
+        after_path_generation = _require_regular(after_path)
+        if after_path_generation != after_descriptor_generation:
+            raise CollectionRequestInputError("input path changed while reading")
+
+        try:
+            final_descriptor = os.fstat(descriptor)
+        except OSError as exc:
+            raise CollectionRequestInputError("input file descriptor could not be finalized") from exc
+        final_descriptor_generation = _require_regular(final_descriptor)
+        if final_descriptor_generation != after_descriptor_generation:
+            raise CollectionRequestInputError("input file changed during final path validation")
+        return raw
+    finally:
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+
+
 def load_json(path: Path) -> Any:
-    raw = path.read_bytes()
-    if len(raw) > _MAX_JSON_BYTES:
-        raise CollectionRequestInputError("input file is too large")
+    raw = _read_regular_file(path)
     try:
         return json.loads(
             raw.decode("utf-8"),
