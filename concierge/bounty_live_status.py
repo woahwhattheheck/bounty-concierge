@@ -107,9 +107,6 @@ def is_clear_for_further_qualification(receipt: dict[str, Any]) -> bool:
         return False
     if live.get("classification") != "OPEN":
         return False
-    if live.get("snapshot_clear_for_further_qualification") is not True:
-        return False
-
     verified_at = _parse_utc(live.get("verified_at"))
     fresh_until = _parse_utc(live.get("fresh_until"))
     if verified_at is None or fresh_until is None:
@@ -250,7 +247,6 @@ def _result(
             "issue_state": issue_state,
             "issue_updated_at": issue_updated_at,
             "repository_redirected": repository_redirected,
-            "snapshot_clear_for_further_qualification": classification == "OPEN",
             "verified_at": _format_utc(captured_at),
             "fresh_until": _format_utc(fresh_until),
         },
