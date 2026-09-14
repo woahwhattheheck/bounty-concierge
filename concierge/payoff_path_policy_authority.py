@@ -1,18 +1,18 @@
 # SPDX-License-Identifier: MIT
-"""Host-held owner authority for current payoff budget policy.
+"""Host-held owner authority for payoff budget policy.
 
-The v3 continuity ledger intentionally keeps policy and effort facts append-only, but
-its work document is still caller-controlled. A caller must therefore not be able
-to turn a self-authored higher BUDGET_POLICY generation into a current READY result.
+The v3 continuity ledger keeps policy and effort facts append-only, but its work
+document is caller-controlled. A caller must not be able to turn a self-authored
+higher BUDGET_POLICY generation into READY owner-review evidence.
 
 Every ordinary/public v3 compilation and verification requires a detached HMAC
 authorization supplied only through host environment. The signed scope binds the
 exact canonical policy chain, ledger generation, prior-receipt anchor, and
-work/opportunity scope. No key, signature, provider, principal, or capture time is
-accepted from CLI arguments or ordinary work-document fields.
+work/opportunity scope. No key, signature, provider, principal, capture time, or
+unsigned-bypass switch is accepted from the work document or CLI.
 
-Historical semantic tests may opt into one explicitly named test-only host switch.
-Production entrypoints must leave that switch unset.
+Historical state-machine tests mock the authority verifier in-process. Production
+runtime code contains no configuration flag that disables owner authentication.
 """
 
 from __future__ import annotations
@@ -35,10 +35,7 @@ PROVIDER_ENV = "BOUNTY_PAYOFF_POLICY_AUTHORIZED_PROVIDER"
 PRINCIPAL_ENV = "BOUNTY_PAYOFF_POLICY_AUTHORIZED_PRINCIPAL_SHA256"
 CAPTURED_AT_ENV = "BOUNTY_PAYOFF_POLICY_AUTHORITY_CAPTURED_AT_UTC"
 SIGNATURE_ENV = "BOUNTY_PAYOFF_POLICY_AUTHORITY_SIGNATURE_SHA256"
-TEST_UNSIGNED_ENV = "BOUNTY_PAYOFF_POLICY_TEST_ONLY_ALLOW_UNSIGNED"
 
-_ORIGINAL_V3_COMPILE = _v3._compile_v3
-_ORIGINAL_V3_VERIFY = _v3.verify_v3
 _INSTALLED = False
 
 
@@ -141,10 +138,10 @@ def sign_current_policy_authority_for_host_fixture(
 ) -> dict[str, str]:
     """Return detached environment fields for a trusted host authorization.
 
-    The helper cannot grant authority without the host-held HMAC key and authorized
-    identity already present in environment. Production adapters should call it
-    only after the owner/credential host has approved the exact normalized policy
-    generation. The returned mapping contains no secret key.
+    This helper cannot grant authority without the host-held HMAC key and authorized
+    identity already present in environment. Trusted host adapters/tests may use it
+    after owner approval of the exact normalized policy generation. The returned
+    mapping contains no secret key.
     """
 
     key, provider, principal = _host_identity()
@@ -167,7 +164,7 @@ def sign_current_policy_authority_for_host_fixture(
 
 
 def verify_current_policy_authority(document: Any) -> dict[str, Any]:
-    """Verify detached host authority for the exact current v3 policy scope."""
+    """Verify detached host authority for the exact v3 policy scope."""
 
     key, provider, principal = _host_identity()
     captured_raw = os.environ.get(CAPTURED_AT_ENV)
@@ -198,53 +195,49 @@ def verify_current_policy_authority(document: Any) -> dict[str, Any]:
     return payload
 
 
-def _test_unsigned_enabled() -> bool:
-    return os.environ.get(TEST_UNSIGNED_ENV) == "1"
-
-
-def _guarded_compile_v3(
-    document: Any,
-    trusted_as_of: datetime | str | None,
-    previous_receipt: Any,
-):
-    # Every ordinary/public v3 compile path requires independent host authority.
-    # Historical semantic tests may opt into the explicit host test switch only.
-    if not _test_unsigned_enabled():
-        verify_current_policy_authority(document)
-    return _ORIGINAL_V3_COMPILE(document, trusted_as_of, previous_receipt)
-
-
-def _guarded_verify_v3(
-    document: Any,
-    packet: Any,
-    markdown: Any,
-    receipt: Any,
-    trusted_now: datetime | str | None = None,
-    previous_receipt: Any = None,
-) -> bool:
-    if not _test_unsigned_enabled():
-        verify_current_policy_authority(document)
-    return _ORIGINAL_V3_VERIFY(
-        document,
-        packet,
-        markdown,
-        receipt,
-        trusted_now=trusted_now,
-        previous_receipt=previous_receipt,
-    )
-
-
 def install() -> None:
-    """Install current owner-policy host authority exactly once."""
+    """Guard every public/direct v3 compile and verify exactly once."""
 
     global _INSTALLED
     if _INSTALLED:
         return
-    _v3._compile_v3 = _guarded_compile_v3
-    _v3.verify_v3 = _guarded_verify_v3
 
-    # Expose host-adapter primitives through the established compatibility module
-    # surface without widening any external-action authority.
+    original_compile = _v3._compile_v3
+    original_verify = _v3.verify_v3
+
+    def guarded_compile_v3(
+        document: Any,
+        trusted_as_of: datetime | str | None,
+        previous_receipt: Any,
+    ):
+        verify_current_policy_authority(document)
+        return original_compile(document, trusted_as_of, previous_receipt)
+
+    def guarded_verify_v3(
+        document: Any,
+        packet: Any,
+        markdown: Any,
+        receipt: Any,
+        trusted_now: datetime | str | None = None,
+        previous_receipt: Any = None,
+    ) -> bool:
+        verify_current_policy_authority(document)
+        return original_verify(
+            document,
+            packet,
+            markdown,
+            receipt,
+            trusted_now=trusted_now,
+            previous_receipt=previous_receipt,
+        )
+
+    # The v3 dispatchers resolve these module globals dynamically, so this protects
+    # both the established core compatibility surface and direct v3 library calls.
+    # Original callables live only in these closures; there is no runtime unsigned
+    # environment/configuration switch in production-imported code.
+    _v3._compile_v3 = guarded_compile_v3
+    _v3.verify_v3 = guarded_verify_v3
+
     _core.PAYOFF_POLICY_AUTHORITY_PURPOSE = AUTHORITY_PURPOSE
     _core.PAYOFF_POLICY_AUTHORITY_MAX_AGE_SECONDS = MAX_AUTHORITY_AGE_SECONDS
     _core.PAYOFF_POLICY_HMAC_KEY_ENV = KEY_ENV
@@ -252,7 +245,6 @@ def install() -> None:
     _core.PAYOFF_POLICY_PRINCIPAL_ENV = PRINCIPAL_ENV
     _core.PAYOFF_POLICY_CAPTURED_AT_ENV = CAPTURED_AT_ENV
     _core.PAYOFF_POLICY_SIGNATURE_ENV = SIGNATURE_ENV
-    _core.PAYOFF_POLICY_TEST_UNSIGNED_ENV = TEST_UNSIGNED_ENV
     _core.PAYOFF_POLICY_AUTHORITY_SCOPE = policy_authority_scope
     _core.PAYOFF_POLICY_AUTHORITY_SCOPE_SHA256 = policy_authority_scope_sha256
     _core.sign_current_policy_authority_for_host_fixture = (
@@ -263,9 +255,8 @@ def install() -> None:
     _core.compile_gate.__doc__ = (
         "Compile owner-review evidence. Every ordinary payoff-path-work/v3 path "
         "requires a fresh detached host HMAC authorization for the exact owner-policy "
-        "scope. The only unsigned v3 path is an explicit test-only host environment "
-        "switch. V1 is fail-closed except its named migration helper; v2 retains "
-        "landed continuity semantics."
+        "scope. There is no runtime unsigned configuration switch. V1 is fail-closed "
+        "except its named migration helper; v2 retains landed continuity semantics."
     )
     _INSTALLED = True
 
@@ -278,7 +269,6 @@ __all__ = [
     "PRINCIPAL_ENV",
     "CAPTURED_AT_ENV",
     "SIGNATURE_ENV",
-    "TEST_UNSIGNED_ENV",
     "policy_authority_scope",
     "policy_authority_scope_sha256",
     "sign_current_policy_authority_for_host_fixture",
