@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import bisect
 import hashlib
 from pathlib import Path
 
@@ -18,63 +19,96 @@ REQUIRED_MARKERS = (
     "canonical history capture wallet metadata was invalid",
     "if __name__ == \"__main__\"",
 )
+ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
 
 if [len(part) for part in PARTS] != EXPECTED_LENGTHS:
     raise SystemExit(
         f"unexpected chunk lengths: {[len(part) for part in PARTS]!r}"
     )
-if any(character not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=" for part in PARTS for character in part):
+if any(character not in ALPHABET for part in PARTS for character in part):
     raise SystemExit("chunk contains non-base64-alphabet bytes")
 
-unique: dict[str, dict[str, object]] = {}
-second = PARTS[1]
-for deletion_index, deleted_character in enumerate(second):
-    encoded = (
-        PARTS[0]
-        + second[:deletion_index]
-        + second[deletion_index + 1 :]
-        + PARTS[2]
-        + PARTS[3]
-    )
+encoded = "".join(PARTS)
+boundaries: list[int] = []
+running = 0
+for part in PARTS:
+    running += len(part)
+    boundaries.append(running)
+
+stages = {
+    "decoded": 0,
+    "length": 0,
+    "prefix": 0,
+    "tail": 0,
+    "utf8": 0,
+    "compiled": 0,
+    "markers": 0,
+}
+compiled: dict[str, dict[str, object]] = {}
+accepted: dict[str, dict[str, object]] = {}
+
+for deletion_index, deleted_character in enumerate(encoded):
+    candidate_encoded = encoded[:deletion_index] + encoded[deletion_index + 1 :]
     try:
-        decoded = base64.b64decode(encoded, validate=True)
+        decoded = base64.b64decode(candidate_encoded, validate=True)
     except Exception:
         continue
+    stages["decoded"] += 1
     if len(decoded) != 15_000:
         continue
+    stages["length"] += 1
     if not decoded.startswith(b"# SPDX-License-Identifier: MIT\n"):
         continue
+    stages["prefix"] += 1
     if not decoded.endswith(b"\n"):
         continue
+    stages["tail"] += 1
     try:
         source = decoded.decode("utf-8")
+    except UnicodeDecodeError:
+        continue
+    stages["utf8"] += 1
+    try:
         compile(source, "concierge/_revenue_settlement_core.py", "exec")
-    except (UnicodeDecodeError, SyntaxError, ValueError):
+    except (SyntaxError, ValueError):
         continue
-    if any(marker not in source for marker in REQUIRED_MARKERS):
-        continue
+    stages["compiled"] += 1
     digest = hashlib.sha256(decoded).hexdigest()
-    candidate = unique.setdefault(
+    chunk_index = bisect.bisect_right(boundaries, deletion_index)
+    chunk_start = 0 if chunk_index == 0 else boundaries[chunk_index - 1]
+    deletion = (chunk_index, deletion_index - chunk_start, deleted_character)
+    record = compiled.setdefault(
         digest,
-        {"bytes": decoded, "deletions": []},
+        {"bytes": decoded, "deletions": [], "missing_markers": []},
     )
-    candidate["deletions"].append((deletion_index, deleted_character))
+    record["deletions"].append(deletion)
+    missing = [marker for marker in REQUIRED_MARKERS if marker not in source]
+    record["missing_markers"] = missing
+    if not missing:
+        stages["markers"] += 1
+        accepted[digest] = record
 
-print(f"ZAQ_RECOVERY_UNIQUE_CANDIDATES {len(unique)}")
-for digest, candidate in sorted(unique.items()):
+print("ZAQ_RECOVERY_STAGES", stages)
+print("ZAQ_RECOVERY_COMPILED_UNIQUE", len(compiled))
+for digest, record in sorted(compiled.items()):
     print(
-        "ZAQ_RECOVERY_CANDIDATE",
+        "ZAQ_RECOVERY_COMPILED",
         digest,
-        candidate["deletions"],
+        record["deletions"],
+        "missing_markers=",
+        record["missing_markers"],
     )
+print("ZAQ_RECOVERY_ACCEPTED_UNIQUE", len(accepted))
 
-if len(unique) != 1:
-    raise SystemExit("single-character recovery did not yield one unique source")
+selection = compiled if len(compiled) == 1 else accepted
+if len(selection) != 1:
+    raise SystemExit("full-stream single-character recovery remained ambiguous")
 
-digest, candidate = next(iter(unique.items()))
-recovered = candidate["bytes"]
+digest, record = next(iter(selection.items()))
+recovered = record["bytes"]
 target = Path("concierge/_revenue_settlement_core.py")
 target.write_bytes(recovered)
-print("ZAQ_RECOVERY_DELETIONS", candidate["deletions"])
+print("ZAQ_RECOVERY_DELETIONS", record["deletions"])
+print("ZAQ_RECOVERY_MISSING_MARKERS", record["missing_markers"])
 print("ZAQ_CORE_BYTES", len(recovered))
 print("ZAQ_CORE_SHA256", digest)
