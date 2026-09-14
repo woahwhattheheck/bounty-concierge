@@ -3,11 +3,11 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-import os
 import unittest
 from unittest.mock import patch
 
 from concierge import payoff_path_gate as gate
+from concierge import payoff_path_policy_authority as policy_authority
 
 AS_OF = "2026-09-13T15:00:00.000Z"
 SHA_A = "a" * 64
@@ -98,16 +98,16 @@ def document(events, *, budget, spent, generation=0, previous_receipt_sha256=Non
 
 class PayoffPathPolicyV3Tests(unittest.TestCase):
     def setUp(self):
-        # These are historical semantic fixtures for the landed v3 state machine,
-        # not current authority tests. Production/current v3 never enables this
-        # host-only switch; detached HMAC authority is covered separately.
-        self._unsigned = patch.dict(
-            os.environ,
-            {gate.PAYOFF_POLICY_TEST_UNSIGNED_ENV: "1"},
-            clear=False,
+        # These are deterministic historical state-machine fixtures, not owner-
+        # authority tests. Mock the verifier only inside this test process; there is
+        # no production runtime/configuration switch that disables v3 HMAC checks.
+        self._authority = patch.object(
+            policy_authority,
+            "verify_current_policy_authority",
+            return_value={"purpose": "historical-v3-semantic-fixture"},
         )
-        self._unsigned.start()
-        self.addCleanup(self._unsigned.stop)
+        self._authority.start()
+        self.addCleanup(self._authority.stop)
 
         self.p0 = policy(
             "policy-0", 0, 60, "2026-09-13T12:30:00.000Z", evidence_sha=SHA_B
