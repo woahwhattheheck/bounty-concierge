@@ -30,7 +30,7 @@ A repository rename/move is allowed only when GitHub's final API URL and the ret
 
 ## Currentness contract
 
-`OPEN` is a short-lived observation, never a durable permission bit. Schema v2 therefore does **not** expose a raw `clear_for_further_qualification` field. It records only `snapshot_clear_for_further_qualification`, plus `verified_at` and a code-owned five-minute `fresh_until`.
+`OPEN` is a short-lived observation, never a durable permission bit. Schema v2 therefore exposes **no raw clear/promotion boolean at all**. It records the provider classification plus `verified_at` and a code-owned five-minute `fresh_until`; the clear decision exists only through the freshness-aware accessor.
 
 Consumers must call `is_clear_for_further_qualification(receipt)`. The accessor:
 
