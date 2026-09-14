@@ -15,6 +15,7 @@ def closeout(*, pr=7, amount="10"):
         "repo": "Sponsor/project",
         "pr": pr,
         "state": "MERGED",
+        "merged_at": "2026-09-12T23:59:59Z",
         "currency": "RTC",
         "advertised_amount": amount,
         "cash_status": "not_inferred",
