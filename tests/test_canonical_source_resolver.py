@@ -95,8 +95,13 @@ class CanonicalSourceResolverTests(unittest.TestCase):
             "https://github.com/acme/widgets/issues/17evil",
             "https://github.com/acme/widgets/issues/17?redirect=mirror",
             "https://github.com/acme/widgets/issues/17/extra",
+            "https://github.com/acme/widgets/issues/17.evil",
+            "https://github.com/acme/widgets/issues/17..evil",
+            "https://github.com/acme/widgets/issues/17.#fragment",
             "acme/widgets#17evil",
             "acme/widgets#17-extra",
+            "acme/widgets#17.evil",
+            "acme/widgets#17..evil",
             "evilhttps://github.com/acme/widgets/issues/17",
             "foo/https://github.com/acme/widgets/issues/17",
             "evil/acme/widgets#17",
@@ -119,6 +124,8 @@ class CanonicalSourceResolverTests(unittest.TestCase):
         clean = (
             "Canonical (https://github.com/acme/widgets/issues/17).",
             "Canonical [acme/widgets#17].",
+            "Canonical: https://github.com/acme/widgets/issues/17.",
+            "Canonical: acme/widgets#17.",
         )
         for body in clean:
             with self.subTest(body=body):
