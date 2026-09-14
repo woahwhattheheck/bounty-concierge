@@ -32,9 +32,25 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Normal semantics
+      - name: Pre-authority semantic regression suite
+        env:
+          BOUNTY_SPONSOR_ADJUDICATION_TEST_ONLY_ALLOW_UNSIGNED: "1"
         run: python -m unittest -v tests.test_sponsor_adjudication tests.test_sponsor_adjudication_hardening
-      - name: Optimized semantics
+      - name: Pre-authority optimized semantic regression suite
+        env:
+          BOUNTY_SPONSOR_ADJUDICATION_TEST_ONLY_ALLOW_UNSIGNED: "1"
         run: python -O -m unittest -v tests.test_sponsor_adjudication tests.test_sponsor_adjudication_hardening
+      - name: Host-authority hostile suite
+        env:
+          BOUNTY_SPONSOR_ADJUDICATION_HMAC_KEY_HEX: "1111111111111111111111111111111111111111111111111111111111111111"
+          BOUNTY_SPONSOR_ADJUDICATION_AUTHORIZED_PROVIDER: "gmail"
+          BOUNTY_SPONSOR_ADJUDICATION_AUTHORIZED_PRINCIPAL_SHA256: "36187323d80e525665ff9bb149ea1e60c61f4f3c7dd883fe2f672b15115bcd44"
+        run: python -m unittest -v tests.test_sponsor_adjudication_authority
+      - name: Host-authority optimized hostile suite
+        env:
+          BOUNTY_SPONSOR_ADJUDICATION_HMAC_KEY_HEX: "1111111111111111111111111111111111111111111111111111111111111111"
+          BOUNTY_SPONSOR_ADJUDICATION_AUTHORIZED_PROVIDER: "gmail"
+          BOUNTY_SPONSOR_ADJUDICATION_AUTHORIZED_PRINCIPAL_SHA256: "36187323d80e525665ff9bb149ea1e60c61f4f3c7dd883fe2f672b15115bcd44"
+        run: python -O -m unittest -v tests.test_sponsor_adjudication_authority
       - name: Compile
-        run: python -m py_compile concierge/sponsor_adjudication/*.py tests/test_sponsor_adjudication.py tests/test_sponsor_adjudication_hardening.py
+        run: python -m py_compile concierge/sponsor_adjudication/*.py tests/test_sponsor_adjudication.py tests/test_sponsor_adjudication_hardening.py tests/test_sponsor_adjudication_authority.py
