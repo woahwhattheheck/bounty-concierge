@@ -11,11 +11,15 @@ class RevenueCliTests(unittest.TestCase):
     def test_registry_is_fixed_sorted_safe_and_unique(self):
         names = list(revenue_cli.COMMANDS)
         self.assertEqual(len(names), len(set(names)))
-        self.assertGreaterEqual(len(names), 10)
+        self.assertEqual(len(names), 11)
         for name, command in revenue_cli.COMMANDS.items():
             self.assertRegex(name, r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
             self.assertRegex(command.module, r"^concierge\.[a-z0-9_]+$")
             self.assertTrue(command.summary.endswith("."))
+
+    def test_library_only_custody_modules_are_not_advertised_as_cli_targets(self):
+        self.assertNotIn("collection-custody", revenue_cli.COMMANDS)
+        self.assertNotIn("submission-custody", revenue_cli.COMMANDS)
 
     def test_help_is_side_effect_free_and_lists_every_target(self):
         out = io.StringIO()
