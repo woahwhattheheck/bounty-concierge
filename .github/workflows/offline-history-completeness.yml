@@ -1,0 +1,41 @@
+name: Offline settlement history completeness
+
+on:
+  pull_request:
+    paths:
+      - "concierge/_revenue_settlement_base.py"
+      - "concierge/_revenue_settlement_core.py"
+      - "concierge/revenue_settlement.py"
+      - "tests/test_offline_history_completeness.py"
+      - ".github/workflows/offline-history-completeness.yml"
+  push:
+    branches: [main]
+    paths:
+      - "concierge/_revenue_settlement_base.py"
+      - "concierge/_revenue_settlement_core.py"
+      - "concierge/revenue_settlement.py"
+      - "tests/test_offline_history_completeness.py"
+      - ".github/workflows/offline-history-completeness.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  completeness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile exact modules
+        run: python -m py_compile concierge/_revenue_settlement_base.py concierge/_revenue_settlement_core.py concierge/revenue_settlement.py tests/test_offline_history_completeness.py
+      - name: Run completeness hostiles
+        run: python -m unittest -v tests.test_offline_history_completeness
+      - name: Run optimized completeness hostiles
+        run: python -O -m unittest -v tests.test_offline_history_completeness
