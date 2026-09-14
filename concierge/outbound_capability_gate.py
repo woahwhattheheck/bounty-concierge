@@ -314,10 +314,14 @@ def _tag_metadata(tag_body: Any) -> Optional[Mapping[str, Any]]:
 
 
 def _object_sha(ref_body: Any) -> Optional[str]:
+    # Match the canonical Commons transport contract: authority is the exact
+    # ref -> annotated-tag object SHA. GitHub normally includes an object type
+    # here, but the v2 primitive intentionally does not depend on that optional
+    # response field; the second GET validates the object as an annotated tag.
     if not isinstance(ref_body, Mapping):
         return None
     obj = ref_body.get("object")
-    if not isinstance(obj, Mapping) or obj.get("type") != "tag":
+    if not isinstance(obj, Mapping):
         return None
     try:
         return _sha(obj.get("sha"), "ref object sha")
