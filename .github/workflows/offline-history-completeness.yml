@@ -5,16 +5,22 @@ on:
     paths:
       - "concierge/_revenue_settlement_base.py"
       - "concierge/_revenue_settlement_core.py"
+      - "concierge/_revenue_settlement_core_impl.source"
       - "concierge/revenue_settlement.py"
       - "tests/test_offline_history_completeness.py"
+      - "tests/test_core_history_completeness.py"
+      - "docs/OFFLINE_HISTORY_COMPLETENESS.md"
       - ".github/workflows/offline-history-completeness.yml"
   push:
     branches: [main]
     paths:
       - "concierge/_revenue_settlement_base.py"
       - "concierge/_revenue_settlement_core.py"
+      - "concierge/_revenue_settlement_core_impl.source"
       - "concierge/revenue_settlement.py"
       - "tests/test_offline_history_completeness.py"
+      - "tests/test_core_history_completeness.py"
+      - "docs/OFFLINE_HISTORY_COMPLETENESS.md"
       - ".github/workflows/offline-history-completeness.yml"
 
 permissions:
@@ -33,9 +39,23 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Verify preserved implementation bytes
+        run: test "$(git hash-object concierge/_revenue_settlement_core_impl.source)" = "f25c3969d81dfb19cad0a60a71774c5b770165f6"
       - name: Compile exact modules
-        run: python -m py_compile concierge/_revenue_settlement_base.py concierge/_revenue_settlement_core.py concierge/revenue_settlement.py tests/test_offline_history_completeness.py
-      - name: Run completeness hostiles
-        run: python -m unittest -v tests.test_offline_history_completeness
+        run: >-
+          python -m py_compile
+          concierge/_revenue_settlement_base.py
+          concierge/_revenue_settlement_core.py
+          concierge/revenue_settlement.py
+          tests/test_offline_history_completeness.py
+          tests/test_core_history_completeness.py
+      - name: Run public and direct-core completeness hostiles
+        run: >-
+          python -m unittest -v
+          tests.test_offline_history_completeness
+          tests.test_core_history_completeness
       - name: Run optimized completeness hostiles
-        run: python -O -m unittest -v tests.test_offline_history_completeness
+        run: >-
+          python -O -m unittest -v
+          tests.test_offline_history_completeness
+          tests.test_core_history_completeness
