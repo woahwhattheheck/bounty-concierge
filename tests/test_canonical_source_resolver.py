@@ -120,12 +120,38 @@ class CanonicalSourceResolverTests(unittest.TestCase):
                     result["reason_codes"], ["CANONICAL_SOURCE_MISSING"]
                 )
 
+    def test_unicode_token_contamination_does_not_resolve(self):
+        hostile = (
+            "éhttps://github.com/acme/widgets/issues/17",
+            "https://github.com/acme/widgets/issues/17é",
+            "αacme/widgets#17",
+            "acme/widgets#17α",
+            "\u0301https://github.com/acme/widgets/issues/17",
+            "acme/widgets#17\u0301",
+            "\u200dhttps://github.com/acme/widgets/issues/17",
+            "acme/widgets#17\u200d",
+        )
+        for body in hostile:
+            with self.subTest(body=body):
+                result = resolve_canonical_source(
+                    {
+                        "listing_url": "https://bounties.example/tasks/unicode-hostile",
+                        "body": body,
+                    }
+                )
+                self.assertFalse(result["resolved"])
+                self.assertEqual(
+                    result["reason_codes"], ["CANONICAL_SOURCE_MISSING"]
+                )
+
     def test_clean_text_references_after_punctuation_still_resolve(self):
         clean = (
             "Canonical (https://github.com/acme/widgets/issues/17).",
             "Canonical [acme/widgets#17].",
             "Canonical: https://github.com/acme/widgets/issues/17.",
             "Canonical: acme/widgets#17.",
+            "Canonical — https://github.com/acme/widgets/issues/17",
+            "Canonical — acme/widgets#17",
         )
         for body in clean:
             with self.subTest(body=body):
