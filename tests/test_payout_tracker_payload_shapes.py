@@ -19,7 +19,7 @@ def _response(payload):
 def test_pending_scalar_payloads_fail_closed(mock_get):
     for payload in (None, "pending", 7, True):
         mock_get.return_value = _response(payload)
-        with pytest.raises(payout_tracker.PayoutLookupError, match="pending payout response was malformed"):
+        with pytest.raises(payout_tracker.PayoutLookupError, match="history payout response was malformed"):
             payout_tracker.check_pending("alice", node_url="https://node")
 
 
@@ -39,7 +39,11 @@ def test_wrapped_payload_requires_list_value(mock_get):
     ):
         for value in (None, "oops", {"id": 1}, 7, True):
             mock_get.return_value = _response({key: value})
-            with pytest.raises(payout_tracker.PayoutLookupError, match=f"{key} payout response was malformed"):
+            expected_key = "history" if reader is payout_tracker.check_pending else key
+            with pytest.raises(
+                payout_tracker.PayoutLookupError,
+                match=f"{expected_key} payout response was malformed",
+            ):
                 reader("alice", node_url="https://node")
 
 
