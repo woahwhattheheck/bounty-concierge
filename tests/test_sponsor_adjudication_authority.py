@@ -1,8 +1,11 @@
 import copy
 import hashlib
+import json
 import os
+import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest.mock import patch
 
 from concierge import sponsor_adjudication as sa
@@ -21,6 +24,17 @@ def h(text):
 
 def utc_text(dt):
     return dt.astimezone(timezone.utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def canonical_sha(value):
+    payload = (json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def reseal_report(report):
+    core = {k: copy.deepcopy(v) for k, v in report.items() if k != "report_sha256"}
+    report["report_sha256"] = canonical_sha(core)
+    return report
 
 
 def base_manifest(events=True):
@@ -105,8 +119,10 @@ class SponsorAdjudicationAuthorityTests(unittest.TestCase):
         self.assertTrue(report["claim_units"][0]["sponsor_verified"])
         self.assertEqual(report["claim_units"][0]["action"], "WAIT_SPONSOR")
         authority = report["program"]["sponsor_authority"]
+        binding = report["sponsor_authority_binding"]
         self.assertEqual(authority["provider"], "gmail")
         self.assertEqual(authority["principal_sha256"], h("tokenjunkielabs@gmail.com"))
+        self.assertEqual(binding["manifest_sha256"], authority["manifest_sha256"])
         self.assertEqual(sa.verify_report(report)["report_sha256"], report["report_sha256"])
 
     def test_event_tamper_after_host_attestation_fails(self):
@@ -161,17 +177,58 @@ class SponsorAdjudicationAuthorityTests(unittest.TestCase):
         report = sa.compile_manifest(self.authorize(base_manifest()))
         forged = copy.deepcopy(report)
         forged["sponsor_events"][0]["source_ref"] = "mail:transplanted"
-        core = {k: copy.deepcopy(v) for k, v in forged.items() if k != "report_sha256"}
-        forged["report_sha256"] = hashlib.sha256(
-            ( __import__("json").dumps(core, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
-        ).hexdigest()
+        reseal_report(forged)
         with self.assertRaisesRegex(sa.AdjudicationError, "event scope mismatch"):
             sa.verify_report(forged)
+
+    def test_resealed_non_event_report_tamper_fails_generation_binding(self):
+        report = sa.compile_manifest(self.authorize(base_manifest()))
+        forged = copy.deepcopy(report)
+        forged["findings"][0]["title"] = "Forged historical title"
+        reseal_report(forged)
+        with self.assertRaisesRegex(sa.AdjudicationError, "report generation binding mismatch"):
+            sa.verify_report(forged)
+
+    def test_resealed_valid_enum_derived_action_tamper_fails_generation_binding(self):
+        report = sa.compile_manifest(self.authorize(base_manifest()))
+        forged = copy.deepcopy(report)
+        self.assertEqual(forged["claim_units"][0]["action"], "WAIT_SPONSOR")
+        forged["claim_units"][0]["action"] = "OWNER_REVIEW"
+        reseal_report(forged)
+        with self.assertRaisesRegex(sa.AdjudicationError, "report generation binding mismatch"):
+            sa.verify_report(forged)
+
+    def test_report_binding_transplant_fails(self):
+        first = sa.compile_manifest(self.authorize(base_manifest()))
+        second_manifest = base_manifest()
+        second_manifest["findings"][0]["title"] = "Different signed generation"
+        second = sa.compile_manifest(self.authorize(second_manifest))
+        forged = copy.deepcopy(second)
+        forged["sponsor_authority_binding"] = copy.deepcopy(first["sponsor_authority_binding"])
+        reseal_report(forged)
+        with self.assertRaises(sa.AdjudicationError):
+            sa.verify_report(forged)
+
+    def test_receipt_reseal_cannot_rebind_authority_manifest_generation(self):
+        manifest = self.authorize(base_manifest())
+        with tempfile.TemporaryDirectory() as tmp:
+            sa.write_artifacts(manifest, tmp)
+            receipt_path = Path(tmp) / "receipt.json"
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt["authority_manifest_sha256"] = "00" * 32
+            receipt["receipt_sha256"] = canonical_sha({k: copy.deepcopy(v) for k, v in receipt.items() if k != "receipt_sha256"})
+            receipt_path.write_text(
+                json.dumps(receipt, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(sa.AdjudicationError, "receipt/manifest binding mismatch"):
+                sa.verify_artifacts(tmp)
 
     def test_empty_event_generation_needs_no_authority(self):
         report = sa.compile_manifest(base_manifest(events=False))
         self.assertEqual(report["sponsor_events"], [])
         self.assertNotIn("sponsor_authority", report["program"])
+        self.assertIsNone(report["sponsor_authority_binding"])
         sa.verify_report(report)
 
     def test_empty_event_generation_rejects_meaningless_authority(self):
