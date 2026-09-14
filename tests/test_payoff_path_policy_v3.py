@@ -3,7 +3,9 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 import unittest
+from unittest.mock import patch
 
 from concierge import payoff_path_gate as gate
 
@@ -96,6 +98,17 @@ def document(events, *, budget, spent, generation=0, previous_receipt_sha256=Non
 
 class PayoffPathPolicyV3Tests(unittest.TestCase):
     def setUp(self):
+        # These are historical semantic fixtures for the landed v3 state machine,
+        # not current authority tests. Production/current v3 never enables this
+        # host-only switch; detached HMAC authority is covered separately.
+        self._unsigned = patch.dict(
+            os.environ,
+            {gate.PAYOFF_POLICY_TEST_UNSIGNED_ENV: "1"},
+            clear=False,
+        )
+        self._unsigned.start()
+        self.addCleanup(self._unsigned.stop)
+
         self.p0 = policy(
             "policy-0", 0, 60, "2026-09-13T12:30:00.000Z", evidence_sha=SHA_B
         )
