@@ -415,14 +415,13 @@ def _classify(row: dict[str, Any], snapshot: dict[str, Any], *, now: datetime, a
     ambiguous = branch_ambiguity + unlinked_relevant
 
     event: dict[str, Any] | None = None; reasons: list[str] = []; follow_up_due_at: datetime | None = None
-    if linked_human:
-        event = max(linked_human, key=_order_key); state = "HUMAN_REPLY"; reasons = ["AUTHORIZED_LINKED_HUMAN_REPLY"]
-    elif linked_unbound_human:
-        event = max(linked_unbound_human, key=_order_key); state = "HUMAN_REVIEW_REQUIRED"; reasons = ["LINKED_HUMAN_REPLY_FROM_UNBOUND_ROUTE"]
-    elif bounces:
-        event = max(bounces, key=_order_key); state = "ROUTE_REPAIR"; reasons = ["LATEST_OUTBOUND_BOUNCED"]
-    elif ambiguous:
-        event = max(ambiguous, key=_order_key); state = "HUMAN_REVIEW_REQUIRED"; reasons = ["UNLINKED_OR_AMBIGUOUS_SAME_THREAD_ACTIVITY"]
+    decisive: list[tuple[dict[str, Any], str, list[str]]] = []
+    decisive.extend((m, "HUMAN_REPLY", ["AUTHORIZED_LINKED_HUMAN_REPLY"]) for m in linked_human)
+    decisive.extend((m, "HUMAN_REVIEW_REQUIRED", ["LINKED_HUMAN_REPLY_FROM_UNBOUND_ROUTE"]) for m in linked_unbound_human)
+    decisive.extend((m, "ROUTE_REPAIR", ["LATEST_OUTBOUND_BOUNCED"]) for m in bounces)
+    decisive.extend((m, "HUMAN_REVIEW_REQUIRED", ["UNLINKED_OR_AMBIGUOUS_SAME_THREAD_ACTIVITY"]) for m in ambiguous)
+    if decisive:
+        event, state, reasons = max(decisive, key=lambda candidate: _order_key(candidate[0]))
     elif row["contact_policy"] == "wait_for_buyer_event":
         if linked_auto:
             event = max(linked_auto, key=_order_key); reasons.append("LINKED_AUTOMATED_ACK_PRESENT")
