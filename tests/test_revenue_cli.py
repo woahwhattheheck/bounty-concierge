@@ -25,6 +25,19 @@ class RevenueCliTests(unittest.TestCase):
             del revenue_cli.COMMANDS["cash-cycle"]
         self.assertIs(revenue_cli.COMMANDS["cash-cycle"], original)
 
+    def test_public_record_object_setattr_cannot_mutate_routing(self):
+        public = revenue_cli.COMMANDS["cash-cycle"]
+        with self.assertRaises(AttributeError):
+            object.__setattr__(public, "module", "os")
+        private = revenue_cli._lookup_command("cash-cycle")
+        self.assertIsNot(private, public)
+        self.assertEqual(private.module, "concierge.cash_cycle_review")
+
+        fake = types.SimpleNamespace(main=lambda argv: 0)
+        with mock.patch.object(revenue_cli.importlib, "import_module", return_value=fake) as importer:
+            self.assertEqual(revenue_cli.run(["cash-cycle"]), 0)
+        importer.assert_called_once_with("concierge.cash_cycle_review")
+
     def test_rebinding_public_discovery_view_cannot_inject_route(self):
         injected = {"evil": revenue_cli.RevenueCommand("os", "Nope.")}
         err = io.StringIO()
