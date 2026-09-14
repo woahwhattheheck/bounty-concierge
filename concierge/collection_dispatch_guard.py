@@ -21,6 +21,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import unicodedata
 from typing import Any, Iterable, Mapping, Optional, Sequence
 
 from concierge.collection_request import (
@@ -113,6 +114,11 @@ def _packet_binding(packet: Any) -> dict[str, Any]:
     if type(work) is not dict:
         _fail("PACKET_WORK_INVALID")
     repo = _text(work.get("repo"), "work.repo", limit=200)
+    sponsor_name = _text(source.get("sponsor_name"), "sponsor_name", limit=160)
+    sponsor_key = unicodedata.normalize("NFKC", sponsor_name).casefold()
+    if not sponsor_key:
+        _fail("SPONSOR_IDENTITY_INVALID")
+    sponsor_id = _digest({"sponsor": sponsor_key})[:16]
     pr = work.get("pr")
     if type(pr) is not int or pr <= 0:
         _fail("PACKET_PR_INVALID")
@@ -125,16 +131,19 @@ def _packet_binding(packet: Any) -> dict[str, Any]:
     else:  # verify_collection_request should already make this unreachable.
         _fail("PACKET_DISPOSITION_INVALID")
 
-    # GitHub repository identity is case-insensitive. Crucially, the work/phase
-    # identity does NOT include recipient, outbound provider, packet receipt, or
-    # payout route. Regenerating a packet or choosing another provider therefore
-    # cannot mint a second writer for the same collection operation.
+    # GitHub repository identity is case-insensitive. Sponsor identity is
+    # normalized with NFKC + casefold so presentation casing/width cannot mint
+    # another writer, while distinct sponsors remain independently collectible.
+    # Crucially, identity does NOT include recipient, outbound provider, packet
+    # receipt, or payout route. Regenerating a packet or choosing another
+    # provider therefore cannot mint a second writer for the same sponsor/work
+    # collection operation.
     work_identity = {"repo": repo.casefold(), "pr": pr}
     work_id = _digest(work_identity)[:24]
-    offer_key = f"collection:{phase}:{work_id}"
+    offer_key = f"collection:{phase}:{work_id}:{sponsor_id}"
     identity = normalize_identity(
         provider="collection-federation",
-        destination=f"work:{work_id}",
+        destination=f"work:{work_id}:sponsor:{sponsor_id}",
         thread=f"collection:{phase}",
         operation="dispatch",
     )
@@ -144,6 +153,7 @@ def _packet_binding(packet: Any) -> dict[str, Any]:
         "pr": pr,
         "phase": phase,
         "work_id": work_id,
+        "sponsor_id": sponsor_id,
         "offer_key": offer_key,
         "singlewriter_identity": identity.canonical,
         "operation_key": identity.key,
@@ -151,7 +161,7 @@ def _packet_binding(packet: Any) -> dict[str, Any]:
 
 
 def derive_collection_dispatch_identity(packet: Any) -> dict[str, Any]:
-    """Return the stable work/phase identity used by every collision fence."""
+    """Return the stable sponsor/work/phase identity used by every collision fence."""
     binding = _packet_binding(packet)
     return {
         "schema": SCHEMA,
@@ -160,6 +170,7 @@ def derive_collection_dispatch_identity(packet: Any) -> dict[str, Any]:
         "pr": binding["pr"],
         "phase": binding["phase"],
         "work_id": binding["work_id"],
+        "sponsor_id": binding["sponsor_id"],
         "offer_key": binding["offer_key"],
         "operation_key": binding["operation_key"],
         "singlewriter_identity": dict(binding["singlewriter_identity"]),
@@ -240,6 +251,7 @@ def authorize_collection_dispatch(
             "pr": binding["pr"],
             "phase": binding["phase"],
             "work_id": binding["work_id"],
+            "sponsor_id": binding["sponsor_id"],
         },
         "offer_key": binding["offer_key"],
         "operation_key": binding["operation_key"],
@@ -257,7 +269,8 @@ def authorize_collection_dispatch(
             "provider_census_required": True,
             "shared_claim_required": True,
             "local_singlewriter_lease_required": True,
-            "recipient_independent_work_phase_identity": True,
+            "recipient_independent_sponsor_work_phase_identity": True,
+            "distinct_sponsors_remain_collectible": True,
             "external_send_performed": False,
             "provider_mutation_performed": False,
             "claim_submission_performed": False,
