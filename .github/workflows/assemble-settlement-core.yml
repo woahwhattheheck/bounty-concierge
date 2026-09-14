@@ -4,12 +4,16 @@ on:
   push:
     branches:
       - zaq-h8r6/settlement-core-completeness-20260914
+  pull_request:
+    branches:
+      - main
+    types: [opened, reopened, synchronize]
 
 permissions:
   contents: write
 
 concurrency:
-  group: assemble-settlement-core-${{ github.ref }}
+  group: assemble-settlement-core-${{ github.event.pull_request.head.ref || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -17,9 +21,13 @@ jobs:
     if: ${{ github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      TARGET_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
@@ -28,7 +36,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
           test -f .bootstrap/settlement_core.b64.00
           test -f .bootstrap/settlement_core.b64.01
           test -f .bootstrap/settlement_core.b64.02
@@ -70,8 +78,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          remote_before="$(git ls-remote origin "refs/heads/$GITHUB_REF_NAME" | cut -f1)"
-          test "$remote_before" = "$GITHUB_SHA"
+          remote_before="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)"
+          test "$remote_before" = "$EXPECTED_SHA"
           rm -rf .bootstrap
           rm .github/workflows/assemble-settlement-core.yml
           git config user.name 'github-actions[bot]'
@@ -79,4 +87,4 @@ jobs:
           git add -A
           git diff --cached --check
           git commit -m 'fix(revenue): enforce completeness in authoritative settlement core'
-          git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
