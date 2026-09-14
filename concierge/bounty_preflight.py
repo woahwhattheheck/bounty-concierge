@@ -4,15 +4,17 @@
 ``bounty_audit`` establishes canonical issue/PR state and
 ``bounty_qualification`` decides whether work is safe to dispatch. This module
 fills the missing ``attempt_count`` input from canonical GitHub issue comments,
-binds formal GitHub assignment state, authority-binds maintainer contribution
-terms for credential safety, and revalidates the canonical issue/comment
-generation immediately before an ACTIONABLE dispatch decision is returned.
+binds formal GitHub assignment state to authenticated operator identity,
+authority-binds maintainer contribution terms for credential safety, and
+revalidates the canonical issue/comment generation immediately before an
+ACTIONABLE dispatch decision is returned.
 """
 
 from __future__ import annotations
 
 import argparse
 from copy import deepcopy
+import hashlib
 import json
 import re
 from typing import Any
@@ -32,6 +34,7 @@ from concierge.credential_safety import (
 
 
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
+_AUTHENTICATED_USER_URL = "https://api.github.com/user"
 _ATTEMPT_COMMAND_RE = re.compile(
     r"(?im)^\s*/(?:attempt(?:\s+#?\d+)?|claim(?:\s+#?\d+)?|opire\s+try)(?:\s|$)"
 )
@@ -163,6 +166,39 @@ def _normalized_operator_login(operator_login: str | None) -> str | None:
     return operator_login.strip().casefold()
 
 
+def _authenticated_operator_login(
+    session: Any,
+    *,
+    headers: dict[str, str],
+    token: str | None,
+    asserted_login: str | None,
+) -> str | None:
+    """Return the same-token GitHub principal; an assertion never authorizes alone."""
+    asserted = _normalized_operator_login(asserted_login)
+    if not token:
+        if asserted is not None:
+            raise BountyPreflightError(
+                "operator_login requires an authenticated GitHub token"
+            )
+        return None
+
+    payload = _object_payload(
+        _get_json(session, _AUTHENTICATED_USER_URL, headers=headers),
+        "authenticated user",
+    )
+    login = payload.get("login")
+    if not isinstance(login, str) or not login.strip():
+        raise BountyPreflightError(
+            "GitHub authenticated user response did not contain a non-empty login"
+        )
+    authenticated = login.strip().casefold()
+    if asserted is not None and asserted != authenticated:
+        raise BountyPreflightError(
+            "operator_login did not match authenticated GitHub identity"
+        )
+    return authenticated
+
+
 def _assignee_state(
     issue: dict[str, Any], operator_login: str | None
 ) -> dict[str, Any]:
@@ -263,18 +299,56 @@ def _issue_generation_marker(issue: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
-def _comment_generation_entry(comment: dict[str, Any]) -> tuple[int, str] | None:
+def _comment_generation_entry(comment: dict[str, Any]) -> tuple[int, str, str] | None:
+    """Bind every field that can change claim/maintainer classification, privately."""
     comment_id = comment.get("id")
     updated_at = comment.get("updated_at")
+    body = comment.get("body")
+    association = comment.get("author_association")
+    user = comment.get("user")
+    if body is None:
+        body = ""
+    if association is not None and not isinstance(association, str):
+        return None
+    if user is not None and not isinstance(user, dict):
+        return None
     if (
         isinstance(comment_id, bool)
         or not isinstance(comment_id, int)
         or comment_id <= 0
         or not isinstance(updated_at, str)
         or not updated_at
+        or not isinstance(body, str)
     ):
         return None
-    return comment_id, updated_at
+
+    login: str | None = None
+    user_type: str | None = None
+    if isinstance(user, dict):
+        raw_login = user.get("login")
+        raw_type = user.get("type")
+        if raw_login is not None and not isinstance(raw_login, str):
+            return None
+        if raw_type is not None and not isinstance(raw_type, str):
+            return None
+        login = raw_login
+        user_type = raw_type
+
+    projection = {
+        "author_association": association,
+        "body": body,
+        "user_login": login,
+        "user_type": user_type,
+    }
+    semantic_digest = hashlib.sha256(
+        json.dumps(
+            projection,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+    ).hexdigest()
+    return comment_id, updated_at, semantic_digest
 
 
 def _collect_comment_generation(
@@ -284,11 +358,11 @@ def _collect_comment_generation(
     *,
     session: Any,
     max_pages: int,
-) -> tuple[tuple[tuple[int, str], ...], bool]:
-    """Read a privacy-safe exact issue-comment generation marker."""
+) -> tuple[tuple[tuple[int, str, str], ...], bool]:
+    """Read a privacy-safe content/authority-bound issue-comment generation marker."""
     headers = _headers(token or GITHUB_TOKEN)
     comments_url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
-    entries: list[tuple[int, str]] = []
+    entries: list[tuple[int, str, str]] = []
     for page in range(1, max_pages + 1):
         payload = _get_json(
             session,
@@ -324,7 +398,7 @@ def _canonical_generation_stable(
     session: Any,
     max_pages: int,
     issue_snapshot: dict[str, Any],
-    comment_generation: tuple[tuple[int, str], ...] | None,
+    comment_generation: tuple[tuple[int, str, str], ...] | None,
 ) -> bool:
     """Revalidate the exact issue/comment generation before dispatch authority."""
     if comment_generation is None:
@@ -516,12 +590,23 @@ def _collect_issue_context_with_snapshot(
         raise BountyPreflightError(
             f"GitHub issue body was not a string for {repo}#{number}"
         )
-    assignee_state = _assignee_state(issue, operator_login)
+
+    anonymous_assignee_state = _assignee_state(issue, None)
+    if anonymous_assignee_state["formal_assignee_count"] > 0:
+        authenticated_operator = _authenticated_operator_login(
+            session,
+            headers=headers,
+            token=token,
+            asserted_login=operator_login,
+        )
+        assignee_state = _assignee_state(issue, authenticated_operator)
+    else:
+        assignee_state = anonymous_assignee_state
 
     claimant_logins: set[str] = set()
     attempt_signal_count = 0
     comments_truncated = False
-    comment_generation: list[tuple[int, str]] = []
+    comment_generation: list[tuple[int, str, str]] = []
     comment_generation_complete = True
     credential_signals: set[str] = set()
     if _has_maintainer_authority(issue):
@@ -597,9 +682,10 @@ def collect_issue_context(
 
     External comments contribute only to ``attempt_count``. Raw external comment
     text is never forwarded into qualification. OWNER/MEMBER/COLLABORATOR terms
-    are reduced immediately to generic credential-safety signals, and assignees
-    are reduced to counts/operator-membership from the same captured issue
-    generation, so raw identities never leave the collection boundary.
+    are reduced immediately to generic credential-safety signals. Formal
+    assignment is reduced to counts and membership against the authenticated
+    same-token GitHub principal; a caller-supplied login is only an assertion.
+    Raw identities never leave the collection boundary.
     """
     context, _issue_snapshot = _collect_issue_context_with_snapshot(
         repo,
@@ -626,9 +712,11 @@ def preflight_bounty(
 
     Issue-derived qualification metadata, formal assignment, credential authority,
     and canonical issue state are bound to one captured GitHub issue generation.
-    PR competition and maintainer-comment reads remain live. Before an actionable
-    result is returned, the issue authority fields and exact comment ID/update
-    generation are re-read and must still match the original snapshot.
+    Formal assignment can be treated as operator-owned only when the same token's
+    authenticated GitHub principal matches; ``operator_login`` is never authority
+    by itself. PR competition and maintainer-comment reads remain live. Before an
+    actionable result is returned, the issue authority fields and privacy-safe
+    content/authority-bound comment generation are re-read and must still match.
     """
     context, issue_snapshot = _collect_issue_context_with_snapshot(
         repo,
@@ -724,8 +812,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--operator-login",
         help=(
-            "GitHub login that may already own the issue; when omitted, any formal "
-            "assignee holds dispatch"
+            "Optional assertion of the authenticated GitHub login for formal "
+            "assignment; it never authorizes dispatch by itself"
         ),
     )
     parser.add_argument("--json", action="store_true", help="Emit full safe JSON result")
