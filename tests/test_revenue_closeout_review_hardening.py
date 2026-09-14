@@ -33,6 +33,12 @@ class FakeSession:
             payload = self.routes[key]
         elif url in self.routes:
             payload = self.routes[url]
+        elif (
+            "/pulls/" in url
+            and url.endswith("/comments")
+            and params == {"per_page": 100, "page": 1}
+        ):
+            payload = []
         else:
             raise AssertionError(f"unexpected GET {url} params={params}")
         return FakeResponse(payload)
