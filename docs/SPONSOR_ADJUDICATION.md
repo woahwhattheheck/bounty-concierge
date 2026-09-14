@@ -20,14 +20,43 @@ This module is evidence custody only. It cannot:
 
 Every report and receipt carries those authority flags as `false` and verification rejects escalation.
 
+### Sponsor-origin evidence is host-authorized, not caller-asserted
+
+A manifest's `source_ref` and `source_sha256` fields are **not** authority by themselves. For every non-empty `sponsor_events` generation, the credential-owning host must first reacquire the sponsor evidence, then attach a fresh `sponsor_authority` record. Compilation fails closed when that record is absent, stale, future-dated, signed by the wrong host identity, transplanted to another event generation, or transplanted to another manifest generation.
+
+The host authority binds:
+
+- purpose `bounty-sponsor-adjudication-event-authority/v1`;
+- an authorized provider ID;
+- an authorized principal SHA-256 (never a raw mailbox/token in the report);
+- second-precision UTC `captured_at` with a 300-second compile freshness window;
+- `event_scope_sha256`, covering program identity plus the complete normalized sponsor-event generation;
+- `manifest_sha256`, covering the entire authority-free manifest generation; and
+- `signature_sha256`, HMAC-SHA256 over the preceding authority record.
+
+Host configuration is environment-owned, not accepted as a caller argument:
+
+```text
+BOUNTY_SPONSOR_ADJUDICATION_HMAC_KEY_HEX
+BOUNTY_SPONSOR_ADJUDICATION_AUTHORIZED_PROVIDER
+BOUNTY_SPONSOR_ADJUDICATION_AUTHORIZED_PRINCIPAL_SHA256
+```
+
+The HMAC key must be at least 32 bytes. A trusted adapter may use `authority.sign_for_test_or_host_fixture(...)` **only after the credential-owning host has reacquired the evidence**. The helper proves possession of host configuration; it does not perform provider acquisition itself.
+
+`BOUNTY_SPONSOR_ADJUDICATION_TEST_ONLY_ALLOW_UNSIGNED=1` exists solely so the predecessor semantic regression suite can replay unsigned historical fixtures. It is an explicit host-environment bypass and must never be set by production jobs.
+
+The retained authority record is embedded under `report.program.sponsor_authority`; the report digest and receipt file digests therefore bind it durably. Public `verify_report` / `verify_artifacts` verify the HMAC and exact retained event scope historically. Historical verification deliberately does not reapply the 300-second freshness window: freshness is an ingestion property, while signature/event-scope integrity must remain verifiable later.
+
 ## Input model
 
-The strict JSON manifest has four parts:
+The strict JSON manifest has five logical parts:
 
 1. `program`: stable program identity, sponsor display name, and program source reference.
 2. `findings`: immutable finding IDs, SHA-256 fingerprints, titles, submitter labels, and retained evidence refs.
 3. `submissions`: exact submission receipts with one or more finding IDs and canonical UTC submission time.
 4. `sponsor_events`: retained sponsor-origin evidence with unique event IDs, evidence digests, canonical UTC time, and sponsor claim-unit identity.
+5. `sponsor_authority`: required only when `sponsor_events` is non-empty; host HMAC authority for that exact current generation.
 
 Supported sponsor event types:
 
@@ -63,16 +92,19 @@ Claim units use only:
 
 The deterministic action vocabulary is:
 
-- `WAIT_SPONSOR`: sponsor has received/verified/adjudicating evidence; do not create another outbound touch.
-- `DO_NOT_RESUBMIT`: sponsor authority already covers the finding, or a unit is declined/duplicate.
+- `WAIT_SPONSOR`: host-authorized sponsor evidence says received/verified/adjudicating; do not create another outbound touch.
+- `DO_NOT_RESUBMIT`: host-authorized sponsor authority already covers the finding, or a unit is declined/duplicate.
 - `OWNER_REVIEW`: no sponsor response yet, a reward needs human review, or a payment report still needs independent cash evidence.
 
-Finding-level output becomes `DO_NOT_RESUBMIT` as soon as sponsor-received evidence covers it. This is intentionally stronger than the unit-level `WAIT_SPONSOR` label: the unit may be waiting, while each already-covered finding should not be filed again.
+Finding-level output becomes `DO_NOT_RESUBMIT` as soon as host-authorized sponsor-received evidence covers it. This is intentionally stronger than the unit-level `WAIT_SPONSOR` label: the unit may be waiting, while each already-covered finding should not be filed again.
 
 ## Fail-closed rules
 
 The compiler rejects, among other cases:
 
+- non-empty sponsor events without current host authority;
+- wrong provider/principal, invalid HMAC, stale/future capture, or authority replay/transplant;
+- event-scope or full manifest mutation after host attestation;
 - duplicate JSON keys, floats, `NaN`, and `Infinity`;
 - unknown schema fields;
 - duplicate IDs or two finding IDs sharing one fingerprint;
@@ -89,7 +121,7 @@ The output does not infer cash under any state.
 
 ## Deterministic outputs
 
-Compile:
+Compile after the trusted host has attached `sponsor_authority`:
 
 ```bash
 python -m concierge.sponsor_adjudication compile manifest.json --out-dir ./adjudication-out
@@ -97,22 +129,22 @@ python -m concierge.sponsor_adjudication compile manifest.json --out-dir ./adjud
 
 The compiler writes:
 
-- `adjudication.json` — canonical machine report with `report_sha256`;
+- `adjudication.json` — canonical machine report with `report_sha256` and retained sponsor authority;
 - `claim_units.csv` — spreadsheet-safe unit table;
 - `adjudication.md` — human review packet; and
 - `receipt.json` — manifest/report/file digest binding plus all-false authority ceiling.
 
-Verify later, offline:
+Verify later:
 
 ```bash
 python -m concierge.sponsor_adjudication verify ./adjudication-out
 ```
 
-An exact manifest recompiles byte-for-byte. The verifier re-hashes every emitted file and verifies report/receipt authority ceilings.
+The public verifier re-hashes every emitted file, verifies report/receipt authority ceilings, verifies the retained host HMAC, and rebinds that HMAC to the exact sponsor-event scope carried in the report. It is a historical verification; it does not pretend to reacquire a provider message at verification time.
 
 ## Example: verified findings, one deduped set, reward pending
 
-A sponsor response saying “the concrete findings are verified; we are adjudicating one deduplicated set; reward breakdown pending” should be represented with one `SPONSOR_VERIFIED` event binding every covered finding to one claim unit followed by `ADJUDICATION_STARTED`.
+A sponsor response saying “the concrete findings are verified; we are adjudicating one deduplicated set; reward breakdown pending” should be represented with one `SPONSOR_VERIFIED` event binding every covered finding to one claim unit followed by `ADJUDICATION_STARTED`, then host-authorized only after that evidence has been reacquired at the trusted provider boundary.
 
 The result is:
 
@@ -123,4 +155,4 @@ The result is:
 - finding action `DO_NOT_RESUBMIT`; and
 - `cash_status=not_inferred` everywhere.
 
-That is exactly the intended boundary: preserve sponsor truth, stop duplicate outbound work, and wait for the sponsor without minting a reward or payment claim.
+That is exactly the intended boundary: preserve sponsor truth, stop duplicate outbound work, and wait for the sponsor without letting caller-authored JSON mint a reward or payment claim.
