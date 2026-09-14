@@ -51,7 +51,7 @@ The target's own parser remains authoritative for its arguments, compile/verify 
 
 ## Boundary and failure behavior
 
-The routing authority is a private immutable tuple of frozen command records captured by the lookup helpers. The exported `COMMANDS` object is a read-only `MappingProxyType` discovery view; callers cannot mutate it, and rebinding that public view does not change the route table used by `run()`. User input is never interpreted as an arbitrary Python module path.
+The routing authority is captured as a private tuple containing only immutable string primitives: target name, module path, and summary. Lookup helpers capture that primitive tuple as their default table and construct a fresh tuple-backed `RevenueCommand` only after a target matches. The exported `COMMANDS` object is a separately materialized read-only `MappingProxyType` whose values are immutable `NamedTuple` records; it shares no command object with the routing table trusted by `run()`. Assignment, deletion, public-view rebinding, and `object.__setattr__` against a public record therefore cannot alter the module path used for routing. User input is never interpreted as an arbitrary Python module path.
 
 Targets are imported lazily only after a known target is selected. Unknown targets, missing modules, modules without callable `main(argv)`, and ordinary exceptions raised during module import or entrypoint resolution fail closed with exit code `2`. Import/resolution exception text is not echoed because module initializers and import hooks can include machine paths or credential-like environment data. This sanitizing boundary ends before the target is invoked.
 
