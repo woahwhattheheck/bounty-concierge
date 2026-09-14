@@ -11,7 +11,7 @@ The decision has two separate input planes:
 1. **Request evidence** — auditable source/rule/submission/capture material. Treat this JSON as attacker-controlled.
 2. **Retained verifier authority** — `distribution-fulfillment-authority/v2`, authenticated with HMAC-SHA256 under a host key retained outside the request/authority caller's control.
 
-A capture self-hash is only an integrity checksum. It is **not provenance**. READY is impossible unless the retained authority authenticates the exact normalized source snapshot, maintainer rule, submission packet, live capture, verifier identity, canonical provider namespace, provider resource identity, content digest, issuance time, and active key ID.
+A capture self-hash is only an integrity checksum. It is **not provenance**. READY is impossible unless the retained authority authenticates the exact advertised-reward text plus the normalized source snapshot, maintainer rule, submission packet, live capture, verifier identity, canonical provider namespace, provider resource identity, content digest, issuance time, and active key ID.
 
 The production CLI never accepts:
 
@@ -21,7 +21,7 @@ The production CLI never accepts:
 - a key ID;
 - an evaluation timestamp.
 
-On POSIX, it reads the active key only from:
+The retained-authority CLI is intentionally POSIX-only so authority files can be acquired with descriptor-relative `O_NOFOLLOW` semantics. It reads the active key only from:
 
 ```text
 /var/lib/bounty-concierge/distribution-fulfillment/authority-key.json
@@ -33,9 +33,9 @@ and source-derived records only from:
 /var/lib/bounty-concierge/distribution-fulfillment/records/<sha256(canonical-source-url)>.json
 ```
 
-On Windows, the equivalent fixed root is `C:\ProgramData\bounty-concierge\distribution-fulfillment`.
+Non-POSIX retained-authority execution fails closed rather than falling back to check-then-open pathname semantics.
 
-The key and retained record files must be regular non-symlink files and, on POSIX, must exclude group/other permissions. Deploy the fixed root under an operator/service account boundary whose untrusted request producer cannot write. The HMAC key file is exactly:
+Each key/record read first opens its trusted parent directory with `O_DIRECTORY|O_NOFOLLOW`, verifies owner/mode policy, retains that directory descriptor, then opens the final regular file relative to that descriptor with `O_NOFOLLOW` and reads from the held file descriptor. Parent path rebinding after acquisition therefore cannot redirect the read. Trusted parents must not be group/other writable; retained files must exclude all group/other permission bits. Deploy the fixed root under an operator/service account boundary whose untrusted request producer cannot write. The HMAC key file is exactly:
 
 ```json
 {
@@ -51,7 +51,8 @@ A trusted capture/verifier integration can call `issue_authority_record(...)` wi
 
 For a request with a live capture, the authenticated record binds:
 
-- canonical source URL;
+- canonical source URL after case-folding GitHub owner/repository identity;
+- exact accepted advertised-reward plain-decimal text;
 - normalized source snapshot SHA-256 projection;
 - normalized maintainer-rule SHA-256 projection;
 - normalized submission-packet SHA-256 projection;
@@ -96,7 +97,7 @@ The single-request receipt is immutable; queue-level collision policy lives in s
 
 `distribution-fulfillment-request/v1` contains:
 
-- canonical GitHub issue URL and exact advertised-reward decimal string;
+- canonical GitHub issue identity (owner/repository case-folded so route aliases dedupe) and a bounded, non-negative **plain** advertised-reward decimal string (no exponent notation);
 - source state, labels, update/capture times, and snapshot SHA-256;
 - maintainer-rule comment on that issue, capture time, live-URL requirement, allowed off-platform hosts, and rule digests;
 - a human-only `bounty-submission-packet-item/v1` that cannot infer acceptance/payout/cash;
@@ -164,5 +165,7 @@ Input JSON rejects duplicate object keys. Timestamps use canonical UTC second pr
 - host/redirect/resource validation;
 - duplicate JSON keys and non-finite JSON;
 - CLI rejection of caller-supplied authority paths;
-- POSIX private-file/symlink fences;
+- POSIX retained-descriptor private-file/symlink fences and adversarial parent-path rebinding;
+- authenticated reward tamper and exponent-expansion denial;
+- GitHub owner/repository case-alias collapse across retained paths and queue claim units;
 - source-derived retained-record paths.
