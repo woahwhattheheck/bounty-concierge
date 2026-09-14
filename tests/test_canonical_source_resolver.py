@@ -54,6 +54,20 @@ class CanonicalSourceResolverTests(unittest.TestCase):
         self.assertEqual(result["canonical_repo"], "acme/widgets")
         self.assertEqual(result["issue_number"], 17)
 
+    def test_case_aliases_collapse_to_one_github_identity(self):
+        result = resolve_canonical_source(
+            {
+                "listing_url": "https://bounties.example/tasks/widget-17",
+                "source_urls": [
+                    "https://github.com/Acme/Widgets/issues/17",
+                    "https://github.com/acme/widgets/issues/17",
+                ],
+            }
+        )
+        self.assertTrue(result["resolved"])
+        self.assertEqual(result["canonical_repo"], "acme/widgets")
+        self.assertEqual(result["signals"]["candidate_count"], 1)
+
     def test_external_mirror_can_resolve_full_issue_url_from_text(self):
         result = resolve_canonical_source(
             {
@@ -75,6 +89,27 @@ class CanonicalSourceResolverTests(unittest.TestCase):
         )
         self.assertTrue(result["resolved"])
         self.assertEqual(result["issue_number"], 17)
+
+    def test_text_reference_prefixes_do_not_resolve(self):
+        hostile = (
+            "https://github.com/acme/widgets/issues/17evil",
+            "https://github.com/acme/widgets/issues/17?redirect=mirror",
+            "https://github.com/acme/widgets/issues/17/extra",
+            "acme/widgets#17evil",
+            "acme/widgets#17-extra",
+        )
+        for body in hostile:
+            with self.subTest(body=body):
+                result = resolve_canonical_source(
+                    {
+                        "listing_url": "https://bounties.example/tasks/hostile",
+                        "body": body,
+                    }
+                )
+                self.assertFalse(result["resolved"])
+                self.assertEqual(
+                    result["reason_codes"], ["CANONICAL_SOURCE_MISSING"]
+                )
 
     def test_multiple_explicit_sources_hold_instead_of_guessing(self):
         result = resolve_canonical_source(
