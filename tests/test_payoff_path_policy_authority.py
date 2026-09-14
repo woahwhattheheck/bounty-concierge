@@ -17,6 +17,7 @@ SHA_C = "c" * 64
 SHA_D = "d" * 64
 KEY_HEX = "11" * 32
 PRINCIPAL = "22" * 32
+FORMER_UNSIGNED_ENV = "BOUNTY_PAYOFF_POLICY_TEST_ONLY_ALLOW_UNSIGNED"
 
 
 def canonical_digest(value):
@@ -148,7 +149,7 @@ class PayoffPathPolicyAuthorityTests(unittest.TestCase):
         self.addCleanup(self._env.stop)
         os.environ.pop(gate.PAYOFF_POLICY_CAPTURED_AT_ENV, None)
         os.environ.pop(gate.PAYOFF_POLICY_SIGNATURE_ENV, None)
-        os.environ.pop(gate.PAYOFF_POLICY_TEST_UNSIGNED_ENV, None)
+        os.environ.pop(FORMER_UNSIGNED_ENV, None)
 
     def _authorize(self, doc, captured=None):
         values = gate.sign_current_policy_authority_for_host_fixture(
@@ -189,6 +190,13 @@ class PayoffPathPolicyAuthorityTests(unittest.TestCase):
     def test_current_v3_rejects_without_detached_host_signature(self):
         with self.assertRaisesRegex(gate.PayoffPathError, "detached host authority"):
             gate.compile_gate(self.doc0)
+
+    def test_removed_unsigned_env_name_cannot_disable_authority(self):
+        os.environ[FORMER_UNSIGNED_ENV] = "1"
+        with self.assertRaisesRegex(gate.PayoffPathError, "detached host authority"):
+            gate.compile_gate(self.doc0)
+        with self.assertRaisesRegex(gate.PayoffPathError, "detached host authority"):
+            gate.verify_gate(self.doc0, {}, "", {})
 
     def test_caller_selected_trusted_clock_does_not_bypass_authority(self):
         with self.assertRaisesRegex(gate.PayoffPathError, "detached host authority"):
