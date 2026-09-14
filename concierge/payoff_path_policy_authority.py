@@ -131,18 +131,12 @@ def _signature_payload(
     }
 
 
-def sign_current_policy_authority_for_host_fixture(
+def _sign_current_policy_authority_for_host_fixture(
     document: Any,
     *,
     captured_at_utc: str | None = None,
 ) -> dict[str, str]:
-    """Return detached environment fields for a trusted host authorization.
-
-    This helper cannot grant authority without the host-held HMAC key and authorized
-    identity already present in environment. Trusted host adapters/tests may use it
-    after owner approval of the exact normalized policy generation. The returned
-    mapping contains no secret key.
-    """
+    """Private trusted-host/test fixture signer; never exported through gate."""
 
     key, provider, principal = _host_identity()
     if captured_at_utc is None:
@@ -247,9 +241,6 @@ def install() -> None:
     _core.PAYOFF_POLICY_SIGNATURE_ENV = SIGNATURE_ENV
     _core.PAYOFF_POLICY_AUTHORITY_SCOPE = policy_authority_scope
     _core.PAYOFF_POLICY_AUTHORITY_SCOPE_SHA256 = policy_authority_scope_sha256
-    _core.sign_current_policy_authority_for_host_fixture = (
-        sign_current_policy_authority_for_host_fixture
-    )
     _core.verify_current_policy_authority = verify_current_policy_authority
 
     _core.compile_gate.__doc__ = (
@@ -271,7 +262,6 @@ __all__ = [
     "SIGNATURE_ENV",
     "policy_authority_scope",
     "policy_authority_scope_sha256",
-    "sign_current_policy_authority_for_host_fixture",
     "verify_current_policy_authority",
     "install",
 ]
