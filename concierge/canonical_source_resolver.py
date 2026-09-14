@@ -26,10 +26,11 @@ _ISSUE_PATH_RE = re.compile(
     r"\A/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)/?\Z"
 )
 # Text extraction must consume a complete token, never a valid-looking suffix
-# or prefix embedded inside a longer URL/reference token.  The guards are
-# deliberately symmetric across URL and qualified-reference extraction.
+# or prefix embedded inside a longer URL/reference token. The left guard blocks
+# embedded starts; the right guard permits sentence-ending '.' but rejects a dot
+# when it continues into another identifier component (for example ``17.evil``).
 _TEXT_REF_PREFIX_GUARD = r"(?<![A-Za-z0-9_./?#%=&+~-])"
-_TEXT_REF_SUFFIX_GUARD = r"(?![A-Za-z0-9_./?#%=&+~-])"
+_TEXT_REF_SUFFIX_GUARD = r"(?![A-Za-z0-9_/?#%=&+~-]|\.[A-Za-z0-9_.-])"
 _FULL_ISSUE_URL_RE = re.compile(
     _TEXT_REF_PREFIX_GUARD
     + r"https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)"
