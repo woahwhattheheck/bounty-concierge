@@ -117,8 +117,10 @@ class PayoffPathPolicyV3Tests(unittest.TestCase):
 
     def test_generation_zero_stop_is_evidence_bound_and_verifiable(self):
         self.assertEqual("payoff-path-gate/v3", self.packet0["schema"])
-        self.assertEqual("CHAINED_POLICY_EVIDENCE", self.packet0["continuity"]["mode"])
+        self.assertEqual("CHAINED", self.packet0["continuity"]["mode"])
         self.assertEqual("STOP_UNPAID_WORK", self.packet0["results"][0]["state"])
+        self.assertIn("Continuity: CHAINED ledger", self.markdown0)
+        self.assertNotIn("MISSING_HISTORY_FAIL_CLOSED", self.markdown0)
         self.assertTrue(
             gate.verify_gate(self.doc0, self.packet0, self.markdown0, self.receipt0, AS_OF)
         )
