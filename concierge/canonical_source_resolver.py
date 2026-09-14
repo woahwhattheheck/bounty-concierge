@@ -14,7 +14,6 @@ still pass ``revenue_intake.qualify_live_revenue_intake`` before dispatch.
 from __future__ import annotations
 
 import re
-import unicodedata
 from typing import Any
 from urllib.parse import SplitResult, urlsplit
 
@@ -28,8 +27,8 @@ _ISSUE_PATH_RE = re.compile(
 )
 # Regex guards cheaply reject ASCII token smuggling. A second Unicode-aware
 # boundary check below is authoritative for free-text candidates, because Python
-# character classes that enumerate ASCII cannot recognize letters/marks such as
-# ``é``, ``α``, combining marks, or zero-width joiners as token continuations.
+# character classes that enumerate ASCII cannot recognize Unicode identifier
+# continuation such as letters, marks, joiners, or Other_ID_Continue codepoints.
 _TEXT_REF_TOKEN_CHARS = r"A-Za-z0-9_./?#%=&+~-"
 _TEXT_REF_NON_DOT_TOKEN_CHARS = r"A-Za-z0-9_/?#%=&+~-"
 _TEXT_REF_PREFIX_GUARD = rf"(?<![{_TEXT_REF_TOKEN_CHARS}])"
@@ -54,14 +53,15 @@ _MAX_SOURCE_URLS = 100
 def _is_text_token_char(char: str) -> bool:
     """Return whether one adjacent character can continue a reference token.
 
-    Unicode letters, marks, numbers, connector punctuation, and format joiners
-    are conservatively treated as token continuations. This prevents extracting
-    an ASCII GitHub-looking substring from a larger Unicode token.
+    ``str.isidentifier`` follows Unicode XID rules. Prefixing one character with
+    an ASCII starter turns that predicate into a compact XID_Continue test and
+    covers combining marks, joiners, connector punctuation, non-ASCII digits,
+    and Other_ID_Continue characters such as U+00B7 MIDDLE DOT. URL/reference
+    punctuation that is not an identifier continuation is handled explicitly.
     """
     if char in _TEXT_REF_ASCII_TOKEN_PUNCT:
         return True
-    category = unicodedata.category(char)
-    return category[0] in {"L", "M", "N"} or category in {"Pc", "Cf"}
+    return ("a" + char).isidentifier()
 
 
 def _text_match_has_safe_boundaries(text: str, start: int, end: int) -> bool:
