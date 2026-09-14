@@ -412,17 +412,27 @@ def _classify(row: dict[str, Any], snapshot: dict[str, Any], *, now: datetime, a
             or (m["kind"] in {"human_inbound", "automated_inbound"} and m["from_route"] in authorized and m["related_message_id"] != baseline_id)
         )
     ]
-    ambiguous = branch_ambiguity + unlinked_relevant
+    latest_linked_human = max(linked_human, key=_order_key, default=None)
+    latest_unlinked_relevant = max(unlinked_relevant, key=_order_key, default=None)
+    newer_unlinked_ambiguity = (
+        latest_unlinked_relevant is not None
+        and (
+            latest_linked_human is None
+            or _order_key(latest_unlinked_relevant) > _order_key(latest_linked_human)
+        )
+    )
 
     event: dict[str, Any] | None = None; reasons: list[str] = []; follow_up_due_at: datetime | None = None
-    if linked_human:
-        event = max(linked_human, key=_order_key); state = "HUMAN_REPLY"; reasons = ["AUTHORIZED_LINKED_HUMAN_REPLY"]
+    if branch_ambiguity:
+        event = max(branch_ambiguity, key=_order_key); state = "HUMAN_REVIEW_REQUIRED"; reasons = ["UNLINKED_OR_AMBIGUOUS_SAME_THREAD_ACTIVITY"]
+    elif newer_unlinked_ambiguity:
+        event = latest_unlinked_relevant; state = "HUMAN_REVIEW_REQUIRED"; reasons = ["UNLINKED_OR_AMBIGUOUS_SAME_THREAD_ACTIVITY"]
+    elif linked_human:
+        event = latest_linked_human; state = "HUMAN_REPLY"; reasons = ["AUTHORIZED_LINKED_HUMAN_REPLY"]
     elif linked_unbound_human:
         event = max(linked_unbound_human, key=_order_key); state = "HUMAN_REVIEW_REQUIRED"; reasons = ["LINKED_HUMAN_REPLY_FROM_UNBOUND_ROUTE"]
     elif bounces:
         event = max(bounces, key=_order_key); state = "ROUTE_REPAIR"; reasons = ["LATEST_OUTBOUND_BOUNCED"]
-    elif ambiguous:
-        event = max(ambiguous, key=_order_key); state = "HUMAN_REVIEW_REQUIRED"; reasons = ["UNLINKED_OR_AMBIGUOUS_SAME_THREAD_ACTIVITY"]
     elif row["contact_policy"] == "wait_for_buyer_event":
         if linked_auto:
             event = max(linked_auto, key=_order_key); reasons.append("LINKED_AUTOMATED_ACK_PRESENT")
