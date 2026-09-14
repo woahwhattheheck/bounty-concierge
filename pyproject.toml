@@ -15,3 +15,4 @@ dependencies = ["requests>=2.32.5"]
 concierge = "concierge.entrypoint:main"
 clawrtc = "concierge.entrypoint:main"
 concierge-revenue = "concierge.revenue_cli:main"
+concierge-discover = "concierge.discovered_revenue_intake:main"
