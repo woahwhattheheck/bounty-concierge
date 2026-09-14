@@ -25,9 +25,9 @@ Event input order is normalized before the scope digest is computed. Changing a 
 
 The signed payload additionally binds the host-authorized provider, principal SHA-256, and capture time.
 
-## Host environment
+## Credential-host boundary
 
-Ordinary/public compile and verify read these values only from host environment:
+Ordinary/public compile and verify read these values only from the credential host's environment:
 
 - `BOUNTY_PAYOFF_POLICY_HMAC_KEY_HEX` — at least 32 bytes encoded as hex;
 - `BOUNTY_PAYOFF_POLICY_AUTHORIZED_PROVIDER` — credential-host/provider identity;
@@ -35,7 +35,7 @@ Ordinary/public compile and verify read these values only from host environment:
 - `BOUNTY_PAYOFF_POLICY_AUTHORITY_CAPTURED_AT_UTC` — canonical UTC capture time;
 - `BOUNTY_PAYOFF_POLICY_AUTHORITY_SIGNATURE_SHA256` — HMAC-SHA256 over the exact authority payload.
 
-The key, authorized identity, capture time, and signature are **not** accepted as work-document fields or CLI arguments. The ordinary work submitter must not control the credential-host environment.
+The key, authorized identity, capture time, and signature are **not** accepted as work-document fields or CLI arguments. The ordinary work submitter must not control the credential-host process, its environment, or arbitrary Python execution inside it. HMAC is a process trust boundary: code execution inside the credential host can read the verification key and is therefore trusted by definition.
 
 The normal `payoff_path_gate` compatibility surface deliberately exposes no signing helper. A trusted credential-host adapter may compute the documented canonical policy scope and detached signature outside the ordinary gate call. The repository's private test fixture signer exists only in the authority implementation module for deterministic tests and is not re-exported through the gate API or CLI.
 
