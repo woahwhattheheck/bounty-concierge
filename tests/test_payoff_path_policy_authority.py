@@ -148,6 +148,7 @@ class PayoffPathPolicyAuthorityTests(unittest.TestCase):
         self.addCleanup(self._env.stop)
         os.environ.pop(gate.PAYOFF_POLICY_CAPTURED_AT_ENV, None)
         os.environ.pop(gate.PAYOFF_POLICY_SIGNATURE_ENV, None)
+        os.environ.pop(gate.PAYOFF_POLICY_TEST_UNSIGNED_ENV, None)
 
     def _authorize(self, doc, captured=None):
         values = gate.sign_current_policy_authority_for_host_fixture(
@@ -188,6 +189,12 @@ class PayoffPathPolicyAuthorityTests(unittest.TestCase):
     def test_current_v3_rejects_without_detached_host_signature(self):
         with self.assertRaisesRegex(gate.PayoffPathError, "detached host authority"):
             gate.compile_gate(self.doc0)
+
+    def test_caller_selected_trusted_clock_does_not_bypass_authority(self):
+        with self.assertRaisesRegex(gate.PayoffPathError, "detached host authority"):
+            gate.compile_gate(self.doc0, stamp(self.now))
+        with self.assertRaisesRegex(gate.PayoffPathError, "detached host authority"):
+            v3._compile_v3(self.doc0, stamp(self.now), None)
 
     def test_valid_host_authority_allows_current_generation_zero_stop(self):
         packet, markdown, receipt = self._compile_generation_zero()
@@ -276,6 +283,8 @@ class PayoffPathPolicyAuthorityTests(unittest.TestCase):
         signature = os.environ.pop(gate.PAYOFF_POLICY_SIGNATURE_ENV)
         with self.assertRaisesRegex(gate.PayoffPathError, "detached host authority"):
             gate.verify_gate(self.doc0, packet, markdown, receipt)
+        with self.assertRaisesRegex(gate.PayoffPathError, "detached host authority"):
+            gate.verify_gate(self.doc0, packet, markdown, receipt, stamp(self.now))
         os.environ[gate.PAYOFF_POLICY_CAPTURED_AT_ENV] = captured
         os.environ[gate.PAYOFF_POLICY_SIGNATURE_ENV] = signature
         self.assertTrue(gate.verify_gate(self.doc0, packet, markdown, receipt))
