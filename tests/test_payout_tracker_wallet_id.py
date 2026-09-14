@@ -53,7 +53,13 @@ def test_invalid_wallet_id_fails_before_request(checker, wallet_id):
     ),
 )
 def test_valid_broad_wallet_id_is_forwarded_unchanged(wallet_id):
-    response = MagicMock(status_code=404)
+    response = MagicMock(status_code=200)
+    response.json.return_value = {
+        "ok": True,
+        "miner_id": wallet_id,
+        "transactions": [],
+        "total": 0,
+    }
     with patch(
         "concierge.payout_tracker.requests.get",
         return_value=response,
@@ -61,8 +67,8 @@ def test_valid_broad_wallet_id_is_forwarded_unchanged(wallet_id):
         assert payout_tracker.check_pending(wallet_id, node_url="https://node/") == []
 
     mock_get.assert_called_once_with(
-        "https://node/wallet/pending",
+        "https://node/wallet/history",
         params={"miner_id": wallet_id},
         timeout=15,
-        verify=False,
+        verify=True,
     )
