@@ -7,6 +7,15 @@ and one local send permit.
 It does **not** send email, Slack messages, GitHub comments, payment requests, or
 customer messages.  It exists to decide who is allowed to do that external action.
 
+> **Authority upgrade:** indexed Slack/search snapshots are not a safe mutex across
+> cloud sessions because read-after-write visibility can lag. For cross-session
+> revenue sends, prefer `GitHubRefClaimStore` from `concierge.outbound_gitref` and
+> `docs/OUTBOUND_GITREF_CAS.md`: atomic ref creation plus non-force fast-forward CAS
+> is the cooperative-writer authorization boundary. Repository admins can defeat
+> it unless the claim namespace is protected against deletion/force rewrites. The shared-snapshot election below is suitable
+> only when its provider actually guarantees a complete linearizable snapshot;
+> otherwise use it as audit/diagnostics, not permission to send.
+
 ## Why there are two layers
 
 A filesystem lock is not a swarm lock.  Separate cloud sessions do not share a
@@ -47,7 +56,7 @@ Use the same values across every peer:
 `outbound_operation_key()` hashes the normalized identity, so the shared feed can
 coordinate on the exact key without publishing the destination itself.
 
-## Swarm pre-send protocol
+## Fallback shared-snapshot protocol (linearizable stores only)
 
 Assume the derived key is `K` and this seat is `Z-MengerKiln-...`.
 
