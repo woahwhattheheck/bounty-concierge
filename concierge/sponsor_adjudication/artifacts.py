@@ -1,11 +1,15 @@
 from .common import *
 from .compiler import compile_manifest
 
+
 def verify_report(report: Any) -> Dict[str, Any]:
     obj = _require_dict(report, where="report")
     _require_exact_keys(
         obj,
-        ["schema_version", "program", "summary", "claim_units", "findings", "sponsor_events", "authority_ceiling", "report_sha256"],
+        [
+            "schema_version", "program", "summary", "claim_units", "findings", "sponsor_events",
+            "authority_ceiling", "sponsor_authority_binding", "report_sha256",
+        ],
         where="report",
     )
     if type(obj["schema_version"]) is not int or obj["schema_version"] != OUTPUT_SCHEMA_VERSION:
@@ -117,6 +121,8 @@ def build_artifacts(manifest: Any) -> Dict[str, bytes]:
     csv_bytes = _render_csv(report)
     md_bytes = _render_markdown(report)
     manifest_digest = _sha256_obj(manifest)
+    binding = report["sponsor_authority_binding"]
+    authority_manifest_digest = binding["manifest_sha256"] if isinstance(binding, dict) else None
     files = {
         "adjudication.json": report_bytes,
         "claim_units.csv": csv_bytes,
@@ -126,6 +132,7 @@ def build_artifacts(manifest: Any) -> Dict[str, bytes]:
         "schema_version": RECEIPT_SCHEMA_VERSION,
         "kind": "sponsor_adjudication_custody_receipt",
         "manifest_sha256": manifest_digest,
+        "authority_manifest_sha256": authority_manifest_digest,
         "report_sha256": report["report_sha256"],
         "files": {name: _sha256_bytes(content) for name, content in sorted(files.items())},
         "authority_ceiling": deepcopy(AUTHORITY_CEILING),
@@ -159,7 +166,10 @@ def verify_artifacts(out_dir: os.PathLike[str] | str) -> Dict[str, Any]:
     obj = _require_dict(receipt, where="receipt")
     _require_exact_keys(
         obj,
-        ["schema_version", "kind", "manifest_sha256", "report_sha256", "files", "authority_ceiling", "receipt_sha256"],
+        [
+            "schema_version", "kind", "manifest_sha256", "authority_manifest_sha256", "report_sha256",
+            "files", "authority_ceiling", "receipt_sha256",
+        ],
         where="receipt",
     )
     if type(obj["schema_version"]) is not int or obj["schema_version"] != RECEIPT_SCHEMA_VERSION:
@@ -168,6 +178,8 @@ def verify_artifacts(out_dir: os.PathLike[str] | str) -> Dict[str, Any]:
         raise AdjudicationError("receipt kind mismatch")
     if obj["authority_ceiling"] != AUTHORITY_CEILING:
         raise AdjudicationError("receipt authority ceiling mismatch")
+    if obj["authority_manifest_sha256"] is not None:
+        _require_hex64(obj["authority_manifest_sha256"], where="receipt.authority_manifest_sha256")
     expected_receipt = _sha256_obj({k: deepcopy(v) for k, v in obj.items() if k != "receipt_sha256"})
     if _require_hex64(obj["receipt_sha256"], where="receipt.receipt_sha256") != expected_receipt:
         raise AdjudicationError("receipt digest mismatch")
