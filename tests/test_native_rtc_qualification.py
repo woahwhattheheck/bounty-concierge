@@ -166,9 +166,12 @@ class _Session:
 
 def test_preflight_recognizes_canonical_rtc_title_without_usd(monkeypatch):
     issue = {
+        "state": "open",
         "title": "[BOUNTY: 10 RTC] Add parser",
         "body": "Implement the parser.",
         "labels": [{"name": "bounty"}],
+        "comments": 0,
+        "updated_at": "2026-09-13T12:00:00Z",
     }
     monkeypatch.setattr(bp, "audit_bounty", lambda *args, **kwargs: _audit())
 
