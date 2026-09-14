@@ -12,3 +12,12 @@ from . import payoff_path_policy_v3 as _payoff_path_policy_v3
 _payoff_path_policy_v3.MODE = "CHAINED"
 _payoff_path_policy_v3.install()
 del _payoff_path_policy_v3
+
+# Current v3 owner-policy authority is detached from caller-controlled work bytes.
+# Production/current compile+verify require a fresh host-held HMAC authorization for
+# the exact canonical policy chain/scope; explicit-clock calls remain historical
+# replay only and the production CLI exposes no caller clock override.
+from .payoff_path_policy_authority import install as _install_payoff_policy_authority
+
+_install_payoff_policy_authority()
+del _install_payoff_policy_authority
