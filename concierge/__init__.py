@@ -13,10 +13,10 @@ _payoff_path_policy_v3.MODE = "CHAINED"
 _payoff_path_policy_v3.install()
 del _payoff_path_policy_v3
 
-# Current v3 owner-policy authority is detached from caller-controlled work bytes.
-# Production/current compile+verify require a fresh host-held HMAC authorization for
-# the exact canonical policy chain/scope; explicit-clock calls remain historical
-# replay only and the production CLI exposes no caller clock override.
+# Every ordinary/public v3 compile+verify path requires current detached authority
+# outside caller-controlled work bytes. A host-only TEST_ONLY switch exists solely
+# to preserve deterministic historical state-machine fixtures; production entrypoints
+# must leave it unset.
 from .payoff_path_policy_authority import install as _install_payoff_policy_authority
 
 _install_payoff_policy_authority()
