@@ -57,7 +57,7 @@ def test_history_accepts_current_rustchain_envelope():
         "https://node/wallet/history",
         params={"miner_id": "aliceRTC"},
         timeout=15,
-        verify=False,
+        verify=True,
     )
 
 

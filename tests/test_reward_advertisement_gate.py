@@ -107,9 +107,13 @@ class Session:
 
 def test_preflight_forwards_canonical_issue_title_into_reward_gate(monkeypatch):
     issue = {
+        "state": "open",
         "title": "Bounty: $175 — add parser",
         "body": "Implement the parser.",
         "labels": [],
+        "assignees": [],
+        "comments": 0,
+        "updated_at": "2026-09-13T00:00:00Z",
     }
     monkeypatch.setattr(
         bp,
