@@ -11,13 +11,11 @@ from __future__ import annotations
 import importlib
 import json
 import sys
-from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Callable, Mapping, Sequence, TextIO
+from typing import Callable, Mapping, NamedTuple, Sequence, TextIO
 
 
-@dataclass(frozen=True)
-class RevenueCommand:
+class RevenueCommand(NamedTuple):
     """One public launcher target backed by one canonical authority module."""
 
     module: str
@@ -25,76 +23,98 @@ class RevenueCommand:
 
 
 def _build_fixed_registry():
-    """Return one immutable routing generation plus closed-over accessors."""
+    """Return an immutable primitive routing generation plus public discovery."""
 
-    registry: Mapping[str, RevenueCommand] = MappingProxyType(
+    # Routing authority contains immutable primitives only.  Public discovery
+    # objects are constructed separately below, so callers never receive an
+    # object whose identity is consulted by dispatch or discovery.
+    routes: tuple[tuple[str, str, str], ...] = (
+        (
+            "cash-cycle",
+            "concierge.cash_cycle_review",
+            "Compile/verify evidence-bound cash-cycle owner review receipts.",
+        ),
+        (
+            "closeout",
+            "concierge.revenue_closeout",
+            "Compile/verify revenue closeout authority.",
+        ),
+        (
+            "collection-request",
+            "concierge.collection_request",
+            "Compile/verify collection request packets.",
+        ),
+        (
+            "contract-qualification",
+            "concierge.contract_qualification",
+            "Qualify source-backed external paid-contract opportunities.",
+        ),
+        (
+            "distribution-fulfillment",
+            "concierge.distribution_fulfillment",
+            "Compile/verify distribution fulfillment evidence.",
+        ),
+        (
+            "payoff-path",
+            "concierge.payoff_path_gate",
+            "Gate speculative work on an evidence-backed route to compensation.",
+        ),
+        (
+            "payout-dispute",
+            "concierge.payout_dispute",
+            "Compile/verify payout dispute evidence and owner review state.",
+        ),
+        (
+            "payout-escalation",
+            "concierge.payout_escalation",
+            "Compile/verify evidence-bound payout escalation state.",
+        ),
+        (
+            "realized-economics",
+            "concierge.realized_unit_economics",
+            "Compute/verify realized unit economics from bound evidence.",
+        ),
+        (
+            "receivables-aging",
+            "concierge.receivables_aging",
+            "Compile/verify receivables aging and collection priority evidence.",
+        ),
+        (
+            "settlement",
+            "concierge.revenue_settlement",
+            "Compile/verify revenue settlement authority.",
+        ),
+    )
+
+    public_commands: Mapping[str, RevenueCommand] = MappingProxyType(
         {
-            "cash-cycle": RevenueCommand(
-                "concierge.cash_cycle_review",
-                "Compile/verify evidence-bound cash-cycle owner review receipts.",
-            ),
-            "closeout": RevenueCommand(
-                "concierge.revenue_closeout",
-                "Compile/verify revenue closeout authority.",
-            ),
-            "collection-request": RevenueCommand(
-                "concierge.collection_request",
-                "Compile/verify collection request packets.",
-            ),
-            "contract-qualification": RevenueCommand(
-                "concierge.contract_qualification",
-                "Qualify source-backed external paid-contract opportunities.",
-            ),
-            "distribution-fulfillment": RevenueCommand(
-                "concierge.distribution_fulfillment",
-                "Compile/verify distribution fulfillment evidence.",
-            ),
-            "payoff-path": RevenueCommand(
-                "concierge.payoff_path_gate",
-                "Gate speculative work on an evidence-backed route to compensation.",
-            ),
-            "payout-dispute": RevenueCommand(
-                "concierge.payout_dispute",
-                "Compile/verify payout dispute evidence and owner review state.",
-            ),
-            "payout-escalation": RevenueCommand(
-                "concierge.payout_escalation",
-                "Compile/verify evidence-bound payout escalation state.",
-            ),
-            "realized-economics": RevenueCommand(
-                "concierge.realized_unit_economics",
-                "Compute/verify realized unit economics from bound evidence.",
-            ),
-            "receivables-aging": RevenueCommand(
-                "concierge.receivables_aging",
-                "Compile/verify receivables aging and collection priority evidence.",
-            ),
-            "settlement": RevenueCommand(
-                "concierge.revenue_settlement",
-                "Compile/verify revenue settlement authority.",
-            ),
+            target: RevenueCommand(module, summary)
+            for target, module, summary in routes
         }
     )
 
     def rows() -> list[dict[str, str]]:
         return [
-            {"target": target, "module": command.module, "summary": command.summary}
-            for target, command in sorted(registry.items())
+            {"target": target, "module": module, "summary": summary}
+            for target, module, summary in sorted(routes)
         ]
 
     def names() -> tuple[str, ...]:
-        return tuple(sorted(registry))
+        return tuple(sorted(target for target, _module, _summary in routes))
 
-    def lookup(target: str) -> RevenueCommand | None:
-        return registry.get(target)
+    def lookup_module(target: str) -> str | None:
+        for name, module, _summary in routes:
+            if name == target:
+                return module
+        return None
 
-    return registry, rows, names, lookup
+    return public_commands, rows, names, lookup_module
 
 
-# ``COMMANDS`` is a read-only inspection view. Dispatch and discovery use the
-# accessors that closed over the original immutable generation, so rebinding
-# this exported symbol cannot add, replace, or delete an executable route.
-COMMANDS, _command_rows, _command_names, _lookup_command = _build_fixed_registry()
+# ``COMMANDS`` is an immutable inspection view containing independent immutable
+# records. Dispatch and discovery close over a separate primitive route tuple,
+# so neither mapping rebinding nor value-object tricks can redirect execution.
+COMMANDS, _command_rows, _command_names, _lookup_module = _build_fixed_registry()
 del _build_fixed_registry
 
 
@@ -128,8 +148,8 @@ def _normalize_exit_code(value: object) -> int:
     return value
 
 
-def _load_main(command: RevenueCommand) -> Callable[[list[str]], object]:
-    module = importlib.import_module(command.module)
+def _load_main(module_name: str) -> Callable[[list[str]], object]:
+    module = importlib.import_module(module_name)
     entrypoint = getattr(module, "main", None)
     if not callable(entrypoint):
         raise AttributeError("target module does not expose callable main")
@@ -159,22 +179,22 @@ def run(
         return 0
 
     target = args[0]
-    command = _lookup_command(target)
-    if command is None:
+    module_name = _lookup_module(target)
+    if module_name is None:
         print(f"Error: unknown revenue target: {target}", file=stderr)
         print("Run 'concierge-revenue --list' for supported targets.", file=stderr)
         return 2
 
-    # Only the captured fixed registry can reach importlib: user input is never
-    # used as a module path. Keep every ordinary import/entrypoint-resolution
-    # failure source-text-free because exception strings can contain machine
-    # paths, environment values, or credential-like data. BaseException control
-    # flow (for example KeyboardInterrupt/SystemExit) is deliberately untouched.
+    # Only the captured primitive route generation can reach importlib: user
+    # input is never used as a module path. Keep every ordinary import/entrypoint
+    # resolution failure source-text-free because exception strings can contain
+    # machine paths, environment values, or credential-like data. BaseException
+    # control flow (for example KeyboardInterrupt/SystemExit) is untouched.
     try:
-        entrypoint = _load_main(command)
+        entrypoint = _load_main(module_name)
     except Exception:
         print(
-            f"Error: revenue target unavailable: {target} ({command.module})",
+            f"Error: revenue target unavailable: {target} ({module_name})",
             file=stderr,
         )
         return 2
