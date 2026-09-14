@@ -1,32 +1,110 @@
 # Distribution fulfillment gate
 
-Some paid-work issues are no longer satisfied by a repository artifact alone. A source may carry a `distribution` label and a maintainer rule requiring a real public, off-platform delivery URL before the work counts toward payout. This gate keeps a completed asset/code packet from being mistaken for a payable claim when that external distribution step is still missing.
+Some paid-work issues are not satisfied by a repository artifact alone. A source can require a real public, off-platform delivery URL before a human claim is ready. This gate keeps “the deliverable exists” from being mistaken for “the payout condition has been satisfied.”
 
-The gate is deliberately **read-only and deterministic**. It does not post content, contact maintainers, submit claims, create social accounts, follow redirects, infer acceptance, or recognize revenue. It consumes three independently bound facts: the current source-issue snapshot, the maintainer's explicit distribution rule, and a live-URL capture produced by a separate public-web verifier. It then emits either `READY_FOR_HUMAN_DISTRIBUTION_SUBMISSION` or `HOLD` with stable reason codes.
+The gate is deliberately **read-only**. It does not publish content, contact maintainers, submit claims, create accounts, follow redirects, infer acceptance, authorize payout, mutate a wallet, or recognize revenue. It emits a deterministic `READY_FOR_HUMAN_DISTRIBUTION_SUBMISSION` or `HOLD` receipt plus a reward-prioritized queue.
 
-## Why this exists
+## Trust model
 
-A common failure mode is "the deliverable exists, therefore the bounty is claimable." That is false when the maintainer has added a live-distribution condition. The commercial consequence is worse than a normal validation miss: it creates duplicate/incomplete outreach, makes revenue forecasts optimistic, and wastes operator attention on claims that cannot yet settle.
+The decision has two separate input planes:
 
-This layer addresses that conversion boundary without granting itself posting or payout authority.
+1. **Request evidence** — auditable source/rule/submission/capture material. Treat this JSON as attacker-controlled.
+2. **Retained verifier authority** — `distribution-fulfillment-authority/v2`, authenticated with HMAC-SHA256 under a host key retained outside the request/authority caller's control.
 
-## Inputs
+A capture self-hash is only an integrity checksum. It is **not provenance**. READY is impossible unless the retained authority authenticates the exact normalized source snapshot, maintainer rule, submission packet, live capture, verifier identity, canonical provider namespace, provider resource identity, content digest, issuance time, and active key ID.
 
-`distribution-fulfillment-request/v1` binds:
+The production CLI never accepts:
 
-- a canonical GitHub issue URL and exact advertised-reward decimal string;
-- a current source snapshot (`state`, labels, source update/capture times, snapshot SHA-256);
-- a maintainer-rule comment on that exact issue, with content/rule digests, capture time, `requires_live_url=true`, and an explicit off-platform host allowlist;
-- a downstream `bounty-submission-packet-item/v1` that is still human-only and cannot infer acceptance/payout/cash;
-- optionally, a live capture that binds the requested URL, final resolved URL, observation time, HTTP status, public resolvability, content SHA-256, verifier identity, and a digest of the exact capture envelope.
+- an authority-record path;
+- an authority-record directory;
+- an authority HMAC key;
+- a key ID;
+- an evaluation timestamp.
 
-Malformed authority-bearing input raises an error. Missing or stale business evidence produces `HOLD` instead of an exception.
+On POSIX, it reads the active key only from:
 
-## Important HOLDs
+```text
+/var/lib/bounty-concierge/distribution-fulfillment/authority-key.json
+```
 
-The gate holds when the source is closed, the `distribution` label is absent, the base submission packet is not ready, the live URL is missing, the capture is stale/future, HTTP resolution is unsuccessful, public resolution is false, or the requested/final host is outside the maintainer-rule allowlist.
+and source-derived records only from:
 
-GitHub-hosted URLs are structurally rejected for an off-platform requirement. A portfolio queue also rejects reuse of one final live URL across multiple bounty claims.
+```text
+/var/lib/bounty-concierge/distribution-fulfillment/records/<sha256(canonical-source-url)>.json
+```
+
+On Windows, the equivalent fixed root is `C:\ProgramData\bounty-concierge\distribution-fulfillment`.
+
+The key and retained record files must be regular non-symlink files and, on POSIX, must exclude group/other permissions. Deploy the fixed root under an operator/service account boundary whose untrusted request producer cannot write. The HMAC key file is exactly:
+
+```json
+{
+  "schema": "distribution-fulfillment-authority-key/v1",
+  "key_id": "ops-2026-09",
+  "key_hex": "<64 lowercase hex characters>"
+}
+```
+
+A trusted capture/verifier integration can call `issue_authority_record(...)` with the 32-byte host key. There is intentionally no CLI signing command. Persist the resulting authority record at the source-derived path before evaluation.
+
+## Authority projections
+
+For a request with a live capture, the authenticated record binds:
+
+- canonical source URL;
+- normalized source snapshot SHA-256 projection;
+- normalized maintainer-rule SHA-256 projection;
+- normalized submission-packet SHA-256 projection;
+- normalized live-capture SHA-256 projection;
+- verifier identity;
+- canonical **provider namespace** (for example `social:x` or `video:youtube`);
+- canonical provider `resource_identity`;
+- content SHA-256;
+- verifier issuance time;
+- active host key ID.
+
+For a request without a capture, provider/resource/content/verifier scope is null and the missing URL becomes a business HOLD.
+
+The verifier issuance time must not be in the future and must follow the source/rule/capture evidence it authenticates.
+
+## Freshness and immutable negative decisions
+
+Source snapshots, maintainer rules, and live captures have a seven-day freshness window. READY receipts carry `valid_until` equal to the earliest evidence expiry and cannot verify as current READY authority after that instant.
+
+A stale evidence item is different: it produces a canonical **HOLD**. HOLD receipts remain integrity-verifiable after `valid_until`, including when `valid_until` was already in the past at evaluation time. This does not grant stale evidence positive authority; deterministic replay must still reproduce the same HOLD. The distinction is intentional:
+
+- receipt integrity answers “is this exactly the negative decision that was made?”;
+- READY freshness answers “is this positive readiness decision still current?”
+
+A stale HOLD cannot be edited or replayed into READY because the receipt hash, authenticated authority projection, and deterministic re-evaluation must all agree.
+
+## Cross-claim collision policy
+
+Exact resolved-URL reuse still holds all affected claim units. Provider-resource and provider-content reuse are stricter: their queue keys are based on the **authenticated provider namespace**, not on the capture verifier identity or resolved host.
+
+Therefore two different capture systems observing URL aliases for the same `social:x` resource cannot escape the reuse fence merely by using different verifier IDs or hosts. The trusted upstream verifier is responsible for assigning a canonical provider namespace/resource identity.
+
+Collision HOLD codes are:
+
+- `LIVE_URL_REUSED_ACROSS_CLAIMS`
+- `LIVE_RESOURCE_REUSED_ACROSS_CLAIMS`
+- `LIVE_CONTENT_REUSED_ACROSS_CLAIMS`
+
+The single-request receipt is immutable; queue-level collision policy lives in separately hashed queue items.
+
+## Request evidence
+
+`distribution-fulfillment-request/v1` contains:
+
+- canonical GitHub issue URL and exact advertised-reward decimal string;
+- source state, labels, update/capture times, and snapshot SHA-256;
+- maintainer-rule comment on that issue, capture time, live-URL requirement, allowed off-platform hosts, and rule digests;
+- a human-only `bounty-submission-packet-item/v1` that cannot infer acceptance/payout/cash;
+- optional live capture binding requested/final URL, canonical provider resource identity, observation time, HTTP status, public resolvability, content SHA-256, verifier ID, and capture self-hash.
+
+Malformed authority-bearing input raises an error. Ordinary negative business state such as a closed source, absent label, missing URL, stale evidence, unsuccessful response, private URL, or disallowed host produces HOLD.
+
+GitHub-hosted URLs are structurally rejected for an off-platform requirement. The module never fetches a URL itself; network/SSRF handling remains a separate verifier boundary.
 
 ## Authority ceiling
 
@@ -39,33 +117,52 @@ Every receipt states:
 - `revenue_recognized=false`
 - `human_submission_review_required=true`
 
-A READY receipt therefore means only: the captured evidence clears this distribution-readiness contract. A human still decides whether and how to submit the claim.
+READY therefore means only that authenticated current evidence clears this distribution-readiness gate. A human still decides whether/how to publish or claim.
 
 ## CLI
 
-Evaluate one request:
+Evaluate one request using the fixed retained authority store and the host clock:
 
 ```bash
-python -m concierge.distribution_fulfillment evaluate request.json \
-  --evaluated-at 2026-09-13T10:00:00Z
+python -m concierge.distribution_fulfillment evaluate request.json
 ```
 
-Build a reward-prioritized conversion queue:
+Build a reward-prioritized queue from a JSON array:
 
 ```bash
-python -m concierge.distribution_fulfillment queue requests.json \
-  --evaluated-at 2026-09-13T10:00:00Z
+python -m concierge.distribution_fulfillment queue requests.json
 ```
 
-Verify an immutable single-request receipt by deterministic replay:
+Verify an immutable receipt:
 
 ```bash
-python -m concierge.distribution_fulfillment verify request.json receipt.json \
-  --evaluated-at 2026-09-13T10:00:00Z
+python -m concierge.distribution_fulfillment verify request.json receipt.json
 ```
 
-Input JSON rejects duplicate object keys. Timestamps use canonical UTC second precision. Exact JSON types matter; for example, integer `0` cannot impersonate boolean `false` in authority evidence.
+Verify a queue:
 
-## Live capture boundary
+```bash
+python -m concierge.distribution_fulfillment verify-queue requests.json queue.json
+```
 
-This package intentionally does not fetch arbitrary URLs. Fetching user-controlled URLs is a separate network/SSRF/security boundary and should remain in a hardened public-web verifier. The verifier must create the exact capture envelope consumed here; the envelope digest is recomputed before any READY decision.
+Input JSON rejects duplicate object keys. Timestamps use canonical UTC second precision. Exact JSON types matter; integer `0` cannot impersonate boolean `false`.
+
+## Security regression suite
+
+`tests/test_distribution_fulfillment.py` includes hostile coverage for:
+
+- forging both request evidence and an authority record under an attacker key;
+- caller-selected key IDs;
+- semantic request tampering under a retained authority record;
+- fabricated self-hash captures;
+- provider namespace tampering;
+- two different verifier IDs plus URL aliases for the same provider resource/content;
+- stale source/rule/capture HOLD receipt and queue verification;
+- READY expiry;
+- authority issuance ordering/future time;
+- exact type replay;
+- host/redirect/resource validation;
+- duplicate JSON keys and non-finite JSON;
+- CLI rejection of caller-supplied authority paths;
+- POSIX private-file/symlink fences;
+- source-derived retained-record paths.
