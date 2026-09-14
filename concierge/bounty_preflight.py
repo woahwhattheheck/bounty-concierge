@@ -4,15 +4,17 @@
 ``bounty_audit`` establishes canonical issue/PR state and
 ``bounty_qualification`` decides whether work is safe to dispatch. This module
 fills the missing ``attempt_count`` input from canonical GitHub issue comments,
-binds formal GitHub assignment state, authority-binds maintainer contribution
-terms for credential safety, and revalidates the canonical issue/comment
-generation immediately before an ACTIONABLE dispatch decision is returned.
+binds formal GitHub assignment state to authenticated operator identity,
+authority-binds maintainer contribution terms for credential safety, and
+revalidates issue/comment authority plus dispatch-relevant PR competition
+immediately before an ACTIONABLE dispatch decision is returned.
 """
 
 from __future__ import annotations
 
 import argparse
 from copy import deepcopy
+import hashlib
 import json
 import re
 from typing import Any
@@ -32,6 +34,7 @@ from concierge.credential_safety import (
 
 
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
+_AUTHENTICATED_USER_URL = "https://api.github.com/user"
 _ATTEMPT_COMMAND_RE = re.compile(
     r"(?im)^\s*/(?:attempt(?:\s+#?\d+)?|claim(?:\s+#?\d+)?|opire\s+try)(?:\s|$)"
 )
@@ -163,6 +166,39 @@ def _normalized_operator_login(operator_login: str | None) -> str | None:
     return operator_login.strip().casefold()
 
 
+def _authenticated_operator_login(
+    session: Any,
+    *,
+    headers: dict[str, str],
+    token: str | None,
+    asserted_login: str | None,
+) -> str | None:
+    """Return the same-token GitHub principal; an assertion never authorizes alone."""
+    asserted = _normalized_operator_login(asserted_login)
+    if not token:
+        if asserted is not None:
+            raise BountyPreflightError(
+                "operator_login requires an authenticated GitHub token"
+            )
+        return None
+
+    payload = _object_payload(
+        _get_json(session, _AUTHENTICATED_USER_URL, headers=headers),
+        "authenticated user",
+    )
+    login = payload.get("login")
+    if not isinstance(login, str) or not login.strip():
+        raise BountyPreflightError(
+            "GitHub authenticated user response did not contain a non-empty login"
+        )
+    authenticated = login.strip().casefold()
+    if asserted is not None and asserted != authenticated:
+        raise BountyPreflightError(
+            "operator_login did not match authenticated GitHub identity"
+        )
+    return authenticated
+
+
 def _assignee_state(
     issue: dict[str, Any], operator_login: str | None
 ) -> dict[str, Any]:
@@ -233,8 +269,20 @@ def _assignee_logins(issue: dict[str, Any]) -> tuple[str, ...]:
     return tuple(sorted(set(logins)))
 
 
+def _issue_author_association(issue: dict[str, Any]) -> str:
+    """Normalize exactly the issue-level relationship metadata used for authority."""
+    association = issue.get("author_association")
+    if association is None:
+        return ""
+    if not isinstance(association, str):
+        raise BountyPreflightError(
+            "GitHub issue author_association generation metadata was malformed"
+        )
+    return association.upper()
+
+
 def _issue_generation_marker(issue: dict[str, Any]) -> tuple[Any, ...]:
-    """Return authority-relevant issue state without retaining unrelated metadata."""
+    """Return every issue field consumed by preflight authority/classification."""
     state = issue.get("state")
     title = issue.get("title")
     body = issue.get("body")
@@ -256,6 +304,7 @@ def _issue_generation_marker(issue: dict[str, Any]) -> tuple[Any, ...]:
         state.casefold(),
         title,
         body,
+        _issue_author_association(issue),
         _label_names(issue),
         _assignee_logins(issue),
         comments,
@@ -263,18 +312,56 @@ def _issue_generation_marker(issue: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
-def _comment_generation_entry(comment: dict[str, Any]) -> tuple[int, str] | None:
+def _comment_generation_entry(comment: dict[str, Any]) -> tuple[int, str, str] | None:
+    """Bind every field that can change claim/maintainer classification, privately."""
     comment_id = comment.get("id")
     updated_at = comment.get("updated_at")
+    body = comment.get("body")
+    association = comment.get("author_association")
+    user = comment.get("user")
+    if body is None:
+        body = ""
+    if association is not None and not isinstance(association, str):
+        return None
+    if user is not None and not isinstance(user, dict):
+        return None
     if (
         isinstance(comment_id, bool)
         or not isinstance(comment_id, int)
         or comment_id <= 0
         or not isinstance(updated_at, str)
         or not updated_at
+        or not isinstance(body, str)
     ):
         return None
-    return comment_id, updated_at
+
+    login: str | None = None
+    user_type: str | None = None
+    if isinstance(user, dict):
+        raw_login = user.get("login")
+        raw_type = user.get("type")
+        if raw_login is not None and not isinstance(raw_login, str):
+            return None
+        if raw_type is not None and not isinstance(raw_type, str):
+            return None
+        login = raw_login
+        user_type = raw_type
+
+    projection = {
+        "author_association": association,
+        "body": body,
+        "user_login": login,
+        "user_type": user_type,
+    }
+    semantic_digest = hashlib.sha256(
+        json.dumps(
+            projection,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+    ).hexdigest()
+    return comment_id, updated_at, semantic_digest
 
 
 def _collect_comment_generation(
@@ -284,11 +371,11 @@ def _collect_comment_generation(
     *,
     session: Any,
     max_pages: int,
-) -> tuple[tuple[tuple[int, str], ...], bool]:
-    """Read a privacy-safe exact issue-comment generation marker."""
+) -> tuple[tuple[tuple[int, str, str], ...], bool]:
+    """Read a privacy-safe content/authority-bound issue-comment generation marker."""
     headers = _headers(token or GITHUB_TOKEN)
     comments_url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
-    entries: list[tuple[int, str]] = []
+    entries: list[tuple[int, str, str]] = []
     for page in range(1, max_pages + 1):
         payload = _get_json(
             session,
@@ -324,7 +411,7 @@ def _canonical_generation_stable(
     session: Any,
     max_pages: int,
     issue_snapshot: dict[str, Any],
-    comment_generation: tuple[tuple[int, str], ...] | None,
+    comment_generation: tuple[tuple[int, str, str], ...] | None,
 ) -> bool:
     """Revalidate the exact issue/comment generation before dispatch authority."""
     if comment_generation is None:
@@ -361,6 +448,59 @@ def _canonical_generation_stable(
     if "pull_request" in after:
         raise BountyPreflightError(f"{repo}#{number} became a pull request")
     return _issue_generation_marker(after) == initial_issue
+
+
+def _audit_dispatch_marker(audit: dict[str, Any]) -> tuple[str, int, bool, bool]:
+    """Project exactly the canonical-audit fields consumed by qualification."""
+    if not isinstance(audit, dict):
+        raise BountyPreflightError("canonical bounty audit did not return an object")
+    issue_state = audit.get("issue_state")
+    open_pr_count = audit.get("open_pr_count")
+    stale_listing_signal = audit.get("stale_listing_signal")
+    search_truncated = audit.get("search_truncated")
+    if not isinstance(issue_state, str) or not issue_state:
+        raise BountyPreflightError("canonical audit issue_state was malformed")
+    if (
+        isinstance(open_pr_count, bool)
+        or not isinstance(open_pr_count, int)
+        or open_pr_count < 0
+    ):
+        raise BountyPreflightError("canonical audit open_pr_count was malformed")
+    if not isinstance(stale_listing_signal, bool):
+        raise BountyPreflightError("canonical audit stale_listing_signal was malformed")
+    if not isinstance(search_truncated, bool):
+        raise BountyPreflightError("canonical audit search_truncated was malformed")
+    return (
+        issue_state.casefold(),
+        open_pr_count,
+        stale_listing_signal,
+        search_truncated,
+    )
+
+
+def _canonical_audit_snapshot(
+    repo: str,
+    number: int,
+    token: str | None,
+    *,
+    session: Any,
+    max_pages: int,
+    comments_truncated: bool,
+) -> dict[str, Any]:
+    raw_audit = audit_bounty(
+        repo,
+        number,
+        token,
+        session=session,
+        max_pages=max_pages,
+    )
+    if not isinstance(raw_audit, dict):
+        raise BountyPreflightError("canonical bounty audit did not return an object")
+    audit = dict(raw_audit)
+    if comments_truncated:
+        audit["search_truncated"] = True
+    _audit_dispatch_marker(audit)
+    return audit
 
 
 def _apply_generation_gate(
@@ -403,8 +543,61 @@ def _apply_generation_gate(
                 "code": "CANONICAL_GENERATION_CHANGED",
                 "severity": "HOLD",
                 "message": (
-                    "Canonical GitHub issue/comment state changed while preflight "
+                    "Canonical GitHub issue/comment authority changed while preflight "
                     "was running; rerun before dispatching paid work."
+                ),
+            }
+        )
+    result["reasons"] = reasons
+    result["reason_codes"] = reason_codes
+    result["dispatch"] = False
+    if result.get("disposition") != "REJECT":
+        result["disposition"] = "HOLD"
+    return result
+
+
+def _apply_audit_generation_gate(
+    qualification: dict[str, Any], audit_stable: bool
+) -> dict[str, Any]:
+    """Hold when dispatch-relevant canonical competition state moved."""
+    if not isinstance(qualification, dict):
+        raise BountyPreflightError("qualification result was not an object")
+    result = dict(qualification)
+    signals = result.get("signals")
+    if signals is None:
+        signals = {}
+    elif not isinstance(signals, dict):
+        raise BountyPreflightError("qualification signals were not an object")
+    else:
+        signals = dict(signals)
+    signals["canonical_audit_stable"] = audit_stable
+    result["signals"] = signals
+    if audit_stable:
+        return result
+
+    reasons = result.get("reasons")
+    if reasons is None:
+        reasons = []
+    elif not isinstance(reasons, list):
+        raise BountyPreflightError("qualification reasons were not a list")
+    else:
+        reasons = list(reasons)
+    reason_codes = result.get("reason_codes")
+    if reason_codes is None:
+        reason_codes = []
+    elif not isinstance(reason_codes, list):
+        raise BountyPreflightError("qualification reason_codes were not a list")
+    else:
+        reason_codes = list(reason_codes)
+    if "CANONICAL_AUDIT_CHANGED" not in reason_codes:
+        reason_codes.append("CANONICAL_AUDIT_CHANGED")
+        reasons.append(
+            {
+                "code": "CANONICAL_AUDIT_CHANGED",
+                "severity": "HOLD",
+                "message": (
+                    "Canonical GitHub competition/staleness state changed while "
+                    "preflight was running; rerun before dispatching paid work."
                 ),
             }
         )
@@ -516,12 +709,23 @@ def _collect_issue_context_with_snapshot(
         raise BountyPreflightError(
             f"GitHub issue body was not a string for {repo}#{number}"
         )
-    assignee_state = _assignee_state(issue, operator_login)
+
+    anonymous_assignee_state = _assignee_state(issue, None)
+    if anonymous_assignee_state["formal_assignee_count"] > 0:
+        authenticated_operator = _authenticated_operator_login(
+            session,
+            headers=headers,
+            token=token,
+            asserted_login=operator_login,
+        )
+        assignee_state = _assignee_state(issue, authenticated_operator)
+    else:
+        assignee_state = anonymous_assignee_state
 
     claimant_logins: set[str] = set()
     attempt_signal_count = 0
     comments_truncated = False
-    comment_generation: list[tuple[int, str]] = []
+    comment_generation: list[tuple[int, str, str]] = []
     comment_generation_complete = True
     credential_signals: set[str] = set()
     if _has_maintainer_authority(issue):
@@ -597,9 +801,10 @@ def collect_issue_context(
 
     External comments contribute only to ``attempt_count``. Raw external comment
     text is never forwarded into qualification. OWNER/MEMBER/COLLABORATOR terms
-    are reduced immediately to generic credential-safety signals, and assignees
-    are reduced to counts/operator-membership from the same captured issue
-    generation, so raw identities never leave the collection boundary.
+    are reduced immediately to generic credential-safety signals. Formal
+    assignment is reduced to counts and membership against the authenticated
+    same-token GitHub principal; a caller-supplied login is only an assertion.
+    Raw identities never leave the collection boundary.
     """
     context, _issue_snapshot = _collect_issue_context_with_snapshot(
         repo,
@@ -626,9 +831,11 @@ def preflight_bounty(
 
     Issue-derived qualification metadata, formal assignment, credential authority,
     and canonical issue state are bound to one captured GitHub issue generation.
-    PR competition and maintainer-comment reads remain live. Before an actionable
-    result is returned, the issue authority fields and exact comment ID/update
-    generation are re-read and must still match the original snapshot.
+    Formal assignment can be treated as operator-owned only when the same token's
+    authenticated GitHub principal matches; ``operator_login`` is never authority
+    by itself. PR competition and maintainer-comment reads remain live. Before an
+    actionable result is returned, issue/comment authority and every audit field
+    consumed by qualification are re-read and must remain stable.
     """
     context, issue_snapshot = _collect_issue_context_with_snapshot(
         repo,
@@ -640,18 +847,15 @@ def preflight_bounty(
     )
     issue_url = f"https://api.github.com/repos/{repo}/issues/{number}"
     audit_session = _CapturedIssueSession(session, issue_url, issue_snapshot)
-    raw_audit = audit_bounty(
+    audit = _canonical_audit_snapshot(
         repo,
         number,
         token,
         session=audit_session,
         max_pages=max_pages,
+        comments_truncated=context["comments_truncated"],
     )
-    if not isinstance(raw_audit, dict):
-        raise BountyPreflightError("canonical bounty audit did not return an object")
-    audit = dict(raw_audit)
-    if context["comments_truncated"]:
-        audit["search_truncated"] = True
+    initial_audit_marker = _audit_dispatch_marker(audit)
 
     snapshot = {
         "title": context["title"],
@@ -675,6 +879,19 @@ def preflight_bounty(
     }
     qualification = _apply_assignee_gate(qualification, assignee_state)
 
+    audit_before_generation: dict[str, Any] | None = None
+    if qualification.get("dispatch") is True:
+        audit_before_generation = _canonical_audit_snapshot(
+            repo,
+            number,
+            token,
+            session=session,
+            max_pages=max_pages,
+            comments_truncated=context["comments_truncated"],
+        )
+        audit_stable = _audit_dispatch_marker(audit_before_generation) == initial_audit_marker
+        qualification = _apply_audit_generation_gate(qualification, audit_stable)
+
     if qualification.get("dispatch") is True:
         generation_stable = _canonical_generation_stable(
             repo,
@@ -686,6 +903,23 @@ def preflight_bounty(
             comment_generation=context["_comment_generation"],
         )
         qualification = _apply_generation_gate(qualification, generation_stable)
+
+    if qualification.get("dispatch") is True:
+        audit_after_generation = _canonical_audit_snapshot(
+            repo,
+            number,
+            token,
+            session=session,
+            max_pages=max_pages,
+            comments_truncated=context["comments_truncated"],
+        )
+        final_audit_marker = _audit_dispatch_marker(audit_after_generation)
+        audit_stable = (
+            final_audit_marker == initial_audit_marker
+            and audit_before_generation is not None
+            and final_audit_marker == _audit_dispatch_marker(audit_before_generation)
+        )
+        qualification = _apply_audit_generation_gate(qualification, audit_stable)
 
     return {
         "repo": repo,
@@ -724,8 +958,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--operator-login",
         help=(
-            "GitHub login that may already own the issue; when omitted, any formal "
-            "assignee holds dispatch"
+            "Optional assertion of the authenticated GitHub login for formal "
+            "assignment; it never authorizes dispatch by itself"
         ),
     )
     parser.add_argument("--json", action="store_true", help="Emit full safe JSON result")
