@@ -11,9 +11,11 @@ from concierge.payoff_path_gate import (
     PACKET_SCHEMA,
     PayoffPathError,
     compile_gate,
+    compile_legacy_migration_gate,
     load_strict_json,
     main,
     verify_gate,
+    verify_legacy_migration_gate,
 )
 
 AS_OF = "2026-09-13T15:00:00.000Z"
@@ -69,7 +71,14 @@ def doc(*rows):
 
 class PayoffPathGateTests(unittest.TestCase):
     def compile(self, document):
-        return compile_gate(document, AS_OF)
+        # v1 is retained only as an explicit migration/history fixture. Normal
+        # compile_gate(v1, ...) is production fail-closed and is covered by v3 tests.
+        return compile_legacy_migration_gate(document, AS_OF)
+
+    def verify(self, document, packet, markdown, receipt, trusted_now=AS_OF):
+        return verify_legacy_migration_gate(
+            document, packet, markdown, receipt, trusted_now
+        )
 
     def test_valid_bounty_is_ready_without_claiming_payment(self):
         packet, markdown, receipt = self.compile(doc())
@@ -80,7 +89,7 @@ class PayoffPathGateTests(unittest.TestCase):
         self.assertNotIn("won", markdown.lower())
         self.assertNotIn("payment received", markdown.lower())
         self.assertNotIn("award confirmed", markdown.lower())
-        self.assertTrue(verify_gate(doc(), packet, markdown, receipt, AS_OF))
+        self.assertTrue(self.verify(doc(), packet, markdown, receipt))
 
     def test_all_supported_payoff_mechanisms_are_ready(self):
         mechanisms = [
@@ -236,13 +245,13 @@ class PayoffPathGateTests(unittest.TestCase):
         bad_packet = deepcopy(packet)
         bad_packet["results"][0]["free_work_remaining_minutes"] += 1
         with self.assertRaises(PayoffPathError):
-            verify_gate(document, bad_packet, markdown, receipt, AS_OF)
+            self.verify(document, bad_packet, markdown, receipt)
         with self.assertRaises(PayoffPathError):
-            verify_gate(document, packet, markdown + "tamper", receipt, AS_OF)
+            self.verify(document, packet, markdown + "tamper", receipt)
         bad_receipt = deepcopy(receipt)
         bad_receipt["markdown_sha256"] = "0" * 64
         with self.assertRaises(PayoffPathError):
-            verify_gate(document, packet, markdown, bad_receipt, AS_OF)
+            self.verify(document, packet, markdown, bad_receipt)
 
     def test_changed_source_or_cap_invalidates_packet(self):
         document = doc()
@@ -250,23 +259,23 @@ class PayoffPathGateTests(unittest.TestCase):
         changed = deepcopy(document)
         changed["work_items"][0]["free_work_budget_minutes"] += 1
         with self.assertRaises(PayoffPathError):
-            verify_gate(changed, packet, markdown, receipt, AS_OF)
+            self.verify(changed, packet, markdown, receipt)
         changed = deepcopy(document)
         changed["work_items"][0]["payoff_path"]["source"]["evidence_sha256"] = "c" * 64
         with self.assertRaises(PayoffPathError):
-            verify_gate(changed, packet, markdown, receipt, AS_OF)
+            self.verify(changed, packet, markdown, receipt)
 
     def test_previous_ready_fails_verification_after_deadline(self):
         document = doc()
         packet, markdown, receipt = self.compile(document)
         with self.assertRaisesRegex(PayoffPathError, "no longer current"):
-            verify_gate(document, packet, markdown, receipt, "2026-09-21T00:00:00.000Z")
+            self.verify(document, packet, markdown, receipt, "2026-09-21T00:00:00.000Z")
 
     def test_packet_from_future_rejected(self):
         document = doc()
         packet, markdown, receipt = self.compile(document)
         with self.assertRaisesRegex(PayoffPathError, "future"):
-            verify_gate(document, packet, markdown, receipt, "2026-09-13T14:00:00.000Z")
+            self.verify(document, packet, markdown, receipt, "2026-09-13T14:00:00.000Z")
 
     def test_cli_has_no_as_of_override(self):
         # The production parser intentionally rejects arbitrary --as-of authority.
@@ -351,10 +360,11 @@ class PayoffPathGateTests(unittest.TestCase):
                 ])
 
     def test_empty_document_is_valid_and_deterministic(self):
-        packet, markdown, receipt = self.compile({"schema": "payoff-path-work/v1", "work_items": []})
+        legacy = {"schema": "payoff-path-work/v1", "work_items": []}
+        packet, markdown, receipt = self.compile(legacy)
         self.assertEqual(0, packet["summary"]["total_items"])
         self.assertIn("No speculative work items", markdown)
-        self.assertTrue(verify_gate({"schema": "payoff-path-work/v1", "work_items": []}, packet, markdown, receipt, AS_OF))
+        self.assertTrue(self.verify(legacy, packet, markdown, receipt))
 
 
 if __name__ == "__main__":
