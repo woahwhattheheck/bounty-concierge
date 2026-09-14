@@ -75,6 +75,29 @@ class QueueTests(unittest.TestCase):
         human=msg("human","human_inbound","2026-09-13T12:00:00Z",from_route=BUYER,related=None,seq=20)
         item=self.compile([row()],[snap(anchor(),human)])["items"][0]
         self.assertEqual(item["state"],"HUMAN_REVIEW_REQUIRED"); self.assertIn("UNLINKED",item["reason_codes"][0])
+    def test_newer_ambiguity_overrides_older_positive_evidence_but_newer_linked_human_can_resolve_older_ambiguity(self):
+        human=msg("human","human_inbound","2026-09-13T12:00:00Z",from_route=BUYER,related=SENT,seq=20)
+        newer_outbound=msg("unlinked-out","outbound","2026-09-13T12:30:00Z",to_routes=[BUYER],related=None,seq=30)
+        item=self.compile([row()],[snap(anchor(),human,newer_outbound)])["items"][0]
+        self.assertEqual(item["state"],"HUMAN_REVIEW_REQUIRED")
+        self.assertEqual(item["reason_codes"],["UNLINKED_OR_AMBIGUOUS_SAME_THREAD_ACTIVITY"])
+        self.assertEqual(item["evidence_message_id_sha256"],rq._hash_text("unlinked-out"))
+
+        newer_inbound=msg("unlinked-in","human_inbound","2026-09-13T12:30:00Z",from_route=BUYER,related=None,seq=30)
+        item=self.compile([row()],[snap(anchor(),human,newer_inbound)])["items"][0]
+        self.assertEqual(item["state"],"HUMAN_REVIEW_REQUIRED")
+        self.assertEqual(item["evidence_message_id_sha256"],rq._hash_text("unlinked-in"))
+
+        bounce=msg("bounce","bounce","2026-09-13T12:00:00Z",from_route="mailer-daemon@example.net",related=SENT,seq=20)
+        item=self.compile([row()],[snap(anchor(),bounce,newer_outbound)])["items"][0]
+        self.assertEqual(item["state"],"HUMAN_REVIEW_REQUIRED")
+        self.assertEqual(item["evidence_message_id_sha256"],rq._hash_text("unlinked-out"))
+
+        older_outbound=msg("older-unlinked","outbound","2026-09-13T11:30:00Z",to_routes=[BUYER],related=None,seq=20)
+        newer_human=msg("newer-human","human_inbound","2026-09-13T12:00:00Z",from_route=BUYER,related=SENT,seq=30)
+        item=self.compile([row()],[snap(anchor(),older_outbound,newer_human)])["items"][0]
+        self.assertEqual(item["state"],"HUMAN_REPLY")
+        self.assertEqual(item["evidence_message_id_sha256"],rq._hash_text("newer-human"))
     def test_bounce_is_bound_to_current_generation(self):
         bounce=msg("b","bounce","2026-09-13T12:00:00Z",from_route="mailer-daemon@example.net",related=SENT,seq=20)
         self.assertEqual(self.compile([row()],[snap(anchor(),bounce)])["items"][0]["state"],"ROUTE_REPAIR")
