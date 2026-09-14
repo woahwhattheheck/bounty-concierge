@@ -45,12 +45,12 @@ jobs:
           BOUNTY_SPONSOR_ADJUDICATION_HMAC_KEY_HEX: "1111111111111111111111111111111111111111111111111111111111111111"
           BOUNTY_SPONSOR_ADJUDICATION_AUTHORIZED_PROVIDER: "gmail"
           BOUNTY_SPONSOR_ADJUDICATION_AUTHORIZED_PRINCIPAL_SHA256: "03b2cbe8a9410c7def5943799c27154a6e77daad63ec56df11739fc3b804e506"
-        run: python -m unittest -v tests.test_sponsor_adjudication_authority
+        run: python -m unittest -v tests.test_sponsor_adjudication_authority tests.test_sponsor_adjudication_zero_event_authority
       - name: Host-authority optimized hostile suite
         env:
           BOUNTY_SPONSOR_ADJUDICATION_HMAC_KEY_HEX: "1111111111111111111111111111111111111111111111111111111111111111"
           BOUNTY_SPONSOR_ADJUDICATION_AUTHORIZED_PROVIDER: "gmail"
           BOUNTY_SPONSOR_ADJUDICATION_AUTHORIZED_PRINCIPAL_SHA256: "03b2cbe8a9410c7def5943799c27154a6e77daad63ec56df11739fc3b804e506"
-        run: python -O -m unittest -v tests.test_sponsor_adjudication_authority
+        run: python -O -m unittest -v tests.test_sponsor_adjudication_authority tests.test_sponsor_adjudication_zero_event_authority
       - name: Compile
-        run: python -m py_compile concierge/sponsor_adjudication/*.py tests/test_sponsor_adjudication.py tests/test_sponsor_adjudication_hardening.py tests/test_sponsor_adjudication_authority.py
+        run: python -m py_compile concierge/sponsor_adjudication/*.py tests/test_sponsor_adjudication.py tests/test_sponsor_adjudication_hardening.py tests/test_sponsor_adjudication_authority.py tests/test_sponsor_adjudication_zero_event_authority.py
