@@ -26,6 +26,35 @@ class RevenueCliTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             del revenue_cli.COMMANDS["cash-cycle"]
 
+    def test_exported_command_value_cannot_redirect_routing_or_discovery(self):
+        command = revenue_cli.COMMANDS["cash-cycle"]
+        canonical_module = command.module
+        with self.assertRaises(AttributeError):
+            object.__setattr__(command, "module", "os")
+        self.assertEqual(command.module, canonical_module)
+
+        seen = []
+        fake = types.SimpleNamespace(main=lambda argv: seen.append(argv) or 7)
+        listed_json = io.StringIO()
+        with mock.patch.object(
+            revenue_cli.importlib,
+            "import_module",
+            return_value=fake,
+        ) as importer:
+            self.assertEqual(revenue_cli.run(["cash-cycle", "verify"]), 7)
+            self.assertEqual(
+                revenue_cli.run(["--list-json"], stdout=listed_json),
+                0,
+            )
+
+        importer.assert_called_once_with(canonical_module)
+        self.assertEqual(seen, [["verify"]])
+        payload = json.loads(listed_json.getvalue())
+        cash_cycle = next(
+            row for row in payload["targets"] if row["target"] == "cash-cycle"
+        )
+        self.assertEqual(cash_cycle["module"], canonical_module)
+
     def test_exported_registry_rebind_cannot_change_dispatch_or_discovery(self):
         canonical = revenue_cli.COMMANDS["cash-cycle"]
         rebound = {
