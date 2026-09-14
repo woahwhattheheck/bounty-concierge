@@ -1,8 +1,15 @@
 from .common import *
+from .authority import verify_manifest_authority
+
 
 def _validate_manifest(manifest: Any) -> Dict[str, Any]:
     root = _require_dict(manifest, where="manifest")
-    _require_exact_keys(root, ["schema_version", "program", "findings", "submissions", "sponsor_events"], where="manifest")
+    _require_exact_keys(
+        root,
+        ["schema_version", "program", "findings", "submissions", "sponsor_events"],
+        ["sponsor_authority"],
+        where="manifest",
+    )
     if type(root["schema_version"]) is not int or root["schema_version"] != SCHEMA_VERSION:
         raise AdjudicationError(f"manifest.schema_version must be integer {SCHEMA_VERSION}")
 
@@ -11,6 +18,7 @@ def _validate_manifest(manifest: Any) -> Dict[str, Any]:
     program_id = _require_id(program["program_id"], where="program.program_id")
     sponsor = _require_text(program["sponsor"], where="program.sponsor")
     source_ref = _require_text(program["source_ref"], where="program.source_ref")
+    bare_program = {"program_id": program_id, "sponsor": sponsor, "source_ref": source_ref}
 
     findings: Dict[str, Dict[str, Any]] = {}
     finding_order: List[str] = []
@@ -144,14 +152,16 @@ def _validate_manifest(manifest: Any) -> Dict[str, Any]:
         })
 
     events.sort(key=lambda e: (e["_event_dt"], e["event_id"]))
+    authority = verify_manifest_authority(root, bare_program, events, root.get("sponsor_authority"))
+    normalized_program: Dict[str, Any] = dict(bare_program)
+    if authority is not None:
+        normalized_program["sponsor_authority"] = authority
     return {
         "schema_version": SCHEMA_VERSION,
-        "program": {"program_id": program_id, "sponsor": sponsor, "source_ref": source_ref},
+        "program": normalized_program,
         "findings": findings,
         "finding_order": finding_order,
         "submissions": submissions,
         "finding_submissions": finding_submissions,
         "events": events,
     }
-
-
