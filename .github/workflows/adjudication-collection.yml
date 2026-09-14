@@ -1,0 +1,35 @@
+name: Adjudication Collection Bridge
+
+on:
+  pull_request:
+    paths:
+      - 'concierge/adjudication_collection.py'
+      - 'tests/test_adjudication_collection.py'
+      - 'docs/ADJUDICATION_COLLECTION.md'
+      - '.github/workflows/adjudication-collection.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'concierge/adjudication_collection.py'
+      - 'tests/test_adjudication_collection.py'
+      - 'docs/ADJUDICATION_COLLECTION.md'
+      - '.github/workflows/adjudication-collection.yml'
+
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Unit tests
+        run: python -m unittest tests.test_adjudication_collection -v
+      - name: Optimized-mode unit tests
+        run: python -O -m unittest tests.test_adjudication_collection -v
+      - name: Syntax compile
+        run: python -m py_compile concierge/adjudication_collection.py tests/test_adjudication_collection.py
