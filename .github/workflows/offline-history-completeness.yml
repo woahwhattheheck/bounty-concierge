@@ -7,6 +7,8 @@ on:
       - "concierge/_revenue_settlement_core.py"
       - "concierge/revenue_settlement.py"
       - "tests/test_offline_history_completeness.py"
+      - "tests/test_core_history_completeness.py"
+      - "docs/OFFLINE_HISTORY_COMPLETENESS.md"
       - ".github/workflows/offline-history-completeness.yml"
   push:
     branches: [main]
@@ -15,6 +17,8 @@ on:
       - "concierge/_revenue_settlement_core.py"
       - "concierge/revenue_settlement.py"
       - "tests/test_offline_history_completeness.py"
+      - "tests/test_core_history_completeness.py"
+      - "docs/OFFLINE_HISTORY_COMPLETENESS.md"
       - ".github/workflows/offline-history-completeness.yml"
 
 permissions:
@@ -34,8 +38,20 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Compile exact modules
-        run: python -m py_compile concierge/_revenue_settlement_base.py concierge/_revenue_settlement_core.py concierge/revenue_settlement.py tests/test_offline_history_completeness.py
-      - name: Run completeness hostiles
-        run: python -m unittest -v tests.test_offline_history_completeness
-      - name: Run optimized completeness hostiles
-        run: python -O -m unittest -v tests.test_offline_history_completeness
+        run: >-
+          python -m py_compile
+          concierge/_revenue_settlement_base.py
+          concierge/_revenue_settlement_core.py
+          concierge/revenue_settlement.py
+          tests/test_offline_history_completeness.py
+          tests/test_core_history_completeness.py
+      - name: Run public and direct-core completeness hostiles
+        run: >-
+          python -m unittest -v
+          tests.test_offline_history_completeness
+          tests.test_core_history_completeness
+      - name: Run optimized public and direct-core completeness hostiles
+        run: >-
+          python -O -m unittest -v
+          tests.test_offline_history_completeness
+          tests.test_core_history_completeness
