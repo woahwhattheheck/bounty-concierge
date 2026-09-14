@@ -11,83 +11,124 @@ from __future__ import annotations
 import importlib
 import json
 import sys
-from dataclasses import dataclass
-from typing import Callable, Mapping, Sequence, TextIO
+from types import MappingProxyType
+from typing import Callable, Mapping, NamedTuple, Sequence, TextIO
 
 
-@dataclass(frozen=True)
-class RevenueCommand:
+class RevenueCommand(NamedTuple):
     """One public launcher target backed by one canonical authority module."""
 
     module: str
     summary: str
 
 
-COMMANDS: Mapping[str, RevenueCommand] = {
-    "cash-cycle": RevenueCommand(
-        "concierge.cash_cycle_review",
-        "Compile/verify evidence-bound cash-cycle owner review receipts.",
-    ),
-    "closeout": RevenueCommand(
-        "concierge.revenue_closeout",
-        "Compile/verify revenue closeout authority.",
-    ),
-    "collection-request": RevenueCommand(
-        "concierge.collection_request",
-        "Compile/verify collection request packets.",
-    ),
-    "contract-qualification": RevenueCommand(
-        "concierge.contract_qualification",
-        "Qualify source-backed external paid-contract opportunities.",
-    ),
-    "distribution-fulfillment": RevenueCommand(
-        "concierge.distribution_fulfillment",
-        "Compile/verify distribution fulfillment evidence.",
-    ),
-    "payoff-path": RevenueCommand(
-        "concierge.payoff_path_gate",
-        "Gate speculative work on an evidence-backed route to compensation.",
-    ),
-    "payout-dispute": RevenueCommand(
-        "concierge.payout_dispute",
-        "Compile/verify payout dispute evidence and owner review state.",
-    ),
-    "payout-escalation": RevenueCommand(
-        "concierge.payout_escalation",
-        "Compile/verify evidence-bound payout escalation state.",
-    ),
-    "realized-economics": RevenueCommand(
-        "concierge.realized_unit_economics",
-        "Compute/verify realized unit economics from bound evidence.",
-    ),
-    "receivables-aging": RevenueCommand(
-        "concierge.receivables_aging",
-        "Compile/verify receivables aging and collection priority evidence.",
-    ),
-    "settlement": RevenueCommand(
-        "concierge.revenue_settlement",
-        "Compile/verify revenue settlement authority.",
-    ),
-}
+def _build_fixed_registry():
+    """Return an immutable primitive routing generation plus public discovery."""
+
+    # Routing authority contains immutable primitives only.  Public discovery
+    # objects are constructed separately below, so callers never receive an
+    # object whose identity is consulted by dispatch or discovery.
+    routes: tuple[tuple[str, str, str], ...] = (
+        (
+            "cash-cycle",
+            "concierge.cash_cycle_review",
+            "Compile/verify evidence-bound cash-cycle owner review receipts.",
+        ),
+        (
+            "closeout",
+            "concierge.revenue_closeout",
+            "Compile/verify revenue closeout authority.",
+        ),
+        (
+            "collection-request",
+            "concierge.collection_request",
+            "Compile/verify collection request packets.",
+        ),
+        (
+            "contract-qualification",
+            "concierge.contract_qualification",
+            "Qualify source-backed external paid-contract opportunities.",
+        ),
+        (
+            "distribution-fulfillment",
+            "concierge.distribution_fulfillment",
+            "Compile/verify distribution fulfillment evidence.",
+        ),
+        (
+            "payoff-path",
+            "concierge.payoff_path_gate",
+            "Gate speculative work on an evidence-backed route to compensation.",
+        ),
+        (
+            "payout-dispute",
+            "concierge.payout_dispute",
+            "Compile/verify payout dispute evidence and owner review state.",
+        ),
+        (
+            "payout-escalation",
+            "concierge.payout_escalation",
+            "Compile/verify evidence-bound payout escalation state.",
+        ),
+        (
+            "realized-economics",
+            "concierge.realized_unit_economics",
+            "Compute/verify realized unit economics from bound evidence.",
+        ),
+        (
+            "receivables-aging",
+            "concierge.receivables_aging",
+            "Compile/verify receivables aging and collection priority evidence.",
+        ),
+        (
+            "settlement",
+            "concierge.revenue_settlement",
+            "Compile/verify revenue settlement authority.",
+        ),
+    )
+
+    public_commands: Mapping[str, RevenueCommand] = MappingProxyType(
+        {
+            target: RevenueCommand(module, summary)
+            for target, module, summary in routes
+        }
+    )
+
+    def rows() -> list[dict[str, str]]:
+        return [
+            {"target": target, "module": module, "summary": summary}
+            for target, module, summary in sorted(routes)
+        ]
+
+    def names() -> tuple[str, ...]:
+        return tuple(sorted(target for target, _module, _summary in routes))
+
+    def lookup_module(target: str) -> str | None:
+        for name, module, _summary in routes:
+            if name == target:
+                return module
+        return None
+
+    return public_commands, rows, names, lookup_module
 
 
-def _command_rows() -> list[dict[str, str]]:
-    return [
-        {"target": target, "module": command.module, "summary": command.summary}
-        for target, command in sorted(COMMANDS.items())
-    ]
+# ``COMMANDS`` is an immutable inspection view containing independent immutable
+# records. Dispatch and discovery close over a separate primitive route tuple,
+# so neither mapping rebinding nor value-object tricks can redirect execution.
+COMMANDS, _command_rows, _command_names, _lookup_module = _build_fixed_registry()
+del _build_fixed_registry
 
 
 def _print_help(stream: TextIO) -> None:
+    rows = _command_rows()
     print("usage: concierge-revenue TARGET [TARGET_ARGS ...]", file=stream)
     print("", file=stream)
     print("Revenue control-plane launcher. It delegates to existing canonical", file=stream)
     print("authority modules; this launcher itself performs no provider action.", file=stream)
     print("", file=stream)
     print("targets:", file=stream)
-    width = max(len(name) for name in COMMANDS)
-    for name, command in sorted(COMMANDS.items()):
-        print(f"  {name:<{width}}  {command.summary}", file=stream)
+    width = max(len(row["target"]) for row in rows)
+    for row in rows:
+        print(f"  {row['target']:<{width}}  {row['summary']}", file=stream)
     print("", file=stream)
     print("control-plane options:", file=stream)
     print("  -h, --help   show this help", file=stream)
@@ -107,8 +148,8 @@ def _normalize_exit_code(value: object) -> int:
     return value
 
 
-def _load_main(command: RevenueCommand) -> Callable[[list[str]], object]:
-    module = importlib.import_module(command.module)
+def _load_main(module_name: str) -> Callable[[list[str]], object]:
+    module = importlib.import_module(module_name)
     entrypoint = getattr(module, "main", None)
     if not callable(entrypoint):
         raise AttributeError("target module does not expose callable main")
@@ -129,7 +170,7 @@ def run(
         return 0
 
     if args[0] == "--list":
-        for target in sorted(COMMANDS):
+        for target in _command_names():
             print(target, file=stdout)
         return 0
 
@@ -138,27 +179,29 @@ def run(
         return 0
 
     target = args[0]
-    command = COMMANDS.get(target)
-    if command is None:
+    module_name = _lookup_module(target)
+    if module_name is None:
         print(f"Error: unknown revenue target: {target}", file=stderr)
         print("Run 'concierge-revenue --list' for supported targets.", file=stderr)
         return 2
 
-    # Only fixed registry entries can reach importlib: user input is never used
-    # as a module path. Keep import failure output source-text-free because
-    # nested exception strings can include environment paths or credentials.
+    # Only the captured primitive route generation can reach importlib: user
+    # input is never used as a module path. Keep every ordinary import/entrypoint
+    # resolution failure source-text-free because exception strings can contain
+    # machine paths, environment values, or credential-like data. BaseException
+    # control flow (for example KeyboardInterrupt/SystemExit) is untouched.
     try:
-        entrypoint = _load_main(command)
-    except (ImportError, AttributeError):
+        entrypoint = _load_main(module_name)
+    except Exception:
         print(
-            f"Error: revenue target unavailable: {target} ({command.module})",
+            f"Error: revenue target unavailable: {target} ({module_name})",
             file=stderr,
         )
         return 2
 
-    # Invoke outside the launcher's return-contract handler. Downstream
-    # exceptions (including a TypeError with identical text) remain the target's
-    # own semantics and are never reclassified by this wrapper.
+    # Invoke outside the launcher's import and return-contract handlers.
+    # Downstream exceptions (including a TypeError with identical text) remain
+    # the target's own semantics and are never reclassified by this wrapper.
     result = entrypoint(args[1:])
     try:
         return _normalize_exit_code(result)

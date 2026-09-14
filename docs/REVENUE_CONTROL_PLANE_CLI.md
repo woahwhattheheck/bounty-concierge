@@ -51,9 +51,11 @@ The target's own parser remains authoritative for its arguments, compile/verify 
 
 ## Boundary and failure behavior
 
-The launcher uses a fixed registry; user input is never interpreted as an arbitrary Python module path. Targets are imported lazily only after a known target is selected. Unknown targets, missing modules, and modules without callable `main(argv)` fail closed with exit code `2`. Import exception text is not echoed because nested exceptions can contain machine paths or credential-like environment data.
+The launcher constructs one fixed routing generation at module initialization from immutable primitive `(target, module, summary)` tuples. Dispatch and machine-readable discovery close over those primitives. The exported `COMMANDS` inspection view is built separately from immutable `RevenueCommand` tuple records, so public discovery never shares a mutable object identity with executable routing. Adding, replacing, deleting, or rebinding the exported registry cannot add or redirect a route, and even low-level attribute mutation attempts against an exported command record fail. User input is never interpreted as an arbitrary Python module path.
 
-A target may return an integer exit code or `None` (normalized to `0`). Other return shapes fail closed. A target's own `SystemExit` propagates so its argparse help/errors retain exact semantics. Other target exceptions are not hidden by the launcher.
+Targets are imported lazily only after a known target is selected. Unknown targets, missing modules, modules without callable `main(argv)`, and ordinary exceptions raised while importing or resolving the target entrypoint fail closed with exit code `2`. Import/entrypoint-resolution exception text is not echoed because nested exceptions can contain machine paths or credential-like environment data. `BaseException` control flow such as `SystemExit` remains unsuppressed.
+
+A target may return an integer exit code or `None` (normalized to `0`). Other return shapes fail closed. After a target `main(argv)` is resolved, its execution occurs outside the import-sanitization boundary: the target's own `SystemExit` and other exceptions propagate unchanged so its canonical behavior is not reclassified by the launcher.
 
 ## Authority
 

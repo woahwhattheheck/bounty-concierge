@@ -17,6 +17,89 @@ class RevenueCliTests(unittest.TestCase):
             self.assertRegex(command.module, r"^concierge\.[a-z0-9_]+$")
             self.assertTrue(command.summary.endswith("."))
 
+    def test_exported_registry_rejects_item_add_replace_and_delete(self):
+        injected = revenue_cli.RevenueCommand("concierge.attacker", "Injected route.")
+        with self.assertRaises(TypeError):
+            revenue_cli.COMMANDS["injected"] = injected
+        with self.assertRaises(TypeError):
+            revenue_cli.COMMANDS["cash-cycle"] = injected
+        with self.assertRaises(TypeError):
+            del revenue_cli.COMMANDS["cash-cycle"]
+
+    def test_exported_command_value_cannot_redirect_routing_or_discovery(self):
+        command = revenue_cli.COMMANDS["cash-cycle"]
+        canonical_module = command.module
+        with self.assertRaises(AttributeError):
+            object.__setattr__(command, "module", "os")
+        self.assertEqual(command.module, canonical_module)
+
+        seen = []
+        fake = types.SimpleNamespace(main=lambda argv: seen.append(argv) or 7)
+        listed_json = io.StringIO()
+        with mock.patch.object(
+            revenue_cli.importlib,
+            "import_module",
+            return_value=fake,
+        ) as importer:
+            self.assertEqual(revenue_cli.run(["cash-cycle", "verify"]), 7)
+            self.assertEqual(
+                revenue_cli.run(["--list-json"], stdout=listed_json),
+                0,
+            )
+
+        importer.assert_called_once_with(canonical_module)
+        self.assertEqual(seen, [["verify"]])
+        payload = json.loads(listed_json.getvalue())
+        cash_cycle = next(
+            row for row in payload["targets"] if row["target"] == "cash-cycle"
+        )
+        self.assertEqual(cash_cycle["module"], canonical_module)
+
+    def test_exported_registry_rebind_cannot_change_dispatch_or_discovery(self):
+        canonical = revenue_cli.COMMANDS["cash-cycle"]
+        rebound = {
+            "cash-cycle": revenue_cli.RevenueCommand(
+                "concierge.attacker",
+                "Rebound route.",
+            ),
+            "injected": revenue_cli.RevenueCommand(
+                "concierge.attacker",
+                "Injected route.",
+            ),
+        }
+        seen = []
+        fake = types.SimpleNamespace(main=lambda argv: seen.append(argv) or 7)
+        listed = io.StringIO()
+        listed_json = io.StringIO()
+        err = io.StringIO()
+
+        with mock.patch.object(revenue_cli, "COMMANDS", rebound):
+            with mock.patch.object(
+                revenue_cli.importlib,
+                "import_module",
+                return_value=fake,
+            ) as importer:
+                code = revenue_cli.run(["cash-cycle", "verify", "receipt.json"])
+                unknown = revenue_cli.run(["injected"], stderr=err)
+                self.assertEqual(revenue_cli.run(["--list"], stdout=listed), 0)
+                self.assertEqual(
+                    revenue_cli.run(["--list-json"], stdout=listed_json),
+                    0,
+                )
+
+        self.assertEqual(code, 7)
+        self.assertEqual(unknown, 2)
+        self.assertEqual(seen, [["verify", "receipt.json"]])
+        importer.assert_called_once_with(canonical.module)
+        self.assertIn("cash-cycle", listed.getvalue())
+        self.assertNotIn("injected", listed.getvalue())
+        payload = json.loads(listed_json.getvalue())
+        self.assertEqual(
+            [row["target"] for row in payload["targets"]],
+            sorted(revenue_cli.COMMANDS),
+        )
+        self.assertNotIn("injected", [row["target"] for row in payload["targets"]])
+
     def test_library_only_custody_modules_are_not_advertised_as_cli_targets(self):
         self.assertNotIn("collection-custody", revenue_cli.COMMANDS)
         self.assertNotIn("submission-custody", revenue_cli.COMMANDS)
@@ -79,6 +162,49 @@ class RevenueCliTests(unittest.TestCase):
         self.assertNotIn(secret, err.getvalue())
         self.assertIn("revenue target unavailable", err.getvalue())
 
+    def test_ordinary_import_exceptions_are_redacted(self):
+        secret = "SECRET_PATH_OR_TOKEN_SHOULD_NOT_LEAK"
+        for error_type in (RuntimeError, ValueError, OSError):
+            with self.subTest(error_type=error_type):
+                err = io.StringIO()
+                with mock.patch.object(
+                    revenue_cli.importlib,
+                    "import_module",
+                    side_effect=error_type(secret),
+                ):
+                    code = revenue_cli.run(["receivables-aging"], stderr=err)
+                self.assertEqual(code, 2)
+                self.assertNotIn(secret, err.getvalue())
+                self.assertIn("revenue target unavailable", err.getvalue())
+
+    def test_entrypoint_resolution_exception_is_redacted(self):
+        secret = "SECRET_FROM_MODULE_GETATTR_SHOULD_NOT_LEAK"
+
+        class ExplosiveModule:
+            @property
+            def main(self):
+                raise RuntimeError(secret)
+
+        err = io.StringIO()
+        with mock.patch.object(
+            revenue_cli.importlib,
+            "import_module",
+            return_value=ExplosiveModule(),
+        ):
+            code = revenue_cli.run(["cash-cycle"], stderr=err)
+        self.assertEqual(code, 2)
+        self.assertNotIn(secret, err.getvalue())
+        self.assertIn("revenue target unavailable", err.getvalue())
+
+    def test_import_phase_system_exit_is_not_swallowed(self):
+        with mock.patch.object(
+            revenue_cli.importlib,
+            "import_module",
+            side_effect=SystemExit(23),
+        ):
+            with self.assertRaisesRegex(SystemExit, "23"):
+                revenue_cli.run(["cash-cycle"])
+
     def test_missing_callable_main_fails_closed(self):
         err = io.StringIO()
         with mock.patch.object(
@@ -113,6 +239,17 @@ class RevenueCliTests(unittest.TestCase):
         with mock.patch.object(revenue_cli.importlib, "import_module", return_value=fake):
             with self.assertRaisesRegex(SystemExit, "19"):
                 revenue_cli.run(["cash-cycle", "--help"])
+
+    def test_downstream_runtime_error_propagates_with_original_text(self):
+        secret = "DOWNSTREAM_RUNTIME_ERROR_MUST_PROPAGATE"
+
+        def downstream(_argv):
+            raise RuntimeError(secret)
+
+        fake = types.SimpleNamespace(main=downstream)
+        with mock.patch.object(revenue_cli.importlib, "import_module", return_value=fake):
+            with self.assertRaisesRegex(RuntimeError, secret):
+                revenue_cli.run(["cash-cycle"])
 
     def test_unrelated_downstream_typeerror_propagates(self):
         def downstream(_argv):
