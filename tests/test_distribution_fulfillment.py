@@ -11,7 +11,7 @@ from concierge import distribution_fulfillment as d
 
 NOW = "2026-09-13T10:00:00Z"
 ISSUED = "2026-09-13T09:46:00Z"
-SOURCE = "https://github.com/Scottcjn/rustchain-bounties/issues/315"
+SOURCE = "https://github.com/scottcjn/rustchain-bounties/issues/315"
 KEY = bytes.fromhex("11" * 32)
 ATTACKER_KEY = bytes.fromhex("22" * 32)
 KEY_ID = "ops-2026-09"
@@ -94,7 +94,7 @@ def request_for(issue, reward="10", capture=False, *, resource=None, verifier="p
         verifier=verifier,
         content=content,
     )
-    url = f"https://github.com/Scottcjn/rustchain-bounties/issues/{issue}"
+    url = f"https://github.com/scottcjn/rustchain-bounties/issues/{issue}"
     req["canonical_source_url"] = url
     req["advertised_reward"] = reward
     req["source"]["snapshot_sha256"] = h(str(issue))
@@ -152,6 +152,17 @@ class DistributionFulfillmentTests(unittest.TestCase):
         attacker_auth = authority(forged, key=ATTACKER_KEY)
         with self.assertRaisesRegex(d.DistributionFulfillmentError, "MAC authentication failed"):
             self.evaluate(forged, attacker_auth)
+
+    def test_advertised_reward_is_authenticated_and_exponent_bomb_rejected(self):
+        req = request(); auth = authority(req)
+        forged = copy.deepcopy(req)
+        forged["advertised_reward"] = "999999"
+        with self.assertRaisesRegex(d.DistributionFulfillmentError, "MAC authentication failed"):
+            self.evaluate(forged, auth)
+        with self.assertRaisesRegex(d.DistributionFulfillmentError, "plain decimal"):
+            d._reward("1e100000000")
+        with self.assertRaisesRegex(d.DistributionFulfillmentError, "plain decimal"):
+            d._reward("0." + "1" * 127)
 
     def test_host_key_id_is_not_caller_selected(self):
         req = request()
@@ -317,6 +328,23 @@ class DistributionFulfillmentTests(unittest.TestCase):
         with self.assertRaisesRegex(d.DistributionFulfillmentError, "MAC authentication failed"):
             self.evaluate(req, forged)
 
+    def test_github_case_aliases_share_one_canonical_claim_identity(self):
+        req = request()
+        alias = copy.deepcopy(req)
+        alias["canonical_source_url"] = "https://github.com/SCOTTCJN/RustChain-Bounties/issues/315"
+        self.assertEqual(d._issue(req["canonical_source_url"]), d._issue(alias["canonical_source_url"]))
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self.assertEqual(d._authority_record_path(req["canonical_source_url"], root), d._authority_record_path(alias["canonical_source_url"], root))
+        with self.assertRaisesRegex(d.DistributionFulfillmentError, "duplicate canonical"):
+            d.build_queue(
+                [req, alias],
+                authorities_by_source={SOURCE: authority(req)},
+                trusted_key=KEY,
+                trusted_key_id=KEY_ID,
+                trusted_at=NOW,
+            )
+
     def test_queue_prioritizes_reward_and_exact_authority_coverage(self):
         missing = request(capture=False)
         lower = request_for(316, reward="10", capture=False)
@@ -407,6 +435,44 @@ class DistributionFulfillmentTests(unittest.TestCase):
             link.symlink_to(key_path)
             with self.assertRaisesRegex(d.DistributionFulfillmentError, "symlink"):
                 d._read_private_file(link, name="authority key")
+
+    @unittest.skipUnless(os.name == "posix", "POSIX descriptor fence")
+    def test_private_read_retains_parent_generation_across_path_rebind(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            root = base / "trusted"
+            old = base / "trusted-old"
+            root.mkdir(mode=0o700)
+            key_path = root / "key.json"
+            key_path.write_text(json.dumps({
+                "schema": d.AUTHORITY_KEY_SCHEMA,
+                "key_id": KEY_ID,
+                "key_hex": KEY.hex(),
+            }), encoding="utf-8")
+            os.chmod(key_path, 0o600)
+
+            real_open = os.open
+            swapped = False
+
+            def adversarial_open(path, flags, *args, **kwargs):
+                nonlocal swapped
+                fd = real_open(path, flags, *args, **kwargs)
+                if not swapped and kwargs.get("dir_fd") is None and os.fspath(path) == os.fspath(root):
+                    swapped = True
+                    root.rename(old)
+                    root.mkdir(mode=0o700)
+                    attacker = root / "key.json"
+                    attacker.write_text(json.dumps({
+                        "schema": d.AUTHORITY_KEY_SCHEMA,
+                        "key_id": "attacker-key",
+                        "key_hex": ATTACKER_KEY.hex(),
+                    }), encoding="utf-8")
+                    os.chmod(attacker, 0o600)
+                return fd
+
+            with mock.patch.object(d.os, "open", side_effect=adversarial_open):
+                self.assertEqual(d._load_trusted_key(key_path), (KEY_ID, KEY))
+            self.assertTrue(swapped)
 
     def test_record_path_is_source_derived_not_caller_named(self):
         with tempfile.TemporaryDirectory() as td:
