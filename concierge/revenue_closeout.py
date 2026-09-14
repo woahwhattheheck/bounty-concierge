@@ -1,159 +1,188 @@
 # SPDX-License-Identifier: MIT
-"""Paid-work closeout with evidence-bound settlement-contact state.
+"""Authoritative paid-work closeout evaluator.
 
-The historical closeout implementation is preserved byte-for-byte in
-``revenue_closeout_core``.  This public module closes one authority gap in that
-implementation: a configured ``settlement_followup_url`` is only route metadata;
-it does not prove that a collection/follow-up message was sent.
+This layer composes the reviewed closeout implementation with a content-
+generation fence for every mutable external feedback body. Settlement routing
+never relies on GitHub's second-granularity timestamps to prove that a review,
+inline review comment, or issue comment body was handled.
 
-A merged item therefore remains actionable until an explicit send receipt is
-bound to the same repository, PR, exact settlement route, and post-merge time.
-The receipt is evidence supplied to this read-only compiler; this module never
-contacts a sponsor, sends mail, mutates a provider, or infers cash/revenue.
+The module is read-only. It never contacts a sponsor, sends mail, mutates a
+provider, or infers earned/paid cash from a merge.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-import hashlib
-import re
 from typing import Any
 
-from concierge import revenue_closeout_core as _core
+import requests
+
+from concierge import _revenue_closeout_public_v1 as _v1
 
 
-# Preserve the established public/test-facing API. Only the validation and
-# closeout decision seams below are replaced.
-for _export_name in dir(_core):
+# Preserve the reviewed public/test-facing surface; validation and scanning are
+# replaced below. The preserved predecessor remains immutable reference code.
+for _export_name in dir(_v1):
     if not _export_name.startswith("__"):
-        globals()[_export_name] = getattr(_core, _export_name)
+        globals()[_export_name] = getattr(_v1, _export_name)
+
+_core = _v1._core
+
+_FEEDBACK_BODY_ACK_KEYS = frozenset({"kind", "feedback_id", "body_sha256"})
+_FEEDBACK_BODY_KINDS = frozenset({"review", "inline_comment", "comment"})
+_MAX_FEEDBACK_BODY_ACKS = 1000
 
 
-_original_validate_item = _core._validate_item
-_original_scan_paid_pr = _core.scan_paid_pr
-
-_CONTACT_KEYS = frozenset(
-    {
-        "repo",
-        "pr",
-        "provider",
-        "receipt_ref",
-        "receipt_sha256",
-        "sent_at",
-        "settlement_route_sha256",
-    }
-)
-_PROVIDER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
-_RECEIPT_REF_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$")
-_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-
-
-def _route_sha256(route: str) -> str:
-    return hashlib.sha256(route.encode("utf-8")).hexdigest()
-
-
-def _contact_evidence(
+def _feedback_body_acknowledgements(
     raw: Any,
-    *,
-    repo: str,
-    pr: int,
-    settlement_route: str | None,
-) -> dict[str, Any] | None:
-    if raw is None:
-        return None
-    if type(raw) is not dict or set(raw) != _CONTACT_KEYS:
-        raise RevenueCloseoutInputError(
-            "settlement_followup_evidence must contain exact receipt-binding keys"
-        )
-    if type(raw["repo"]) is not str or raw["repo"] != repo:
-        raise RevenueCloseoutInputError(
-            "settlement_followup_evidence cannot be transplanted across PR identities"
-        )
-    if type(raw["pr"]) is not int or raw["pr"] != pr:
-        raise RevenueCloseoutInputError(
-            "settlement_followup_evidence cannot be transplanted across PR identities"
-        )
-    if settlement_route is None:
-        raise RevenueCloseoutInputError(
-            "settlement_followup_evidence requires settlement_followup_url route metadata"
-        )
-
-    provider = raw["provider"]
-    if type(provider) is not str or not _PROVIDER_RE.fullmatch(provider):
-        raise RevenueCloseoutInputError(
-            "settlement_followup_evidence.provider must be a bounded provider token"
-        )
-    receipt_ref = raw["receipt_ref"]
-    if type(receipt_ref) is not str or not _RECEIPT_REF_RE.fullmatch(receipt_ref):
-        raise RevenueCloseoutInputError(
-            "settlement_followup_evidence.receipt_ref must be one bounded opaque reference"
-        )
-    receipt_sha = raw["receipt_sha256"]
-    if type(receipt_sha) is not str or not _SHA256_RE.fullmatch(receipt_sha):
-        raise RevenueCloseoutInputError(
-            "settlement_followup_evidence.receipt_sha256 must be lowercase SHA-256"
-        )
-    route_sha = raw["settlement_route_sha256"]
-    if type(route_sha) is not str or not _SHA256_RE.fullmatch(route_sha):
-        raise RevenueCloseoutInputError(
-            "settlement_followup_evidence.settlement_route_sha256 must be lowercase SHA-256"
-        )
-    expected_route_sha = _route_sha256(settlement_route)
-    if route_sha != expected_route_sha:
-        raise RevenueCloseoutInputError(
-            "settlement_followup_evidence is not bound to the configured settlement route"
-        )
-    sent_at = _parse_timestamp(
-        raw["sent_at"],
-        field="settlement_followup_evidence.sent_at",
-        allow_none=False,
-    )
-    return {
-        "repo": repo,
-        "pr": pr,
-        "provider": provider,
-        "receipt_ref": receipt_ref,
-        "receipt_sha256": receipt_sha,
-        "sent_at": _iso_or_none(sent_at),
-        "settlement_route_sha256": route_sha,
+    legacy_review_acks: dict[int, str],
+) -> dict[tuple[str, int], str]:
+    """Normalize legacy review acks plus generalized feedback-body acks."""
+    result: dict[tuple[str, int], str] = {
+        ("review", review_id): digest
+        for review_id, digest in legacy_review_acks.items()
     }
+    if raw is None:
+        return result
+    if type(raw) is not list:
+        raise RevenueCloseoutInputError(
+            "acknowledged_feedback_bodies must be a list of exact feedback generations"
+        )
+    if len(raw) > _MAX_FEEDBACK_BODY_ACKS:
+        raise RevenueCloseoutInputError("acknowledged_feedback_bodies is too large")
+
+    seen_new: set[tuple[str, int]] = set()
+    for entry in raw:
+        if type(entry) is not dict or set(entry) != _FEEDBACK_BODY_ACK_KEYS:
+            raise RevenueCloseoutInputError(
+                "acknowledged_feedback_bodies entries require exact "
+                "kind/feedback_id/body_sha256 keys"
+            )
+        kind = entry["kind"]
+        feedback_id = entry["feedback_id"]
+        digest = entry["body_sha256"]
+        if type(kind) is not str or kind not in _FEEDBACK_BODY_KINDS:
+            raise RevenueCloseoutInputError(
+                "acknowledged_feedback_bodies.kind must be review, "
+                "inline_comment, or comment"
+            )
+        if type(feedback_id) is not int or feedback_id <= 0:
+            raise RevenueCloseoutInputError(
+                "acknowledged_feedback_bodies.feedback_id must be a positive integer"
+            )
+        if type(digest) is not str or not _SHA256_RE.fullmatch(digest):
+            raise RevenueCloseoutInputError(
+                "acknowledged_feedback_bodies.body_sha256 must be lowercase SHA-256"
+            )
+        key = (kind, feedback_id)
+        if key in seen_new:
+            raise RevenueCloseoutInputError(
+                "acknowledged_feedback_bodies must not repeat a feedback identity"
+            )
+        seen_new.add(key)
+        prior = result.get(key)
+        if prior is not None and prior != digest:
+            raise RevenueCloseoutInputError(
+                "legacy and generalized acknowledgements conflict for one feedback identity"
+            )
+        result[key] = digest
+    return result
 
 
 def _validate_item(raw: Any) -> dict[str, Any]:
-    item = _original_validate_item(raw)
-    evidence = _contact_evidence(
-        raw.get("settlement_followup_evidence") if type(raw) is dict else None,
-        repo=item["repo"],
-        pr=item["pr"],
-        settlement_route=item["settlement_followup_url"],
+    item = _v1._validate_item(raw)
+    generalized = _feedback_body_acknowledgements(
+        raw.get("acknowledged_feedback_bodies") if type(raw) is dict else None,
+        item["acknowledged_review_bodies"],
     )
-    return {**item, "settlement_followup_evidence": evidence}
+    return {
+        **item,
+        "acknowledged_feedback_bodies": generalized,
+    }
 
 
-def _validate_contact_chronology(
-    result: dict[str, Any], evidence: dict[str, Any]
-) -> None:
-    if result["state"] != "MERGED":
-        raise RevenueCloseoutInputError(
-            "settlement_followup_evidence is only valid for currently merged work"
-        )
-    merged_at = _parse_timestamp(
-        result.get("merged_at"), field="merged_at", allow_none=False
-    )
-    sent_at = _parse_timestamp(
-        evidence["sent_at"],
-        field="settlement_followup_evidence.sent_at",
-        allow_none=False,
-    )
-    now = datetime.now(timezone.utc)
-    if sent_at < merged_at:
-        raise RevenueCloseoutInputError(
-            "settlement follow-up send evidence cannot predate the merge"
-        )
-    if sent_at > now:
-        raise RevenueCloseoutInputError(
-            "settlement follow-up send evidence cannot be in the future"
-        )
+def _feedback_body_generations(
+    feedback: list[dict[str, Any]],
+    acknowledgements: dict[tuple[str, int], str],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Partition every actionable mutable body by exact stable-id generation."""
+    acknowledged: list[dict[str, Any]] = []
+    unacknowledged: list[dict[str, Any]] = []
+    for event in feedback:
+        kind = event.get("kind")
+        if kind not in _FEEDBACK_BODY_KINDS or not event.get("_has_body"):
+            continue
+        if kind == "review" and event.get("state") != "COMMENTED":
+            continue
+
+        source_id = event.get("_source_id")
+        if (
+            not isinstance(source_id, tuple)
+            or len(source_id) != 2
+            or source_id[0] != kind
+            or type(source_id[1]) is not int
+            or source_id[1] <= 0
+        ):
+            raise RevenueCloseoutError(
+                f"GitHub non-empty {kind} omitted a stable positive id"
+            )
+        digest = event.get("_body_digest")
+        if type(digest) is not str or not _SHA256_RE.fullmatch(digest):
+            raise RevenueCloseoutError(
+                f"GitHub non-empty {kind} omitted a stable body digest"
+            )
+
+        receipt = {
+            "kind": kind,
+            "feedback_id": source_id[1],
+            "body_sha256": digest,
+            "author": event["author"],
+            "at": _iso_or_none(event["at"]),
+            "url": event["url"],
+        }
+        if acknowledgements.get((kind, source_id[1])) == digest:
+            acknowledged.append(receipt)
+        else:
+            unacknowledged.append(receipt)
+    return acknowledged, unacknowledged
+
+
+def _legacy_review_receipts(
+    receipts: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "review_id": receipt["feedback_id"],
+            "body_sha256": receipt["body_sha256"],
+            "author": receipt["author"],
+            "submitted_at": receipt["at"],
+            "url": receipt["url"],
+        }
+        for receipt in receipts
+        if receipt["kind"] == "review"
+    ]
+
+
+def _decorate_head_moved(
+    result: dict[str, Any], item: dict[str, Any]
+) -> dict[str, Any]:
+    result = _v1._decorate_head_moved(result, item)
+    result["acknowledged_feedback_body_count"] = 0
+    result["unacknowledged_feedback_body_count"] = 0
+    result["unacknowledged_feedback_body_generations"] = []
+    return result
+
+
+def _source_key(event: dict[str, Any]) -> tuple[str, int] | None:
+    source_id = event.get("_source_id")
+    if (
+        isinstance(source_id, tuple)
+        and len(source_id) == 2
+        and isinstance(source_id[0], str)
+        and type(source_id[1]) is int
+        and source_id[1] > 0
+    ):
+        return source_id[0], source_id[1]
+    return None
 
 
 def scan_paid_pr(
@@ -163,50 +192,179 @@ def scan_paid_pr(
     session: Any = requests,
     max_pages: int = 10,
 ) -> dict[str, Any]:
-    """Read one paid-work PR without confusing a route with proof of contact."""
+    """Read one paid-work PR and return a content-generation-safe closeout receipt."""
     item = _validate_item(raw_item)
+    if isinstance(max_pages, bool) or not isinstance(max_pages, int) or max_pages <= 0:
+        raise RevenueCloseoutInputError("max_pages must be positive")
 
-    # The core scanner resolves its validator dynamically. Keep it pointed at
-    # this stricter validator so direct and queue callers share one contract.
-    _core._validate_item = globals()["_validate_item"]
-    result = _original_scan_paid_pr(
-        raw_item,
-        token,
-        session=session,
-        max_pages=max_pages,
-    )
+    token = token or GITHUB_TOKEN
+    headers = _headers(token)
+    repo = item["repo"]
+    number = item["pr"]
+
+    initial_pr = _core._fetch_pr(repo, number, session=session, headers=headers)
+    initial = _core._validate_pr_snapshot(initial_pr, item)
+    expected_head = item["expected_head_sha"]
+    if expected_head is not None and expected_head != initial["head_sha"]:
+        return _decorate_head_moved(_core._head_moved_result(item, initial), item)
+
+    if initial["state"] == "closed" or expected_head is not None:
+        coherent = _core._coherent_lifecycle_snapshot(
+            item,
+            session=session,
+            headers=headers,
+            max_pages=max_pages,
+        )
+        if isinstance(coherent, dict):
+            return _decorate_head_moved(coherent, item)
+        snapshot, feedback = coherent
+    else:
+        snapshot = initial
+        feedback = _core._collect_feedback(
+            repo,
+            number,
+            item["operator_login"],
+            session=session,
+            headers=headers,
+            max_pages=max_pages,
+        )
+
+    merged_at = snapshot["merged_at"]
+    state = snapshot["state"]
+    if merged_at is not None:
+        safe_state = "MERGED"
+    elif state == "closed":
+        safe_state = "CLOSED_UNMERGED"
+    else:
+        safe_state = "OPEN"
 
     evidence = item["settlement_followup_evidence"]
     evidence_current = False
-    if evidence is not None and result["state"] != "HEAD_MOVED":
-        _validate_contact_chronology(result, evidence)
+    if evidence is not None:
+        _validate_contact_chronology(
+            state=safe_state,
+            merged_at=merged_at,
+            evidence=evidence,
+        )
         evidence_current = True
 
-    # Maintainer repair/response continues to outrank settlement routing. Only
-    # the core's settlement decision pair is refined here.
-    if result["state"] == "MERGED" and result["next_action"] in {
-        "route_settlement_followup",
-        "monitor_settlement",
-    }:
-        if not evidence_current:
-            result["next_action"] = "route_settlement_followup"
-            if result.get("settlement_followup_url") is None:
-                result["reason"] = "merged_without_settlement_route"
-            else:
-                result["reason"] = "merged_route_metadata_without_send_evidence"
+    review_decisions = _core._current_review_decisions(feedback)
+    current_change_requests = [
+        event
+        for event in review_decisions.values()
+        if event["state"] == "CHANGES_REQUESTED"
+    ]
+    last_seen = item["last_seen_at"]
+    new_feedback = [event for event in feedback if event["at"] >= last_seen]
+
+    acknowledged_bodies, unacknowledged_bodies = _feedback_body_generations(
+        feedback,
+        item["acknowledged_feedback_bodies"],
+    )
+    acknowledged_keys = {
+        (receipt["kind"], receipt["feedback_id"])
+        for receipt in acknowledged_bodies
+    }
+
+    response_feedback: list[dict[str, Any]] = []
+    for event in new_feedback:
+        kind = event["kind"]
+        if kind in {"comment", "inline_comment"}:
+            if event.get("_has_body") and _source_key(event) in acknowledged_keys:
+                continue
+            response_feedback.append(event)
+        elif kind == "review" and event["state"] == "COMMENTED":
+            if event.get("_has_body") and _source_key(event) in acknowledged_keys:
+                continue
+            response_feedback.append(event)
+
+    unacknowledged_keys = {
+        (receipt["kind"], receipt["feedback_id"])
+        for receipt in unacknowledged_bodies
+    }
+    unacknowledged_events = [
+        event for event in feedback if _source_key(event) in unacknowledged_keys
+    ]
+
+    if current_change_requests:
+        next_action = "repair_requested"
+        reason = "current_maintainer_changes_requested"
+    elif unacknowledged_bodies:
+        next_action = "respond_to_maintainer"
+        kinds = {receipt["kind"] for receipt in unacknowledged_bodies}
+        hidden_generation = any(event["at"] < last_seen for event in unacknowledged_events)
+        if kinds == {"review"}:
+            reason = "unacknowledged_maintainer_review_body_generation"
+        elif hidden_generation:
+            reason = "unacknowledged_maintainer_feedback_body_generation"
         else:
-            result["next_action"] = "monitor_settlement"
-            result["reason"] = "merged_followup_send_evidenced"
+            # Preserve the historical reason for newly visible comment feedback;
+            # the generation receipt still prevents timestamp-only acknowledgement.
+            reason = "new_maintainer_feedback"
+    elif response_feedback:
+        next_action = "respond_to_maintainer"
+        reason = "new_maintainer_feedback"
+    elif merged_at is not None:
+        if evidence_current:
+            next_action = "monitor_settlement"
+            reason = "merged_followup_send_evidenced"
+        else:
+            next_action = "route_settlement_followup"
+            if item["settlement_followup_url"] is None:
+                reason = "merged_without_settlement_route"
+            else:
+                reason = "merged_route_metadata_without_send_evidence"
+    elif state == "closed":
+        next_action = "investigate_closed_unmerged"
+        reason = "pr_closed_unmerged"
+    elif new_feedback:
+        next_action = "await_acceptance"
+        reason = "new_nonactionable_maintainer_review"
+    else:
+        next_action = "await_acceptance"
+        reason = "open_without_new_maintainer_feedback"
 
-    result["settlement_followup_send_evidenced"] = evidence_current
-    result["settlement_followup_evidence"] = evidence
-    result["settlement_route_proves_prior_contact"] = False
-    return result
+    if next_action == "respond_to_maintainer" and unacknowledged_bodies:
+        action_events = unacknowledged_events + response_feedback
+        latest = max(action_events, key=lambda event: event["at"]) if action_events else None
+    else:
+        latest = new_feedback[-1] if new_feedback else None
+
+    acknowledged_reviews = _legacy_review_receipts(acknowledged_bodies)
+    unacknowledged_reviews = _legacy_review_receipts(unacknowledged_bodies)
+
+    return {
+        "repo": repo,
+        "pr": number,
+        "canonical_url": snapshot["canonical_url"],
+        "head_sha": snapshot["head_sha"],
+        "advertised_amount": format(item["advertised_amount"], "f"),
+        "currency": item["currency"],
+        "state": safe_state,
+        "merged_at": _iso_or_none(merged_at),
+        "next_action": next_action,
+        "reason": reason,
+        "new_feedback_count": len(new_feedback),
+        "current_change_request_count": len(current_change_requests),
+        "latest_feedback": _latest_feedback_receipt(latest),
+        "settlement_followup_url": item["settlement_followup_url"],
+        "settlement_followup_send_evidenced": evidence_current,
+        "settlement_followup_evidence": evidence,
+        "settlement_route_proves_prior_contact": False,
+        "acknowledged_review_body_count": len(acknowledged_reviews),
+        "unacknowledged_review_body_count": len(unacknowledged_reviews),
+        "unacknowledged_review_body_generations": unacknowledged_reviews,
+        "acknowledged_feedback_body_count": len(acknowledged_bodies),
+        "unacknowledged_feedback_body_count": len(unacknowledged_bodies),
+        "unacknowledged_feedback_body_generations": unacknowledged_bodies,
+        "cash_status": "not_inferred",
+    }
 
 
-# Core-defined functions resolve collaborators through the core module's global
-# namespace. Patch the two guarded seams so build_closeout_queue() and main()
-# automatically use the evidence-bound behavior while preserving their APIs.
+# Install the single authoritative evaluator into the compatibility facade.
+# Its queue/CLI functions resolve these globals dynamically, so every public
+# path receives the same content-generation fence. The preserved predecessor is
+# not patched, preventing validation recursion and retaining auditability.
 _core._validate_item = _validate_item
 _core.scan_paid_pr = scan_paid_pr
 

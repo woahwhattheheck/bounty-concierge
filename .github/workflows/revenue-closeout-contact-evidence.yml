@@ -5,10 +5,21 @@ on:
     paths:
       - "concierge/revenue_closeout.py"
       - "concierge/revenue_closeout_core.py"
+      - "concierge/_revenue_closeout_public_v1.py"
+      - "concierge/_revenue_closeout_core_impl.py"
       - "tests/test_revenue_closeout.py"
+      - "tests/legacy_revenue_closeout.py"
+      - "tests/legacy_revenue_closeout_contact_evidence.py"
+      - "tests/legacy_revenue_closeout_contact_evidence_edges.py"
+      - "tests/test_revenue_closeout_inline_reviews.py"
+      - "tests/test_revenue_closeout_review_hardening.py"
+      - "tests/test_revenue_closeout_review_body_generation.py"
+      - "tests/test_revenue_closeout_feedback_generation_v2.py"
       - "tests/test_revenue_closeout_contact_evidence.py"
       - "tests/test_revenue_closeout_contact_evidence_edges.py"
       - "docs/REVENUE_CLOSEOUT_CONTACT_EVIDENCE.md"
+      - "docs/REVENUE_CLOSEOUT_REVIEW_BODY_ACK.md"
+      - "docs/REVENUE_CLOSEOUT_FEEDBACK_GENERATIONS.md"
       - ".github/workflows/revenue-closeout-contact-evidence.yml"
   push:
     branches:
@@ -16,10 +27,21 @@ on:
     paths:
       - "concierge/revenue_closeout.py"
       - "concierge/revenue_closeout_core.py"
+      - "concierge/_revenue_closeout_public_v1.py"
+      - "concierge/_revenue_closeout_core_impl.py"
       - "tests/test_revenue_closeout.py"
+      - "tests/legacy_revenue_closeout.py"
+      - "tests/legacy_revenue_closeout_contact_evidence.py"
+      - "tests/legacy_revenue_closeout_contact_evidence_edges.py"
+      - "tests/test_revenue_closeout_inline_reviews.py"
+      - "tests/test_revenue_closeout_review_hardening.py"
+      - "tests/test_revenue_closeout_review_body_generation.py"
+      - "tests/test_revenue_closeout_feedback_generation_v2.py"
       - "tests/test_revenue_closeout_contact_evidence.py"
       - "tests/test_revenue_closeout_contact_evidence_edges.py"
       - "docs/REVENUE_CLOSEOUT_CONTACT_EVIDENCE.md"
+      - "docs/REVENUE_CLOSEOUT_REVIEW_BODY_ACK.md"
+      - "docs/REVENUE_CLOSEOUT_FEEDBACK_GENERATIONS.md"
       - ".github/workflows/revenue-closeout-contact-evidence.yml"
 
 permissions:
@@ -52,18 +74,35 @@ jobs:
           python -m py_compile
           concierge/revenue_closeout.py
           concierge/revenue_closeout_core.py
+          concierge/_revenue_closeout_public_v1.py
+          concierge/_revenue_closeout_core_impl.py
           tests/test_revenue_closeout.py
+          tests/legacy_revenue_closeout.py
+          tests/legacy_revenue_closeout_contact_evidence.py
+          tests/legacy_revenue_closeout_contact_evidence_edges.py
+          tests/test_revenue_closeout_inline_reviews.py
+          tests/test_revenue_closeout_review_hardening.py
+          tests/test_revenue_closeout_review_body_generation.py
+          tests/test_revenue_closeout_feedback_generation_v2.py
           tests/test_revenue_closeout_contact_evidence.py
           tests/test_revenue_closeout_contact_evidence_edges.py
       - name: Run closeout regressions
         run: >-
           python -m unittest -v
           tests.test_revenue_closeout
+          tests.test_revenue_closeout_inline_reviews
+          tests.test_revenue_closeout_review_hardening
+          tests.test_revenue_closeout_review_body_generation
+          tests.test_revenue_closeout_feedback_generation_v2
           tests.test_revenue_closeout_contact_evidence
           tests.test_revenue_closeout_contact_evidence_edges
       - name: Run optimized closeout regressions
         run: >-
           python -O -m unittest -v
           tests.test_revenue_closeout
+          tests.test_revenue_closeout_inline_reviews
+          tests.test_revenue_closeout_review_hardening
+          tests.test_revenue_closeout_review_body_generation
+          tests.test_revenue_closeout_feedback_generation_v2
           tests.test_revenue_closeout_contact_evidence
           tests.test_revenue_closeout_contact_evidence_edges
