@@ -1,0 +1,42 @@
+name: Claim Work Live Authority
+
+on:
+  pull_request:
+    paths:
+      - "concierge/claim_work_authority.py"
+      - "tests/test_claim_work_authority.py"
+      - "docs/CLAIM_WORK_LIVE_AUTHORITY.md"
+      - ".github/workflows/claim-work-live-authority.yml"
+      - "concierge/sponsor_adjudication/**"
+  push:
+    branches: [main]
+    paths:
+      - "concierge/claim_work_authority.py"
+      - "tests/test_claim_work_authority.py"
+      - "docs/CLAIM_WORK_LIVE_AUTHORITY.md"
+      - ".github/workflows/claim-work-live-authority.yml"
+      - "concierge/sponsor_adjudication/**"
+
+permissions:
+  contents: read
+
+jobs:
+  authority:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install runtime dependency
+        run: python -m pip install --disable-pip-version-check requests
+      - name: Compile exact authority source
+        run: python -m py_compile concierge/claim_work_authority.py tests/test_claim_work_authority.py
+      - name: Hostile authority suite
+        run: python -m unittest -v tests.test_claim_work_authority
+      - name: Hostile authority suite under optimized Python
+        run: python -O -m unittest -v tests.test_claim_work_authority
