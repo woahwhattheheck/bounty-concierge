@@ -230,8 +230,13 @@ class CapabilityGateTests(unittest.TestCase):
         with self.assertRaises(CapabilityGateBlocked):
             self.verify(transport=FakeTransport(ref, self.tag))
 
-    def test_live_ref_must_point_to_annotated_tag(self):
-        ref = dict(self.ref); ref["object"] = {"type": "commit", "sha": TAG_SHA}
+    def test_live_ref_shape_does_not_depend_on_optional_object_type(self):
+        ref = dict(self.ref); ref["object"] = {"sha": TAG_SHA}
+        proof = self.verify(transport=FakeTransport(ref, self.tag))
+        self.assertTrue(proof["proof_of_possession_verified"])
+
+    def test_live_ref_missing_object_sha_blocks(self):
+        ref = dict(self.ref); ref["object"] = {}
         with self.assertRaises(CapabilityGateBlocked):
             self.verify(transport=FakeTransport(ref, self.tag))
 
