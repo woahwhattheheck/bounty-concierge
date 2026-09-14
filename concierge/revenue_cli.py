@@ -164,16 +164,15 @@ def run(
         )
         return 2
 
+    # Invoke outside the launcher's return-contract handler. Downstream
+    # exceptions (including a TypeError with identical text) remain the target's
+    # own semantics and are never reclassified by this wrapper.
+    result = entrypoint(args[1:])
     try:
-        return _normalize_exit_code(entrypoint(args[1:]))
-    except TypeError as exc:
-        # Normalize only the launcher's own return-contract failure. Do not
-        # catch downstream SystemExit: argparse help/errors and module-defined
-        # exit semantics must propagate exactly.
-        if str(exc) == "target main(argv) must return int or None":
-            print(f"Error: invalid return contract from revenue target: {target}", file=stderr)
-            return 2
-        raise
+        return _normalize_exit_code(result)
+    except TypeError:
+        print(f"Error: invalid return contract from revenue target: {target}", file=stderr)
+        return 2
 
 
 def main(argv: Sequence[str] | None = None) -> int:
