@@ -44,7 +44,7 @@ BOUNTY_SPONSOR_ADJUDICATION_AUTHORIZED_PRINCIPAL_SHA256
 
 The HMAC key must be at least 32 bytes. A trusted adapter may use `authority.sign_for_test_or_host_fixture(...)` **only after the credential-owning host has reacquired the evidence**. The helper proves possession of host configuration; it does not perform provider acquisition itself.
 
-`BOUNTY_SPONSOR_ADJUDICATION_TEST_ONLY_ALLOW_UNSIGNED=1` exists solely so the predecessor semantic regression suite can replay unsigned historical fixtures. It is an explicit host-environment bypass and must never be set by production jobs.
+The former `BOUNTY_SPONSOR_ADJUDICATION_TEST_ONLY_ALLOW_UNSIGNED` switch is retired. Its presence now fails closed on compile, report binding, retained verification, and fixture signing; production has no unsigned sponsor-authority mode. The predecessor semantic regression suite is preserved by a repository-local `sitecustomize` adapter under `tests/sponsor_adjudication_unsigned_site/`, loaded only when the dedicated workflow step explicitly prepends that directory to `PYTHONPATH`. That adapter is outside the `concierge` package and is not activated by any production environment flag.
 
 The retained authority record is embedded under `report.program.sponsor_authority`; the report digest and receipt file digests therefore bind it durably. Public `verify_report` / `verify_artifacts` verify the HMAC and exact retained event scope historically. Historical verification deliberately does not reapply the 300-second freshness window: freshness is an ingestion property, while signature/event-scope integrity must remain verifiable later.
 
@@ -103,6 +103,7 @@ Finding-level output becomes `DO_NOT_RESUBMIT` as soon as host-authorized sponso
 The compiler rejects, among other cases:
 
 - non-empty sponsor events without current host authority;
+- a configured retired unsigned-authority environment variable;
 - wrong provider/principal, invalid HMAC, stale/future capture, or authority replay/transplant;
 - event-scope or full manifest mutation after host attestation;
 - duplicate JSON keys, floats, `NaN`, and `Infinity`;

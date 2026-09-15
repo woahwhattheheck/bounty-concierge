@@ -5,6 +5,7 @@ on:
     paths:
       - "concierge/sponsor_adjudication/**"
       - "tests/test_sponsor_adjudication*.py"
+      - "tests/sponsor_adjudication_unsigned_site/**"
       - "docs/SPONSOR_ADJUDICATION.md"
       - ".github/workflows/sponsor-adjudication.yml"
   push:
@@ -12,6 +13,7 @@ on:
     paths:
       - "concierge/sponsor_adjudication/**"
       - "tests/test_sponsor_adjudication*.py"
+      - "tests/sponsor_adjudication_unsigned_site/**"
       - "docs/SPONSOR_ADJUDICATION.md"
       - ".github/workflows/sponsor-adjudication.yml"
   workflow_dispatch:
@@ -34,23 +36,23 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Pre-authority semantic regression suite
         env:
-          BOUNTY_SPONSOR_ADJUDICATION_TEST_ONLY_ALLOW_UNSIGNED: "1"
+          PYTHONPATH: "tests/sponsor_adjudication_unsigned_site:."
         run: python -m unittest -v tests.test_sponsor_adjudication tests.test_sponsor_adjudication_hardening
       - name: Pre-authority optimized semantic regression suite
         env:
-          BOUNTY_SPONSOR_ADJUDICATION_TEST_ONLY_ALLOW_UNSIGNED: "1"
+          PYTHONPATH: "tests/sponsor_adjudication_unsigned_site:."
         run: python -O -m unittest -v tests.test_sponsor_adjudication tests.test_sponsor_adjudication_hardening
       - name: Host-authority hostile suite
         env:
           BOUNTY_SPONSOR_ADJUDICATION_HMAC_KEY_HEX: "1111111111111111111111111111111111111111111111111111111111111111"
           BOUNTY_SPONSOR_ADJUDICATION_AUTHORIZED_PROVIDER: "gmail"
           BOUNTY_SPONSOR_ADJUDICATION_AUTHORIZED_PRINCIPAL_SHA256: "03b2cbe8a9410c7def5943799c27154a6e77daad63ec56df11739fc3b804e506"
-        run: python -m unittest -v tests.test_sponsor_adjudication_authority tests.test_sponsor_adjudication_zero_event_authority
+        run: python -m unittest -v tests.test_sponsor_adjudication_authority tests.test_sponsor_adjudication_zero_event_authority tests.test_sponsor_adjudication_runtime_unsigned_rejection
       - name: Host-authority optimized hostile suite
         env:
           BOUNTY_SPONSOR_ADJUDICATION_HMAC_KEY_HEX: "1111111111111111111111111111111111111111111111111111111111111111"
           BOUNTY_SPONSOR_ADJUDICATION_AUTHORIZED_PROVIDER: "gmail"
           BOUNTY_SPONSOR_ADJUDICATION_AUTHORIZED_PRINCIPAL_SHA256: "03b2cbe8a9410c7def5943799c27154a6e77daad63ec56df11739fc3b804e506"
-        run: python -O -m unittest -v tests.test_sponsor_adjudication_authority tests.test_sponsor_adjudication_zero_event_authority
+        run: python -O -m unittest -v tests.test_sponsor_adjudication_authority tests.test_sponsor_adjudication_zero_event_authority tests.test_sponsor_adjudication_runtime_unsigned_rejection
       - name: Compile
-        run: python -m py_compile concierge/sponsor_adjudication/*.py tests/test_sponsor_adjudication.py tests/test_sponsor_adjudication_hardening.py tests/test_sponsor_adjudication_authority.py tests/test_sponsor_adjudication_zero_event_authority.py
+        run: python -m py_compile concierge/sponsor_adjudication/*.py tests/test_sponsor_adjudication.py tests/test_sponsor_adjudication_hardening.py tests/test_sponsor_adjudication_authority.py tests/test_sponsor_adjudication_zero_event_authority.py tests/test_sponsor_adjudication_runtime_unsigned_rejection.py tests/sponsor_adjudication_unsigned_site/sitecustomize.py

@@ -1,20 +1,22 @@
 """Host authority for sponsor-origin adjudication events.
 
-The compiler's ordinary manifest is caller-controlled.  This module prevents that
+The compiler's ordinary manifest is caller-controlled. This module prevents that
 caller from turning a self-authored source_ref/source_sha256 pair into sponsor
-verification, reward, or payment posture.  A non-empty sponsor-event generation
+verification, reward, or payment posture. A non-empty sponsor-event generation
 must be attested by the credential-owning host with a key and identity supplied
 through host environment, never caller arguments.
 
 Historical reports carry a second host HMAC over the complete compiled report
-projection.  That binding chains the exact retained report bytes back to the
+projection. That binding chains the exact retained report bytes back to the
 signed authority-free manifest generation, so a caller cannot edit a derived
 status/action or other non-event output, recompute the public report hash, and
 keep sponsor authority.
 
-The test-only unsigned switch exists solely so the predecessor semantic suite can
-exercise its historical state machine.  It is an explicit host-environment
-choice; production entrypoints must leave it unset.
+The former test-only unsigned environment switch is retained only as a
+fail-closed compatibility tombstone. Its presence is an unsafe process
+configuration and every authority entrypoint rejects it. Historical semantic
+fixtures are exercised by a repository-local test harness outside the production
+package; production code has no unsigned mode.
 """
 from __future__ import annotations
 
@@ -63,8 +65,12 @@ _EVENT_KEYS = (
 )
 
 
-def _test_unsigned_enabled() -> bool:
-    return os.environ.get(TEST_UNSIGNED_ENV) == "1"
+def _reject_legacy_unsigned_mode() -> None:
+    """Reject the retired runtime bypass before any authority decision."""
+    if TEST_UNSIGNED_ENV in os.environ:
+        raise AdjudicationError(
+            f"{TEST_UNSIGNED_ENV} is retired; unsigned sponsor authority is forbidden"
+        )
 
 
 def event_scope_rows(events: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
@@ -232,11 +238,10 @@ def verify_manifest_authority(
     authority_value: Any,
 ) -> Dict[str, Any] | None:
     """Verify current host authority before caller events may drive state."""
+    _reject_legacy_unsigned_mode()
     if not events:
         if authority_value is not None:
             raise AdjudicationError("sponsor_authority is forbidden when sponsor_events is empty")
-        return None
-    if _test_unsigned_enabled():
         return None
     if authority_value is None:
         raise AdjudicationError("non-empty sponsor_events require host sponsor_authority")
@@ -254,8 +259,7 @@ def verify_manifest_authority(
 
 def bind_report_generation(program: Mapping[str, Any], report_projection: Mapping[str, Any]) -> Dict[str, Any] | None:
     """Bind a compiled report projection to the exact signed input generation."""
-    if _test_unsigned_enabled():
-        return None
+    _reject_legacy_unsigned_mode()
     authority = _normalize_authority(program.get("sponsor_authority"))
     _verify_signature(authority)
     key, _, _ = _host_config()
@@ -276,19 +280,18 @@ def verify_report_authority(
     report_binding_value: Any,
     report_projection: Mapping[str, Any],
 ) -> Dict[str, Any] | None:
-    """Verify retained sponsor authority and the exact historical report generation.
+    """Verify retained sponsor authority and exact historical report generation.
 
     Historical verification intentionally does not impose current freshness on the
-    original provider capture.  It does, however, require both the original host
+    original provider capture. It does, however, require both the original host
     HMAC and the host HMAC over the complete compiled report projection.
     """
+    _reject_legacy_unsigned_mode()
     if not events:
         if "sponsor_authority" in program:
             raise AdjudicationError("report has sponsor authority without sponsor events")
         if report_binding_value is not None:
             raise AdjudicationError("report has sponsor authority binding without sponsor events")
-        return None
-    if _test_unsigned_enabled():
         return None
     authority = _normalize_authority(program.get("sponsor_authority"))
     expected_scope = event_scope_sha256(program, events)
@@ -316,12 +319,13 @@ def sign_for_test_or_host_fixture(
     *,
     captured_at: str,
 ) -> Dict[str, Any]:
-    """Create an attestation using host env; intended for trusted adapters/tests only.
+    """Create an attestation using host env; intended for trusted adapters/tests.
 
     Production ingestion must generate this only after the credential-owning host
-    has reacquired the sponsor evidence.  Exporting this helper does not grant a
+    has reacquired the sponsor evidence. Exporting this helper does not grant a
     caller authority because the HMAC key and authorized identity remain host env.
     """
+    _reject_legacy_unsigned_mode()
     key, provider, principal = _host_config()
     _parse_utc(captured_at, where="captured_at")
     authority = {
