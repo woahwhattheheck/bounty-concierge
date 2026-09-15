@@ -329,8 +329,14 @@ def _validated_reconciliation(
 
 def _ranking_cmp(left: dict[str, Any], right: dict[str, Any]) -> int:
     """Compare exact cash/minute ratios without decimal-division rounding."""
-    left_cross = left["_verified"] * Decimal(right["active_minutes"])
-    right_cross = right["_verified"] * Decimal(left["active_minutes"])
+    # Decimal multiplication obeys the ambient context. The accepted money
+    # domain permits 30 significant digits, so precision 28 can round distinct
+    # cross-products equal and activate the identity tie-break incorrectly.
+    # Match the exact-sum boundary's precision without mutating global state.
+    with localcontext() as context:
+        context.prec = 128
+        left_cross = left["_verified"] * Decimal(right["active_minutes"])
+        right_cross = right["_verified"] * Decimal(left["active_minutes"])
     if left_cross > right_cross:
         return -1
     if left_cross < right_cross:
