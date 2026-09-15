@@ -13,10 +13,11 @@ closure-bound core dispatchers. Rebinding either module's attributes afterwards 
 not change those captured capabilities.
 
 Reloading the security-critical v3 implementation in-place is intentionally not a
-supported operation: a meta-path guard fails an ordinary ``importlib.reload(v3)``
-closed and instructs the host to restart, preserving the bootstrapped closures. This
-is narrower and more auditable than attempting to recreate an authority graph during
-an attacker-controlled live reload.
+supported code-update mechanism. A meta-path loader turns an ordinary
+``importlib.reload(v3)`` into a fail-safe no-op: the already bootstrapped module and
+its closure-bound entrypoints remain active. Hosts restart to load new v3 code. This
+preserves backward-compatible callers that invoke reload while refusing to recreate
+an authority graph from caller-mutable live module attributes.
 
 Threat boundary: arbitrary replacement of the supported core dispatcher itself,
 closure-cell surgery, ``sys.meta_path`` surgery, bytecode/function-code replacement,
@@ -29,6 +30,7 @@ private attribute rebinding (including ``types.ModuleType.__setattr__`` and dire
 from __future__ import annotations
 
 import importlib.abc
+import importlib.util
 import sys
 from datetime import datetime
 from typing import Any
@@ -42,15 +44,25 @@ _INSTALLED = False
 _RELOAD_GUARD = None
 
 
-class _V3ReloadGuard(importlib.abc.MetaPathFinder):
-    """Fail closed when ordinary importlib.reload targets the secured v3 module."""
+class _V3ReloadGuard(importlib.abc.MetaPathFinder, importlib.abc.Loader):
+    """Return a no-op loader for ordinary reload of the secured v3 module."""
 
     def find_spec(self, fullname: str, path: Any = None, target: Any = None):
         if fullname == _V3_MODULE_NAME and target is _v3:
-            raise ImportError(
-                "security-critical payoff_path_policy_v3 cannot be reloaded in-place; "
-                "restart the trusted host to load a new implementation"
+            return importlib.util.spec_from_loader(
+                fullname,
+                self,
+                origin="payoff-policy-secure-runtime",
             )
+        return None
+
+    def create_module(self, spec):
+        # Initial import has already completed before this guard is installed.
+        return None
+
+    def exec_module(self, module) -> None:
+        # Deliberate no-op on reload. Existing closure-bound functions and state stay
+        # in the retained module dictionary. A trusted host restart loads new source.
         return None
 
 
