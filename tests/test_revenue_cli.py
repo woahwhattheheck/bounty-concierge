@@ -11,7 +11,11 @@ class RevenueCliTests(unittest.TestCase):
     def test_registry_is_fixed_sorted_safe_and_unique(self):
         names = list(revenue_cli.COMMANDS)
         self.assertEqual(len(names), len(set(names)))
-        self.assertEqual(len(names), 11)
+        self.assertEqual(len(names), 12)
+        self.assertEqual(
+            revenue_cli.COMMANDS["payout-delivery"].module,
+            "concierge.payout_delivery_gate",
+        )
         for name, command in revenue_cli.COMMANDS.items():
             self.assertRegex(name, r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
             self.assertRegex(command.module, r"^concierge\.[a-z0-9_]+$")
@@ -220,7 +224,7 @@ class RevenueCliTests(unittest.TestCase):
         err = io.StringIO()
         fake = types.SimpleNamespace(main=lambda argv: {"not": "an exit code"})
         with mock.patch.object(revenue_cli.importlib, "import_module", return_value=fake):
-            code = revenue_cli.run(["payoff-path"], stderr=err)
+            code = revenue_cli.run(["payoff-path"])
         self.assertEqual(code, 2)
         self.assertIn("invalid return contract", err.getvalue())
 
