@@ -96,10 +96,17 @@ class FleetEconomicSourceIdentityTests(unittest.TestCase):
     def test_noncanonical_source_alias_surfaces_are_rejected(self):
         invalid = [
             "http://github.com/o/r/issues/1",
+            " https://github.com/o/r/issues/1",
+            "https://github.com/o/r/issues/1\n",
+            "https://github.com/o/\tr/issues/1",
+            "https://github.com\\o/r/issues/1",
             "https://user:secret@github.com/o/r/issues/1",
             "https://github.com:443/o/r/issues/1",
+            "https://github.com:/o/r/issues/1",
             "https://github.com/o/r/issues/1?duplicate=1",
+            "https://github.com/o/r/issues/1?",
             "https://github.com/o/r/issues/1#duplicate",
+            "https://github.com/o/r/issues/1#",
             "https://github.com/o/r/issues/%31",
             "https://github.com/o/r/issues/1/../1",
             "https://github.com/o//r/issues/1",
@@ -110,6 +117,14 @@ class FleetEconomicSourceIdentityTests(unittest.TestCase):
                     compile_fleet_economic_admission(
                         request(candidate(f"bad-{index}", source))
                     )
+
+    def test_source_length_is_bounded_before_economics(self):
+        source = "https://example.test/" + ("a" * 2048)
+        with self.assertRaisesRegex(
+            EconomicAdmissionInputError,
+            "exceeds 2048 characters",
+        ):
+            compile_fleet_economic_admission(request(candidate("long", source)))
 
     def test_distinct_generic_paths_are_not_guessed_equivalent(self):
         receipt = compile_fleet_economic_admission(

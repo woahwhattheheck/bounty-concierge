@@ -6,12 +6,12 @@ The original v1 economics compiler remains byte-preserved in
 source-identity fence that must run before any candidate can contribute to
 single or batch economics.
 
-Only bounded HTTPS URLs without userinfo, query, fragment, or an explicit port
-are accepted. GitHub issue URLs bind case-insensitive owner/repository identity
-and the exact positive issue number. Other URLs bind a normalized IDNA host
-while preserving the path instead of guessing application-specific identity.
-This remains planning-only and grants no dispatch, claim, submission, payment,
-cash, or revenue authority.
+Only bounded HTTPS URLs without whitespace, backslashes, userinfo, query,
+fragment, or an explicit port are accepted. GitHub issue URLs bind
+case-insensitive owner/repository identity and the exact positive issue number.
+Other URLs bind a normalized IDNA host while preserving the path instead of
+guessing application-specific identity. This remains planning-only and grants
+no dispatch, claim, submission, payment, cash, or revenue authority.
 """
 from __future__ import annotations
 
@@ -60,11 +60,26 @@ def _canonical_host(value: str, field: str) -> str:
 
 
 def _source_identity(value: Any, field: str) -> str:
-    source = _base._nonempty_string(value, field)
+    if not isinstance(value, str) or not value:
+        raise EconomicAdmissionInputError(f"{field} must be a non-empty string")
+    if value != value.strip():
+        raise EconomicAdmissionInputError(
+            f"{field} must not contain surrounding whitespace"
+        )
+    source = value
     if len(source) > _MAX_CANONICAL_SOURCE_URL_CHARS:
         raise EconomicAdmissionInputError(
             f"{field} exceeds {_MAX_CANONICAL_SOURCE_URL_CHARS} characters"
         )
+    if any(character.isspace() or ord(character) == 0x7F for character in source):
+        raise EconomicAdmissionInputError(f"{field} must not contain whitespace")
+    if "\\" in source:
+        raise EconomicAdmissionInputError(f"{field} must not contain backslashes")
+    if "?" in source or "#" in source:
+        raise EconomicAdmissionInputError(
+            f"{field} must not contain a query or fragment delimiter"
+        )
+
     try:
         parsed = urlsplit(source)
         explicit_port = parsed.port
@@ -75,7 +90,7 @@ def _source_identity(value: Any, field: str) -> str:
         raise EconomicAdmissionInputError(f"{field} must use https")
     if parsed.username is not None or parsed.password is not None:
         raise EconomicAdmissionInputError(f"{field} must not contain userinfo")
-    if explicit_port is not None:
+    if explicit_port is not None or ":" in parsed.netloc:
         raise EconomicAdmissionInputError(f"{field} must not contain an explicit port")
     if parsed.query or parsed.fragment:
         raise EconomicAdmissionInputError(
@@ -149,7 +164,7 @@ def compile_fleet_economic_admission(request: dict[str, Any]) -> dict[str, Any]:
     authority = dict(body.get("authority", {}))
     authority["canonical_source_identity_rechecked"] = True
     authority["canonical_source_identity_rule"] = (
-        "bounded_https_no_userinfo_query_fragment_or_port;"
+        "bounded_https_no_whitespace_backslash_userinfo_query_fragment_or_port;"
         "github_issue_owner_repo_casefold_plus_positive_number;"
         "generic_idna_host_casefold_exact_path"
     )
