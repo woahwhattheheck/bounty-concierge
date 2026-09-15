@@ -1,27 +1,29 @@
 # SPDX-License-Identifier: MIT
-"""Host-held owner authority for payoff budget policy.
+"""Verify-only host authority for payoff budget policy.
 
 The v3 continuity ledger keeps policy and effort facts append-only, but its work
 document is caller-controlled. A caller must not be able to turn a self-authored
 higher BUDGET_POLICY generation into READY owner-review evidence.
 
-Every ordinary/public v3 compilation and verification requires a detached HMAC
-authorization supplied only through host environment. The signed scope binds the
-exact canonical policy chain, ledger generation, prior-receipt anchor, and
-work/opportunity scope. No key, signature, provider, principal, capture time, or
-unsigned-bypass switch is accepted from the work document or CLI.
+Runtime code therefore holds *verification* authority only. A detached RSA
+PKCS#1 v1.5 / SHA-256 signature binds the exact canonical policy chain, ledger
+generation, prior-receipt anchor, work/opportunity scope, provider, principal and
+capture time. The private signing key is deliberately absent from this module,
+from process environment, and from every ordinary compile/verify API.
 
-The enforcement call lives inside the sole v3 compiler/verifier implementation,
-not in a mutable one-time monkey patch. Reloading the v3 module therefore reloads
-the guard with the implementation instead of restoring an unauthenticated raw path.
-Historical semantic tests may mock the verifier in-process; production runtime code
-contains no configuration flag that disables owner authentication.
+The verifier also captures its dependency graph in definition defaults. The v3
+compiler retains this exact verifier capability across module reloads, so rebinding
+the public module attribute does not silently replace the authority decision.
+Arbitrary mutation of private function internals is equivalent to arbitrary code
+execution and is outside this evidence boundary; ordinary caller data, environment
+values, public attribute rebinding, and module reload are all handled fail-closed.
 """
 
 from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import os
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -30,20 +32,20 @@ from typing import Any
 from . import payoff_path_gate_core as _core
 from . import payoff_path_policy_v3 as _v3
 
-AUTHORITY_PURPOSE = "bounty-payoff-owner-policy-authority/v1"
+AUTHORITY_PURPOSE = "bounty-payoff-owner-policy-authority/v2"
 MAX_AUTHORITY_AGE_SECONDS = 300
+RSA_SHA256_DIGESTINFO_PREFIX = bytes.fromhex("3031300d060960864801650304020105000420")
 
-KEY_ENV = "BOUNTY_PAYOFF_POLICY_HMAC_KEY_HEX"
+MODULUS_ENV = "BOUNTY_PAYOFF_POLICY_RSA_MODULUS_HEX"
+EXPONENT_ENV = "BOUNTY_PAYOFF_POLICY_RSA_EXPONENT"
 PROVIDER_ENV = "BOUNTY_PAYOFF_POLICY_AUTHORIZED_PROVIDER"
 PRINCIPAL_ENV = "BOUNTY_PAYOFF_POLICY_AUTHORIZED_PRINCIPAL_SHA256"
 CAPTURED_AT_ENV = "BOUNTY_PAYOFF_POLICY_AUTHORITY_CAPTURED_AT_UTC"
-SIGNATURE_ENV = "BOUNTY_PAYOFF_POLICY_AUTHORITY_SIGNATURE_SHA256"
+SIGNATURE_ENV = "BOUNTY_PAYOFF_POLICY_AUTHORITY_SIGNATURE_HEX"
 
 
-def _canonical_bytes(value: Any) -> bytes:
-    import json
-
-    return json.dumps(
+def _canonical_bytes(value: Any, _dumps=json.dumps) -> bytes:
+    return _dumps(
         value,
         sort_keys=True,
         separators=(",", ":"),
@@ -51,69 +53,60 @@ def _canonical_bytes(value: Any) -> bytes:
     ).encode("utf-8")
 
 
-def _host_identity() -> tuple[bytes, str, str]:
-    key_text = os.environ.get(KEY_ENV)
-    provider_text = os.environ.get(PROVIDER_ENV)
-    principal_text = os.environ.get(PRINCIPAL_ENV)
-    if not key_text or not provider_text or not principal_text:
-        raise _core.PayoffPathError("payoff owner-policy host configuration is incomplete")
-    if len(key_text) < 64 or len(key_text) % 2:
-        raise _core.PayoffPathError(
-            "payoff owner-policy HMAC key must be at least 32 bytes of hex"
-        )
-    try:
-        key = bytes.fromhex(key_text)
-    except ValueError as exc:
-        raise _core.PayoffPathError(
-            "payoff owner-policy HMAC key must be hexadecimal"
-        ) from exc
-    if len(key) < 32:
-        raise _core.PayoffPathError(
-            "payoff owner-policy HMAC key must be at least 32 bytes"
-        )
-    provider = _core._opaque_ref(provider_text, PROVIDER_ENV)
-    principal = _core._sha(principal_text, PRINCIPAL_ENV)
-    return key, provider, principal
+def policy_authority_scope(
+    document: Any,
+    *,
+    _normalize=_v3._normalize_document,
+    _work_scope_sha256=_v3._work_scope_sha256,
+    _deepcopy=deepcopy,
+    _error=_core.PayoffPathError,
+    _purpose=AUTHORITY_PURPOSE,
+) -> dict[str, Any]:
+    """Return the canonical owner-policy scope a trusted signer authorizes."""
 
-
-def _canonical_capture(value: Any, name: str) -> str:
-    if type(value) is not str:
-        raise _core.PayoffPathError(f"{name} must be canonical UTC text")
-    parsed = _core._timestamp(value, name)
-    rendered = _core._render_timestamp(parsed)
-    if rendered != value:
-        raise _core.PayoffPathError(f"{name} must be canonical UTC text")
-    return rendered
-
-
-def policy_authority_scope(document: Any) -> dict[str, Any]:
-    """Return the canonical owner-policy scope a trusted host authorizes."""
-
-    if type(document) is not dict or document.get("schema") != _v3.WORK_SCHEMA:
-        raise _core.PayoffPathError(
-            f"current owner-policy authority requires {_v3.WORK_SCHEMA} input"
-        )
-    normalized = _v3._normalize_document(document)
+    normalized = _normalize(document)
     continuity = normalized["continuity"]
     policies = [
-        deepcopy(event)
+        _deepcopy(event)
         for event in continuity["events"]
         if event["kind"] == "BUDGET_POLICY"
     ]
     if not policies:
-        raise _core.PayoffPathError("current v3 document has no owner budget policy")
+        raise _error("current v3 document has no owner budget policy")
     return {
-        "purpose": AUTHORITY_PURPOSE,
+        "purpose": _purpose,
         "ledger_id": continuity["ledger_id"],
         "generation": continuity["generation"],
         "previous_receipt_sha256": continuity["previous_receipt_sha256"],
-        "work_scope_sha256": _v3._work_scope_sha256(normalized["work_items"]),
+        "work_scope_sha256": _work_scope_sha256(normalized["work_items"]),
         "policy_events": policies,
     }
 
 
-def policy_authority_scope_sha256(document: Any) -> str:
-    return _core._digest(policy_authority_scope(document))
+def policy_authority_scope_sha256(
+    document: Any,
+    *,
+    _scope=policy_authority_scope,
+    _digest=_core._digest,
+) -> str:
+    return _digest(_scope(document))
+
+
+def _canonical_capture(
+    value: Any,
+    name: str,
+    *,
+    _timestamp=_core._timestamp,
+    _render_timestamp=_core._render_timestamp,
+    _error=_core.PayoffPathError,
+) -> str:
+    if type(value) is not str:
+        raise _error(f"{name} must be canonical UTC text")
+    parsed = _timestamp(value, name)
+    rendered = _render_timestamp(parsed)
+    if rendered != value:
+        raise _error(f"{name} must be canonical UTC text")
+    return rendered
 
 
 def _signature_payload(
@@ -122,78 +115,122 @@ def _signature_payload(
     provider: str,
     principal_sha256: str,
     captured_at_utc: str,
+    _scope_sha256=policy_authority_scope_sha256,
+    _purpose=AUTHORITY_PURPOSE,
 ) -> dict[str, Any]:
     return {
-        "purpose": AUTHORITY_PURPOSE,
+        "purpose": _purpose,
         "provider": provider,
         "principal_sha256": principal_sha256,
         "captured_at_utc": captured_at_utc,
-        "policy_scope_sha256": policy_authority_scope_sha256(document),
+        "policy_scope_sha256": _scope_sha256(document),
     }
 
 
-def _sign_current_policy_authority_for_host_fixture(
+def verify_current_policy_authority(
     document: Any,
     *,
-    captured_at_utc: str | None = None,
-) -> dict[str, str]:
-    """Private trusted-host/test fixture signer; never exported through gate."""
+    _getenv=os.environ.get,
+    _opaque_ref=_core._opaque_ref,
+    _sha=_core._sha,
+    _timestamp=_core._timestamp,
+    _render_timestamp=_core._render_timestamp,
+    _error=_core.PayoffPathError,
+    _canonical_capture_impl=_canonical_capture,
+    _payload_impl=_signature_payload,
+    _canonical_bytes_impl=_canonical_bytes,
+    _sha256=hashlib.sha256,
+    _compare_digest=hmac.compare_digest,
+    _datetime_now=datetime.now,
+    _timezone_utc=timezone.utc,
+    _digestinfo_prefix=RSA_SHA256_DIGESTINFO_PREFIX,
+    _max_age=MAX_AUTHORITY_AGE_SECONDS,
+    _modulus_env=MODULUS_ENV,
+    _exponent_env=EXPONENT_ENV,
+    _provider_env=PROVIDER_ENV,
+    _principal_env=PRINCIPAL_ENV,
+    _captured_env=CAPTURED_AT_ENV,
+    _signature_env=SIGNATURE_ENV,
+) -> dict[str, Any]:
+    """Verify detached RSA authority for the exact current v3 policy scope.
 
-    key, provider, principal = _host_identity()
-    if captured_at_utc is None:
-        captured_at_utc = _core._render_timestamp(
-            datetime.now(timezone.utc).replace(microsecond=0)
-        )
-    captured = _canonical_capture(captured_at_utc, "captured_at_utc")
-    payload = _signature_payload(
+    Only the public RSA key is present at runtime. This function contains no signing
+    helper and consumes no private key or symmetric secret.
+    """
+
+    modulus_text = _getenv(_modulus_env)
+    exponent_text = _getenv(_exponent_env)
+    provider_text = _getenv(_provider_env)
+    principal_text = _getenv(_principal_env)
+    captured_raw = _getenv(_captured_env)
+    signature_text = _getenv(_signature_env)
+    if not all(
+        (modulus_text, exponent_text, provider_text, principal_text, captured_raw, signature_text)
+    ):
+        raise _error("payoff owner-policy RSA authority configuration is incomplete")
+
+    if type(modulus_text) is not str or modulus_text != modulus_text.lower():
+        raise _error("payoff owner-policy RSA modulus must be canonical lowercase hex")
+    try:
+        modulus = int(modulus_text, 16)
+    except ValueError as exc:
+        raise _error("payoff owner-policy RSA modulus must be hexadecimal") from exc
+    if format(modulus, "x") != modulus_text or modulus.bit_length() < 2048 or modulus % 2 == 0:
+        raise _error("payoff owner-policy RSA modulus must be canonical odd >=2048-bit hex")
+
+    if type(exponent_text) is not str or not exponent_text.isdigit():
+        raise _error("payoff owner-policy RSA exponent must be canonical decimal")
+    exponent = int(exponent_text, 10)
+    if str(exponent) != exponent_text or exponent < 3 or exponent % 2 == 0:
+        raise _error("payoff owner-policy RSA exponent must be canonical odd decimal >=3")
+
+    provider = _opaque_ref(provider_text, _provider_env)
+    principal = _sha(principal_text, _principal_env)
+    captured = _canonical_capture_impl(captured_raw, _captured_env)
+    payload = _payload_impl(
         document,
         provider=provider,
         principal_sha256=principal,
         captured_at_utc=captured,
     )
-    signature = hmac.new(key, _canonical_bytes(payload), hashlib.sha256).hexdigest()
-    return {
-        CAPTURED_AT_ENV: captured,
-        SIGNATURE_ENV: signature,
-    }
 
+    key_bytes = (modulus.bit_length() + 7) // 8
+    if type(signature_text) is not str or signature_text != signature_text.lower():
+        raise _error("payoff owner-policy RSA signature must be canonical lowercase hex")
+    if len(signature_text) != key_bytes * 2:
+        raise _error("payoff owner-policy RSA signature length does not match modulus")
+    try:
+        signature = int(signature_text, 16)
+    except ValueError as exc:
+        raise _error("payoff owner-policy RSA signature must be hexadecimal") from exc
+    if signature >= modulus:
+        raise _error("payoff owner-policy RSA signature is out of range")
 
-def verify_current_policy_authority(document: Any) -> dict[str, Any]:
-    """Verify detached host authority for the exact v3 policy scope."""
+    digest = _sha256(_canonical_bytes_impl(payload)).digest()
+    digest_info = _digestinfo_prefix + digest
+    padding_length = key_bytes - len(digest_info) - 3
+    if padding_length < 8:
+        raise _error("payoff owner-policy RSA modulus is too small for SHA-256 signature")
+    expected = b"\x00\x01" + (b"\xff" * padding_length) + b"\x00" + digest_info
+    recovered = pow(signature, exponent, modulus).to_bytes(key_bytes, "big")
+    if not _compare_digest(recovered, expected):
+        raise _error("payoff owner-policy RSA signature mismatch")
 
-    key, provider, principal = _host_identity()
-    captured_raw = os.environ.get(CAPTURED_AT_ENV)
-    signature_raw = os.environ.get(SIGNATURE_ENV)
-    if not captured_raw or not signature_raw:
-        raise _core.PayoffPathError(
-            "current payoff owner policy requires detached host authority"
-        )
-    captured = _canonical_capture(captured_raw, CAPTURED_AT_ENV)
-    signature = _core._sha(signature_raw, SIGNATURE_ENV)
-    payload = _signature_payload(
-        document,
-        provider=provider,
-        principal_sha256=principal,
-        captured_at_utc=captured,
-    )
-    expected = hmac.new(key, _canonical_bytes(payload), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(signature, expected):
-        raise _core.PayoffPathError("payoff owner-policy host HMAC mismatch")
-
-    captured_dt = _core._timestamp(captured, CAPTURED_AT_ENV)
-    now = datetime.now(timezone.utc).replace(microsecond=0)
+    captured_dt = _timestamp(captured, _captured_env)
+    now = _datetime_now(_timezone_utc).replace(microsecond=0)
     age = (now - captured_dt).total_seconds()
     if age < 0:
-        raise _core.PayoffPathError("payoff owner-policy authority capture is in the future")
-    if age > MAX_AUTHORITY_AGE_SECONDS:
-        raise _core.PayoffPathError("payoff owner-policy authority capture is stale")
+        raise _error("payoff owner-policy authority capture is in the future")
+    if age > _max_age:
+        raise _error("payoff owner-policy authority capture is stale")
     return payload
 
 
 __all__ = [
     "AUTHORITY_PURPOSE",
     "MAX_AUTHORITY_AGE_SECONDS",
-    "KEY_ENV",
+    "MODULUS_ENV",
+    "EXPONENT_ENV",
     "PROVIDER_ENV",
     "PRINCIPAL_ENV",
     "CAPTURED_AT_ENV",
