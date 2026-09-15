@@ -19,7 +19,8 @@ The compiler accepts:
 - the exact advertised reward in its **native currency**;
 - an explicit operator estimate of agent-hours;
 - an explicit policy for each accepted native currency;
-- an optional operator-declared `batch_key` for work that is genuinely compatible enough to execute as one batch.
+- an optional operator-declared `batch_key` for work that is genuinely compatible enough to execute as one batch;
+- one bounded canonical HTTPS source URL for each work identity.
 
 It never accepts or invents a win probability. It never converts RTC to USD or produces a cross-currency winner.
 
@@ -36,7 +37,32 @@ Anything that misses either single threshold is held unless it belongs to a same
 
 An individually eligible single is **removed from the batch pool before aggregation**. That prevents one large job from subsidizing a pile of otherwise uneconomic microtasks.
 
-Duplicate `work_id`, duplicate canonical source URLs, and one `batch_key` spanning multiple currencies fail the entire compile rather than silently double-counting or inventing FX.
+Duplicate `work_id`, duplicate canonical source identities, and one `batch_key` spanning multiple currencies fail the entire compile rather than silently double-counting or inventing FX.
+
+## Canonical source identity fence
+
+Economic aggregation occurs only after every source URL has passed a conservative identity compiler.
+
+All source URLs must:
+
+- use HTTPS;
+- be at most 2,048 characters;
+- contain a valid IDNA host;
+- omit userinfo, query strings, fragments, explicit ports, trailing-dot hosts, and path dot segments.
+
+GitHub issue URLs receive stronger binding because they are the primary bounty identity surface. The identity is:
+
+```text
+github-issue:<casefolded-owner>/<casefolded-repository>#<positive-issue-number>
+```
+
+This means host case, owner/repository case, `www.github.com`, an optional trailing slash, and leading zeroes in the issue number cannot create extra economic candidates. Encoded or repeated-separator GitHub paths fail closed.
+
+For non-GitHub URLs, only the scheme/host are normalized; the path remains exact. The compiler deliberately does **not** guess that `/work/1` and `/work/1/` identify the same object on an arbitrary service.
+
+The receipt binds the sorted normalized identities in `source_identity_sha256` and states `canonical_source_identity_rechecked=true`. Original source strings remain visible in candidate rows for auditability.
+
+The byte-exact original v1 economics implementation is preserved privately as `concierge._fleet_economic_admission_v1`; the public module is the canonical-source-hardened wrapper. Existing callers retain the same public import and CLI path.
 
 ## Checked-in swarm policy
 
@@ -95,7 +121,7 @@ For repeated work, use a common `batch_key` only when the work can actually shar
 
 A green economics receipt means only:
 
-> under the supplied native-currency policy and supplied effort estimate, this work is economically eligible for further dispatch review.
+> under the supplied native-currency policy and supplied effort estimate, this uniquely identified work is economically eligible for further dispatch review.
 
 It does **not** mean:
 
@@ -111,6 +137,7 @@ It does **not** mean:
 
 The receipt therefore emits:
 
+- `canonical_source_identity_rechecked=true`;
 - `fx_conversion=false`;
 - `win_probability_inferred=false`;
 - `canonical_eligibility_rechecked=false`;
@@ -122,14 +149,22 @@ Use live canonical qualification/collision controls for eligibility and custody.
 
 ## Receipt integrity
 
-The compiler canonicalizes the normalized policy and output, binds the policy SHA-256, and emits a final `receipt_sha256`. `verify_receipt()` proves only self-integrity of that receipt. It cannot authenticate source reward data, effort estimates, or batch compatibility.
+The compiler canonicalizes the normalized policy and output, binds the policy SHA-256 and source-identity SHA-256, and emits a final `receipt_sha256`. `verify_receipt()` proves only self-integrity plus presence of the hardened source-identity authority marker. It cannot authenticate source reward data, effort estimates, or batch compatibility.
 
 ## Tests
 
 ```bash
-python -m unittest -v tests/test_fleet_economic_admission.py
-python -O -m unittest -v tests/test_fleet_economic_admission.py
-python -m py_compile concierge/fleet_economic_admission.py tests/test_fleet_economic_admission.py
+python -m unittest -v \
+  tests/test_fleet_economic_admission.py \
+  tests/test_fleet_economic_source_identity.py
+python -O -m unittest -v \
+  tests/test_fleet_economic_admission.py \
+  tests/test_fleet_economic_source_identity.py
+python -m py_compile \
+  concierge/_fleet_economic_admission_v1.py \
+  concierge/fleet_economic_admission.py \
+  tests/test_fleet_economic_admission.py \
+  tests/test_fleet_economic_source_identity.py
 ```
 
-Focused hostiles cover one-RTC microtasks, high-reward/low-rate work, aggregate batch floors, aggregate rate floors, anti-subsidy behavior, duplicate identities, mixed-currency batch keys, float/bool/non-finite numeric ingress, missing policy, no cross-currency winner, deterministic receipts, tamper detection, and the CLI authority ceiling.
+Focused hostiles cover one-RTC microtasks, high-reward/low-rate work, aggregate batch floors, aggregate rate floors, anti-subsidy behavior, exact and aliased duplicate identities, mixed-currency batch keys, hostile URL ingress, float/bool/non-finite numeric ingress, missing policy, no cross-currency winner, deterministic receipts, tamper detection, and the CLI authority ceiling.
