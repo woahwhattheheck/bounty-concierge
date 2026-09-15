@@ -1,19 +1,21 @@
 # SPDX-License-Identifier: MIT
 """Evidence-bound, send-free routing for bounty submission transport failover.
 
-This module lives between ``submission_packet`` readiness and an external
-provider mutation.  It never sends, never infers sponsor acceptance, and never
-turns a timeout/unknown result into permission to try a second route.
+A caller-controlled string is never enough to prove a provider attempt failed.
+Recorded outcomes are consumed only from a provider-attempt authority receipt that
+is authenticated by a verifier supplied outside the routing request.  The
+router itself never sends, signs provider receipts, or infers sponsor acceptance.
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import hmac
 import json
 import re
 from pathlib import Path
-from typing import Any, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple
 from urllib.parse import urlsplit
 
 
@@ -21,18 +23,31 @@ class SubmissionTransportInputError(ValueError):
     """Raised when transport evidence is structurally unsafe or inconsistent."""
 
 
+AuthorityVerifier = Callable[[dict[str, Any]], bool]
+
 _SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _TOKEN_RE = re.compile(r"^[a-z0-9][a-z0-9_.:-]{0,127}$")
 _FAILURE_RE = re.compile(r"^[A-Z0-9][A-Z0-9_.:-]{0,127}$")
 _GITHUB_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 _AMBIGUOUS_FAILURE_MARKERS = (
-    "TIMEOUT", "UNKNOWN", "NETWORK", "CONNECTION", "RATE_LIMIT",
-    "RETRY", "TEMPORARY", "TRANSIENT", "UNAVAILABLE", "NO_RECEIPT",
+    "TIMEOUT",
+    "UNKNOWN",
+    "NETWORK",
+    "CONNECTION",
+    "RATE_LIMIT",
+    "RETRY",
+    "TEMPORARY",
+    "TRANSIENT",
+    "UNAVAILABLE",
+    "NO_RECEIPT",
 )
 _MAX_ROUTES = 16
 _MAX_ATTEMPTS = 16
 _MAX_TEXT = 1024
+_MAX_KEYRING_ENTRIES = 64
+_MIN_AUTHORITY_KEY_BYTES = 32
+_MAX_AUTHORITY_KEY_BYTES = 128
 
 _PACKET_KEYS = {
     "canonical_source_url",
@@ -52,16 +67,27 @@ _POLICY_KEYS = {
     "routes",
     "policy_sha256",
 }
-_ROUTE_KEYS = {"route_id", "route_class", "route_evidence_sha256", "failover_on"}
-_ATTEMPT_KEYS = {
+_ROUTE_KEYS = {
+    "route_id",
+    "route_class",
+    "authority_id",
+    "route_evidence_sha256",
+    "failover_on",
+}
+_RECEIPT_KEYS = {
+    "schema",
+    "authority_id",
+    "operation_sha256",
     "attempt_id",
     "route_id",
     "packet_sha256",
     "head_sha",
     "artifact_evidence_sha256",
+    "policy_sha256",
     "outcome",
     "failure_class",
     "provider_evidence_sha256",
+    "auth_tag_hmac_sha256",
 }
 _ALLOWED_OUTCOMES = {"FAILED_CONFIRMED", "SUCCESS_CONFIRMED", "AMBIGUOUS"}
 
@@ -212,6 +238,7 @@ def _check_policy(policy: Any, packet: dict[str, Any]) -> dict[str, Any]:
             raise SubmissionTransportInputError("route has missing or undeclared fields")
         route_id = _token(raw["route_id"], "route_id")
         route_class = _token(raw["route_class"], "route_class")
+        authority_id = _token(raw["authority_id"], "authority_id")
         if route_id in route_ids:
             raise SubmissionTransportInputError("route IDs must be unique")
         route_ids.add(route_id)
@@ -226,6 +253,7 @@ def _check_policy(policy: Any, packet: dict[str, Any]) -> dict[str, Any]:
             {
                 "route_id": route_id,
                 "route_class": route_class,
+                "authority_id": authority_id,
                 "route_evidence_sha256": route_evidence,
                 "failover_on": failures,
             }
@@ -245,7 +273,127 @@ def _check_policy(policy: Any, packet: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _check_attempts(attempts: Any, packet: dict[str, Any], routes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _operation_descriptor(
+    packet: dict[str, Any], policy: dict[str, Any], route: dict[str, Any], attempt_index: int
+) -> dict[str, Any]:
+    core = {
+        "schema": "submission-transport-operation/v1",
+        "attempt_index": attempt_index,
+        "canonical_source_url": packet["canonical_source_url"],
+        "packet_sha256": packet["packet_sha256"],
+        "head_sha": packet["head_sha"],
+        "artifact_evidence_sha256": packet["artifact_evidence_sha256"],
+        "policy_sha256": policy["policy_sha256"],
+        "route_id": route["route_id"],
+        "route_class": route["route_class"],
+        "authority_id": route["authority_id"],
+        "route_evidence_sha256": route["route_evidence_sha256"],
+    }
+    return {**core, "operation_sha256": _sha256(core)}
+
+
+def compile_transport_operation(packet: Any, policy: Any, attempt_index: int) -> dict[str, Any]:
+    """Return the exact operation descriptor a trusted provider adapter must bind.
+
+    This helper does not authenticate or perform an external operation.  It gives
+    the provider adapter a stable operation digest to include in its separately
+    authenticated post-attempt receipt.
+    """
+    if type(attempt_index) is not int or attempt_index < 0:
+        raise SubmissionTransportInputError("attempt_index must be a non-negative integer")
+    checked_packet = _check_packet(packet)
+    checked_policy = _check_policy(policy, checked_packet)
+    routes = checked_policy["routes"]
+    if attempt_index >= len(routes):
+        raise SubmissionTransportInputError("attempt_index exceeds policy route count")
+    return _operation_descriptor(checked_packet, checked_policy, routes[attempt_index], attempt_index)
+
+
+def _public_attempt(receipt: dict[str, Any], verified: bool) -> dict[str, Any]:
+    public = {
+        "attempt_id": receipt["attempt_id"],
+        "route_id": receipt["route_id"],
+        "authority_id": receipt["authority_id"],
+        "operation_sha256": receipt["operation_sha256"],
+        "authority_receipt_sha256": _sha256(receipt),
+        "authority_verified": verified,
+    }
+    if verified:
+        public.update(
+            {
+                "outcome": receipt["outcome"],
+                "failure_class": receipt["failure_class"],
+                "provider_evidence_sha256": receipt["provider_evidence_sha256"],
+            }
+        )
+    return public
+
+
+def _check_receipt_shape(
+    raw: Any,
+    packet: dict[str, Any],
+    policy: dict[str, Any],
+    route: dict[str, Any],
+    attempt_index: int,
+) -> dict[str, Any]:
+    if type(raw) is not dict or set(raw) != _RECEIPT_KEYS:
+        raise SubmissionTransportInputError("provider authority receipt has missing or undeclared fields")
+    if raw["schema"] != "provider-attempt-authority/v1":
+        raise SubmissionTransportInputError("unsupported provider authority receipt schema")
+    authority_id = _token(raw["authority_id"], "receipt authority_id")
+    if authority_id != route["authority_id"]:
+        raise SubmissionTransportInputError("receipt authority does not match policy route authority")
+    attempt_id = _token(raw["attempt_id"], "attempt_id")
+    route_id = _token(raw["route_id"], "receipt route_id")
+    if route_id != route["route_id"]:
+        raise SubmissionTransportInputError("receipt route does not match exact policy prefix")
+    if raw["packet_sha256"] != packet["packet_sha256"]:
+        raise SubmissionTransportInputError("receipt packet binding does not match")
+    if raw["head_sha"] != packet["head_sha"]:
+        raise SubmissionTransportInputError("receipt head binding does not match")
+    if raw["artifact_evidence_sha256"] != packet["artifact_evidence_sha256"]:
+        raise SubmissionTransportInputError("receipt artifact evidence binding does not match")
+    if raw["policy_sha256"] != policy["policy_sha256"]:
+        raise SubmissionTransportInputError("receipt policy binding does not match")
+    expected_operation = _operation_descriptor(packet, policy, route, attempt_index)["operation_sha256"]
+    if raw["operation_sha256"] != expected_operation:
+        raise SubmissionTransportInputError("receipt operation binding does not match")
+
+    provider_evidence_sha = _sha256_text(raw["provider_evidence_sha256"], "provider_evidence_sha256")
+    auth_tag = _sha256_text(raw["auth_tag_hmac_sha256"], "auth_tag_hmac_sha256")
+    outcome = raw["outcome"]
+    if outcome not in _ALLOWED_OUTCOMES:
+        raise SubmissionTransportInputError("provider authority outcome is unsupported")
+    failure_class = raw["failure_class"]
+    if outcome == "FAILED_CONFIRMED":
+        failure_class = _failure(failure_class, "failure_class")
+    elif failure_class is not None:
+        raise SubmissionTransportInputError("failure_class must be null unless outcome is FAILED_CONFIRMED")
+
+    return {
+        "schema": "provider-attempt-authority/v1",
+        "authority_id": authority_id,
+        "operation_sha256": expected_operation,
+        "attempt_id": attempt_id,
+        "route_id": route_id,
+        "packet_sha256": packet["packet_sha256"],
+        "head_sha": packet["head_sha"],
+        "artifact_evidence_sha256": packet["artifact_evidence_sha256"],
+        "policy_sha256": policy["policy_sha256"],
+        "outcome": outcome,
+        "failure_class": failure_class,
+        "provider_evidence_sha256": provider_evidence_sha,
+        "auth_tag_hmac_sha256": auth_tag,
+    }
+
+
+def _check_attempts(
+    attempts: Any,
+    packet: dict[str, Any],
+    policy: dict[str, Any],
+    authority_verifier: Optional[AuthorityVerifier],
+) -> list[dict[str, Any]]:
+    routes = policy["routes"]
     if type(attempts) is not list or len(attempts) > _MAX_ATTEMPTS:
         raise SubmissionTransportInputError("attempts must be a bounded list")
     if len(attempts) > len(routes):
@@ -254,66 +402,81 @@ def _check_attempts(attempts: Any, packet: dict[str, Any], routes: list[dict[str
     checked = []
     seen_attempt_ids = set()
     for index, raw in enumerate(attempts):
-        if type(raw) is not dict or set(raw) != _ATTEMPT_KEYS:
-            raise SubmissionTransportInputError("attempt has missing or undeclared fields")
-        attempt_id = _token(raw["attempt_id"], "attempt_id")
-        if attempt_id in seen_attempt_ids:
+        receipt = _check_receipt_shape(raw, packet, policy, routes[index], index)
+        if receipt["attempt_id"] in seen_attempt_ids:
             raise SubmissionTransportInputError("attempt IDs must be unique")
-        seen_attempt_ids.add(attempt_id)
+        seen_attempt_ids.add(receipt["attempt_id"])
+        verified = False
+        if authority_verifier is not None:
+            try:
+                result = authority_verifier(dict(receipt))
+            except Exception as exc:
+                raise SubmissionTransportInputError("provider authority verifier failed closed") from exc
+            if type(result) is not bool:
+                raise SubmissionTransportInputError("provider authority verifier must return bool")
+            verified = result
+        checked.append({"receipt": receipt, "authority_verified": verified})
 
-        expected_route = routes[index]
-        route_id = _token(raw["route_id"], "attempt route_id")
-        if route_id != expected_route["route_id"]:
-            raise SubmissionTransportInputError("attempts must be an exact route-policy prefix; route skipping is forbidden")
-        if raw["packet_sha256"] != packet["packet_sha256"]:
-            raise SubmissionTransportInputError("attempt packet binding does not match")
-        if raw["head_sha"] != packet["head_sha"]:
-            raise SubmissionTransportInputError("attempt head binding does not match")
-        if raw["artifact_evidence_sha256"] != packet["artifact_evidence_sha256"]:
-            raise SubmissionTransportInputError("attempt artifact evidence binding does not match")
-        provider_evidence_sha = _sha256_text(
-            raw["provider_evidence_sha256"], "provider_evidence_sha256"
-        )
-        outcome = raw["outcome"]
-        if outcome not in _ALLOWED_OUTCOMES:
-            raise SubmissionTransportInputError("attempt outcome is unsupported")
-        failure_class = raw["failure_class"]
-        if outcome == "FAILED_CONFIRMED":
-            failure_class = _failure(failure_class, "failure_class")
-        elif failure_class is not None:
-            raise SubmissionTransportInputError("failure_class must be null unless outcome is FAILED_CONFIRMED")
-
-        checked.append(
-            {
-                "attempt_id": attempt_id,
-                "route_id": route_id,
-                "outcome": outcome,
-                "failure_class": failure_class,
-                "provider_evidence_sha256": provider_evidence_sha,
-            }
-        )
-
-    # A success or ambiguous result is a stop boundary.  A confirmed failure may
-    # advance only when the exact failure class was pre-authorized by that route.
-    for index, attempt in enumerate(checked[:-1]):
-        route = routes[index]
-        if attempt["outcome"] in {"SUCCESS_CONFIRMED", "AMBIGUOUS"}:
+    for index, item in enumerate(checked[:-1]):
+        receipt = item["receipt"]
+        if not item["authority_verified"]:
+            raise SubmissionTransportInputError("attempts continue after unverified provider authority")
+        if receipt["outcome"] in {"SUCCESS_CONFIRMED", "AMBIGUOUS"}:
             raise SubmissionTransportInputError("attempts continue after a stop-boundary outcome")
-        if attempt["failure_class"] not in route["failover_on"]:
+        if receipt["failure_class"] not in routes[index]["failover_on"]:
             raise SubmissionTransportInputError("attempts advance after an unapproved failure class")
 
     return checked
 
 
-def compile_transport_decision(request: Any) -> dict[str, Any]:
-    """Compile one deterministic, send-free transport decision receipt."""
+def make_hmac_authority_verifier(keys: Mapping[str, bytes]) -> AuthorityVerifier:
+    """Build a verifier from host-provisioned HMAC keys kept outside requests.
+
+    This is a concrete stdlib reference boundary for integrations.  Provider
+    adapters should own signing keys; orchestration request JSON must never carry
+    them.  The returned verifier only authenticates receipts and does not sign.
+    """
+    if not isinstance(keys, Mapping) or len(keys) > _MAX_KEYRING_ENTRIES:
+        raise SubmissionTransportInputError("authority keyring must be a bounded mapping")
+    frozen: dict[str, bytes] = {}
+    for raw_id, raw_key in keys.items():
+        authority_id = _token(raw_id, "authority keyring id")
+        if type(raw_key) is not bytes or not (_MIN_AUTHORITY_KEY_BYTES <= len(raw_key) <= _MAX_AUTHORITY_KEY_BYTES):
+            raise SubmissionTransportInputError("authority verification keys must be 32..128 raw bytes")
+        frozen[authority_id] = bytes(raw_key)
+
+    def verify(receipt: dict[str, Any]) -> bool:
+        authority_id = receipt.get("authority_id")
+        key = frozen.get(authority_id)
+        if key is None:
+            return False
+        supplied = receipt.get("auth_tag_hmac_sha256")
+        if type(supplied) is not str or not _SHA256_RE.fullmatch(supplied):
+            return False
+        body = dict(receipt)
+        del body["auth_tag_hmac_sha256"]
+        expected = hmac.new(key, _canonical_bytes(body), hashlib.sha256).hexdigest()
+        return hmac.compare_digest(supplied, expected)
+
+    return verify
+
+
+def compile_transport_decision(
+    request: Any, *, authority_verifier: Optional[AuthorityVerifier] = None
+) -> dict[str, Any]:
+    """Compile one deterministic, send-free transport decision receipt.
+
+    Any recorded provider attempt is untrusted unless ``authority_verifier``
+    independently authenticates its provider-attempt receipt.  Unverified
+    provider history can never unlock a fallback route.
+    """
     if type(request) is not dict or set(request) != {"packet", "policy", "attempts"}:
         raise SubmissionTransportInputError("request must contain exactly packet, policy, and attempts")
 
     packet = _check_packet(request["packet"])
     policy = _check_policy(request["policy"], packet)
     routes = policy["routes"]
-    attempts = _check_attempts(request["attempts"], packet, routes)
+    attempts = _check_attempts(request["attempts"], packet, policy, authority_verifier)
 
     next_route = None
     reason_codes = []
@@ -323,11 +486,15 @@ def compile_transport_decision(request: Any) -> dict[str, Any]:
         reason_codes = ["PRIMARY_ROUTE_NOT_ATTEMPTED"]
     else:
         last_index = len(attempts) - 1
-        last = attempts[-1]
+        last_item = attempts[-1]
+        last = last_item["receipt"]
         route = routes[last_index]
-        if last["outcome"] == "SUCCESS_CONFIRMED":
+        if not last_item["authority_verified"]:
+            disposition = "HOLD_PROVIDER_AUTHORITY_UNVERIFIED"
+            reason_codes = ["PROVIDER_OUTCOME_AUTHORITY_UNVERIFIED"]
+        elif last["outcome"] == "SUCCESS_CONFIRMED":
             disposition = "ALREADY_SUBMITTED"
-            reason_codes = ["SUCCESS_CONFIRMED"]
+            reason_codes = ["SUCCESS_CONFIRMED_BY_PROVIDER_AUTHORITY"]
         elif last["outcome"] == "AMBIGUOUS":
             disposition = "HOLD_AMBIGUOUS_PROVIDER_OUTCOME"
             reason_codes = ["PROVIDER_OUTCOME_AMBIGUOUS"]
@@ -340,18 +507,26 @@ def compile_transport_decision(request: Any) -> dict[str, Any]:
         else:
             disposition = "READY_FALLBACK"
             next_route = routes[len(attempts)]
-            reason_codes = ["CONFIRMED_FAILURE_ALLOWLISTED", "NEXT_POLICY_ROUTE_AVAILABLE"]
+            reason_codes = [
+                "PROVIDER_FAILURE_AUTHORITY_VERIFIED",
+                "CONFIRMED_FAILURE_ALLOWLISTED",
+                "NEXT_POLICY_ROUTE_AVAILABLE",
+            ]
 
     public_next = None
     if next_route is not None:
         public_next = {
             "route_id": next_route["route_id"],
             "route_class": next_route["route_class"],
+            "authority_id": next_route["authority_id"],
             "route_evidence_sha256": next_route["route_evidence_sha256"],
         }
 
+    public_attempts = [
+        _public_attempt(item["receipt"], item["authority_verified"]) for item in attempts
+    ]
     receipt = {
-        "schema": "submission-transport-decision/v1",
+        "schema": "submission-transport-decision/v2",
         "canonical_source_url": packet["canonical_source_url"],
         "packet_sha256": packet["packet_sha256"],
         "head_sha": packet["head_sha"],
@@ -360,11 +535,15 @@ def compile_transport_decision(request: Any) -> dict[str, Any]:
         "policy_sha256": policy["policy_sha256"],
         "policy_evidence_sha256": policy["policy_evidence_sha256"],
         "attempt_count": len(attempts),
-        "completed_attempts": attempts,
+        "completed_attempts": public_attempts,
         "disposition": disposition,
         "reason_codes": reason_codes,
         "next_route": public_next,
         "authority": {
+            "provider_outcome_authority_required": bool(attempts),
+            "all_recorded_outcomes_authority_verified": all(
+                item["authority_verified"] for item in attempts
+            ),
             "external_send_authorized": False,
             "global_outbound_lease_required": True,
             "sponsor_route_authenticity_inferred": False,
@@ -377,12 +556,14 @@ def compile_transport_decision(request: Any) -> dict[str, Any]:
     return receipt
 
 
-def verify_transport_decision(request: Any, receipt: Any) -> bool:
+def verify_transport_decision(
+    request: Any, receipt: Any, *, authority_verifier: Optional[AuthorityVerifier] = None
+) -> bool:
     """Return True only when ``receipt`` exactly recompiles from ``request``."""
     if type(receipt) is not dict:
         return False
     try:
-        expected = compile_transport_decision(request)
+        expected = compile_transport_decision(request, authority_verifier=authority_verifier)
     except SubmissionTransportInputError:
         return False
     return expected == receipt
@@ -408,17 +589,33 @@ def strict_json_loads(text: str) -> Any:
         raise SubmissionTransportInputError(f"invalid JSON: {exc.msg}") from exc
 
 
-def _load_request(path: str) -> dict[str, Any]:
+def _load_json(path: str) -> Any:
     if path == "-":
         import sys
 
         raw = sys.stdin.read()
     else:
         raw = Path(path).read_text(encoding="utf-8")
-    value = strict_json_loads(raw)
-    if type(value) is not dict:
-        raise SubmissionTransportInputError("request JSON must contain an object")
-    return value
+    return strict_json_loads(raw)
+
+
+def _load_keyring(path: Optional[str]) -> Optional[AuthorityVerifier]:
+    if path is None:
+        return None
+    value = _load_json(path)
+    if type(value) is not dict or len(value) > _MAX_KEYRING_ENTRIES:
+        raise SubmissionTransportInputError("authority keyring file must contain one bounded JSON object")
+    keys: dict[str, bytes] = {}
+    for raw_id, raw_hex in value.items():
+        authority_id = _token(raw_id, "authority keyring id")
+        if type(raw_hex) is not str or len(raw_hex) % 2 or not re.fullmatch(r"[0-9a-f]+", raw_hex):
+            raise SubmissionTransportInputError("authority keyring values must be lowercase hex")
+        try:
+            raw_key = bytes.fromhex(raw_hex)
+        except ValueError as exc:
+            raise SubmissionTransportInputError("authority keyring contains invalid hex") from exc
+        keys[authority_id] = raw_key
+    return make_hmac_authority_verifier(keys)
 
 
 def format_summary(receipt: dict[str, Any]) -> str:
@@ -434,14 +631,21 @@ def format_summary(receipt: dict[str, Any]) -> str:
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m concierge.submission_transport_router",
-        description="Compile a send-free, evidence-bound submission transport decision.",
+        description="Compile a send-free, authority-verified submission transport decision.",
     )
     parser.add_argument("request", help="JSON request path, or - for stdin")
+    parser.add_argument(
+        "--authority-keyring",
+        help="separately provisioned JSON mapping authority_id to 32..128-byte lowercase-hex HMAC key",
+    )
     parser.add_argument("--summary", action="store_true")
     args = parser.parse_args(argv)
     try:
-        request = _load_request(args.request)
-        receipt = compile_transport_decision(request)
+        request = _load_json(args.request)
+        if type(request) is not dict:
+            raise SubmissionTransportInputError("request JSON must contain an object")
+        verifier = _load_keyring(args.authority_keyring)
+        receipt = compile_transport_decision(request, authority_verifier=verifier)
     except (OSError, SubmissionTransportInputError) as exc:
         parser.error(str(exc))
     if args.summary:
