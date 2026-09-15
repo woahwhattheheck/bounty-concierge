@@ -35,6 +35,6 @@ jobs:
       - name: Compile
         run: python -m py_compile concierge/outbound_email_identity.py tests/test_outbound_email_identity.py
       - name: Focused hostile suite
-        run: python -m unittest -v tests.test_outbound_email_identity
+        run: python -m unittest discover -s tests -p 'test_outbound_email_identity.py' -v
       - name: Focused hostile suite under optimized interpreter
-        run: python -O -m unittest -v tests.test_outbound_email_identity
+        run: python -O -m unittest discover -s tests -p 'test_outbound_email_identity.py' -v
