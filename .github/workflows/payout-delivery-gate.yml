@@ -1,0 +1,44 @@
+name: payout-delivery-gate
+
+on:
+  push:
+    paths:
+      - concierge/payout_delivery_gate.py
+      - concierge/revenue_cli.py
+      - tests/test_payout_delivery_gate.py
+      - tests/test_revenue_cli.py
+      - data/payout_delivery_gate/**
+      - docs/PAYOUT_DELIVERY_GATE.md
+      - .github/workflows/payout-delivery-gate.yml
+  pull_request:
+    paths:
+      - concierge/payout_delivery_gate.py
+      - concierge/revenue_cli.py
+      - tests/test_payout_delivery_gate.py
+      - tests/test_revenue_cli.py
+      - data/payout_delivery_gate/**
+      - docs/PAYOUT_DELIVERY_GATE.md
+      - .github/workflows/payout-delivery-gate.yml
+
+permissions:
+  contents: read
+
+jobs:
+  focused-regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.13"]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile boundary
+        run: python -m py_compile concierge/payout_delivery_gate.py tests/test_payout_delivery_gate.py
+      - name: Focused gate suite
+        run: python -m unittest -v tests.test_payout_delivery_gate tests.test_revenue_cli
+      - name: Focused gate suite under optimized Python
+        run: python -O -m unittest -v tests.test_payout_delivery_gate tests.test_revenue_cli

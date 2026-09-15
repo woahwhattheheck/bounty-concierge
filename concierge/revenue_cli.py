@@ -25,7 +25,7 @@ class RevenueCommand(NamedTuple):
 def _build_fixed_registry():
     """Return an immutable primitive routing generation plus public discovery."""
 
-    # Routing authority contains immutable primitives only.  Public discovery
+    # Routing authority contains immutable primitives only. Public discovery
     # objects are constructed separately below, so callers never receive an
     # object whose identity is consulted by dispatch or discovery.
     routes: tuple[tuple[str, str, str], ...] = (
@@ -58,6 +58,11 @@ def _build_fixed_registry():
             "payoff-path",
             "concierge.payoff_path_gate",
             "Gate speculative work on an evidence-backed route to compensation.",
+        ),
+        (
+            "payout-delivery",
+            "concierge.payout_delivery_gate",
+            "Gate one single-writer payout follow-up provider mutation.",
         ),
         (
             "payout-dispute",
