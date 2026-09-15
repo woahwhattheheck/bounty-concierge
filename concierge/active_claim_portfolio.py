@@ -46,6 +46,7 @@ _LIVE_REWARD_SIGNAL_KEYS = {
 }
 
 ActiveClaimPortfolioError = _core.ActiveClaimPortfolioError
+_MAX_SAFE_INT_DIGITS = len(str(_core._MAX_SAFE_INT))
 
 
 def _canonical_bytes(value: Any) -> bytes:
@@ -196,6 +197,46 @@ def _signal_amounts(signals: Dict[str, Any], key: str) -> List[Decimal]:
     return result
 
 
+def _exact_native_units(amount: Decimal, decimal_places: int) -> Optional[int]:
+    """Convert one non-negative Decimal to exact bounded integer units.
+
+    Decimal construction and tuple inspection are context-free. This avoids the
+    process-wide mutable precision and rounding mode entirely, while bounding
+    exponent work before multiplication so hostile scientific notation cannot
+    manufacture a huge intermediate integer.
+    """
+    sign, raw_digits, exponent = amount.as_tuple()
+    first_nonzero = next(
+        (index for index, digit in enumerate(raw_digits) if digit), None
+    )
+    if first_nonzero is None:
+        return 0
+    if sign:
+        return None
+
+    digits = raw_digits[first_nonzero:]
+    shift = exponent + decimal_places
+    if shift < 0:
+        fractional_digits = -shift
+        if fractional_digits >= len(digits):
+            return None
+        if any(digits[-fractional_digits:]):
+            return None
+        digits = digits[:-fractional_digits]
+        shift = 0
+
+    if len(digits) + shift > _MAX_SAFE_INT_DIGITS:
+        return None
+    units = 0
+    for digit in digits:
+        units = units * 10 + digit
+    if shift:
+        units *= 10 ** shift
+    if units > _core._MAX_SAFE_INT:
+        return None
+    return units
+
+
 def _canonical_live_reward_minor(
     qualification: Dict[str, Any]
 ) -> Tuple[Optional[Tuple[str, int]], Optional[str]]:
@@ -239,12 +280,8 @@ def _canonical_live_reward_minor(
         return None, "LIVE_REWARD_CURRENCY_AMBIGUOUS"
 
     currency, amount = next(iter(native.items()))
-    scaled = amount * Decimal(100) if currency == "USD" else amount
-    integral = scaled.to_integral_value()
-    if scaled != integral:
-        return None, "LIVE_REWARD_AMOUNT_UNREPRESENTABLE"
-    minor = int(integral)
-    if minor < 0 or minor > _core._MAX_SAFE_INT:
+    minor = _exact_native_units(amount, 2 if currency == "USD" else 0)
+    if minor is None:
         return None, "LIVE_REWARD_AMOUNT_UNREPRESENTABLE"
     return (currency, minor), None
 
