@@ -3,23 +3,24 @@
 
 ``outbound_singlewriter.normalize_identity`` is intentionally provider-neutral
 and therefore does not guess whether two destination spellings are the same
-mailbox.  Revenue email cannot safely use that generic boundary directly:
+mailbox. Revenue email cannot safely use that generic boundary directly:
 provider-truth dedupe already treats case/IDNA aliases as one recipient, and a
 second worker must not be able to turn the same business touch into another
 single-writer / Commons capability-lease domain merely by spelling the address
 differently.
 
-This module is deliberately small.  It reuses the exact recipient and offer-key
+This module is deliberately small. It reuses the exact recipient and offer-key
 canonicalizers from ``outbound_dedupe`` and projects them into the existing
-``OutboundIdentity`` shape.  It performs no provider I/O and grants no send,
-contact, payment, or revenue authority.
+``OutboundIdentity`` shape. Production email-touch acquisition deliberately
+exposes no caller-controlled clock: ordinary callers must not be able to expire
+a live lease by supplying a future timestamp. This module performs no provider
+I/O and grants no send, contact, payment, or revenue authority.
 """
 from __future__ import annotations
 
-from datetime import datetime
 import re
 import unicodedata
-from typing import Any, Optional
+from typing import Any
 
 from .outbound_dedupe import OutboundDedupeInputError, _canonical_email, _offer_key
 from .outbound_singlewriter import OutboundIdentity, OutboundSingleWriter, normalize_identity
@@ -50,13 +51,13 @@ def normalize_email_touch_identity(
 ) -> OutboundIdentity:
     """Return one provider-neutral identity for an exact revenue email touch.
 
-    Physical providers are intentionally excluded.  Gmail and another email
+    Physical providers are intentionally excluded. Gmail and another email
     transport are not independent authority domains for the same recipient,
     offer, and business action.
 
     ``recipient`` uses the exact operational identity policy already enforced
     by :mod:`concierge.outbound_dedupe`: case-folded local part plus IDNA/lower
-    domain.  ``offer_key`` remains a caller-retained lowercase stable key, and
+    domain. ``offer_key`` remains a caller-retained lowercase stable key, and
     ``action`` is NFKC/case-fold normalized to a compact machine token.
     """
     try:
@@ -91,11 +92,17 @@ def acquire_email_touch(
     action: str,
     owner: str,
     ttl_seconds: int = 300,
-    now: Optional[datetime] = None,
 ) -> dict[str, Any]:
     """Acquire the existing local lease using the canonical email-touch domain.
 
-    This is only the local idempotency/custody step.  Production outbound still
+    This production-facing wrapper intentionally exposes no ``now``/``as_of``
+    override. Lease-currentness is evaluated by ``OutboundSingleWriter`` using
+    its process-owned clock; a revenue caller cannot jump beyond another live
+    lease's expiry by narrating a future timestamp. Lower-level deterministic
+    tests may exercise ``OutboundSingleWriter`` directly when they need explicit
+    time injection.
+
+    This is only the local idempotency/custody step. Production outbound still
     requires provider-side DNR evidence, owner/content/route authority, Muse or
     equivalent fleet arbitration, and the Commons v2 capability-possession gate
     before any external provider mutation.
@@ -111,5 +118,4 @@ def acquire_email_touch(
         **identity.canonical,
         owner=owner,
         ttl_seconds=ttl_seconds,
-        now=now,
     )
