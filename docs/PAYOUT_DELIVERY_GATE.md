@@ -33,6 +33,10 @@ concierge-revenue payout-delivery compile request.json arbitration.json history.
 concierge-revenue payout-delivery verify request.json arbitration.json history.json delivery-receipt.json --output verified.json
 ```
 
-Inputs use strict JSON with duplicate-key rejection, a 1 MiB bound, regular-file and no-follow checks. Outputs are create-exclusive and refuse overwrite/symlink targets. Verification recompiles at the receipt's exact `as_of` timestamp and requires byte-equivalent canonical JSON semantics.
+Inputs use strict JSON with duplicate-key rejection, a 1 MiB bound, regular-file and no-follow leaf checks. Outputs are create-exclusive and refuse overwrite or symlink traversal at **every parent component and the leaf**. Output creation is anchored to verified directory descriptors; error cleanup unlinks through that same verified parent descriptor instead of re-resolving the original path. Relative output paths containing `..` are rejected rather than allowing the output authority root to move during traversal.
+
+The hardened output boundary fails closed on hosts that cannot provide `O_NOFOLLOW`, `O_DIRECTORY`, and `dir_fd` support. This is intentional: silently falling back to leaf-only no-follow semantics would reintroduce parent-symlink redirection.
+
+Verification recompiles at the receipt's exact `as_of` timestamp and requires byte-equivalent canonical JSON semantics.
 
 Synthetic fixtures under `data/payout_delivery_gate/` are test vectors only. They do not constitute a live sponsor claim, a Muse selection, a payment request, or evidence that any sponsor was contacted.
