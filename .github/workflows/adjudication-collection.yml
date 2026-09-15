@@ -5,6 +5,7 @@ on:
     paths:
       - 'concierge/adjudication_collection.py'
       - 'tests/test_adjudication_collection.py'
+      - 'tests/test_adjudication_collection_exact_types.py'
       - 'docs/ADJUDICATION_COLLECTION.md'
       - '.github/workflows/adjudication-collection.yml'
   push:
@@ -12,6 +13,7 @@ on:
     paths:
       - 'concierge/adjudication_collection.py'
       - 'tests/test_adjudication_collection.py'
+      - 'tests/test_adjudication_collection_exact_types.py'
       - 'docs/ADJUDICATION_COLLECTION.md'
       - '.github/workflows/adjudication-collection.yml'
 
@@ -28,8 +30,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Unit tests
-        run: python -m unittest tests.test_adjudication_collection -v
+        run: python -m unittest tests.test_adjudication_collection tests.test_adjudication_collection_exact_types -v
       - name: Optimized-mode unit tests
-        run: python -O -m unittest tests.test_adjudication_collection -v
+        run: python -O -m unittest tests.test_adjudication_collection tests.test_adjudication_collection_exact_types -v
       - name: Syntax compile
-        run: python -m py_compile concierge/adjudication_collection.py tests/test_adjudication_collection.py
+        run: python -m py_compile concierge/adjudication_collection.py tests/test_adjudication_collection.py tests/test_adjudication_collection_exact_types.py
