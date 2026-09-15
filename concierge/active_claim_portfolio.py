@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 import hashlib
 import json
 from pathlib import Path
@@ -39,8 +40,13 @@ _EVENT_KEYS = frozenset(
         "predecessor_event_digest", "evidence_ref", "evidence_sha256",
     }
 )
+_LIVE_REWARD_SIGNAL_KEYS = {
+    "USD": ("advertised_reward_usd", "live_label_reward_usd"),
+    "RTC": ("advertised_reward_rtc", "live_label_reward_rtc"),
+}
 
 ActiveClaimPortfolioError = _core.ActiveClaimPortfolioError
+_MAX_SAFE_INT_DIGITS = len(str(_core._MAX_SAFE_INT))
 
 
 def _canonical_bytes(value: Any) -> bytes:
@@ -136,13 +142,18 @@ def _inspect_live_availability(repo: str, number: int, max_pages: int) -> Dict[s
     return inspect_bounty_availability(repo, number, max_pages=max_pages)
 
 
-def _qualification_hold(code: str) -> Dict[str, Any]:
-    return {
+def _qualification_hold(code: str, *, canonical: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    result: Dict[str, Any] = {
         "disposition": "HOLD",
         "dispatch": False,
         "reason_codes": [code],
         "signals": {},
     }
+    if canonical is not None:
+        # revenue_intake results are explicitly safe-to-log normalized receipts;
+        # retain the exact verifier-owned bytes inside the hold generation.
+        result["canonical_qualification"] = canonical
+    return result
 
 
 def _availability_hold(repo: str, number: int, code: str) -> Dict[str, Any]:
@@ -164,6 +175,134 @@ def _availability_hold(repo: str, number: int, code: str) -> Dict[str, Any]:
             "user_identity_retained": False,
         },
     }
+
+
+def _signal_amounts(signals: Dict[str, Any], key: str) -> List[Decimal]:
+    raw = signals.get(key, [])
+    if not isinstance(raw, list):
+        raise ActiveClaimPortfolioError("live qualification reward signals are malformed")
+    result: List[Decimal] = []
+    for value in raw:
+        if type(value) is not str or not value or len(value) > 96 or value != value.strip():
+            raise ActiveClaimPortfolioError("live qualification reward signals are malformed")
+        try:
+            amount = Decimal(value)
+        except (InvalidOperation, ValueError) as exc:
+            raise ActiveClaimPortfolioError(
+                "live qualification reward signals are malformed"
+            ) from exc
+        if not amount.is_finite() or amount < 0:
+            raise ActiveClaimPortfolioError("live qualification reward signals are malformed")
+        result.append(amount)
+    return result
+
+
+def _exact_native_units(amount: Decimal, decimal_places: int) -> Optional[int]:
+    """Convert one non-negative Decimal to exact bounded integer units.
+
+    Decimal construction and tuple inspection are context-free. This avoids the
+    process-wide mutable precision and rounding mode entirely, while bounding
+    exponent work before multiplication so hostile scientific notation cannot
+    manufacture a huge intermediate integer.
+    """
+    sign, raw_digits, exponent = amount.as_tuple()
+    first_nonzero = next(
+        (index for index, digit in enumerate(raw_digits) if digit), None
+    )
+    if first_nonzero is None:
+        return 0
+    if sign:
+        return None
+
+    digits = raw_digits[first_nonzero:]
+    shift = exponent + decimal_places
+    if shift < 0:
+        fractional_digits = -shift
+        if fractional_digits >= len(digits):
+            return None
+        if any(digits[-fractional_digits:]):
+            return None
+        digits = digits[:-fractional_digits]
+        shift = 0
+
+    if len(digits) + shift > _MAX_SAFE_INT_DIGITS:
+        return None
+    units = 0
+    for digit in digits:
+        units = units * 10 + digit
+    if shift:
+        units *= 10 ** shift
+    if units > _core._MAX_SAFE_INT:
+        return None
+    return units
+
+
+def _canonical_live_reward_minor(
+    qualification: Dict[str, Any]
+) -> Tuple[Optional[Tuple[str, int]], Optional[str]]:
+    """Extract one exact native reward from the fresh qualification receipt.
+
+    Live revenue intake nests the sponsor-authoritative reward signals under its
+    ``qualification`` gate. USD is represented in cents by ``reward_minor``;
+    RTC is represented in whole RTC because the custody schema is integer-only.
+    Fractional RTC therefore fails closed instead of being rounded.
+    """
+    if (
+        qualification.get("disposition") != "ACTIONABLE"
+        or qualification.get("dispatch") is not True
+    ):
+        return None, None
+
+    gate = qualification.get("qualification")
+    if not isinstance(gate, dict):
+        return None, "LIVE_REWARD_BINDING_UNAVAILABLE"
+    signals = gate.get("signals")
+    if not isinstance(signals, dict):
+        return None, "LIVE_REWARD_BINDING_UNAVAILABLE"
+
+    native: Dict[str, Decimal] = {}
+    try:
+        for currency, keys in _LIVE_REWARD_SIGNAL_KEYS.items():
+            values: List[Decimal] = []
+            for key in keys:
+                values.extend(_signal_amounts(signals, key))
+            unique = sorted(set(values))
+            if len(unique) > 1:
+                return None, "LIVE_REWARD_AMOUNT_AMBIGUOUS"
+            if unique:
+                native[currency] = unique[0]
+    except ActiveClaimPortfolioError:
+        return None, "LIVE_REWARD_BINDING_UNAVAILABLE"
+
+    if not native:
+        return None, "LIVE_REWARD_BINDING_UNAVAILABLE"
+    if len(native) != 1:
+        return None, "LIVE_REWARD_CURRENCY_AMBIGUOUS"
+
+    currency, amount = next(iter(native.items()))
+    minor = _exact_native_units(amount, 2 if currency == "USD" else 0)
+    if minor is None:
+        return None, "LIVE_REWARD_AMOUNT_UNREPRESENTABLE"
+    return (currency, minor), None
+
+
+def _bind_live_reward(
+    candidate: Dict[str, Any], qualification: Dict[str, Any]
+) -> Tuple[Dict[str, Any], List[str]]:
+    canonical, code = _canonical_live_reward_minor(qualification)
+    if code is not None:
+        return _qualification_hold(code, canonical=qualification), [code]
+    if canonical is None:
+        return qualification, []
+
+    currency, reward_minor = canonical
+    if candidate["reward_currency"] != currency:
+        code = "LIVE_REWARD_CURRENCY_MISMATCH"
+        return _qualification_hold(code, canonical=qualification), [code]
+    if candidate["reward_minor"] != reward_minor:
+        code = "LIVE_REWARD_AMOUNT_MISMATCH"
+        return _qualification_hold(code, canonical=qualification), [code]
+    return qualification, []
 
 
 def _canonicalize_events(events: Any) -> List[Dict[str, Any]]:
@@ -212,6 +351,7 @@ def _decorate(
             "live_authority_refreshed": mode == "live",
             "caller_clock_authoritative": False,
             "caller_receipts_authoritative": False,
+            "caller_reward_metadata_authoritative": False,
             "historical_replay_authorizes_new_work": False,
             "external_github_claim": False,
             "sponsor_or_maintainer_contact": False,
@@ -282,9 +422,10 @@ def compile_live_active_claim_portfolio(
                 codes.append("LIVE_AVAILABILITY_READ_FAILED")
             cache[key] = (qualification, availability, codes)
         qualification, availability, codes = cache[key]
+        bound_qualification, reward_codes = _bind_live_reward(item, qualification)
         opportunity_id = "%s#%d" % (item["repo"], item["number"])
-        if codes:
-            failure_codes.setdefault(opportunity_id, []).extend(codes)
+        if codes or reward_codes:
+            failure_codes.setdefault(opportunity_id, []).extend(codes + reward_codes)
         # v1 core needs observed_at in its generation. Use a fixed neutral value:
         # current authority bytes, not wall time, define the live generation.
         core_candidates.append(
@@ -296,7 +437,7 @@ def compile_live_active_claim_portfolio(
                 "observed_at": "1970-01-01T00:00:00Z",
                 "reward_currency": item["reward_currency"],
                 "reward_minor": item["reward_minor"],
-                "qualification": qualification,
+                "qualification": bound_qualification,
                 "availability": availability,
             }
         )

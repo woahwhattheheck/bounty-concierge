@@ -25,12 +25,25 @@ def live_candidate(repo="Acme/Widget", number=17, worker="worker-a", sponsor="sp
     }
 
 
-def qualification(dispatch=True):
+def qualification(dispatch=True, *, currency="USD", amount="90"):
+    disposition = "ACTIONABLE" if dispatch else "HOLD"
+    signals = {
+        "advertised_reward_usd": [amount] if dispatch and currency == "USD" else [],
+        "live_label_reward_usd": [],
+        "advertised_reward_rtc": [amount] if dispatch and currency == "RTC" else [],
+        "live_label_reward_rtc": [],
+        "canonical_audit_complete": True,
+    }
     return {
-        "disposition": "ACTIONABLE" if dispatch else "HOLD",
+        "disposition": disposition,
         "dispatch": dispatch,
         "reason_codes": [],
-        "signals": {"canonical_audit_complete": True},
+        "qualification": {
+            "disposition": disposition,
+            "dispatch": dispatch,
+            "signals": signals,
+        },
+        "provenance": {"disposition": disposition, "dispatch": dispatch, "signals": {}},
     }
 
 
@@ -123,6 +136,7 @@ class ActiveClaimPortfolioV2Tests(unittest.TestCase):
         self.assertTrue(receipt["authority"]["live_authority_refreshed"])
         self.assertFalse(receipt["authority"]["external_github_claim"])
         self.assertFalse(receipt["authority"]["revenue_recognition"])
+        self.assertFalse(receipt["authority"]["caller_reward_metadata_authoritative"])
 
     def test_live_candidate_cannot_supply_green_receipts(self):
         cand = live_candidate()
@@ -202,6 +216,66 @@ class ActiveClaimPortfolioV2Tests(unittest.TestCase):
         )
         self.assertEqual(result(receipt)["disposition"], "CONFLICT_HOLD")
         self.assertIn("AVAILABILITY_IDENTITY_MISMATCH", result(receipt)["reason_codes"])
+
+    def test_live_usd_reward_amount_mismatch_holds(self):
+        cand = live_candidate()
+        cand["reward_minor"] = 2500000
+        receipt = acp.compile_live_active_claim_portfolio([cand], [], policy())
+        row = result(receipt)
+        self.assertEqual(row["disposition"], "CONFLICT_HOLD")
+        self.assertIn("LIVE_REWARD_AMOUNT_MISMATCH", row["reason_codes"])
+
+    def test_live_reward_currency_mismatch_holds(self):
+        cand = live_candidate()
+        cand["reward_currency"] = "RTC"
+        cand["reward_minor"] = 90
+        receipt = acp.compile_live_active_claim_portfolio([cand], [], policy())
+        row = result(receipt)
+        self.assertEqual(row["disposition"], "CONFLICT_HOLD")
+        self.assertIn("LIVE_REWARD_CURRENCY_MISMATCH", row["reason_codes"])
+
+    def test_live_rtc_reward_exact_match_is_ready(self):
+        cand = live_candidate()
+        cand["reward_currency"] = "RTC"
+        cand["reward_minor"] = 25
+        self.q.return_value = qualification(currency="RTC", amount="25")
+        receipt = acp.compile_live_active_claim_portfolio([cand], [], policy())
+        self.assertEqual(result(receipt)["disposition"], "READY_FOR_INTERNAL_CLAIM")
+
+    def test_fractional_rtc_reward_holds_in_integer_custody_schema(self):
+        cand = live_candidate()
+        cand["reward_currency"] = "RTC"
+        cand["reward_minor"] = 25
+        self.q.return_value = qualification(currency="RTC", amount="25.5")
+        receipt = acp.compile_live_active_claim_portfolio([cand], [], policy())
+        row = result(receipt)
+        self.assertEqual(row["disposition"], "CONFLICT_HOLD")
+        self.assertIn("LIVE_REWARD_AMOUNT_UNREPRESENTABLE", row["reason_codes"])
+
+    def test_dual_currency_live_reward_holds_ambiguous(self):
+        q = qualification()
+        q["qualification"]["signals"]["advertised_reward_rtc"] = ["90"]
+        self.q.return_value = q
+        receipt = acp.compile_live_active_claim_portfolio([live_candidate()], [], policy())
+        row = result(receipt)
+        self.assertEqual(row["disposition"], "CONFLICT_HOLD")
+        self.assertIn("LIVE_REWARD_CURRENCY_AMBIGUOUS", row["reason_codes"])
+
+    def test_actionable_missing_reward_signals_holds(self):
+        q = qualification()
+        q["qualification"]["signals"] = {"canonical_audit_complete": True}
+        self.q.return_value = q
+        receipt = acp.compile_live_active_claim_portfolio([live_candidate()], [], policy())
+        row = result(receipt)
+        self.assertEqual(row["disposition"], "CONFLICT_HOLD")
+        self.assertIn("LIVE_REWARD_BINDING_UNAVAILABLE", row["reason_codes"])
+
+    def test_non_actionable_qualification_does_not_invent_reward_failure(self):
+        self.q.return_value = qualification(dispatch=False)
+        receipt = acp.compile_live_active_claim_portfolio([live_candidate()], [], policy())
+        row = result(receipt)
+        self.assertEqual(row["disposition"], "CONFLICT_HOLD")
+        self.assertNotIn("LIVE_REWARD_BINDING_UNAVAILABLE", row["reason_codes"])
 
     def test_case_alias_candidates_collapse_to_one_identity(self):
         receipt = acp.compile_live_active_claim_portfolio(
@@ -310,7 +384,6 @@ class ActiveClaimPortfolioV2Tests(unittest.TestCase):
         )
 
     def test_currency_is_metadata_not_summed(self):
-        self.q.return_value = qualification()
         self.a.side_effect = lambda repo, number, max_pages: availability(repo, number)
         one = live_candidate(repo="o/a", number=1)
         one["reward_currency"] = "RTC"
@@ -318,6 +391,10 @@ class ActiveClaimPortfolioV2Tests(unittest.TestCase):
         two = live_candidate(repo="o/b", number=2, worker="worker-b", sponsor="sponsor-b")
         two["reward_currency"] = "USD"
         two["reward_minor"] = 250000
+        self.q.side_effect = [
+            qualification(currency="RTC", amount="25"),
+            qualification(currency="USD", amount="2500"),
+        ]
         receipt = acp.compile_live_active_claim_portfolio([one, two], [], policy())
         self.assertNotIn("reward_total", receipt["capacity"])
         self.assertEqual(result(receipt, "o/a#1")["reward_currency"], "RTC")
