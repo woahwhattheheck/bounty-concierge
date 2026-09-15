@@ -28,11 +28,12 @@ SPONSOR_UNSIGNED_TEST_ENV = "BOUNTY_SPONSOR_ADJUDICATION_TEST_ONLY_ALLOW_UNSIGNE
 _RECEIPT_DOMAIN = b"bounty-claim-work-live-binding/v1\x00"
 
 _ORIGINAL_VERIFIED_CONTEXT = _cwa._verified_context
+_ORIGINAL_NORMALIZE_INPUT = _cwa._normalize_input
 _ORIGINAL_VERIFY_RECEIPT = _cwa.verify_claim_work_receipt
 
 
 def _require_authenticated_sponsor_mode() -> None:
-    # Match the upstream switch's exact enabling semantics.  A literal "0" is
+    # Match the upstream switch's exact enabling semantics. A literal "0" is
     # commonly present in deterministic host/test environments and does not
     # enable unsigned adjudication; "1" does and must never cross this boundary.
     if os.environ.get(SPONSOR_UNSIGNED_TEST_ENV) == "1":
@@ -69,6 +70,14 @@ def _verified_context(report_raw: Any, claim_unit_id_raw: Any):
     return _ORIGINAL_VERIFIED_CONTEXT(report_raw, claim_unit_id_raw)
 
 
+def _normalize_input(payload: Any):
+    # Validate both independent host authorities before any provider read. This
+    # keeps bad key configuration fail-closed and zero-network.
+    _require_authenticated_sponsor_mode()
+    _receipt_key()
+    return _ORIGINAL_NORMALIZE_INPUT(payload)
+
+
 def _verify_claim_work_receipt(receipt: Any) -> bool:
     try:
         _require_authenticated_sponsor_mode()
@@ -86,5 +95,6 @@ def install() -> None:
     _cwa._receipt_key = _receipt_key
     _cwa._receipt_hmac = _receipt_hmac
     _cwa._verified_context = _verified_context
+    _cwa._normalize_input = _normalize_input
     _cwa.verify_claim_work_receipt = _verify_claim_work_receipt
     _cwa._CLAIM_WORK_HARDENING_INSTALLED = True
