@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import inspect
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -108,7 +108,6 @@ class EmailTouchIdentityTests(unittest.TestCase):
         self.assertNotEqual(upper.key, lower.key)
 
     def test_local_lease_domain_collapses_email_aliases(self) -> None:
-        now = datetime(2026, 9, 15, 7, 45, tzinfo=timezone.utc)
         with TemporaryDirectory() as root:
             guard = OutboundSingleWriter(root)
             first = acquire_email_touch(
@@ -117,7 +116,6 @@ class EmailTouchIdentityTests(unittest.TestCase):
                 offer_key="pilot:q4",
                 action="Initial-Outreach",
                 owner="seat-a",
-                now=now,
             )
             self.assertEqual(first["operation_key"], email_touch_operation_key(
                 recipient="buyer@example.com",
@@ -131,7 +129,36 @@ class EmailTouchIdentityTests(unittest.TestCase):
                     offer_key="pilot:q4",
                     action="initial-outreach",
                     owner="seat-b",
-                    now=now,
+                )
+
+    def test_production_wrapper_has_no_caller_clock_authority(self) -> None:
+        self.assertNotIn("now", inspect.signature(acquire_email_touch).parameters)
+        self.assertNotIn("as_of", inspect.signature(acquire_email_touch).parameters)
+        with TemporaryDirectory() as root:
+            guard = OutboundSingleWriter(root)
+            acquire_email_touch(
+                guard,
+                recipient="buyer@example.com",
+                offer_key="pilot:q4",
+                action="proposal",
+                owner="seat-a",
+            )
+            with self.assertRaises(TypeError):
+                acquire_email_touch(
+                    guard,
+                    recipient="buyer@example.com",
+                    offer_key="pilot:q4",
+                    action="proposal",
+                    owner="seat-b",
+                    now="2099-01-01T00:00:00Z",  # type: ignore[call-arg]
+                )
+            with self.assertRaises(LeaseBusy):
+                acquire_email_touch(
+                    guard,
+                    recipient="buyer@example.com",
+                    offer_key="pilot:q4",
+                    action="proposal",
+                    owner="seat-b",
                 )
 
     def test_shared_election_cannot_split_on_recipient_case(self) -> None:
