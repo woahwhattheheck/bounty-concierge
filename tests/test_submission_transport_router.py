@@ -174,18 +174,26 @@ def test_attempt_after_ambiguous_outcome_is_rejected():
         compile_transport_decision(req)
 
 
-def test_unallowlisted_failure_holds():
+def test_unallowlisted_terminal_failure_holds():
     packet = ready_packet()
-    failed = attempt(packet, outcome="FAILED_CONFIRMED", failure="PROVIDER_TIMEOUT_CONFIRMED")
+    failed = attempt(packet, outcome="FAILED_CONFIRMED", failure="PROVIDER_TERMINAL_POLICY_REJECTED")
     req = {"packet": packet, "policy": route_policy(packet), "attempts": [failed]}
     receipt = compile_transport_decision(req)
     check(receipt["disposition"] == "HOLD_FAILURE_NOT_AUTHORIZED_FOR_FAILOVER")
     check(receipt["next_route"] is None)
 
 
-def test_advancing_after_unallowlisted_failure_is_rejected():
+def test_ambiguous_like_failure_class_must_use_ambiguous_outcome():
     packet = ready_packet()
     failed = attempt(packet, outcome="FAILED_CONFIRMED", failure="PROVIDER_TIMEOUT_CONFIRMED")
+    req = {"packet": packet, "policy": route_policy(packet), "attempts": [failed]}
+    with pytest.raises(SubmissionTransportInputError, match="ambiguous/non-terminal"):
+        compile_transport_decision(req)
+
+
+def test_advancing_after_unallowlisted_failure_is_rejected():
+    packet = ready_packet()
+    failed = attempt(packet, outcome="FAILED_CONFIRMED", failure="PROVIDER_TERMINAL_POLICY_REJECTED")
     email = attempt(
         packet,
         outcome="SUCCESS_CONFIRMED",
@@ -269,6 +277,37 @@ def test_nonready_packet_is_rejected():
     packet["packet_sha256"] = digest({k: v for k, v in packet.items() if k != "packet_sha256"})
     with pytest.raises(SubmissionTransportInputError, match="not READY"):
         compile_transport_decision({"packet": packet, "policy": route_policy(ready_packet()), "attempts": []})
+
+
+@pytest.mark.parametrize(
+    "bad_source",
+    [
+        "http://github.com/example/project/issues/315",
+        "https://user@github.com/example/project/issues/315",
+        "https://github.com/example/project/issues/315?route=email",
+        "https://github.com/example/project/issues/0315",
+        "https://github.com/example/project/issues/315/extra",
+    ],
+)
+def test_noncanonical_source_urls_are_rejected(bad_source):
+    packet = ready_packet()
+    packet["canonical_source_url"] = bad_source
+    packet["packet_sha256"] = digest({k: v for k, v in packet.items() if k != "packet_sha256"})
+    policy = route_policy(ready_packet())
+    policy["canonical_source_url"] = bad_source
+    policy["packet_sha256"] = packet["packet_sha256"]
+    policy["policy_sha256"] = digest({k: v for k, v in policy.items() if k != "policy_sha256"})
+    with pytest.raises(SubmissionTransportInputError, match="canonical_source_url"):
+        compile_transport_decision({"packet": packet, "policy": policy, "attempts": []})
+
+
+def test_packet_reward_authority_must_remain_advertised_only():
+    packet = ready_packet()
+    packet["authority"]["reward"] = "earned"
+    packet["packet_sha256"] = digest({k: v for k, v in packet.items() if k != "packet_sha256"})
+    policy = route_policy(packet)
+    with pytest.raises(SubmissionTransportInputError, match="authority"):
+        compile_transport_decision({"packet": packet, "policy": policy, "attempts": []})
 
 
 def test_strict_json_rejects_duplicate_keys_and_nonfinite_constants():

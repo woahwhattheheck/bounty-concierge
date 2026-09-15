@@ -14,6 +14,7 @@ import json
 import re
 from pathlib import Path
 from typing import Any, Iterable, List, Optional, Tuple
+from urllib.parse import urlsplit
 
 
 class SubmissionTransportInputError(ValueError):
@@ -24,6 +25,11 @@ _SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _TOKEN_RE = re.compile(r"^[a-z0-9][a-z0-9_.:-]{0,127}$")
 _FAILURE_RE = re.compile(r"^[A-Z0-9][A-Z0-9_.:-]{0,127}$")
+_GITHUB_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+_AMBIGUOUS_FAILURE_MARKERS = (
+    "TIMEOUT", "UNKNOWN", "NETWORK", "CONNECTION", "RATE_LIMIT",
+    "RETRY", "TEMPORARY", "TRANSIENT", "UNAVAILABLE", "NO_RECEIPT",
+)
 _MAX_ROUTES = 16
 _MAX_ATTEMPTS = 16
 _MAX_TEXT = 1024
@@ -97,7 +103,48 @@ def _token(value: Any, name: str) -> str:
 def _failure(value: Any, name: str) -> str:
     if type(value) is not str or not _FAILURE_RE.fullmatch(value):
         raise SubmissionTransportInputError(f"{name} must be a canonical uppercase failure token")
+    if any(marker in value for marker in _AMBIGUOUS_FAILURE_MARKERS):
+        raise SubmissionTransportInputError(
+            f"{name} denotes ambiguous/non-terminal provider state; use AMBIGUOUS outcome"
+        )
     return value
+
+
+def _strict_issue_url(value: Any) -> str:
+    value = _bounded_text(value, "canonical_source_url")
+    parsed = urlsplit(value)
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise SubmissionTransportInputError("canonical_source_url port is invalid") from exc
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != "github.com"
+        or port is not None
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise SubmissionTransportInputError("canonical_source_url must be canonical github.com HTTPS")
+    parts = parsed.path.split("/")
+    if len(parts) != 5 or parts[0] != "" or parts[3] != "issues":
+        raise SubmissionTransportInputError("canonical_source_url has invalid issue path shape")
+    owner, repo, raw_number = parts[1], parts[2], parts[4]
+    if (
+        not _GITHUB_NAME_RE.fullmatch(owner)
+        or not _GITHUB_NAME_RE.fullmatch(repo)
+        or owner in {".", ".."}
+        or repo in {".", ".."}
+        or not raw_number.isdigit()
+        or int(raw_number) <= 0
+        or str(int(raw_number)) != raw_number
+    ):
+        raise SubmissionTransportInputError("canonical_source_url repository/issue identity is invalid")
+    canonical = f"https://github.com/{owner}/{repo}/issues/{raw_number}"
+    if value != canonical:
+        raise SubmissionTransportInputError("canonical_source_url must use canonical spelling")
+    return canonical
 
 
 def _check_packet(packet: Any) -> dict[str, Any]:
@@ -107,15 +154,14 @@ def _check_packet(packet: Any) -> dict[str, Any]:
         raise SubmissionTransportInputError("packet is not READY_FOR_HUMAN_SUBMISSION")
     if packet["reason_codes"] != []:
         raise SubmissionTransportInputError("ready packet must have no reason codes")
-    source = _bounded_text(packet["canonical_source_url"], "canonical_source_url")
-    if not source.startswith("https://github.com/") or "/issues/" not in source:
-        raise SubmissionTransportInputError("canonical_source_url must be a canonical GitHub issue URL")
+    source = _strict_issue_url(packet["canonical_source_url"])
 
     authority = packet["authority"]
     if type(authority) is not dict:
         raise SubmissionTransportInputError("packet authority is missing")
     if (
         authority.get("submission") != "human_only"
+        or authority.get("reward") != "advertised_only"
         or authority.get("acceptance") != "not_inferred"
         or authority.get("payout") != "not_inferred"
         or authority.get("cash_claim") is not False

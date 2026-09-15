@@ -42,7 +42,7 @@ The policy hash is an integrity binding, **not sponsor authentication**. The rec
 
 `HOLD_NO_AUTHORIZED_ROUTE_REMAINS` follows an allowlisted terminal failure on the final policy route.
 
-The router rejects route skipping, duplicate route/attempt IDs, attempts after success or ambiguity, advancement after an unallowlisted failure, cross-artifact attempt evidence, changed packet/policy hashes, unsupported schemas/outcomes, undeclared fields, duplicate JSON keys, and non-finite JSON constants.
+The router rejects route skipping, duplicate route/attempt IDs, attempts after success or ambiguity, advancement after an unallowlisted failure, cross-artifact attempt evidence, changed packet/policy hashes, non-canonical GitHub issue URLs, unsupported schemas/outcomes, undeclared fields, duplicate JSON keys, and non-finite JSON constants. Failure-class tokens containing timeout, unknown, network/connection, rate-limit/retry, temporary/transient/unavailable, or no-receipt semantics are also rejected as non-terminal; represent those outcomes as `AMBIGUOUS`.
 
 ## Example: GitHub App 403 to sponsor email
 
