@@ -2,15 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from datetime import datetime, timezone
 
 import pytest
 
-from concierge import payoff_path_gate as gate
-from concierge import payoff_path_gate_core as core
-from concierge import payoff_path_policy_authority as authority
-
-# Test-only RSA-2048 private fixture. Runtime code receives only the public N/e.
+# Test-only RSA-2048 private fixture. Production code never imports this file.
 _TEST_RSA_N_HEX = (
     "aff7a78a9d3f1d170b0f27c775a6b5b776bb6eb7f09edbecebfbd12f19e53271"
     "3499c28a82c50cd048a7a5c58a8facacedaa21f8c2763beb07a63032a191e451"
@@ -35,6 +32,17 @@ _TEST_RSA_E = 65537
 _TEST_PROVIDER = "fixture-provider"
 _TEST_PRINCIPAL = "9" * 64
 _DIGESTINFO_PREFIX = bytes.fromhex("3031300d060960864801650304020105000420")
+
+# pytest imports conftest before collecting test modules. Install the *public* test
+# trust anchor before importing concierge so production bootstrap semantics are real.
+os.environ.setdefault("BOUNTY_PAYOFF_POLICY_RSA_MODULUS_HEX", _TEST_RSA_N_HEX)
+os.environ.setdefault("BOUNTY_PAYOFF_POLICY_RSA_EXPONENT", str(_TEST_RSA_E))
+os.environ.setdefault("BOUNTY_PAYOFF_POLICY_AUTHORIZED_PROVIDER", _TEST_PROVIDER)
+os.environ.setdefault("BOUNTY_PAYOFF_POLICY_AUTHORIZED_PRINCIPAL_SHA256", _TEST_PRINCIPAL)
+
+from concierge import payoff_path_gate as gate  # noqa: E402
+from concierge import payoff_path_gate_core as core  # noqa: E402
+from concierge import payoff_path_policy_authority as authority  # noqa: E402
 
 
 def _canonical_bytes(value):
@@ -79,11 +87,6 @@ def _real_authority_for_v3_semantic_suite(request, monkeypatch):
     if not request.module.__name__.endswith("test_payoff_path_policy_v3"):
         yield
         return
-
-    monkeypatch.setenv(authority.MODULUS_ENV, _TEST_RSA_N_HEX)
-    monkeypatch.setenv(authority.EXPONENT_ENV, str(_TEST_RSA_E))
-    monkeypatch.setenv(authority.PROVIDER_ENV, _TEST_PROVIDER)
-    monkeypatch.setenv(authority.PRINCIPAL_ENV, _TEST_PRINCIPAL)
 
     real_compile = gate.compile_gate
     real_verify = gate.verify_gate
