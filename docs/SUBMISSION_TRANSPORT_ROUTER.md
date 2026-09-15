@@ -1,44 +1,100 @@
 # Submission transport failover router
 
-`concierge.submission_transport_router` is the send-free decision layer between a finished `bounty-submission-packet/v1` inner packet and any external GitHub, email, web-form, or other sponsor submission action.
+`concierge.submission_transport_router` is a send-free decision layer for paid-work submission transport. It answers one narrow question: after a finished submission packet and an ordered sponsor route policy exist, does verified transport history permit naming exactly one next route?
 
-It exists for a recurring last-mile failure: a finished paid-work packet is ready, the preferred provider route is attempted, and that provider appears to return a terminal failure such as a GitHub App `403 Resource not accessible by integration`. A second route is dangerous unless the system can prove all three things: the previous operation is the exact operation for this artifact and policy route, the provider outcome is authentic rather than caller narration, and the sponsor policy explicitly permits failover for that terminal failure class.
+It never performs email, GitHub mutation, form submission, sponsor contact, payout, or payment claim. A `READY_*` decision is not permission to send. Commons' provider-linearizable outbound lease, provider permissions, no-contact rules, content approval, and Muse/fleet arbitration remain separate required gates.
 
-The router performs **no external send** and **does not sign provider receipts**. It compiles provider-authority receipts and a sponsor-evidence-bound route policy into exactly one public decision: use the primary route, use one exact fallback, stop because success is already confirmed, or hold.
+## Why this exists
 
-## Trust boundary
+A recurring conversion seam is:
 
-Request JSON is untrusted orchestration input. In particular, a caller cannot unlock fallback by supplying a string such as `FAILED_CONFIRMED`, a plausible failure class, or a hash-shaped evidence pointer.
+1. a finished artifact is `READY_FOR_HUMAN_SUBMISSION`;
+2. the preferred provider route is attempted;
+3. the provider appears to reject the operation, for example a GitHub App `403`;
+4. a sponsor-documented fallback exists, often email.
 
-Every recorded provider attempt is accepted as outcome truth only when a verifier supplied **outside the request** authenticates a `provider-attempt-authority/v1` receipt. The reference verifier uses HMAC-SHA-256 with host/provider-adapter keys that are separately provisioned and never carried inside the routing request. Integrations may supply another verifier, but it occupies the same trusted boundary and must validate a provider/host authority rather than operator narration.
+Blindly trying the fallback is unsafe. A timeout, lost response, successful operation with a lost receipt, or caller-authored `"FAILED_CONFIRMED"` can create duplicate submissions and spam a hot lead.
 
-If an attempt exists and no verifier is supplied, the decision is `HOLD_PROVIDER_AUTHORITY_UNVERIFIED`. A failed HMAC has the same result. The public decision deliberately omits the unverified receipt's claimed `outcome`, `failure_class`, and provider-evidence digest so the router cannot launder unauthenticated claims into an authoritative-looking receipt.
+The router therefore requires both route-policy evidence and independently retained provider-attempt evidence before fallback is possible.
 
-The HMAC reference boundary is only as strong as key custody. The signing key must belong to the provider adapter or another independently trusted host component that observes the real provider result. Do **not** give that key to the orchestration component that constructs requests, do not place it in route policy, and do not commit it to the repository. The router exposes verification, not signing.
+## Public vs private surface
 
-## Position in the control plane
+Supported production API:
 
-The boundaries are intentionally separate:
+```python
+from concierge.submission_transport_router import (
+    compile_transport_operation,
+    compile_transport_decision,
+    verify_transport_decision,
+)
+```
 
-1. `submission_packet.py` proves that the selected paid-work artifact is `READY_FOR_HUMAN_SUBMISSION`.
-2. `compile_transport_operation()` derives the exact operation digest for one route before a provider adapter acts.
-3. The separately trusted provider adapter performs the provider operation and emits an authenticated `provider-attempt-authority/v1` receipt binding the operation and result.
-4. **This router** verifies that authority receipt and proves whether transport history permits exactly one next route.
-5. Commons' provider-linearizable outbound capability lease plus `outbound_capability_gate.py` still decide whether the current worker may perform a revenue-bearing provider mutation.
-6. `submission_custody.py` records what was actually dispatched and what the sponsor did next.
-7. settlement / payout rails remain separate.
+The deterministic routing engine lives in private module
+`concierge._submission_transport_router_core`. That private engine accepts verifier dependency injection for isolated hostile tests. **It is not a production trust boundary and is not the supported import surface.**
 
-A router receipt never substitutes for the global outbound lease and never claims sponsor acceptance or payment.
+The public module deliberately does **not** expose:
 
-## Request contract
+- an `authority_verifier=` parameter;
+- a receipt-ledger path parameter;
+- an environment variable selecting a verifier or ledger;
+- `make_hmac_authority_verifier`;
+- a CLI trust-root selector.
 
-The JSON request contains exactly:
+Ordinary request/library callers therefore cannot promote `lambda _: True`, an attacker-selected keyring, or an attacker-selected receipt directory through the supported compiler.
 
-- `packet`: one inner packet produced by `bounty-submission-packet/v1`, including its `packet_sha256`. The router requires `READY_FOR_HUMAN_SUBMISSION`, an empty reason list, human-only/advertised-only authority, a canonical GitHub issue source, and re-verifies the canonical packet digest.
-- `policy`: `sponsor-submission-transport-policy/v1`. It binds the canonical source, exact packet digest, an operator-verified sponsor-policy evidence digest, and an ordered list of opaque routes.
-- `attempts`: an ordered prefix of authenticated provider-attempt receipts. Every receipt binds the exact packet, head SHA, artifact-evidence SHA, policy SHA, route, authority, and deterministic operation SHA.
+## Host-retained provider receipt ledger
 
-Each route has:
+The public compiler authenticates recorded provider outcomes only by exact receipt equality against one fixed host ledger:
+
+```text
+/var/lib/bounty-concierge/provider-attempt-authority/<operation_sha256>.json
+```
+
+The directory path is a literal inside the public verifier. It is not selected by request, CLI, environment, or public function argument.
+
+The ledger directory must:
+
+- exist as a directory;
+- be owned by root (`uid 0`);
+- not be group- or world-writable.
+
+Each receipt file must:
+
+- be opened without following a final symlink when the platform supports `O_NOFOLLOW`;
+- be a regular file;
+- be owned by root;
+- not be group- or world-writable;
+- not be world-readable;
+- be 1..32768 bytes;
+- contain strict duplicate-key-free UTF-8 JSON.
+
+The filename is the exact deterministic `operation_sha256`. The retained JSON object must equal the presented provider receipt byte-for-byte after strict JSON parsing. Missing, unreadable, insecure, malformed, or mismatched host evidence returns false; the private engine then produces `HOLD_PROVIDER_AUTHORITY_UNVERIFIED`.
+
+The provider adapter or host supervisor owns ledger publication. Orchestration callers do not write this directory and do not choose its path.
+
+The public receipt truth-labels:
+
+- `provider_authority_trust_root = fixed-root-owned-provider-receipt-ledger`;
+- `caller_verifier_injection_supported = false`;
+- `caller_trust_root_selection_supported = false`.
+
+## Canonical submission packet contract
+
+The public adapter reuses `submission_custody._verify_submission_packet` directly. Transport therefore inherits the repository's canonical packet contract instead of maintaining a weaker duplicate:
+
+- exact packet/evidence/authority shapes;
+- canonical source and PR identity;
+- source-repo / PR-repo consistency;
+- positive advertised reward;
+- changed-path allowlist enforcement;
+- PASS-only test and acceptance evidence;
+- exact packet SHA-256 binding.
+
+The private engine's older packet checker is overridden by the public adapter at import time and is not the supported entrypoint.
+
+## Route policy
+
+A `sponsor-submission-transport-policy/v1` binds the exact packet and ordered routes. Each route includes:
 
 ```json
 {
@@ -50,19 +106,17 @@ Each route has:
 }
 ```
 
-`authority_id` names the independently provisioned authority that may attest outcomes for that route. A receipt from a different authority is rejected even if its signature is otherwise valid under some other trusted key.
-
-The policy hash is an integrity binding, **not sponsor authentication**. The decision receipt therefore fixes `sponsor_route_authenticity_inferred=false`; callers must obtain and verify sponsor route authority independently before constructing the policy.
+`authority_id` names the provider/host authority that produced the retained receipt. `route_evidence_sha256` and `policy_evidence_sha256` are integrity bindings, not sponsor authentication; the decision keeps `sponsor_route_authenticity_inferred=false`.
 
 ## Exact operation binding
 
-Before a provider adapter performs route `i`, call:
+Before a trusted provider adapter acts on route index `i`:
 
 ```python
 operation = compile_transport_operation(packet, policy, i)
 ```
 
-The operation digest covers:
+The operation SHA binds:
 
 - canonical source URL;
 - packet SHA-256;
@@ -70,15 +124,15 @@ The operation digest covers:
 - artifact evidence SHA-256;
 - policy SHA-256;
 - route index;
-- route ID and class;
-- route authority ID;
+- route ID/class;
+- authority ID;
 - route evidence SHA-256.
 
-This makes a receipt non-replayable across another artifact revision, packet, policy, route, authority, or route position. A provider adapter must copy `operation_sha256` into its authority receipt after observing the actual provider result.
+A receipt retained under one operation cannot authorize another packet, revision, policy, route, authority, or route position.
 
-## Provider-attempt authority receipt
+## Provider-attempt receipt
 
-A receipt has exactly these fields:
+Recorded attempts use the private engine's `provider-attempt-authority/v1` envelope:
 
 ```json
 {
@@ -93,105 +147,47 @@ A receipt has exactly these fields:
   "policy_sha256": "<policy digest>",
   "outcome": "FAILED_CONFIRMED",
   "failure_class": "PROVIDER_403_INTEGRATION_FORBIDDEN",
-  "provider_evidence_sha256": "<digest of retained provider evidence>",
-  "auth_tag_hmac_sha256": "<authority authentication tag>"
+  "provider_evidence_sha256": "<retained provider evidence digest>",
+  "auth_tag_hmac_sha256": "<private-engine envelope field>"
 }
 ```
 
-For the reference HMAC verifier, the provider adapter computes `auth_tag_hmac_sha256` over canonical JSON of all fields **except** `auth_tag_hmac_sha256`, using sorted keys, UTF-8, compact separators `(',', ':')`, `ensure_ascii=False`, and HMAC-SHA-256.
+The public trust decision is **not** caller HMAC selection. It is exact equality with the fixed root-owned host receipt ledger. The HMAC field remains part of the private engine's deterministic envelope and test surface; production authority comes from host-retained exact receipt custody.
 
-A signed receipt is evidence of what the trusted adapter attested. The adapter itself is responsible for turning raw provider semantics into `SUCCESS_CONFIRMED`, `FAILED_CONFIRMED`, or `AMBIGUOUS`. A timeout, missing response, lost receipt, connection/network failure, retry state, rate limit, temporary/transient condition, or otherwise unknown result must be `AMBIGUOUS`; the router also structurally rejects failure-class tokens carrying those semantics as terminal failure.
+Timeout, unknown, network/connection, rate-limit/retry, temporary/transient/unavailable, and no-receipt semantics are not terminal failure classes. They must be represented as `AMBIGUOUS`.
 
-## Outcomes
+## Decisions
 
-`READY_PRIMARY` means no provider attempt is recorded and the first policy route is the only candidate. No provider-outcome verifier is required merely to name the first candidate.
+- `READY_PRIMARY`: no provider attempt exists; names the first policy route.
+- `READY_FALLBACK`: the exact previous receipt is retained in the fixed host ledger, its outcome is `FAILED_CONFIRMED`, its exact terminal failure class is sponsor-policy allowlisted, and another route remains.
+- `ALREADY_SUBMITTED`: retained provider receipt says `SUCCESS_CONFIRMED`; no next route.
+- `HOLD_PROVIDER_AUTHORITY_UNVERIFIED`: a recorded attempt lacks exact retained host authority.
+- `HOLD_AMBIGUOUS_PROVIDER_OUTCOME`: retained provider result is ambiguous.
+- `HOLD_FAILURE_NOT_AUTHORIZED_FOR_FAILOVER`: retained terminal failure is not allowlisted.
+- `HOLD_NO_AUTHORIZED_ROUTE_REMAINS`: retained allowlisted terminal failure occurred on the final route.
 
-`READY_FALLBACK` requires all of the following:
+Attempts after unverified authority, success, ambiguity, or unallowlisted failure are rejected.
 
-- the previous receipt is authenticated by the policy route's separately provisioned authority;
-- the authenticated outcome is `FAILED_CONFIRMED`;
-- its exact terminal failure class appears in that route's sponsor-policy `failover_on`;
-- another policy route remains.
-
-`ALREADY_SUBMITTED` follows an authenticated `SUCCESS_CONFIRMED` and exposes no next route.
-
-`HOLD_PROVIDER_AUTHORITY_UNVERIFIED` follows a recorded attempt whose authority cannot be independently verified. This includes a valid-looking receipt when no verifier is supplied and a receipt carrying an invalid authentication tag.
-
-`HOLD_AMBIGUOUS_PROVIDER_OUTCOME` follows an authenticated `AMBIGUOUS`. A later route attempt after ambiguity is rejected.
-
-`HOLD_FAILURE_NOT_AUTHORIZED_FOR_FAILOVER` follows an authenticated terminal failure whose class is absent from the sponsor policy.
-
-`HOLD_NO_AUTHORIZED_ROUTE_REMAINS` follows an authenticated allowlisted terminal failure on the final policy route.
-
-The router rejects route skipping, duplicate route/attempt IDs, attempts after success or ambiguity, attempts after unverified provider authority, advancement after an unallowlisted failure, cross-artifact replay, changed policy/operation bindings, wrong route authority, non-canonical GitHub issue URLs, unsupported schemas/outcomes, undeclared fields, duplicate JSON keys, and non-finite JSON constants.
-
-## Reference HMAC verifier
-
-Library integrations should provision verifier keys outside request data:
-
-```python
-from concierge.submission_transport_router import (
-    compile_transport_decision,
-    make_hmac_authority_verifier,
-)
-
-verifier = make_hmac_authority_verifier({
-    "github-app-adapter-v1": trusted_adapter_key_bytes,
-    "smtp-adapter-v1": trusted_smtp_adapter_key_bytes,
-})
-receipt = compile_transport_decision(request, authority_verifier=verifier)
-```
-
-Keys must be 32..128 raw bytes. The returned verifier authenticates but never signs receipts.
-
-The CLI can consume a separately provisioned keyring file:
-
-```bash
-python -m concierge.submission_transport_router request.json \
-  --authority-keyring /run/secrets/submission-transport-verifier-keys.json
-```
-
-The keyring is a strict JSON object mapping `authority_id` to lowercase hex key bytes. It is a host trust input, not part of the submission request. If the keyring is omitted and attempts exist, the result is HOLD.
-
-## Example: authenticated GitHub App 403 to sponsor email
-
-Suppose the first policy route is `upstream-github` with authority `github-app-adapter-v1`, and its allowlist contains `PROVIDER_403_INTEGRATION_FORBIDDEN`. The next route is `sponsor-email` with a separate SMTP authority.
-
-Only an authenticated provider receipt bound to the exact first-route operation and attesting:
-
-```text
-outcome=FAILED_CONFIRMED
-failure_class=PROVIDER_403_INTEGRATION_FORBIDDEN
-```
-
-can produce `READY_FALLBACK` naming `sponsor-email`. A caller-written string with the same values, an arbitrary provider-evidence digest, a forged tag, an unknown authority, a receipt from a different packet/revision/route, or a missing verifier all HOLD or fail closed.
-
-If GitHub's result is uncertain, the trusted adapter must attest `AMBIGUOUS`; email is not selected.
-
-Route IDs are opaque. Do not put an email address, token, private URL, provider credential, raw provider response, or raw sponsor message into the policy or decision receipt.
-
-## CLI and verification
+## CLI
 
 ```bash
 python -m concierge.submission_transport_router request.json
 python -m concierge.submission_transport_router request.json --summary
 ```
 
-The CLI returns zero for `READY_PRIMARY`, `READY_FALLBACK`, and `ALREADY_SUBMITTED`; HOLD dispositions return 2. Invalid/tampered requests fail through `argparse` with a non-zero exit.
+There is intentionally no verifier/keyring/ledger selector. Host authority configuration is fixed outside caller control.
 
-`strict_json_loads()` rejects duplicate keys and non-finite constants. `verify_transport_decision(request, receipt, authority_verifier=...)` recompiles the exact request against the same trust boundary and compares the whole deterministic decision, including `decision_sha256`.
+The CLI returns zero for `READY_PRIMARY`, `READY_FALLBACK`, and `ALREADY_SUBMITTED`; HOLD dispositions return 2.
 
 ## Authority ceiling
 
-Every decision receipt fixes these values:
+Every public decision keeps:
 
-- `external_send_authorized=false`
-- `global_outbound_lease_required=true`
-- `sponsor_route_authenticity_inferred=false`
-- `sponsor_acceptance_inferred=false`
-- `payment_inferred=false`
-- `cash_claim=false`
+- `external_send_authorized=false`;
+- `global_outbound_lease_required=true`;
+- `sponsor_route_authenticity_inferred=false`;
+- `sponsor_acceptance_inferred=false`;
+- `payment_inferred=false`;
+- `cash_claim=false`.
 
-It also records whether provider-outcome authority was required and whether all recorded outcomes were verified.
-
-A `READY_*` decision is therefore **not permission to send**. It only says verified transport history does not itself forbid naming that one next route. Provider permission, buyer/sponsor authority, no-contact rules, content approval, the global outbound lease, and Muse/fleet arbitration remain independent gates.
+Transport readiness is only one input to the broader outbound control plane.
