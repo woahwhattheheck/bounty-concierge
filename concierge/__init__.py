@@ -20,3 +20,11 @@ del _payoff_path_policy_v3
 from . import payoff_path_policy_authority as _payoff_path_policy_authority
 
 del _payoff_path_policy_authority
+
+# Bind the verified authority and v3 semantic implementation into closure-held public
+# and direct entrypoints. This removes security dependence on mutable module attrs;
+# in-place v3 reload fails closed and requires a trusted host restart.
+from . import payoff_path_policy_secure_runtime as _payoff_path_policy_secure_runtime
+
+_payoff_path_policy_secure_runtime.install()
+del _payoff_path_policy_secure_runtime
