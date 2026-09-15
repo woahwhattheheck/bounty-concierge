@@ -196,6 +196,51 @@ def _signal_amounts(signals: Dict[str, Any], key: str) -> List[Decimal]:
     return result
 
 
+def _exact_native_minor(amount: Decimal, currency: str) -> Optional[int]:
+    """Convert a canonical Decimal to integer native units without ambient context.
+
+    Decimal arithmetic honors the caller's mutable process-wide context.  The live
+    reward authority boundary must not: a low global precision must never round
+    ``90.01`` USD into ``9000`` cents.  This converter reasons directly over the
+    exact Decimal tuple, bounds before any large power is allocated, and returns
+    ``None`` when the amount cannot be represented by the integer custody schema.
+    """
+    if amount.is_zero():
+        return 0
+    sign, digits, exponent = amount.as_tuple()
+    if sign:
+        return None
+    scale = 2 if currency == "USD" else 0
+    exponent += scale
+    digit_values = tuple(int(value) for value in digits)
+
+    if exponent < 0:
+        fractional_places = -exponent
+        if fractional_places >= len(digit_values):
+            return None
+        split = len(digit_values) - fractional_places
+        if any(digit_values[split:]):
+            return None
+        digit_values = digit_values[:split]
+        exponent = 0
+
+    stripped = tuple(value for index, value in enumerate(digit_values) if value != 0 or any(digit_values[index:]))
+    if not stripped:
+        return 0
+    max_digits = len(str(_core._MAX_SAFE_INT))
+    if len(stripped) + exponent > max_digits:
+        return None
+
+    minor = 0
+    for value in stripped:
+        minor = minor * 10 + value
+    if exponent:
+        minor *= 10 ** exponent
+    if minor > _core._MAX_SAFE_INT:
+        return None
+    return minor
+
+
 def _canonical_live_reward_minor(
     qualification: Dict[str, Any]
 ) -> Tuple[Optional[Tuple[str, int]], Optional[str]]:
@@ -239,12 +284,10 @@ def _canonical_live_reward_minor(
         return None, "LIVE_REWARD_CURRENCY_AMBIGUOUS"
 
     currency, amount = next(iter(native.items()))
-    scaled = amount * Decimal(100) if currency == "USD" else amount
-    integral = scaled.to_integral_value()
-    if scaled != integral:
-        return None, "LIVE_REWARD_AMOUNT_UNREPRESENTABLE"
-    minor = int(integral)
-    if minor < 0 or minor > _core._MAX_SAFE_INT:
+    if amount.is_zero():
+        return None, "LIVE_REWARD_ZERO_VALUE"
+    minor = _exact_native_minor(amount, currency)
+    if minor is None or minor <= 0:
         return None, "LIVE_REWARD_AMOUNT_UNREPRESENTABLE"
     return (currency, minor), None
 
