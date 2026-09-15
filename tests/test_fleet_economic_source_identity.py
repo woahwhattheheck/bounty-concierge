@@ -1,6 +1,7 @@
 from copy import deepcopy
 import unittest
 
+from concierge import _fleet_economic_admission_v1 as _base
 from concierge.fleet_economic_admission import (
     EconomicAdmissionInputError,
     compile_fleet_economic_admission,
@@ -39,6 +40,12 @@ def request(*items):
         "policy": deepcopy(POLICY),
         "candidates": list(items),
     }
+
+
+def reseal(receipt):
+    body = deepcopy(receipt)
+    body.pop("receipt_sha256", None)
+    return {**body, "receipt_sha256": _base._sha256_json(body)}
 
 
 class FleetEconomicSourceIdentityTests(unittest.TestCase):
@@ -146,6 +153,33 @@ class FleetEconomicSourceIdentityTests(unittest.TestCase):
 
         changed = deepcopy(receipt)
         changed["source_identity_sha256"] = "0" * 64
+        self.assertFalse(verify_receipt(changed))
+
+    def test_resealed_contradictory_source_alias_is_rejected(self):
+        receipt = compile_fleet_economic_admission(
+            request(
+                candidate("issue-42", "https://github.com/owner/repo/issues/42"),
+                candidate("issue-43", "https://github.com/owner/repo/issues/43"),
+            )
+        )
+        changed = deepcopy(receipt)
+        changed["candidates"][1]["canonical_source_url"] = (
+            "https://www.github.com/OWNER/REPO/issues/042"
+        )
+        changed = reseal(changed)
+
+        self.assertTrue(_base.verify_receipt(changed))
+        self.assertFalse(verify_receipt(changed))
+
+    def test_resealed_malformed_candidate_is_rejected(self):
+        receipt = compile_fleet_economic_admission(
+            request(candidate("one", "https://github.com/o/r/issues/1"))
+        )
+        changed = deepcopy(receipt)
+        changed["candidates"][0] = "not-an-object"
+        changed = reseal(changed)
+
+        self.assertTrue(_base.verify_receipt(changed))
         self.assertFalse(verify_receipt(changed))
 
 
