@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - zte-h3n8/reinvestment-authority-isolation-188-20260915
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
 
 permissions:
   contents: write
@@ -15,12 +18,15 @@ concurrency:
 
 jobs:
   assemble-verify-commit:
-    if: github.ref_name == 'zte-h3n8/reinvestment-authority-isolation-188-20260915'
+    if: >-
+      (github.event_name == 'push' && github.ref_name == 'zte-h3n8/reinvestment-authority-isolation-188-20260915') ||
+      (github.event_name == 'pull_request' && github.head_ref == 'zte-h3n8/reinvestment-authority-isolation-188-20260915')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: zte-h3n8/reinvestment-authority-isolation-188-20260915
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
@@ -223,4 +229,4 @@ jobs:
             exit 1
           fi
           git commit -m 'fix(revenue): isolate reinvestment attribution authority'
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin 'HEAD:zte-h3n8/reinvestment-authority-isolation-188-20260915'
