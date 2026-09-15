@@ -33,7 +33,7 @@ concierge-revenue payout-delivery compile request.json arbitration.json history.
 concierge-revenue payout-delivery verify request.json arbitration.json history.json delivery-receipt.json --output verified.json
 ```
 
-Inputs use strict JSON with duplicate-key rejection, a 1 MiB bound, regular-file and no-follow leaf checks. Outputs are create-exclusive and refuse overwrite or symlink traversal at **every parent component and the leaf**. Output creation is anchored to verified directory descriptors; error cleanup unlinks through that same verified parent descriptor instead of re-resolving the original path. Relative output paths containing `..` are rejected rather than allowing the output authority root to move during traversal.
+Inputs use strict JSON with duplicate-key rejection, a 1 MiB bound, regular-file and no-follow leaf checks. Outputs are create-exclusive and refuse overwrite or symlink traversal at **every parent component and the leaf**. Output creation is anchored to verified directory descriptors. After a leaf has been created, any later write or fsync failure deliberately preserves the created pathname instead of attempting pathname cleanup: another same-authority writer may already have replaced that leaf, so unlink-on-error could delete a foreign successor. Failed output paths therefore require explicit operator reconciliation before retry. Relative output paths containing `..` are rejected rather than allowing the output authority root to move during traversal.
 
 The hardened output boundary fails closed on hosts that cannot provide `O_NOFOLLOW`, `O_DIRECTORY`, and `dir_fd` support. This is intentional: silently falling back to leaf-only no-follow semantics would reintroduce parent-symlink redirection.
 

@@ -82,13 +82,18 @@ def open_verified_parent(path: Path) -> Tuple[int, str]:
 
 
 def create_exclusive_regular(path: Path, payload: bytes, *, mode: int = 0o600) -> None:
-    """Create one regular file without following the leaf or any parent symlink."""
+    """Create one regular file without following the leaf or any parent symlink.
+
+    Once the leaf has been created, a later write/fsync failure deliberately
+    leaves that generation in place. Pathname cleanup would be unsafe because
+    another same-authority writer could replace the leaf before cleanup and turn
+    an unlink into deletion of a foreign successor.
+    """
     if type(payload) is not bytes:
         raise SecureOutputError("output payload must be bytes")
 
     parent_fd, leaf = open_verified_parent(path)
     fd = -1
-    created = False
     try:
         flags = (
             os.O_WRONLY
@@ -99,7 +104,6 @@ def create_exclusive_regular(path: Path, payload: bytes, *, mode: int = 0o600) -
         )
         try:
             fd = os.open(leaf, flags, mode, dir_fd=parent_fd)
-            created = True
         except OSError as exc:
             raise SecureOutputError(
                 f"refusing to overwrite or follow output path: {path}"
@@ -116,16 +120,6 @@ def create_exclusive_regular(path: Path, payload: bytes, *, mode: int = 0o600) -
                 raise SecureOutputError("short output write")
             view = view[written:]
         os.fsync(fd)
-    except Exception:
-        if fd >= 0:
-            os.close(fd)
-            fd = -1
-        if created:
-            try:
-                os.unlink(leaf, dir_fd=parent_fd)
-            except OSError:
-                pass
-        raise
     finally:
         if fd >= 0:
             os.close(fd)
