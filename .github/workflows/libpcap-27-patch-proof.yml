@@ -1,0 +1,53 @@
+name: libpcap 27 patch proof
+
+on:
+  pull_request:
+    paths:
+      - 'deliverables/google_patch_rewards_libpcap_27/**'
+      - '.github/workflows/libpcap-27-patch-proof.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  upstream-build-and-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y flex bison
+      - name: Clone pinned libpcap and apply hardening patch
+        run: |
+          git clone https://github.com/the-tcpdump-group/libpcap.git /tmp/libpcap
+          cd /tmp/libpcap
+          git checkout f15c258be8f269875b351f4c437992194c1baa2b
+          git apply --check "$GITHUB_WORKSPACE/deliverables/google_patch_rewards_libpcap_27/libpcap-27-stack-depth-guard.patch"
+          git apply "$GITHUB_WORKSPACE/deliverables/google_patch_rewards_libpcap_27/libpcap-27-stack-depth-guard.patch"
+      - name: Build upstream filtertest
+        run: |
+          cmake -S /tmp/libpcap -B /tmp/libpcap/build -DCMAKE_BUILD_TYPE=Debug
+          cmake --build /tmp/libpcap/build --target filtertest -j2
+      - name: Ordinary filter still compiles
+        run: /tmp/libpcap/build/testprogs/filtertest -q EN10MB 'tcp port 80'
+      - name: Pathological depth fails closed instead of exhausting stack
+        shell: bash
+        run: |
+          python3 - <<'PY' >/tmp/deep-filter.txt
+          terms = []
+          for i in range(300):
+              a = 1 + (i // (254 * 254)) % 254
+              b = 1 + (i // 254) % 254
+              c = 1 + i % 254
+              terms.append(f"not host 10.{a}.{b}.{c}")
+          print(" and ".join(terms))
+          PY
+          FILTER="$(cat /tmp/deep-filter.txt)"
+          set +e
+          ulimit -s 64
+          OUTPUT=$(/tmp/libpcap/build/testprogs/filtertest -q EN10MB "$FILTER" 2>&1)
+          RC=$?
+          set -e
+          printf '%s\n' "$OUTPUT"
+          test "$RC" -ne 0
+          test "$RC" -lt 128
+          grep -F 'too deeply nested to optimize' <<<"$OUTPUT"
