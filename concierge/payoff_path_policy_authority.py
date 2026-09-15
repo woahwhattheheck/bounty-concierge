@@ -11,12 +11,13 @@ generation, prior-receipt anchor, work/opportunity scope, provider, principal an
 capture time. The private signing key is deliberately absent from this module,
 from process environment, and from every ordinary compile/verify API.
 
-The verifier also captures its dependency graph in definition defaults. The v3
-compiler retains this exact verifier capability across module reloads, so rebinding
-the public module attribute does not silently replace the authority decision.
-Arbitrary mutation of private function internals is equivalent to arbitrary code
-execution and is outside this evidence boundary; ordinary caller data, environment
-values, public attribute rebinding, and module reload are all handled fail-closed.
+The verifier captures its dependency graph in definition defaults. The module also
+rejects ordinary public replacement/deletion of that critical verifier attribute, so
+the v3 lazy import continues to resolve the verifier after public-attribute rebinding
+attempts and module reloads. Arbitrary mutation of private Python interpreter state
+is equivalent to arbitrary code execution and is outside this evidence boundary;
+caller data, environment values, public attribute rebinding, and ordinary module
+reload are all handled fail-closed.
 """
 
 from __future__ import annotations
@@ -25,6 +26,8 @@ import hashlib
 import hmac
 import json
 import os
+import sys
+import types
 from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any
@@ -134,7 +137,6 @@ def verify_current_policy_authority(
     _opaque_ref=_core._opaque_ref,
     _sha=_core._sha,
     _timestamp=_core._timestamp,
-    _render_timestamp=_core._render_timestamp,
     _error=_core.PayoffPathError,
     _canonical_capture_impl=_canonical_capture,
     _payload_impl=_signature_payload,
@@ -224,6 +226,27 @@ def verify_current_policy_authority(
     if age > _max_age:
         raise _error("payoff owner-policy authority capture is stale")
     return payload
+
+
+class _VerifyOnlyAuthorityModule(types.ModuleType):
+    """Keep the critical verifier identity stable under ordinary module mutation."""
+
+    _LOCKED_NAMES = frozenset({"verify_current_policy_authority"})
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name in self._LOCKED_NAMES and name in self.__dict__:
+            # Deliberately ignore replacement rather than raising: callers cannot
+            # swap the verifier, while generic instrumentation/cleanup remains safe.
+            return
+        super().__setattr__(name, value)
+
+    def __delattr__(self, name: str) -> None:
+        if name in self._LOCKED_NAMES:
+            raise AttributeError(f"{name} is a retained verify-only authority capability")
+        super().__delattr__(name)
+
+
+sys.modules[__name__].__class__ = _VerifyOnlyAuthorityModule
 
 
 __all__ = [
