@@ -20,10 +20,55 @@ SHA_B = "b" * 64
 SHA_C = "c" * 64
 SHA_D = "d" * 64
 
+# Test-only RSA-2048 private fixture. Production code receives only N/e.
+TEST_RSA_N_HEX = (
+    "aff7a78a9d3f1d170b0f27c775a6b5b776bb6eb7f09edbecebfbd12f19e53271"
+    "3499c28a82c50cd048a7a5c58a8facacedaa21f8c2763beb07a63032a191e451"
+    "5cf0b123d0ec576f9e990d693def17f8075cfa8ee87875eaef16371efef7da06"
+    "b5462ae94ea4397308cce0c5c2b965a72566e970984a3ce08060b1f31e64fed0"
+    "5751a91ff2eb16696e535f38723bae847cf8398bec3619951232dde3d7de822a5"
+    "21a45c885042dfa2f16d82825ffa4798e1cd496b46a0a071ca4fa18b1095c458"
+    "8ce392f9d8d2d61ffc5a76d54d91b3e664ef817e9e917c8a8149d05174950653"
+    "a62b398cb9ed48115fdf0d4c9a9d66212837687896a2fbf5a66f8464ac7d113"
+)
+TEST_RSA_D_HEX = (
+    "bf6a81dba1fceb2d608a61409d6acbcc2c6197a9dfc5ef2c0ff32334e97bb91e"
+    "0c3f76b02b05cf4fd8b905a042d4d231b56c4252d2b6c0572feaf2b876540d84"
+    "5f1034a1916886c9ea419e4fc2b4e3e3459f39b005e783de1c56937f7ee67e9f"
+    "ed7121721f1490a9e2037c3ef94e53eb39747406574dea6061f0cda279ddc33b6"
+    "f4f3ee07e2fb487519a73ab6ee02c444ef9198924b119bc85e0e652692abfe83"
+    "802492939402082577fcef7523224084e5f84e4aa316e4ccea3aaabc8d1d13bd9"
+    "1bb1bd89eaf3465cca9cd5fe033850d6379384d7ed0f7fba15d3e44d033c19c9"
+    "dfa49ee10636e126372702f5ff0f2b6c2a743eac47d863f7750ef5b65e881"
+)
+TEST_RSA_E = 65537
+TEST_PROVIDER = "fixture-provider"
+TEST_PRINCIPAL = "9" * 64
+DIGESTINFO_PREFIX = bytes.fromhex("3031300d060960864801650304020105000420")
+
 
 def digest(value):
     payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def canonical_bytes(value):
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+
+
+def rsa_sign_payload(payload):
+    modulus = int(TEST_RSA_N_HEX, 16)
+    private_exponent = int(TEST_RSA_D_HEX, 16)
+    key_bytes = (modulus.bit_length() + 7) // 8
+    digest_bytes = hashlib.sha256(canonical_bytes(payload)).digest()
+    digest_info = DIGESTINFO_PREFIX + digest_bytes
+    padding = b"\xff" * (key_bytes - len(digest_info) - 3)
+    encoded = b"\x00\x01" + padding + b"\x00" + digest_info
+    message = int.from_bytes(encoded, "big")
+    signature = pow(message, private_exponent, modulus)
+    return signature.to_bytes(key_bytes, "big").hex()
 
 
 def payoff_path():
@@ -106,9 +151,10 @@ class PayoffPathPolicyAuthorityRecoveryTests(unittest.TestCase):
         self.env = mock.patch.dict(
             os.environ,
             {
-                authority.KEY_ENV: "11" * 32,
-                authority.PROVIDER_ENV: "fixture-provider",
-                authority.PRINCIPAL_ENV: "9" * 64,
+                authority.MODULUS_ENV: TEST_RSA_N_HEX,
+                authority.EXPONENT_ENV: str(TEST_RSA_E),
+                authority.PROVIDER_ENV: TEST_PROVIDER,
+                authority.PRINCIPAL_ENV: TEST_PRINCIPAL,
             },
             clear=False,
         )
@@ -142,10 +188,21 @@ class PayoffPathPolicyAuthorityRecoveryTests(unittest.TestCase):
         )
 
     def authorize(self, document_value, *, captured_at_utc=None):
-        signed = authority._sign_current_policy_authority_for_host_fixture(
-            document_value,
-            captured_at_utc=captured_at_utc,
-        )
+        if captured_at_utc is None:
+            captured_at_utc = core._render_timestamp(
+                datetime.now(timezone.utc).replace(microsecond=0)
+            )
+        payload = {
+            "purpose": authority.AUTHORITY_PURPOSE,
+            "provider": TEST_PROVIDER,
+            "principal_sha256": TEST_PRINCIPAL,
+            "captured_at_utc": captured_at_utc,
+            "policy_scope_sha256": authority.policy_authority_scope_sha256(document_value),
+        }
+        signed = {
+            authority.CAPTURED_AT_ENV: captured_at_utc,
+            authority.SIGNATURE_ENV: rsa_sign_payload(payload),
+        }
         os.environ.update(signed)
         return signed
 
@@ -172,16 +229,21 @@ class PayoffPathPolicyAuthorityRecoveryTests(unittest.TestCase):
             payload["policy_scope_sha256"],
         )
 
+    def test_production_authority_is_verify_only(self):
+        self.assertFalse(hasattr(authority, "_sign_current_policy_authority_for_host_fixture"))
+        self.assertFalse(hasattr(authority, "PRIVATE_KEY_ENV"))
+        self.assertFalse(hasattr(authority, "KEY_ENV"))
+
     def test_policy_mutation_and_host_identity_rotation_fail_closed(self):
         forged = copy.deepcopy(self.doc1)
         forged["continuity"]["events"][-1]["minutes"] = 180
         forged["work_items"][0]["free_work_budget_minutes"] = 180
-        with self.assertRaisesRegex(gate.PayoffPathError, "HMAC mismatch"):
+        with self.assertRaisesRegex(gate.PayoffPathError, "RSA signature mismatch"):
             gate.compile_gate(forged, AS_OF, self.receipt0)
 
         self.authorize(self.doc1)
         os.environ[authority.PROVIDER_ENV] = "rotated-provider"
-        with self.assertRaisesRegex(gate.PayoffPathError, "HMAC mismatch"):
+        with self.assertRaisesRegex(gate.PayoffPathError, "RSA signature mismatch"):
             gate.compile_gate(self.doc1, AS_OF, self.receipt0)
 
     def test_stale_and_future_host_captures_fail_closed(self):
@@ -196,38 +258,37 @@ class PayoffPathPolicyAuthorityRecoveryTests(unittest.TestCase):
         with self.assertRaisesRegex(gate.PayoffPathError, "future"):
             gate.compile_gate(self.doc1, AS_OF, self.receipt0)
 
-    def test_z_module_reload_cannot_restore_unsigned_public_or_direct_paths(self):
+    def test_z_public_verifier_rebinding_and_reload_cannot_bypass_authority(self):
         original = (self.packet1, self.markdown1, self.receipt1)
+        original_verifier = authority.verify_current_policy_authority
+
+        authority.verify_current_policy_authority = lambda document: {"forged": True}
+        self.assertIs(original_verifier, authority.verify_current_policy_authority)
+        with self.assertRaises(AttributeError):
+            del authority.verify_current_policy_authority
+
         self.clear_authority_receipt()
         os.environ["BOUNTY_PAYOFF_POLICY_TEST_ONLY_ALLOW_UNSIGNED"] = "1"
-
         importlib.reload(v3)
 
         self.assertEqual("CHAINED", v3.MODE)
-        with self.assertRaisesRegex(gate.PayoffPathError, "detached host authority"):
-            gate.compile_gate(self.doc1, AS_OF, self.receipt0)
-        with self.assertRaisesRegex(gate.PayoffPathError, "detached host authority"):
-            v3._compile_v3(self.doc1, AS_OF, self.receipt0)
-        with self.assertRaisesRegex(gate.PayoffPathError, "detached host authority"):
-            gate.verify_gate(
-                self.doc1,
-                self.packet1,
-                self.markdown1,
-                self.receipt1,
-                AS_OF,
-                self.receipt0,
-            )
-        with self.assertRaisesRegex(gate.PayoffPathError, "detached host authority"):
-            v3.verify_v3(
-                self.doc1,
-                self.packet1,
-                self.markdown1,
-                self.receipt1,
-                AS_OF,
-                self.receipt0,
-            )
+        for compile_call in (
+            lambda: gate.compile_gate(self.doc1, AS_OF, self.receipt0),
+            lambda: v3._compile_v3(self.doc1, AS_OF, self.receipt0),
+        ):
+            with self.assertRaisesRegex(gate.PayoffPathError, "authority configuration is incomplete"):
+                compile_call()
+        for verify_call in (
+            lambda: gate.verify_gate(
+                self.doc1, self.packet1, self.markdown1, self.receipt1, AS_OF, self.receipt0
+            ),
+            lambda: v3.verify_v3(
+                self.doc1, self.packet1, self.markdown1, self.receipt1, AS_OF, self.receipt0
+            ),
+        ):
+            with self.assertRaisesRegex(gate.PayoffPathError, "authority configuration is incomplete"):
+                verify_call()
 
-        # Valid detached authority still produces byte-identical evidence after reload.
         self.authorize(self.doc1)
         self.assertEqual(original, gate.compile_gate(self.doc1, AS_OF, self.receipt0))
         self.assertEqual(original, v3._compile_v3(self.doc1, AS_OF, self.receipt0))
@@ -242,7 +303,6 @@ class PayoffPathPolicyAuthorityRecoveryTests(unittest.TestCase):
             )
         )
 
-        # Reload must not turn the stored raw core callable into the dispatcher itself.
         legacy = {"schema": gate.LEGACY_WORK_SCHEMA, "work_items": [work_item(budget=60, spent=0)]}
         legacy_packet, _, _ = gate.compile_legacy_migration_gate(legacy, AS_OF)
         self.assertEqual("LEGACY_REPLAY_ONLY", legacy_packet["continuity"]["mode"])
