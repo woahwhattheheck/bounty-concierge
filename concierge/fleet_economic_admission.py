@@ -154,6 +154,32 @@ def _candidate_source_identities(request: Any) -> list[str]:
     return identities
 
 
+def _verified_receipt_source_identities(receipt: dict[str, Any]) -> list[str]:
+    """Reconstruct retained candidate identities without trusting compiler markers."""
+    candidates = receipt.get("candidates")
+    if type(candidates) is not list:
+        raise EconomicAdmissionInputError("receipt candidates must be a list")
+
+    identities: list[str] = []
+    seen: dict[str, int] = {}
+    for index, candidate in enumerate(candidates):
+        if type(candidate) is not dict:
+            raise EconomicAdmissionInputError(
+                f"receipt candidates[{index}] must be an object"
+            )
+        field = f"candidates[{index}].canonical_source_url"
+        identity = _source_identity(candidate.get("canonical_source_url"), field)
+        prior = seen.get(identity)
+        if prior is not None:
+            raise EconomicAdmissionInputError(
+                "duplicate canonical_source_url identity: "
+                f"candidates[{prior}] and candidates[{index}] resolve to {identity}"
+            )
+        seen[identity] = index
+        identities.append(identity)
+    return identities
+
+
 def compile_fleet_economic_admission(request: dict[str, Any]) -> dict[str, Any]:
     """Compile economics only after canonical source identities are unique."""
     identities = _candidate_source_identities(request)
@@ -174,17 +200,23 @@ def compile_fleet_economic_admission(request: dict[str, Any]) -> dict[str, Any]:
 
 
 def verify_receipt(receipt: dict[str, Any]) -> bool:
-    """Verify self-integrity and the hardened authority marker."""
+    """Verify self-integrity and reconstruct the canonical source commitment."""
     if not _base.verify_receipt(receipt):
         return False
     authority = receipt.get("authority")
     source_digest = receipt.get("source_identity_sha256")
-    return (
-        type(authority) is dict
-        and authority.get("canonical_source_identity_rechecked") is True
-        and type(source_digest) is str
-        and _HEX_SHA256_RE.fullmatch(source_digest) is not None
-    )
+    if (
+        type(authority) is not dict
+        or authority.get("canonical_source_identity_rechecked") is not True
+        or type(source_digest) is not str
+        or _HEX_SHA256_RE.fullmatch(source_digest) is None
+    ):
+        return False
+    try:
+        identities = _verified_receipt_source_identities(receipt)
+    except EconomicAdmissionInputError:
+        return False
+    return _base._sha256_json(sorted(identities)) == source_digest
 
 
 def format_summary(receipt: dict[str, Any]) -> str:
