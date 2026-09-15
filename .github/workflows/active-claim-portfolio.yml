@@ -5,7 +5,9 @@ on:
     paths:
       - "concierge/active_claim_portfolio.py"
       - "concierge/_active_claim_portfolio_core.py"
+      - "concierge/bounty_qualification.py"
       - "tests/test_active_claim_portfolio.py"
+      - "tests/test_positive_reward_authority.py"
       - "docs/ACTIVE_CLAIM_PORTFOLIO.md"
       - ".github/workflows/active-claim-portfolio.yml"
   push:
@@ -13,7 +15,9 @@ on:
     paths:
       - "concierge/active_claim_portfolio.py"
       - "concierge/_active_claim_portfolio_core.py"
+      - "concierge/bounty_qualification.py"
       - "tests/test_active_claim_portfolio.py"
+      - "tests/test_positive_reward_authority.py"
       - "docs/ACTIVE_CLAIM_PORTFOLIO.md"
       - ".github/workflows/active-claim-portfolio.yml"
 
@@ -34,8 +38,20 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Compile exact paths
-        run: python -m py_compile concierge/active_claim_portfolio.py concierge/_active_claim_portfolio_core.py tests/test_active_claim_portfolio.py
+        run: >-
+          python -m py_compile
+          concierge/active_claim_portfolio.py
+          concierge/_active_claim_portfolio_core.py
+          concierge/bounty_qualification.py
+          tests/test_active_claim_portfolio.py
+          tests/test_positive_reward_authority.py
       - name: Focused hostile suite
-        run: python -m unittest -v tests.test_active_claim_portfolio
+        run: >-
+          python -m unittest -v
+          tests.test_active_claim_portfolio
+          tests.test_positive_reward_authority
       - name: Focused hostiles under optimized Python
-        run: python -O -m unittest -v tests.test_active_claim_portfolio
+        run: >-
+          python -O -m unittest -v
+          tests.test_active_claim_portfolio
+          tests.test_positive_reward_authority
