@@ -33,6 +33,20 @@ _ORIGINAL_VERIFY = _core.verify_gate
 _INSTALLED = False
 
 
+def _verify_current_policy_authority(document: Any) -> dict[str, Any]:
+    """Authenticate current owner policy from inside the sole v3 implementation.
+
+    Import lazily to avoid a module-load cycle: the authority module canonicalizes
+    scope with this module's normalization helpers. Keeping this call in v3 source
+    also means ``importlib.reload(payoff_path_policy_v3)`` reloads the guard rather
+    than restoring an unauthenticated raw compiler/verifier.
+    """
+
+    from .payoff_path_policy_authority import verify_current_policy_authority
+
+    return verify_current_policy_authority(document)
+
+
 def _event_digest(event: dict[str, Any]) -> str:
     return _core._digest({"schema": CONTINUITY_SCHEMA, "event": event})
 
@@ -492,6 +506,7 @@ def _compile_v3(
     trusted_as_of: datetime | str | None,
     previous_receipt: Any,
 ) -> tuple[dict[str, Any], str, dict[str, Any]]:
+    _verify_current_policy_authority(document)
     as_of = _core._trusted_now(trusted_as_of)
     normalized = _normalize_document(document)
     continuity, _spent, heads = _derive_semantics(normalized, as_of, previous_receipt)
@@ -527,6 +542,7 @@ def verify_v3(
     trusted_now: datetime | str | None = None,
     previous_receipt: Any = None,
 ) -> bool:
+    _verify_current_policy_authority(document)
     now = _core._trusted_now(trusted_now)
     normalized = _normalize_document(document)
     packet_obj = _core._exact_keys(
@@ -690,8 +706,8 @@ def install() -> None:
     _core.compile_gate.__doc__ = (
         "Compile owner-review evidence. Normal v1 input is always fail-closed; use "
         "compile_legacy_migration_gate only for explicit historical migration replay. "
-        "v2 uses the landed continuity chain; v3 adds evidence-bound effort and "
-        "versioned owner-policy supersession."
+        "v2 uses the landed continuity chain; v3 adds evidence-bound effort, versioned "
+        "owner-policy supersession, and mandatory detached host policy authority."
     )
     _INSTALLED = True
 
