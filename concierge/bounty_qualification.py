@@ -372,6 +372,21 @@ def qualify_dispatch(
             "HOLD",
             "No explicit paid reward amount is advertised in canonical issue metadata.",
         )
+    if any(
+        amount.is_zero()
+        for rewards in (
+            advertised_rewards,
+            label_rewards,
+            advertised_rtc_rewards,
+            label_rtc_rewards,
+        )
+        for amount in rewards
+    ):
+        add(
+            "ZERO_VALUE_REWARD",
+            "HOLD",
+            "Canonical reward evidence includes a zero-value amount; paid-work dispatch requires a positive reward.",
+        )
     if len(advertised_rewards) > 1:
         add(
             "AMBIGUOUS_ADVERTISED_REWARD",
