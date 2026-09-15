@@ -146,7 +146,7 @@ def compile_adjudication_collection(payload:Any)->dict[str,Any]:
 
 def verify_adjudication_collection(payload:Any,packet:Any)->bool:
     if type(packet) is not dict: return False
-    try: return packet==compile_adjudication_collection(payload)
+    try: return _json(packet)==_json(compile_adjudication_collection(payload))
     except AdjudicationCollectionError: return False
 
 def _pairs(pairs:list[tuple[str,Any]])->dict[str,Any]:
