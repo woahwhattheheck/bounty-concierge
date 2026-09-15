@@ -1,0 +1,45 @@
+name: zero-value-reward-authority
+
+on:
+  pull_request:
+    paths:
+      - "concierge/bounty_qualification.py"
+      - "concierge/revenue_intake.py"
+      - "tests/test_zero_value_reward_authority.py"
+      - "docs/ZERO_VALUE_REWARD_AUTHORITY.md"
+      - ".github/workflows/zero-value-reward-authority.yml"
+  push:
+    branches: [main]
+    paths:
+      - "concierge/bounty_qualification.py"
+      - "concierge/revenue_intake.py"
+      - "tests/test_zero_value_reward_authority.py"
+      - "docs/ZERO_VALUE_REWARD_AUTHORITY.md"
+      - ".github/workflows/zero-value-reward-authority.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  zero-value-reward-authority:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile exact paths
+        run: >-
+          python -m py_compile
+          concierge/bounty_qualification.py
+          concierge/revenue_intake.py
+          tests/test_zero_value_reward_authority.py
+      - name: Zero-value authority hostiles
+        run: python -m unittest -v tests.test_zero_value_reward_authority
+      - name: Zero-value authority hostiles under optimized Python
+        run: python -O -m unittest -v tests.test_zero_value_reward_authority
