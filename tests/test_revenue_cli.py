@@ -11,7 +11,11 @@ class RevenueCliTests(unittest.TestCase):
     def test_registry_is_fixed_sorted_safe_and_unique(self):
         names = list(revenue_cli.COMMANDS)
         self.assertEqual(len(names), len(set(names)))
-        self.assertEqual(len(names), 11)
+        self.assertEqual(len(names), 12)
+        self.assertEqual(
+            revenue_cli.COMMANDS["payout-delivery"].module,
+            "concierge.payout_delivery_gate",
+        )
         for name, command in revenue_cli.COMMANDS.items():
             self.assertRegex(name, r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
             self.assertRegex(command.module, r"^concierge\.[a-z0-9_]+$")
@@ -42,10 +46,7 @@ class RevenueCliTests(unittest.TestCase):
             return_value=fake,
         ) as importer:
             self.assertEqual(revenue_cli.run(["cash-cycle", "verify"]), 7)
-            self.assertEqual(
-                revenue_cli.run(["--list-json"], stdout=listed_json),
-                0,
-            )
+            self.assertEqual(revenue_cli.run(["--list-json"], stdout=listed_json), 0)
 
         importer.assert_called_once_with(canonical_module)
         self.assertEqual(seen, [["verify"]])
@@ -82,10 +83,7 @@ class RevenueCliTests(unittest.TestCase):
                 code = revenue_cli.run(["cash-cycle", "verify", "receipt.json"])
                 unknown = revenue_cli.run(["injected"], stderr=err)
                 self.assertEqual(revenue_cli.run(["--list"], stdout=listed), 0)
-                self.assertEqual(
-                    revenue_cli.run(["--list-json"], stdout=listed_json),
-                    0,
-                )
+                self.assertEqual(revenue_cli.run(["--list-json"], stdout=listed_json), 0)
 
         self.assertEqual(code, 7)
         self.assertEqual(unknown, 2)
@@ -138,7 +136,11 @@ class RevenueCliTests(unittest.TestCase):
         seen = []
         fake = types.SimpleNamespace(main=lambda argv: seen.append(argv) or 7)
         command = revenue_cli.COMMANDS["cash-cycle"]
-        with mock.patch.object(revenue_cli.importlib, "import_module", return_value=fake) as importer:
+        with mock.patch.object(
+            revenue_cli.importlib,
+            "import_module",
+            return_value=fake,
+        ) as importer:
             code = revenue_cli.run(["cash-cycle", "verify", "--weird=1", "a b.json"])
         self.assertEqual(code, 7)
         self.assertEqual(seen, [["verify", "--weird=1", "a b.json"]])

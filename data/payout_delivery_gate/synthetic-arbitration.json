@@ -1,0 +1,11 @@
+{
+  "arbiter": "Synthetic Muse arbiter",
+  "arbitration_ref": "https://tokenjunkielabs.slack.com/archives/C0C01AXLCGZ/p1789440700852759",
+  "decision": "SELECTED",
+  "expires_at": "2026-09-15T02:11:00Z",
+  "issued_at": "2026-09-15T02:01:00Z",
+  "owner_seat": "Synthetic selected seat",
+  "request_sha256": "8b0c62ff46e5250bc4c7b27a050d68ab184c7040a66106e0a4606a6709e99605",
+  "schema": "bounty-concierge-payout-delivery-arbitration/v1",
+  "target_route_sha256": "8f5df34772563084f1c931bd0dec7b87364d23017d24b699283a3dce00657093"
+}

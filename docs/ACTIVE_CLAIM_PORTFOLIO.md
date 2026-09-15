@@ -13,6 +13,17 @@ The live path accepts identity, worker/sponsor assignment, reward metadata, and 
 
 Either read failing or returning non-object data fails closed. Provider exception text is not copied into the receipt. GitHub `owner/repo` identity is case-folded before live reads, candidate grouping, generation binding, event lineage, and capacity accounting.
 
+### Reward binding
+
+Caller reward fields are descriptive input, not live authority. When the fresh revenue-intake result is actionable, the portfolio re-derives the one native advertised reward from the verifier-owned qualification signals and requires the candidate's `reward_currency` and `reward_minor` to match exactly before READY is possible.
+
+- USD is bound in exact cents (`$90` => `reward_minor: 9000`).
+- RTC remains a distinct native currency and is never converted to USD. The current custody schema stores integer RTC, so a fractional canonical RTC offer fails closed rather than being rounded.
+- Native-unit conversion uses exact decimal tuple arithmetic. Process-wide decimal precision and rounding are caller state and cannot change the canonical reward.
+- Missing/malformed reward signals, multiple native currencies, multiple distinct amounts, currency mismatch, or amount mismatch all produce a hold.
+
+The exact normalized qualification receipt is retained inside the fail-closed reward-binding generation when a mismatch is detected. No raw issue/comment text is introduced: `revenue_intake` results are already safe-to-log normalized receipts.
+
 The implementation keeps the previously reviewed v1 deterministic ledger engine in the private `_active_claim_portfolio_core` module. The public v2 adapter supplies only verifier-owned live evidence to that engine. The fixed neutral `observed_at` used at the private-core boundary is deliberate: current authority bytes, not wall time, define an opportunity generation; event age is measured from verifier-owned current UTC.
 
 ## Historical replay
@@ -41,6 +52,6 @@ python -m concierge.active_claim_portfolio replay \
 
 ## Authority limits
 
-A READY result is internal work-custody permission only. It is not a GitHub claim, sponsor contact, upstream submission, acceptance, payout, cash, or revenue assertion. The receipt records these limits explicitly.
+A READY result is internal work-custody permission only. It is not a GitHub claim, sponsor contact, upstream submission, acceptance, payout, cash, or revenue assertion. The receipt records these limits explicitly, including `caller_reward_metadata_authoritative=false`.
 
 Reward values remain per-opportunity metadata; currencies are never summed or converted.

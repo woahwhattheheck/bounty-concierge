@@ -1,0 +1,15 @@
+{
+  "claimant_label": "Synthetic claimant",
+  "message_sha256": "c5ea3a1b34e744468610c96dbf223a7d68511045d2894658ee8df3af7555fcce",
+  "opportunity_ref": "Scottcjn/Rustchain#100",
+  "prepared_at": "2026-09-15T02:00:00Z",
+  "request_id": "rustchain-100-claim-synthetic",
+  "reward_reference": "10 RTC advertised reward — synthetic fixture only",
+  "schema": "bounty-concierge-payout-delivery-request/v1",
+  "source_authority_ref": "https://github.com/woahwhattheheck/bottube/pull/16",
+  "source_authority_sha256": "500af2029950a4dc4d5cf9964eb6826960753c94c3fa4cf810f2ba11df0d6bb3",
+  "target_kind": "GITHUB_COMMENT",
+  "target_route_sha256": "8f5df34772563084f1c931bd0dec7b87364d23017d24b699283a3dce00657093",
+  "work_sha": "c209eda74549ac424d113ad5abfbe6506ce59207",
+  "work_url": "https://github.com/woahwhattheheck/bottube/pull/16"
+}

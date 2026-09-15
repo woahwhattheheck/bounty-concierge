@@ -1,0 +1,50 @@
+name: Fleet economic admission
+
+on:
+  pull_request:
+    paths:
+      - "concierge/_fleet_economic_admission_v1.py"
+      - "concierge/fleet_economic_admission.py"
+      - "tests/test_fleet_economic_admission.py"
+      - "tests/test_fleet_economic_source_identity.py"
+      - "docs/FLEET_ECONOMIC_ADMISSION.md"
+      - "policies/swarm_fleet_economics_v1.json"
+      - ".github/workflows/fleet-economic-admission.yml"
+  push:
+    branches: [main]
+    paths:
+      - "concierge/_fleet_economic_admission_v1.py"
+      - "concierge/fleet_economic_admission.py"
+      - "tests/test_fleet_economic_admission.py"
+      - "tests/test_fleet_economic_source_identity.py"
+      - "policies/swarm_fleet_economics_v1.json"
+      - ".github/workflows/fleet-economic-admission.yml"
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.13"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Focused tests
+        run: >-
+          python -m unittest -v
+          tests/test_fleet_economic_admission.py
+          tests/test_fleet_economic_source_identity.py
+      - name: Optimized-mode tests
+        run: >-
+          python -O -m unittest -v
+          tests/test_fleet_economic_admission.py
+          tests/test_fleet_economic_source_identity.py
+      - name: Syntax
+        run: >-
+          python -m py_compile
+          concierge/_fleet_economic_admission_v1.py
+          concierge/fleet_economic_admission.py
+          tests/test_fleet_economic_admission.py
+          tests/test_fleet_economic_source_identity.py

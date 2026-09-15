@@ -1,0 +1,9 @@
+{
+  "captured_at": "2026-09-15T02:02:00Z",
+  "complete": true,
+  "items": [],
+  "request_sha256": "8b0c62ff46e5250bc4c7b27a050d68ab184c7040a66106e0a4606a6709e99605",
+  "schema": "bounty-concierge-payout-delivery-history/v1",
+  "target_route_sha256": "8f5df34772563084f1c931bd0dec7b87364d23017d24b699283a3dce00657093",
+  "terminal": null
+}
