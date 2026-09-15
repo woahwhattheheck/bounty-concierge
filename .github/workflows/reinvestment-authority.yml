@@ -1,0 +1,45 @@
+name: reinvestment-authority
+
+on:
+  pull_request:
+    paths:
+      - "concierge/reinvestment_allocator.py"
+      - "concierge/_reinvestment_allocator_core.py"
+      - "tests/test_reinvestment_allocator.py"
+      - "docs/REALIZED_REINVESTMENT_REVIEW.md"
+      - ".github/workflows/reinvestment-authority.yml"
+  push:
+    branches: [main]
+    paths:
+      - "concierge/reinvestment_allocator.py"
+      - "concierge/_reinvestment_allocator_core.py"
+      - "tests/test_reinvestment_allocator.py"
+      - "docs/REALIZED_REINVESTMENT_REVIEW.md"
+      - ".github/workflows/reinvestment-authority.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  authority-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile exact paths
+        run: >-
+          python -m py_compile
+          concierge/reinvestment_allocator.py
+          concierge/_reinvestment_allocator_core.py
+          tests/test_reinvestment_allocator.py
+      - name: Commercial-authority hostiles
+        run: python -m unittest -v tests.test_reinvestment_allocator
+      - name: Commercial-authority hostiles under optimized Python
+        run: python -O -m unittest -v tests.test_reinvestment_allocator
