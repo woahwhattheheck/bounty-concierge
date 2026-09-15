@@ -12,3 +12,13 @@ from . import payoff_path_policy_v3 as _payoff_path_policy_v3
 _payoff_path_policy_v3.MODE = "CHAINED"
 _payoff_path_policy_v3.install()
 del _payoff_path_policy_v3
+
+# The claim/work primitive was recovered from its stale source branch without
+# rewriting original product logic. Install the narrow security shim at package
+# import so direct ``concierge.claim_work_authority`` consumers receive distinct
+# retained-receipt authority and cannot transitively accept sponsor test-only
+# unsigned adjudication.
+from . import claim_work_authority_hardening as _claim_work_authority_hardening
+
+_claim_work_authority_hardening.install()
+del _claim_work_authority_hardening
