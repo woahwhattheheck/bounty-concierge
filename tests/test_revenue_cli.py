@@ -46,10 +46,7 @@ class RevenueCliTests(unittest.TestCase):
             return_value=fake,
         ) as importer:
             self.assertEqual(revenue_cli.run(["cash-cycle", "verify"]), 7)
-            self.assertEqual(
-                revenue_cli.run(["--list-json"], stdout=listed_json),
-                0,
-            )
+            self.assertEqual(revenue_cli.run(["--list-json"], stdout=listed_json), 0)
 
         importer.assert_called_once_with(canonical_module)
         self.assertEqual(seen, [["verify"]])
@@ -86,10 +83,7 @@ class RevenueCliTests(unittest.TestCase):
                 code = revenue_cli.run(["cash-cycle", "verify", "receipt.json"])
                 unknown = revenue_cli.run(["injected"], stderr=err)
                 self.assertEqual(revenue_cli.run(["--list"], stdout=listed), 0)
-                self.assertEqual(
-                    revenue_cli.run(["--list-json"], stdout=listed_json),
-                    0,
-                )
+                self.assertEqual(revenue_cli.run(["--list-json"], stdout=listed_json), 0)
 
         self.assertEqual(code, 7)
         self.assertEqual(unknown, 2)
@@ -142,7 +136,11 @@ class RevenueCliTests(unittest.TestCase):
         seen = []
         fake = types.SimpleNamespace(main=lambda argv: seen.append(argv) or 7)
         command = revenue_cli.COMMANDS["cash-cycle"]
-        with mock.patch.object(revenue_cli.importlib, "import_module", return_value=fake) as importer:
+        with mock.patch.object(
+            revenue_cli.importlib,
+            "import_module",
+            return_value=fake,
+        ) as importer:
             code = revenue_cli.run(["cash-cycle", "verify", "--weird=1", "a b.json"])
         self.assertEqual(code, 7)
         self.assertEqual(seen, [["verify", "--weird=1", "a b.json"]])
@@ -224,7 +222,7 @@ class RevenueCliTests(unittest.TestCase):
         err = io.StringIO()
         fake = types.SimpleNamespace(main=lambda argv: {"not": "an exit code"})
         with mock.patch.object(revenue_cli.importlib, "import_module", return_value=fake):
-            code = revenue_cli.run(["payoff-path"])
+            code = revenue_cli.run(["payoff-path"], stderr=err)
         self.assertEqual(code, 2)
         self.assertIn("invalid return contract", err.getvalue())
 
