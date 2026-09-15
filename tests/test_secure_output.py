@@ -78,14 +78,30 @@ class SecureOutputTests(unittest.TestCase):
             finally:
                 os.chdir(previous)
 
-    def test_failed_write_unlinks_through_verified_parent(self):
+    def test_failed_write_preserves_created_generation_for_reconciliation(self):
         self.require_supported_host()
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "receipt.json"
             with mock.patch.object(secure_output.os, "write", side_effect=OSError("boom")):
                 with self.assertRaises(OSError):
                     payout._write_new(target, b"receipt\n")
-            self.assertFalse(target.exists())
+            self.assertTrue(target.exists())
+            self.assertEqual(target.read_bytes(), b"")
+
+    def test_failed_write_never_unlinks_foreign_successor(self):
+        self.require_supported_host()
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "receipt.json"
+
+            def replace_then_fail(_fd, _view):
+                target.unlink()
+                target.write_bytes(b"foreign-successor\n")
+                raise OSError("boom")
+
+            with mock.patch.object(secure_output.os, "write", side_effect=replace_then_fail):
+                with self.assertRaises(OSError):
+                    payout._write_new(target, b"receipt\n")
+            self.assertEqual(target.read_bytes(), b"foreign-successor\n")
 
     def test_unsupported_host_fails_closed(self):
         with mock.patch.object(secure_output.os, "supports_dir_fd", set()):
