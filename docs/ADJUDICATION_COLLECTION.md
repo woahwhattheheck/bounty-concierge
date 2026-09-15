@@ -80,6 +80,14 @@ A later exact reward reaffirmation also does not mint a second key. If an origin
 
 The sponsor reward and claim-unit identity are host-authorized; the `work` tuple is not. The bridge therefore never presents caller-supplied repo/PR/head as factual merged rewarded work and never emits a send-ready disposition. In the owner-review draft it is rendered only as a **caller-supplied unverified candidate**. An unrelated/fabricated syntactically valid GitHub tuple must still stop at `OWNER_REVIEW_REQUIRED`. A future carrier may add a separately trusted GitHub merge/readback receipt plus a mechanical relation from that work identity to the selected sponsor claim unit; until then, this module deliberately does not cross that authority boundary.
 
+## Payout-route provenance boundary
+
+The sponsor reward does **not** authenticate the destination through which Bryce should collect it. `payout_route` is caller-supplied packet data. Its type and syntax are validated, and its digest is receipt-bound, but neither property proves that a payment link, wallet, hosted handle, or other destination is owned or authorized by Bryce.
+
+Accordingly, every owner-review draft renders the route only as a **caller-supplied unverified candidate**. The authority object carries `payout_route_independently_verified: false`. Before any sponsor contact, an owner or separately authorized sender must independently verify both (a) that the candidate work is the merged work for the selected sponsor claim unit and (b) that the candidate payout route is controlled by or authorized for Bryce. A malicious but syntactically valid route, including an attacker HTTPS payment link, can never become trusted merely by appearing in an otherwise host-authorized sponsor packet.
+
+Changing or correcting an unverified route remains non-generative: it changes the packet receipt but does not mint a second commercial `collection_key` for the same sponsor reward.
+
 ## Authority ceiling
 
 The bridge is deterministic preparation only. It does not:
@@ -88,10 +96,11 @@ The bridge is deterministic preparation only. It does not:
 - mutate email, GitHub, Stripe, a wallet, a bank, or any provider;
 - initiate a payout;
 - authenticate a sponsor merely because retained bytes have a digest;
+- authenticate or prove ownership of a caller-supplied payout route;
 - turn a reward offer into debt, cash, payment-due proof, or recognized revenue; or
 - prove the caller-supplied merged-work fields independently.
 
-The packet retains sponsor-authority provider/principal/scope provenance plus the signed manifest/report-projection digests, but not either HMAC signature itself. Because the caller-supplied GitHub work tuple is not independently verified or mechanically bound to the sponsor claim unit, the strongest disposition is `OWNER_REVIEW_REQUIRED`, never send-ready. The draft labels the work URL/head as caller-supplied unverified candidates and explicitly requires independent verification of merge state and claim-unit relation before any send. The output also requires an owner or separately authorized sender.
+The packet retains sponsor-authority provider/principal/scope provenance plus the signed manifest/report-projection digests, but not either HMAC signature itself. Because neither the caller-supplied GitHub work tuple nor the payout route is independently verified, the strongest disposition is `OWNER_REVIEW_REQUIRED`, never send-ready. The draft labels both the work URL/head and payout route as caller-supplied unverified candidates and explicitly requires independent verification of merge/claim-unit relation plus payout-route ownership or authorization before any send. The output also requires an owner or separately authorized sender.
 
 ## CLI
 
@@ -108,7 +117,6 @@ python -m concierge.adjudication_collection input.json --verify packet.json
 ```
 
 The loader rejects duplicate JSON keys, floats/non-finite numbers, oversized JSON integers, symlink-following where the platform supports `O_NOFOLLOW`, non-regular files, and files larger than 1 MiB before unbounded reads.
-
 
 ## Display-safety boundary
 
