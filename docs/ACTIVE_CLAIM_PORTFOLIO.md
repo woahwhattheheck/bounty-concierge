@@ -19,6 +19,7 @@ Caller reward fields are descriptive input, not live authority. When the fresh r
 
 - USD is bound in exact cents (`$90` => `reward_minor: 9000`).
 - RTC remains a distinct native currency and is never converted to USD. The current custody schema stores integer RTC, so a fractional canonical RTC offer fails closed rather than being rounded.
+- Native-unit conversion uses exact decimal tuple arithmetic. Process-wide decimal precision and rounding are caller state and cannot change the canonical reward.
 - Missing/malformed reward signals, multiple native currencies, multiple distinct amounts, currency mismatch, or amount mismatch all produce a hold.
 
 The exact normalized qualification receipt is retained inside the fail-closed reward-binding generation when a mismatch is detected. No raw issue/comment text is introduced: `revenue_intake` results are already safe-to-log normalized receipts.
