@@ -25,12 +25,15 @@ CONTINUITY_SCHEMA = "payoff-path-continuity/v2"
 PACKET_SCHEMA = "payoff-path-gate/v3"
 RECEIPT_SCHEMA = "payoff-path-gate-receipt/v3"
 EVENT_KINDS = {"BUDGET_POLICY", "EFFORT"}
-MODE = "CHAINED_POLICY_EVIDENCE"
+MODE = globals().get("MODE", "CHAINED_POLICY_EVIDENCE")
 _MAX_EVENTS = getattr(_core, "_MAX_EVENTS", 100_000)
 
-_ORIGINAL_INTERNAL_COMPILE = _core._compile_gate
-_ORIGINAL_VERIFY = _core.verify_gate
-_INSTALLED = False
+# importlib.reload() preserves the module dictionary while re-executing source.
+# Keep the first-import raw core callables and install state rather than capturing
+# our own dispatcher as an "original" or silently resetting compatibility mode.
+_ORIGINAL_INTERNAL_COMPILE = globals().get("_ORIGINAL_INTERNAL_COMPILE", _core._compile_gate)
+_ORIGINAL_VERIFY = globals().get("_ORIGINAL_VERIFY", _core.verify_gate)
+_INSTALLED = globals().get("_INSTALLED", False)
 
 
 def _verify_current_policy_authority(document: Any) -> dict[str, Any]:
