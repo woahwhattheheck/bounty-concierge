@@ -11,13 +11,19 @@ generation, prior-receipt anchor, work/opportunity scope, provider, principal an
 capture time. The private signing key is deliberately absent from this module,
 from process environment, and from every ordinary compile/verify API.
 
-The verifier captures its dependency graph in definition defaults. The module also
-rejects ordinary public replacement/deletion of that critical verifier attribute, so
-the v3 lazy import continues to resolve the verifier after public-attribute rebinding
-attempts and module reloads. Arbitrary mutation of private Python interpreter state
-is equivalent to arbitrary code execution and is outside this evidence boundary;
-caller data, environment values, public attribute rebinding, and ordinary module
-reload are all handled fail-closed.
+The trusted public key, provider and principal are captured exactly once during
+package bootstrap. Per-call environment mutation can supply only the detached
+capture/signature, not replace the trust anchor. Ordinary module reload preserves
+the first bootstrap values. The verifier captures its dependency graph in definition
+defaults, and the module rejects ordinary replacement/deletion of the verifier or
+bootstrap anchor attributes.
+
+This boundary assumes the host launches/imports the package before untrusted caller
+code executes. Arbitrary mutation of private interpreter state before trusted
+bootstrap (or arbitrary replacement of installed source) is equivalent to taking
+over the host itself and is outside this evidence boundary. Caller documents,
+post-bootstrap environment mutation, public/private module-attribute assignment,
+and ordinary module reload are handled fail-closed.
 """
 
 from __future__ import annotations
@@ -35,7 +41,7 @@ from typing import Any
 from . import payoff_path_gate_core as _core
 from . import payoff_path_policy_v3 as _v3
 
-AUTHORITY_PURPOSE = "bounty-payoff-owner-policy-authority/v2"
+AUTHORITY_PURPOSE = "bounty-payoff-owner-policy-authority/v3"
 MAX_AUTHORITY_AGE_SECONDS = 300
 RSA_SHA256_DIGESTINFO_PREFIX = bytes.fromhex("3031300d060960864801650304020105000420")
 
@@ -45,6 +51,13 @@ PROVIDER_ENV = "BOUNTY_PAYOFF_POLICY_AUTHORIZED_PROVIDER"
 PRINCIPAL_ENV = "BOUNTY_PAYOFF_POLICY_AUTHORIZED_PRINCIPAL_SHA256"
 CAPTURED_AT_ENV = "BOUNTY_PAYOFF_POLICY_AUTHORITY_CAPTURED_AT_UTC"
 SIGNATURE_ENV = "BOUNTY_PAYOFF_POLICY_AUTHORITY_SIGNATURE_HEX"
+
+# importlib.reload() executes in the existing module dictionary. Preserve the
+# first trusted-bootstrap anchor instead of re-reading caller-mutable environment.
+_BOOTSTRAP_MODULUS_TEXT = globals().get("_BOOTSTRAP_MODULUS_TEXT", os.environ.get(MODULUS_ENV))
+_BOOTSTRAP_EXPONENT_TEXT = globals().get("_BOOTSTRAP_EXPONENT_TEXT", os.environ.get(EXPONENT_ENV))
+_BOOTSTRAP_PROVIDER_TEXT = globals().get("_BOOTSTRAP_PROVIDER_TEXT", os.environ.get(PROVIDER_ENV))
+_BOOTSTRAP_PRINCIPAL_TEXT = globals().get("_BOOTSTRAP_PRINCIPAL_TEXT", os.environ.get(PRINCIPAL_ENV))
 
 
 def _canonical_bytes(value: Any, _dumps=json.dumps) -> bytes:
@@ -134,6 +147,10 @@ def verify_current_policy_authority(
     document: Any,
     *,
     _getenv=os.environ.get,
+    _bootstrap_modulus_text=_BOOTSTRAP_MODULUS_TEXT,
+    _bootstrap_exponent_text=_BOOTSTRAP_EXPONENT_TEXT,
+    _bootstrap_provider_text=_BOOTSTRAP_PROVIDER_TEXT,
+    _bootstrap_principal_text=_BOOTSTRAP_PRINCIPAL_TEXT,
     _opaque_ref=_core._opaque_ref,
     _sha=_core._sha,
     _timestamp=_core._timestamp,
@@ -147,8 +164,6 @@ def verify_current_policy_authority(
     _timezone_utc=timezone.utc,
     _digestinfo_prefix=RSA_SHA256_DIGESTINFO_PREFIX,
     _max_age=MAX_AUTHORITY_AGE_SECONDS,
-    _modulus_env=MODULUS_ENV,
-    _exponent_env=EXPONENT_ENV,
     _provider_env=PROVIDER_ENV,
     _principal_env=PRINCIPAL_ENV,
     _captured_env=CAPTURED_AT_ENV,
@@ -156,14 +171,14 @@ def verify_current_policy_authority(
 ) -> dict[str, Any]:
     """Verify detached RSA authority for the exact current v3 policy scope.
 
-    Only the public RSA key is present at runtime. This function contains no signing
-    helper and consumes no private key or symmetric secret.
+    The RSA public key and owner identity are first-import bootstrap capabilities;
+    only the detached capture timestamp and signature are read per invocation.
     """
 
-    modulus_text = _getenv(_modulus_env)
-    exponent_text = _getenv(_exponent_env)
-    provider_text = _getenv(_provider_env)
-    principal_text = _getenv(_principal_env)
+    modulus_text = _bootstrap_modulus_text
+    exponent_text = _bootstrap_exponent_text
+    provider_text = _bootstrap_provider_text
+    principal_text = _bootstrap_principal_text
     captured_raw = _getenv(_captured_env)
     signature_text = _getenv(_signature_env)
     if not all(
@@ -229,14 +244,20 @@ def verify_current_policy_authority(
 
 
 class _VerifyOnlyAuthorityModule(types.ModuleType):
-    """Keep the critical verifier identity stable under ordinary module mutation."""
+    """Keep verifier and first-import trust anchor stable under ordinary mutation."""
 
-    _LOCKED_NAMES = frozenset({"verify_current_policy_authority"})
+    _LOCKED_NAMES = frozenset(
+        {
+            "verify_current_policy_authority",
+            "_BOOTSTRAP_MODULUS_TEXT",
+            "_BOOTSTRAP_EXPONENT_TEXT",
+            "_BOOTSTRAP_PROVIDER_TEXT",
+            "_BOOTSTRAP_PRINCIPAL_TEXT",
+        }
+    )
 
     def __setattr__(self, name: str, value: Any) -> None:
         if name in self._LOCKED_NAMES and name in self.__dict__:
-            # Deliberately ignore replacement rather than raising: callers cannot
-            # swap the verifier, while generic instrumentation/cleanup remains safe.
             return
         super().__setattr__(name, value)
 
