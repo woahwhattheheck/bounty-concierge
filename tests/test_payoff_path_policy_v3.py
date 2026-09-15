@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import unittest
+from unittest import mock
 
 from concierge import payoff_path_gate as gate
 
@@ -96,6 +97,16 @@ def document(events, *, budget, spent, generation=0, previous_receipt_sha256=Non
 
 class PayoffPathPolicyV3Tests(unittest.TestCase):
     def setUp(self):
+        # These tests exercise v3 continuity semantics, not the host trust boundary.
+        # Mock the verifier in-process instead of exposing any runtime/env unsigned
+        # switch in production code. Dedicated authority tests exercise real HMAC.
+        self.authority_patcher = mock.patch(
+            "concierge.payoff_path_policy_authority.verify_current_policy_authority",
+            return_value={"test_fixture": True},
+        )
+        self.authority_patcher.start()
+        self.addCleanup(self.authority_patcher.stop)
+
         self.p0 = policy(
             "policy-0", 0, 60, "2026-09-13T12:30:00.000Z", evidence_sha=SHA_B
         )

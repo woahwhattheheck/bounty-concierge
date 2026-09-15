@@ -12,3 +12,19 @@ from . import payoff_path_policy_v3 as _payoff_path_policy_v3
 _payoff_path_policy_v3.MODE = "CHAINED"
 _payoff_path_policy_v3.install()
 del _payoff_path_policy_v3
+
+# Capture the verify-only owner-policy trust anchor during package bootstrap, before
+# imported caller code gets a chance to replace per-process environment configuration.
+# A missing/invalid launch-time public key or principal intentionally leaves v3
+# owner-policy compilation fail-closed until the host restarts with valid authority.
+from . import payoff_path_policy_authority as _payoff_path_policy_authority
+
+del _payoff_path_policy_authority
+
+# Bind the verified authority and v3 semantic implementation into closure-held public
+# and direct entrypoints. This removes security dependence on mutable module attrs;
+# in-place v3 reload fails closed and requires a trusted host restart.
+from . import payoff_path_policy_secure_runtime as _payoff_path_policy_secure_runtime
+
+_payoff_path_policy_secure_runtime.install()
+del _payoff_path_policy_secure_runtime
