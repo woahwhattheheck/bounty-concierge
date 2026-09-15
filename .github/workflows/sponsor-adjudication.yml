@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "concierge/sponsor_adjudication/**"
+      - "tests/conftest.py"
       - "tests/test_sponsor_adjudication*.py"
       - "tests/sponsor_adjudication_unsigned_site/**"
       - "docs/SPONSOR_ADJUDICATION.md"
@@ -12,6 +13,7 @@ on:
     branches: [main]
     paths:
       - "concierge/sponsor_adjudication/**"
+      - "tests/conftest.py"
       - "tests/test_sponsor_adjudication*.py"
       - "tests/sponsor_adjudication_unsigned_site/**"
       - "docs/SPONSOR_ADJUDICATION.md"
@@ -55,4 +57,4 @@ jobs:
           BOUNTY_SPONSOR_ADJUDICATION_AUTHORIZED_PRINCIPAL_SHA256: "03b2cbe8a9410c7def5943799c27154a6e77daad63ec56df11739fc3b804e506"
         run: python -O -m unittest -v tests.test_sponsor_adjudication_authority tests.test_sponsor_adjudication_zero_event_authority tests.test_sponsor_adjudication_runtime_unsigned_rejection
       - name: Compile
-        run: python -m py_compile concierge/sponsor_adjudication/*.py tests/test_sponsor_adjudication.py tests/test_sponsor_adjudication_hardening.py tests/test_sponsor_adjudication_authority.py tests/test_sponsor_adjudication_zero_event_authority.py tests/test_sponsor_adjudication_runtime_unsigned_rejection.py tests/sponsor_adjudication_unsigned_site/sitecustomize.py
+        run: python -m py_compile concierge/sponsor_adjudication/*.py tests/conftest.py tests/test_sponsor_adjudication.py tests/test_sponsor_adjudication_hardening.py tests/test_sponsor_adjudication_authority.py tests/test_sponsor_adjudication_zero_event_authority.py tests/test_sponsor_adjudication_runtime_unsigned_rejection.py tests/sponsor_adjudication_unsigned_site/sitecustomize.py
