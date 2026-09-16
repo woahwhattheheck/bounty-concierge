@@ -160,16 +160,16 @@ jobs:
           from pathlib import Path
 
           expected = {
-              ".github/workflows/reinvestment-authority.yml": "0ed83ccd0b70d1885046e8c9b5b5225588aecb14",
+              ".github/workflows/reinvestment-authority.yml": "0ed83c7ceca15541b7a9ea1e716fc4f167cf1fb3",
               "concierge/_reinvestment_allocator_api.py": "0afd51877ceb8ad611352c14439d83afef9bf955",
-              "concierge/_reinvestment_allocator_cli.py": "64da5cfa8fff7700387ed810e7a1a648626d2eda",
-              "concierge/_reinvestment_allocator_transport.py": "472e93d8e9d9e36a492c1794a4884b8ffd3a7914",
-              "concierge/_reinvestment_allocator_worker.py": "491b04b38894a13782491718ea3547e60df41757",
+              "concierge/_reinvestment_allocator_cli.py": "64da5f1a67eb8d0bd90782d0b8c029d052161b88",
+              "concierge/_reinvestment_allocator_transport.py": "472efce478e918d4e17f87620b301302d303e39c",
+              "concierge/_reinvestment_allocator_worker.py": "491b5700e4af442cac06e3a381eff39cbab7ad6f",
               "concierge/reinvestment_allocator.py": "9660f576c2beaf4b2e6e2fca9bc38f07cf5cead0",
-              "docs/REALIZED_REINVESTMENT_REVIEW.md": "17b652607720776422b4654ead701cc623d5b6ed",
-              "tests/reinvestment_allocator_case_driver.py": "c9a79fd1aed0ac40f4545ff38cfb0526d18670f8",
-              "tests/reinvestment_allocator_test_support.py": "35b516e9ce348d36a75b7b9aaa189bad19a78f42",
-              "tests/test_reinvestment_allocator.py": "d82f5ff219931870595bcce3d3e7c1a156766151",
+              "docs/REALIZED_REINVESTMENT_REVIEW.md": "17b45746abbcc3c43fc31e53c576267909e3bc57",
+              "tests/reinvestment_allocator_case_driver.py": "c9a1e88f34c90207176d09f1074b8ae57ed3b4dc",
+              "tests/reinvestment_allocator_test_support.py": "35b5ed9aa19e7b5d4a5bc9d2dcd4c4562c3f7c76",
+              "tests/test_reinvestment_allocator.py": "d82f9b24fe14b46cdc6f768b7c93bb18894a9807",
               "concierge/_reinvestment_allocator_core.source": "5731fd0652bc94b20d1f3b2de48628f633f550a9",
           }
           for path, wanted in expected.items():
