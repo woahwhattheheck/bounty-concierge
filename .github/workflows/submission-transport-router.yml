@@ -5,9 +5,8 @@ on:
     paths:
       - "concierge/submission_transport_router.py"
       - "concierge/_submission_transport_router_core.py"
-      - "concierge/submission_transport_renderer_hardening.py"
+      - "concierge/_submission_transport_core_source_*.py"
       - "concierge/submission_custody.py"
-      - "concierge/__init__.py"
       - "tests/test_submission_transport_router.py"
       - "tests/test_submission_transport_renderer_boundary.py"
       - "docs/SUBMISSION_TRANSPORT_ROUTER.md"
@@ -17,9 +16,8 @@ on:
     paths:
       - "concierge/submission_transport_router.py"
       - "concierge/_submission_transport_router_core.py"
-      - "concierge/submission_transport_renderer_hardening.py"
+      - "concierge/_submission_transport_core_source_*.py"
       - "concierge/submission_custody.py"
-      - "concierge/__init__.py"
       - "tests/test_submission_transport_router.py"
       - "tests/test_submission_transport_renderer_boundary.py"
       - "docs/SUBMISSION_TRANSPORT_ROUTER.md"
@@ -48,15 +46,21 @@ jobs:
           python -m py_compile
           concierge/submission_transport_router.py
           concierge/_submission_transport_router_core.py
-          concierge/submission_transport_renderer_hardening.py
+          concierge/_submission_transport_core_source_00.py
+          concierge/_submission_transport_core_source_01.py
+          concierge/_submission_transport_core_source_02.py
+          concierge/_submission_transport_core_source_03.py
+          concierge/_submission_transport_core_source_04.py
+          concierge/_submission_transport_core_source_05.py
+          concierge/_submission_transport_core_source_06.py
           tests/test_submission_transport_router.py
           tests/test_submission_transport_renderer_boundary.py
-      - name: Direct-core and host-root hostile suite
+      - name: Direct-core, reload, runpy, and host-root hostile suite
         run: >-
           python -m pytest -q
           tests/test_submission_transport_router.py
           tests/test_submission_transport_renderer_boundary.py
-      - name: Direct-core and host-root hostile suite under optimized Python
+      - name: Hostile suite under optimized Python
         run: >-
           python -O -m pytest -q
           tests/test_submission_transport_router.py

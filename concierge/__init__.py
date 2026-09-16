@@ -22,11 +22,3 @@ from . import claim_work_authority_hardening as _claim_work_authority_hardening
 
 _claim_work_authority_hardening.install()
 del _claim_work_authority_hardening
-
-# Close the submission-transport predecessor graph before any supported direct
-# core import returns. Injected test candidates remain observable only through
-# the non-production test schema; no module-level renderer can mint a v2 receipt.
-from . import submission_transport_renderer_hardening as _submission_transport_renderer_hardening
-
-_submission_transport_renderer_hardening.install()
-del _submission_transport_renderer_hardening
