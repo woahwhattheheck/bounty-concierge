@@ -11,6 +11,7 @@ This module provides:
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import re
@@ -18,6 +19,7 @@ import subprocess
 import threading
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
+from urllib.parse import urlsplit
 
 import requests
 
@@ -29,6 +31,7 @@ POOL_ENDPOINTS = {
     "herominers": "stratum+tcp://warthog.herominers.com:1140",
     "accpool": "stratum+tcp://warthog.acc-pool.pw:1140",
 }
+POOL_URL_SCHEMES = frozenset({"stratum+tcp", "stratum+ssl"})
 
 MULTIPLIER_MANAGED_SUBPROCESS = 1.5
 MULTIPLIER_EXTERNAL_MINER = 1.15
@@ -96,13 +99,74 @@ def _canonical_pool_name(name: str) -> Optional[str]:
     return aliases.get(normalized)
 
 
+def _valid_pool_hostname(hostname: str) -> bool:
+    """Return whether *hostname* is an IP address or a conservative DNS name."""
+    try:
+        ipaddress.ip_address(hostname)
+        return True
+    except ValueError:
+        pass
+
+    if len(hostname) > 253:
+        return False
+    candidate = hostname[:-1] if hostname.endswith(".") else hostname
+    if not candidate:
+        return False
+    labels = candidate.split(".")
+    return all(
+        1 <= len(label) <= 63
+        and label[0].isalnum()
+        and label[-1].isalnum()
+        and all(char.isalnum() or char == "-" for char in label)
+        for label in labels
+    )
+
+
+def _validate_explicit_pool_url(pool_url: object) -> Tuple[Optional[str], Optional[str]]:
+    """Validate a custom Stratum endpoint without claiming network reachability."""
+    if not isinstance(pool_url, str):
+        return None, "Pool URL must be a string"
+    if not pool_url:
+        return None, "Pool URL must not be empty"
+    if pool_url != pool_url.strip() or any(
+        char.isspace() or ord(char) < 32 or ord(char) == 127 for char in pool_url
+    ):
+        return None, "Pool URL must not contain whitespace or control characters"
+
+    try:
+        parsed = urlsplit(pool_url)
+        hostname = parsed.hostname
+        port = parsed.port
+    except ValueError as exc:
+        return None, f"Malformed pool URL: {exc}"
+
+    if parsed.scheme.lower() not in POOL_URL_SCHEMES:
+        allowed = ", ".join(sorted(POOL_URL_SCHEMES))
+        return None, f"Pool URL scheme must be one of: {allowed}"
+    if not hostname or not _valid_pool_hostname(hostname):
+        return None, "Pool URL must include a valid hostname or IP address"
+    if port is None:
+        return None, "Pool URL must include an explicit port"
+    if parsed.username is not None or parsed.password is not None:
+        return None, "Pool URL must not include credentials"
+    if parsed.path not in ("", "/"):
+        return None, "Pool URL must not include a path"
+    if parsed.query or parsed.fragment:
+        return None, "Pool URL must not include a query or fragment"
+
+    return pool_url, None
+
+
 def resolve_pool_endpoint(pool_name: Optional[str], pool_url: Optional[str] = None) -> Dict:
-    """Resolve a known pool endpoint or accept an explicit pool URL."""
-    if pool_url:
+    """Resolve a known pool endpoint or validate an explicit Stratum URL."""
+    if pool_url is not None:
+        endpoint, error = _validate_explicit_pool_url(pool_url)
+        if error:
+            return {"verified": False, "error": error}
         return {
             "verified": True,
             "pool": pool_name or "custom",
-            "endpoint": pool_url,
+            "endpoint": endpoint,
             "source": "explicit-url",
         }
 
