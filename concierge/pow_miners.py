@@ -107,7 +107,7 @@ def _valid_pool_hostname(hostname: str) -> bool:
     except ValueError:
         pass
 
-    if len(hostname) > 253:
+    if not hostname.isascii() or len(hostname) > 253:
         return False
     candidate = hostname[:-1] if hostname.endswith(".") else hostname
     if not candidate:
@@ -147,6 +147,8 @@ def _validate_explicit_pool_url(pool_url: object) -> Tuple[Optional[str], Option
         return None, "Pool URL must include a valid hostname or IP address"
     if port is None:
         return None, "Pool URL must include an explicit port"
+    if port == 0:
+        return None, "Pool URL port must be between 1 and 65535"
     if parsed.username is not None or parsed.password is not None:
         return None, "Pool URL must not include credentials"
     if parsed.path not in ("", "/"):

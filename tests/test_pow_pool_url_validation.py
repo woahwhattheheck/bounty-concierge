@@ -34,6 +34,8 @@ class ExplicitPoolUrlValidationTests(unittest.TestCase):
             ("stratum+tcp://example.org", "explicit port"),
             ("stratum+tcp://:1234", "hostname"),
             ("stratum+tcp://bad_host:1234", "hostname"),
+            ("stratum+tcp://éxample.org:1234", "hostname"),
+            ("stratum+tcp://example.org:0", "between 1 and 65535"),
             ("stratum+tcp://example.org:99999", "Malformed"),
             ("stratum+tcp://user:pass@example.org:1234", "credentials"),
             ("stratum+tcp://example.org:1234/miner", "path"),
