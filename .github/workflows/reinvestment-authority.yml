@@ -1,190 +1,62 @@
-name: zte exact-source bootstrap
+name: reinvestment authority isolation
 
 on:
-  push:
-    branches:
-      - znm-h7q2/reinvestment-authority-v3
   pull_request:
-    types: [opened, synchronize, reopened]
+    paths:
+      - "concierge/reinvestment_allocator.py"
+      - "concierge/_reinvestment_allocator_api.py"
+      - "concierge/_reinvestment_allocator_cli.py"
+      - "concierge/_reinvestment_allocator_transport.py"
+      - "concierge/_reinvestment_allocator_worker.py"
+      - "concierge/_reinvestment_allocator_core.source"
+      - "tests/test_reinvestment_allocator.py"
+      - "tests/reinvestment_allocator_case_driver.py"
+      - "tests/reinvestment_allocator_test_support.py"
+      - "docs/REALIZED_REINVESTMENT_REVIEW.md"
+      - ".github/workflows/reinvestment-authority.yml"
+      - "concierge/revenue_closeout.py"
+      - "concierge/revenue_settlement.py"
+      - "concierge/realized_unit_economics.py"
+  push:
     branches: [main]
+    paths:
+      - "concierge/reinvestment_allocator.py"
+      - "concierge/_reinvestment_allocator_api.py"
+      - "concierge/_reinvestment_allocator_cli.py"
+      - "concierge/_reinvestment_allocator_transport.py"
+      - "concierge/_reinvestment_allocator_worker.py"
+      - "concierge/_reinvestment_allocator_core.source"
+      - "tests/test_reinvestment_allocator.py"
+      - "tests/reinvestment_allocator_case_driver.py"
+      - "tests/reinvestment_allocator_test_support.py"
+      - "docs/REALIZED_REINVESTMENT_REVIEW.md"
+      - ".github/workflows/reinvestment-authority.yml"
+      - "concierge/revenue_closeout.py"
+      - "concierge/revenue_settlement.py"
+      - "concierge/realized_unit_economics.py"
+  workflow_dispatch:
 
 permissions:
-  contents: write
-  issues: read
-
-concurrency:
-  group: zte-reinvestment-authority-bootstrap
-  cancel-in-progress: false
+  contents: read
 
 jobs:
-  assemble-verify-commit:
-    if: >-
-      (github.event_name == 'push' && github.ref_name == 'znm-h7q2/reinvestment-authority-v3') ||
-      (github.event_name == 'pull_request' && github.head_ref == 'znm-h7q2/reinvestment-authority-v3')
+  hostile-isolation-suite:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.13"]
+        mode: [normal, optimized]
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: znm-h7q2/reinvestment-authority-v3
-          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - name: Reconstruct checksum-gated source archive
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EXPECTED_ARCHIVE_SHA256: 95515c81275797ce78f3f2650067be89de41b2230b9e12ddf0dcfdfbf9a30d29
-        run: |
-          python - <<'PY'
-          import base64
-          import hashlib
-          import io
-          import json
-          import os
-          from pathlib import Path, PurePosixPath
-          import re
-          import tarfile
-          import urllib.request
-
-          repository = os.environ["GITHUB_REPOSITORY"]
-          owner = os.environ["GITHUB_REPOSITORY_OWNER"]
-          token = os.environ["GH_TOKEN"]
-          expected_archive = os.environ["EXPECTED_ARCHIVE_SHA256"]
-          comment_ids = [
-              5676755877,
-              5676767718,
-              5676779864,
-              5676791944,
-              5676820077,
-              5676829096,
-              5676838268,
-              5676841822,
-          ]
-          expected_chunks = {
-              1: "9a11adb4c508b90fbed5b5052a9709c49d6a893e179f045b91c2b674016768fb",
-              2: "64b54d75f6fb649357d1da33194e9471308b1953008a6247a2caf15b2916974c",
-              3: "ed23b9e81eb54a77343db50f45d5436cd5a2b0baf1c581c393f89e06b322069c",
-              4: "7fad5a8945885c83820816e0b160934b1689e517b8503d5d4b5df573d1915782",
-              5: "0def3688d0ea4e809e1c4938631993ed595ba777db6bcb51803e5a733944b07a",
-              6: "18d25ac581264b358fc79222d2a9c4d49b3edf5e119feaea89a3f84f1f688c36",
-              7: "064b90c3788a495d1de5929ceb34d0f9f298c93561335037fb7fa67389c6b384",
-              8: "1c3a9ab91e146c40b4dd7026550046b9d4ed1833716c7623b8fdf0e8b4e8118d",
-          }
-          allowlist = {
-              ".github/workflows/reinvestment-authority.yml",
-              "concierge/reinvestment_allocator.py",
-              "concierge/_reinvestment_allocator_api.py",
-              "concierge/_reinvestment_allocator_cli.py",
-              "concierge/_reinvestment_allocator_transport.py",
-              "concierge/_reinvestment_allocator_worker.py",
-              "docs/REALIZED_REINVESTMENT_REVIEW.md",
-              "tests/test_reinvestment_allocator.py",
-              "tests/reinvestment_allocator_case_driver.py",
-              "tests/reinvestment_allocator_test_support.py",
-          }
-          header_re = re.compile(r"^ZTE_BUNDLE_V1 ([0-9]{3})/008 ([0-9a-f]{64})$")
-          chunks = {}
-          for expected_index, comment_id in enumerate(comment_ids, start=1):
-              url = f"https://api.github.com/repos/{repository}/issues/comments/{comment_id}"
-              request = urllib.request.Request(
-                  url,
-                  headers={
-                      "Accept": "application/vnd.github+json",
-                      "Authorization": f"Bearer {token}",
-                      "X-GitHub-Api-Version": "2022-11-28",
-                      "User-Agent": "zte-exact-source-bootstrap",
-                  },
-              )
-              with urllib.request.urlopen(request, timeout=30) as response:
-                  payload = json.load(response)
-              if payload.get("user", {}).get("login") != owner:
-                  raise SystemExit(f"comment {comment_id} owner mismatch")
-              lines = payload.get("body", "").splitlines()
-              if not lines:
-                  raise SystemExit(f"comment {comment_id} is empty")
-              match = header_re.fullmatch(lines[0])
-              if match is None:
-                  raise SystemExit(f"comment {comment_id} header mismatch")
-              index = int(match.group(1))
-              declared = match.group(2)
-              if index != expected_index or declared != expected_chunks[index]:
-                  raise SystemExit(f"comment {comment_id} identity mismatch")
-              chunk = "".join("".join(lines[1:]).split())
-              actual = hashlib.sha256(chunk.encode("ascii")).hexdigest()
-              if actual != declared:
-                  raise SystemExit(f"comment {comment_id} chunk digest mismatch")
-              chunks[index] = chunk
-
-          encoded = "".join(chunks[index] for index in range(1, 9))
-          archive = base64.b64decode(encoded, validate=True)
-          if hashlib.sha256(archive).hexdigest() != expected_archive:
-              raise SystemExit("whole archive digest mismatch")
-
-          root = Path.cwd().resolve()
-          with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as bundle:
-              members = bundle.getmembers()
-              names = {member.name for member in members}
-              if names != allowlist or len(members) != len(allowlist):
-                  raise SystemExit(f"archive path set mismatch: {sorted(names ^ allowlist)}")
-              for member in members:
-                  pure = PurePosixPath(member.name)
-                  if (
-                      not member.isfile()
-                      or pure.is_absolute()
-                      or ".." in pure.parts
-                      or member.size > 1_000_000
-                  ):
-                      raise SystemExit(f"unsafe archive member: {member.name}")
-                  target = (root / member.name).resolve()
-                  if root not in target.parents:
-                      raise SystemExit(f"archive member escapes repository: {member.name}")
-                  extracted = bundle.extractfile(member)
-                  if extracted is None:
-                      raise SystemExit(f"archive member unreadable: {member.name}")
-                  data = extracted.read()
-                  if len(data) != member.size:
-                      raise SystemExit(f"archive member size mismatch: {member.name}")
-                  target.parent.mkdir(parents=True, exist_ok=True)
-                  target.write_bytes(data)
-          PY
-      - name: Restore the exact reviewed allocator core
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse 4434fcd15c54ba1f1f08307aa2e4aa7c4f638994^{commit})" = "4434fcd15c54ba1f1f08307aa2e4aa7c4f638994"
-          git show 4434fcd15c54ba1f1f08307aa2e4aa7c4f638994:concierge/_reinvestment_allocator_core.py > concierge/_reinvestment_allocator_core.source
-      - name: Verify exact source graph and blob identities
-        run: |
-          python - <<'PY'
-          import hashlib
-          from pathlib import Path
-
-          expected = {
-              ".github/workflows/reinvestment-authority.yml": "0ed83ccd0b70d1885046e8c9b5b5225588aecb14",
-              "concierge/_reinvestment_allocator_api.py": "0afd51877ceb8ad611352c14439d83afef9bf955",
-              "concierge/_reinvestment_allocator_cli.py": "64da5cfa8fff7700387ed810e7a1a648626d2eda",
-              "concierge/_reinvestment_allocator_transport.py": "472e93d8e9d9e36a492c1794a4884b8ffd3a7914",
-              "concierge/_reinvestment_allocator_worker.py": "491b04b38894a13782491718ea3547e60df41757",
-              "concierge/reinvestment_allocator.py": "9660f576c2beaf4b2e6e2fca9bc38f07cf5cead0",
-              "docs/REALIZED_REINVESTMENT_REVIEW.md": "17b652607720776422b4654ead701cc623d5b6ed",
-              "tests/reinvestment_allocator_case_driver.py": "c9a79fd1aed0ac40f4545ff38cfb0526d18670f8",
-              "tests/reinvestment_allocator_test_support.py": "35b516e9ce348d36a75b7b9aaa189bad19a78f42",
-              "tests/test_reinvestment_allocator.py": "d82f5ff219931870595bcce3d3e7c1a156766151",
-              "concierge/_reinvestment_allocator_core.source": "5731fd0652bc94b20d1f3b2de48628f633f550a9",
-          }
-          for path, wanted in expected.items():
-              data = Path(path).read_bytes()
-              actual = hashlib.sha1(
-                  b"blob " + str(len(data)).encode("ascii") + b"\0" + data
-              ).hexdigest()
-              if actual != wanted:
-                  raise SystemExit(f"Git blob mismatch for {path}: {actual} != {wanted}")
-          PY
+          python-version: ${{ matrix.python-version }}
       - name: Install runtime dependency
         run: python -m pip install --disable-pip-version-check -r requirements.txt
-      - name: Run exact hostile proof before commit
+      - name: Compile authority surface
         run: |
-          set -euo pipefail
           python -m py_compile \
             concierge/reinvestment_allocator.py \
             concierge/_reinvestment_allocator_api.py \
@@ -194,38 +66,11 @@ jobs:
             tests/test_reinvestment_allocator.py \
             tests/reinvestment_allocator_case_driver.py \
             tests/reinvestment_allocator_test_support.py
-          python -m unittest discover -s tests -p 'test_reinvestment_allocator.py' -v
-          python -O -m unittest discover -s tests -p 'test_reinvestment_allocator.py' -v
-      - name: Commit exact source successor
+      - name: Run hostile suite
+        shell: bash
         run: |
-          set -euo pipefail
-          expected_paths=$(cat <<'EOF'
-          .github/workflows/reinvestment-authority.yml
-          concierge/_reinvestment_allocator_api.py
-          concierge/_reinvestment_allocator_cli.py
-          concierge/_reinvestment_allocator_core.source
-          concierge/_reinvestment_allocator_transport.py
-          concierge/_reinvestment_allocator_worker.py
-          concierge/reinvestment_allocator.py
-          docs/REALIZED_REINVESTMENT_REVIEW.md
-          tests/reinvestment_allocator_case_driver.py
-          tests/reinvestment_allocator_test_support.py
-          tests/test_reinvestment_allocator.py
-          EOF
-          )
-          actual_paths=$(git status --porcelain=v1 | sed 's/^...//' | LC_ALL=C sort)
-          if [[ "$actual_paths" != "$expected_paths" ]]; then
-            echo "unexpected worktree path set" >&2
-            diff -u <(printf '%s\n' "$expected_paths") <(printf '%s\n' "$actual_paths") || true
-            exit 1
+          if [[ "${{ matrix.mode }}" == "optimized" ]]; then
+            python -O -m unittest discover -s tests -p 'test_reinvestment_allocator.py' -v
+          else
+            python -m unittest discover -s tests -p 'test_reinvestment_allocator.py' -v
           fi
-          git config user.name 'Z-TungstenEstuary-0254-H3N8'
-          git config user.email 'zte-h3n8@users.noreply.github.com'
-          git add -- $expected_paths
-          staged_paths=$(git diff --cached --name-only | LC_ALL=C sort)
-          if [[ "$staged_paths" != "$expected_paths" ]]; then
-            echo "unexpected staged path set" >&2
-            exit 1
-          fi
-          git commit -m 'fix(revenue): isolate reinvestment attribution authority'
-          git push origin 'HEAD:znm-h7q2/reinvestment-authority-v3'
