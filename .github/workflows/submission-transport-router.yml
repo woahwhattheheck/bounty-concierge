@@ -5,17 +5,25 @@ on:
     paths:
       - "concierge/submission_transport_router.py"
       - "concierge/_submission_transport_router_core.py"
+      - "concierge/submission_transport_renderer_hardening.py"
       - "concierge/submission_custody.py"
+      - "concierge/__init__.py"
       - "tests/test_submission_transport_router.py"
+      - "tests/test_submission_transport_renderer_boundary.py"
       - "docs/SUBMISSION_TRANSPORT_ROUTER.md"
+      - "docs/SUBMISSION_TRANSPORT_RENDERER_HARDENING.md"
       - ".github/workflows/submission-transport-router.yml"
   pull_request:
     paths:
       - "concierge/submission_transport_router.py"
       - "concierge/_submission_transport_router_core.py"
+      - "concierge/submission_transport_renderer_hardening.py"
       - "concierge/submission_custody.py"
+      - "concierge/__init__.py"
       - "tests/test_submission_transport_router.py"
+      - "tests/test_submission_transport_renderer_boundary.py"
       - "docs/SUBMISSION_TRANSPORT_ROUTER.md"
+      - "docs/SUBMISSION_TRANSPORT_RENDERER_HARDENING.md"
       - ".github/workflows/submission-transport-router.yml"
 
 permissions:
@@ -40,8 +48,16 @@ jobs:
           python -m py_compile
           concierge/submission_transport_router.py
           concierge/_submission_transport_router_core.py
+          concierge/submission_transport_renderer_hardening.py
           tests/test_submission_transport_router.py
+          tests/test_submission_transport_renderer_boundary.py
       - name: Direct-core and host-root hostile suite
-        run: python -m pytest -q tests/test_submission_transport_router.py
+        run: >-
+          python -m pytest -q
+          tests/test_submission_transport_router.py
+          tests/test_submission_transport_renderer_boundary.py
       - name: Direct-core and host-root hostile suite under optimized Python
-        run: python -O -m pytest -q tests/test_submission_transport_router.py
+        run: >-
+          python -O -m pytest -q
+          tests/test_submission_transport_router.py
+          tests/test_submission_transport_renderer_boundary.py
