@@ -9,6 +9,7 @@ import pytest
 from conftest import _authorize
 from concierge import payoff_path_gate as gate
 from concierge import payoff_path_policy_authority as authority
+from concierge import payoff_path_policy_secure_runtime as secure_runtime
 from concierge import payoff_path_policy_v3 as v3
 
 AS_OF = "2026-09-13T15:00:00.000Z"
@@ -77,6 +78,33 @@ def _forge_higher_cap(document):
     forged["continuity"]["events"][0]["minutes"] = 600
     forged["work_items"][0]["free_work_budget_minutes"] = 600
     return forged
+
+
+def test_runtime_contract_truthfully_excludes_closure_traversal_metadata_mutation():
+    """The exact predecessor attack is not misrepresented as in-scope resistance."""
+    secure = v3._compile_v3
+    captured_functions = [
+        cell.cell_contents
+        for cell in (secure.__closure__ or ())
+        if isinstance(cell.cell_contents, types.FunctionType)
+    ]
+    assert any(
+        fn.__name__ == "verify_current_policy_authority"
+        for fn in captured_functions
+    ), "predecessor closure traversal must remain mechanically demonstrable"
+
+    assert secure_runtime.SAME_PROCESS_CLOSURE_INTROSPECTION_RESISTANT is False
+    assert secure_runtime.CAPTURED_FUNCTION_METADATA_MUTATION_IN_SCOPE is False
+    assert secure_runtime.PUBLIC_BINDING_REPLACEMENT_IN_SCOPE is True
+    assert secure_runtime.PUBLIC_ORIGINAL_FUNCTION_METADATA_MUTATION_IN_SCOPE is True
+    assert (
+        secure_runtime.RECOMMENDED_HIGHER_ASSURANCE_BOUNDARY
+        == "CONTROLLED_FRESH_INTERPRETER"
+    )
+    runtime_doc = secure_runtime.__doc__ or ""
+    assert "walk a supported" in runtime_doc
+    assert "captured/private function" in runtime_doc
+    assert "outside this runtime's threat boundary" in runtime_doc
 
 
 def test_module_base_setter_and_dict_writes_cannot_replace_runtime_authority(monkeypatch):
