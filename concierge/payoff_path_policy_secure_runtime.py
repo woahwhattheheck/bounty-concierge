@@ -1,31 +1,40 @@
 # SPDX-License-Identifier: MIT
-"""Closure-bound runtime authority for payoff policy v3.
+"""Bootstrap-captured runtime authority for payoff policy v3.
 
 Python module attributes and Python function metadata are ordinary mutable process
-state. Security-critical owner-policy verification must therefore not depend on
-looking a verifier up from a public module on each call, retaining caller-mutable
-``__defaults__`` / ``__kwdefaults__`` authority dependencies, or consuming the
-caller's mutable document after authentication.
+state. This runtime reduces reliance on *public* mutable bindings: it does not look a
+verifier up from a public module on each call, does not consume the caller's mutable
+document after authentication, and does not rely on ordinary ``importlib.reload`` as
+a code-update boundary.
 
 This module is imported during trusted ``concierge`` package bootstrap, after the v3
 implementation and verify-only authority module exist but before the caller receives
-the package. ``install()`` seals the verifier function graph into private globals,
-seals the raw v3 compile/verify functions with that verifier, then installs
-closure-bound entrypoints which authenticate and semantically consume one private
-exact-builtins snapshot.
+the package. ``install()`` clones the verifier/function dependency graph into
+bootstrap-captured functions, clones the raw v3 compile/verify functions around that
+verifier, then installs entrypoints which authenticate and semantically consume one
+private exact-builtins snapshot.
+
+IMPORTANT SAME-PROCESS LIMIT: Python functions remain introspectable mutable objects.
+A caller with arbitrary same-interpreter Python execution can walk a supported
+wrapper's ``__closure__`` and mutate metadata on a captured function object. This
+runtime does **not** claim resistance to closure traversal, captured/private function
+metadata mutation, closure-cell mutation, code-object replacement, or equivalent
+same-process object-graph surgery. Run the policy gate in a controlled fresh Python
+interpreter when that attacker capability is relevant.
 
 Reloading the security-critical v3 implementation in-place is intentionally not a
 supported code-update mechanism. A meta-path loader turns an ordinary
 ``importlib.reload(v3)`` into a fail-safe no-op: the already bootstrapped module and
-its closure-bound entrypoints remain active. Hosts restart to load new v3 code.
+its bootstrap-captured entrypoints remain active. Hosts restart to load new v3 code.
 
-Threat boundary: arbitrary replacement of the supported core dispatcher itself,
-closure-cell surgery, ``sys.meta_path`` surgery, bytecode/function-code replacement,
-installed-source replacement, or executing attacker code before trusted package
-bootstrap is arbitrary interpreter/host takeover and is out of scope. Ordinary
-caller documents, post-bootstrap environment mutation, authority/v3 module
-public/private attribute rebinding, mutable public verifier function metadata, and
-ordinary ``importlib.reload(v3)`` are in scope.
+Threat boundary. In scope: ordinary caller documents; post-bootstrap environment
+mutation; authority/v3 module public/private *binding* replacement; mutation of the
+public/original verifier function's metadata; and ordinary ``importlib.reload(v3)``.
+Out of scope as same-interpreter/host takeover: traversing a supported callable's
+closure to mutate a captured/private function or its defaults/globals; closure-cell
+surgery; ``sys.meta_path`` surgery; bytecode/function-code replacement; installed-
+source replacement; mutating imported runtime/interpreter primitives; replacement
+of the supported core dispatcher itself; or attacker code before trusted bootstrap.
 """
 
 from __future__ import annotations
@@ -48,6 +57,14 @@ _MAX_SNAPSHOT_NODES = 200_000
 _MAX_SNAPSHOT_TEXT = 4_000_000
 _MAX_SNAPSHOT_DEPTH = 64
 
+# Machine-readable truth contract for callers/tests. These are documentation of the
+# supported security boundary, not an authorization mechanism.
+SAME_PROCESS_CLOSURE_INTROSPECTION_RESISTANT = False
+CAPTURED_FUNCTION_METADATA_MUTATION_IN_SCOPE = False
+PUBLIC_BINDING_REPLACEMENT_IN_SCOPE = True
+PUBLIC_ORIGINAL_FUNCTION_METADATA_MUTATION_IN_SCOPE = True
+RECOMMENDED_HIGHER_ASSURANCE_BOUNDARY = "CONTROLLED_FRESH_INTERPRETER"
+
 
 class _V3ReloadGuard(importlib.abc.MetaPathFinder, importlib.abc.Loader):
     """Return a no-op loader for ordinary reload of the secured v3 module."""
@@ -66,21 +83,22 @@ class _V3ReloadGuard(importlib.abc.MetaPathFinder, importlib.abc.Loader):
         return None
 
     def exec_module(self, module) -> None:
-        # Deliberate no-op on reload. Existing closure-bound functions and state stay
-        # in the retained module dictionary. A trusted host restart loads new source.
+        # Deliberate no-op on reload. Existing bootstrap-captured functions and state
+        # stay in the retained module dictionary. A trusted host restart loads source.
         return None
 
 
 def _seal_function_graph(function, memo=None):
-    """Clone a Python function and its Python-function dependency graph once.
+    """Bootstrap-clone a Python function and Python-function dependency graph.
 
     The clones receive private globals dictionaries plus detached copies of defaults
-    and keyword defaults. This is a bootstrap-time capability seal: later mutation of
-    the public module bindings or the original functions' ``__kwdefaults__`` cannot
-    alter the retained verifier/semantic graph.
+    and keyword defaults. This prevents later mutation of the *public/original*
+    function objects and module bindings from being consulted by the supported path.
 
-    Module objects and C/builtin callables remain shared. Mutating arbitrary imported
-    runtime modules or interpreter primitives is outside this carrier's threat model.
+    It is not an immutable-object seal. A same-process caller that traverses a
+    wrapper's closure to obtain one of these captured clones can mutate that clone's
+    metadata; that capability is explicitly outside this runtime's threat boundary.
+    Module objects and C/builtin callables also remain shared.
     """
 
     if not isinstance(function, types.FunctionType):
@@ -113,8 +131,6 @@ def _seal_function_graph(function, memo=None):
             return {key: seal_value(item) for key, item in value.items()}
         return value
 
-    # Only names actually loaded by this code object need sealed Python-function
-    # bindings. Memoization safely closes recursive/cyclic call graphs.
     for name in function.__code__.co_names:
         value = private_globals.get(name)
         if isinstance(value, types.FunctionType):
@@ -148,10 +164,8 @@ def _build_runtime(
     legacy_work_schema: str,
     error_type,
 ):
-    """Build dispatch functions whose authority graph is closure-bound."""
+    """Build dispatch functions whose ordinary public bindings are bootstrap-captured."""
 
-    # Snapshot limits are captured at trusted bootstrap rather than looked up from
-    # caller-mutable module attributes on each security decision.
     max_snapshot_nodes = _MAX_SNAPSHOT_NODES
     max_snapshot_text = _MAX_SNAPSHOT_TEXT
     max_snapshot_depth = _MAX_SNAPSHOT_DEPTH
@@ -287,25 +301,18 @@ def _build_runtime(
 
 
 def install() -> None:
-    """Install closure-bound authority exactly once during trusted package bootstrap."""
+    """Install bootstrap-captured authority once during trusted package bootstrap."""
 
     global _INSTALLED, _RELOAD_GUARD
     if _INSTALLED:
         return
 
-    # Seal the verifier before exposing concierge to callers. This detaches the
-    # security decision from public function metadata such as __kwdefaults__ and from
-    # Python-function dependencies reachable through those defaults/globals.
     sealed_memo = {}
     trusted_verify = _seal_function_graph(
         _authority.verify_current_policy_authority,
         sealed_memo,
     )
 
-    # Clone the raw v3 functions into private globals and replace their authority hook
-    # with the sealed verifier. verify_v3 also recompiles through the sealed compiler.
-    # Therefore the semantic read after the outer authority check cannot cross a later
-    # caller-rebound v3._verify_current_policy_authority hook.
     raw_v3_compile = _seal_function_graph(_v3._compile_v3, sealed_memo)
     raw_v3_compile.__globals__["_verify_current_policy_authority"] = trusted_verify
     raw_v3_verify = _seal_function_graph(_v3.verify_v3, sealed_memo)
@@ -341,4 +348,11 @@ def install() -> None:
     _INSTALLED = True
 
 
-__all__ = ["install"]
+__all__ = [
+    "install",
+    "SAME_PROCESS_CLOSURE_INTROSPECTION_RESISTANT",
+    "CAPTURED_FUNCTION_METADATA_MUTATION_IN_SCOPE",
+    "PUBLIC_BINDING_REPLACEMENT_IN_SCOPE",
+    "PUBLIC_ORIGINAL_FUNCTION_METADATA_MUTATION_IN_SCOPE",
+    "RECOMMENDED_HIGHER_ASSURANCE_BOUNDARY",
+]
