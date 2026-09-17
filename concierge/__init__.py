@@ -2,28 +2,6 @@
 """RustChain Bounty Concierge -- CLI tool for bounty hunters."""
 __version__ = "0.1.0"
 
-# Seal the reinvestment authority surface while the package itself is initializing.
-# Python initializes a parent package before returning any requested child module,
-# so a normal caller cannot first obtain ``_reinvestment_allocator_api`` or
-# ``_reinvestment_allocator_transport`` and poison their factory globals before the
-# public closures capture them. Explicitly pre-seeding either internal name in
-# ``sys.modules`` is rejected rather than trusted.
-import sys as _sys
-
-_reinvestment_internal_names = (
-    f"{__name__}._reinvestment_allocator_api",
-    f"{__name__}._reinvestment_allocator_transport",
-)
-if any(name in _sys.modules for name in _reinvestment_internal_names):
-    raise ImportError(
-        "reinvestment authority internals must not be preloaded before package initialization"
-    )
-from . import reinvestment_allocator as _reinvestment_allocator
-
-del _reinvestment_allocator
-del _reinvestment_internal_names
-del _sys
-
 # Install the additive payoff continuity v3 dispatcher before callers import either
 # payoff-path surface. Existing v2 semantics remain delegated to the landed core;
 # normal v1 calls become fail-closed and historical replay moves behind an explicitly
