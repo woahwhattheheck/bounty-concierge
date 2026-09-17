@@ -3,6 +3,7 @@ name: reinvestment authority isolation
 on:
   pull_request:
     paths:
+      - "concierge/__init__.py"
       - "concierge/reinvestment_allocator.py"
       - "concierge/_reinvestment_allocator_api.py"
       - "concierge/_reinvestment_allocator_cli.py"
@@ -10,6 +11,7 @@ on:
       - "concierge/_reinvestment_allocator_worker.py"
       - "concierge/_reinvestment_allocator_core.source"
       - "tests/test_reinvestment_allocator.py"
+      - "tests/test_reinvestment_allocator_preimport_seal.py"
       - "tests/reinvestment_allocator_case_driver.py"
       - "tests/reinvestment_allocator_test_support.py"
       - "docs/REALIZED_REINVESTMENT_REVIEW.md"
@@ -20,6 +22,7 @@ on:
   push:
     branches: [main]
     paths:
+      - "concierge/__init__.py"
       - "concierge/reinvestment_allocator.py"
       - "concierge/_reinvestment_allocator_api.py"
       - "concierge/_reinvestment_allocator_cli.py"
@@ -27,6 +30,7 @@ on:
       - "concierge/_reinvestment_allocator_worker.py"
       - "concierge/_reinvestment_allocator_core.source"
       - "tests/test_reinvestment_allocator.py"
+      - "tests/test_reinvestment_allocator_preimport_seal.py"
       - "tests/reinvestment_allocator_case_driver.py"
       - "tests/reinvestment_allocator_test_support.py"
       - "docs/REALIZED_REINVESTMENT_REVIEW.md"
@@ -58,19 +62,21 @@ jobs:
       - name: Compile authority surface
         run: |
           python -m py_compile \
+            concierge/__init__.py \
             concierge/reinvestment_allocator.py \
             concierge/_reinvestment_allocator_api.py \
             concierge/_reinvestment_allocator_cli.py \
             concierge/_reinvestment_allocator_transport.py \
             concierge/_reinvestment_allocator_worker.py \
             tests/test_reinvestment_allocator.py \
+            tests/test_reinvestment_allocator_preimport_seal.py \
             tests/reinvestment_allocator_case_driver.py \
             tests/reinvestment_allocator_test_support.py
       - name: Run hostile suite
         shell: bash
         run: |
           if [[ "${{ matrix.mode }}" == "optimized" ]]; then
-            python -O -m unittest discover -s tests -p 'test_reinvestment_allocator.py' -v
+            python -O -m unittest discover -s tests -p 'test_reinvestment_allocator*.py' -v
           else
-            python -m unittest discover -s tests -p 'test_reinvestment_allocator.py' -v
+            python -m unittest discover -s tests -p 'test_reinvestment_allocator*.py' -v
           fi
