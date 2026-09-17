@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from copy import deepcopy
+import hashlib
+import json
+from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch, sentinel
 
+from concierge.paid_work_effort_value_gate import compile_paid_work_effort_value_gate
 from concierge.revenue_dispatch import (
     RevenueDispatchError,
     _load_gate_receipt,
@@ -45,20 +49,86 @@ def availability(*, dispatch=True, reason=None):
     }
 
 
+POLICY_SHA = "b" * 64
+REQUEST_SHA = "c" * 64
+
+
+REAL_POLICY = {
+    "schema": "paid-work-effort-value-policy/v1",
+    "evidence_max_age_seconds": 86400,
+    "deadline_safety_seconds": 3600,
+    "max_active_claims": 1,
+    "fleet_economic_policy": {
+        "schema": "fleet-economic-policy/v1",
+        "min_batch_items": 2,
+        "max_batch_items": 200,
+        "currencies": {
+            "USD": {
+                "min_single_reward": "100",
+                "min_batch_reward": "500",
+                "min_reward_per_agent_hour": "100",
+            }
+        },
+    },
+}
+
+
+def _evidence(state, tag, authority=None):
+    value = {
+        "state": state,
+        "evidence_url": f"https://evidence.example/{tag}",
+        "observed_at": "2026-09-16T19:30:00Z",
+    }
+    if authority is not None:
+        value["authority"] = authority
+    return value
+
+
+def real_gate_request():
+    return {
+        "schema": "paid-work-effort-value-gate/v1",
+        "as_of": "2026-09-16T20:00:00Z",
+        "policy": deepcopy(REAL_POLICY),
+        "candidate": {
+            "work_id": "work-17",
+            "canonical_source_url": "https://github.com/acme/widgets/issues/17",
+            "advertised_payout": {
+                "amount": "300",
+                "currency": "USD",
+                "unit_type": "CASH",
+                "observed_at": "2026-09-16T19:30:00Z",
+            },
+            "estimated_engineering_hours": "1",
+            "model_tool_cost": {"state": "KNOWN", "amount": "10", "currency": "USD"},
+            "deadline_at": "2026-09-17T20:00:00Z",
+            "congestion": {"active_claims": 0, "observed_at": "2026-09-16T19:30:00Z"},
+            "acceptance": _evidence("CONFIRMED", "acceptance", "FIRST_PARTY"),
+            "payout_route": _evidence("CONFIRMED", "payout-route"),
+            "account_kyc": _evidence("READY", "account-kyc"),
+        },
+    }
+
+
 def receipt(
     *,
     decision="GO",
     work_id="work-17",
     source="https://github.com/acme/widgets/issues/17",
     at="2026-09-16T20:00:00Z",
+    policy_sha=POLICY_SHA,
 ):
     return {
         "schema": "paid-work-effort-value-gate-receipt/v1",
+        "request_sha256": REQUEST_SHA,
+        "policy_sha256": policy_sha,
         "work_id": work_id,
         "canonical_source_url": source,
         "canonical_source_identity": "github:acme/widgets/issues/17",
         "as_of": at,
         "decision": decision,
+        "reason_codes": ["ALL_GATES_CLEAR"] if decision == "GO" else [decision],
+        "economics": {"fleet_economic_receipt": None},
+        "gates": {},
         "receipt_sha256": "a" * 64,
         "authority": {
             "go_is_internal_admission_signal": True,
@@ -71,7 +141,8 @@ def receipt(
     }
 
 
-NOW = datetime(2026, 9, 16, 20, 30, 0, tzinfo=timezone.utc)
+def raw(value):
+    return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
 
 
 class RevenueDispatchTests(unittest.TestCase):
@@ -79,11 +150,20 @@ class RevenueDispatchTests(unittest.TestCase):
         self,
         *,
         gate=None,
+        gate_bytes=None,
         work_id=None,
         avail=None,
         incoming=None,
         max_age=3600,
+        expected_bytes_sha=None,
+        expected_policy_sha=POLICY_SHA,
+        dispatch_as_of="2026-09-16T20:30:00Z",
+        verify=True,
     ):
+        if gate_bytes is None and gate is not None:
+            gate_bytes = raw(gate)
+        if gate_bytes is not None and expected_bytes_sha is None:
+            expected_bytes_sha = hashlib.sha256(gate_bytes).hexdigest()
         with patch(
             "concierge.revenue_dispatch.qualify_live_revenue_intake",
             return_value=incoming or intake(),
@@ -91,10 +171,8 @@ class RevenueDispatchTests(unittest.TestCase):
             "concierge.revenue_dispatch.inspect_bounty_availability",
             return_value=avail or availability(),
         ), patch(
-            "concierge.revenue_dispatch._trusted_now", return_value=NOW
-        ), patch(
             "concierge.revenue_dispatch.verify_paid_work_receipt",
-            return_value=True,
+            return_value=verify,
         ):
             return qualify_available_live_revenue_intake(
                 "acme/widgets",
@@ -104,8 +182,11 @@ class RevenueDispatchTests(unittest.TestCase):
                 session=sentinel.session,
                 max_pages=3,
                 saturation_threshold=2,
-                gate_receipt=gate,
+                gate_receipt_bytes=gate_bytes,
                 work_id=work_id,
+                expected_gate_receipt_bytes_sha256=expected_bytes_sha,
+                expected_policy_sha256=expected_policy_sha,
+                dispatch_as_of=dispatch_as_of,
                 gate_max_age_seconds=max_age,
             )
 
@@ -116,74 +197,83 @@ class RevenueDispatchTests(unittest.TestCase):
         self.assertIn("ECONOMICS:GATE_RECEIPT_REQUIRED", result["reason_codes"])
         self.assertFalse(result["dispatch_authority"]["new_work_dispatch"])
 
-    def test_verified_fresh_go_allows_internal_implementation_only(self):
-        result = self.run_dispatch(gate=receipt(), work_id="work-17")
-        self.assertTrue(result["dispatch"])
-        self.assertEqual(result["economic_admission"]["decision"], "GO")
-        authority = result["dispatch_authority"]
-        self.assertTrue(authority["new_work_dispatch"])
-        self.assertTrue(authority["internal_implementation_only"])
-        self.assertFalse(authority["external_claim_authority"])
-        self.assertFalse(authority["external_submission_authority"])
-        self.assertFalse(authority["payment_cash_or_revenue_authority"])
-
-    def test_every_non_go_decision_fails_closed(self):
-        for decision in (
-            "HOLD_VALUE_UNKNOWN",
-            "HOLD_ACCOUNT_GATE",
-            "SKIP_ECONOMICS",
-        ):
-            with self.subTest(decision=decision):
-                result = self.run_dispatch(
-                    gate=receipt(decision=decision), work_id="work-17"
-                )
-                self.assertFalse(result["dispatch"])
-                self.assertEqual(result["disposition"], "HOLD")
-                self.assertIn(f"ECONOMICS:{decision}", result["reason_codes"])
-
-    def test_tampered_receipt_fails(self):
+    def test_real_upstream_gate_receipt_composes_to_dispatch(self):
+        gate = compile_paid_work_effort_value_gate(real_gate_request())
+        payload = raw(gate)
         with patch(
             "concierge.revenue_dispatch.qualify_live_revenue_intake",
             return_value=intake(),
         ), patch(
             "concierge.revenue_dispatch.inspect_bounty_availability",
             return_value=availability(),
-        ), patch(
-            "concierge.revenue_dispatch._trusted_now", return_value=NOW
-        ), patch(
-            "concierge.revenue_dispatch.verify_paid_work_receipt",
-            return_value=False,
         ):
-            with self.assertRaisesRegex(RevenueDispatchError, "integrity"):
-                qualify_available_live_revenue_intake(
-                    "acme/widgets",
-                    17,
-                    gate_receipt=receipt(),
-                    work_id="work-17",
-                )
+            result = qualify_available_live_revenue_intake(
+                "acme/widgets",
+                17,
+                gate_receipt_bytes=payload,
+                work_id="work-17",
+                expected_gate_receipt_bytes_sha256=hashlib.sha256(payload).hexdigest(),
+                expected_policy_sha256=gate["policy_sha256"],
+                dispatch_as_of="2026-09-16T20:05:00Z",
+            )
+        self.assertTrue(result["dispatch"])
+        self.assertEqual(result["economic_admission"]["receipt_sha256"], gate["receipt_sha256"])
+        self.assertEqual(result["economic_admission"]["policy_sha256"], gate["policy_sha256"])
+
+    def test_verified_fresh_go_binds_exact_provenance(self):
+        gate = receipt()
+        payload = raw(gate)
+        result = self.run_dispatch(gate_bytes=payload, work_id="work-17")
+        self.assertTrue(result["dispatch"])
+        economics = result["economic_admission"]
+        self.assertEqual(economics["decision"], "GO")
+        self.assertEqual(economics["gate_receipt_bytes_sha256"], hashlib.sha256(payload).hexdigest())
+        self.assertEqual(economics["policy_sha256"], POLICY_SHA)
+        self.assertEqual(economics["request_sha256"], REQUEST_SHA)
+        self.assertEqual(economics["dispatch_as_of"], "2026-09-16T20:30:00Z")
+        self.assertRegex(economics["binding_sha256"], r"^[0-9a-f]{64}$")
+        authority = result["dispatch_authority"]
+        self.assertEqual(authority["evidence_binding_sha256"], economics["binding_sha256"])
+        self.assertTrue(authority["internal_implementation_only"])
+        self.assertFalse(authority["external_claim_authority"])
+        self.assertFalse(authority["payment_cash_or_revenue_authority"])
+
+    def test_every_non_go_decision_fails_closed_with_binding(self):
+        for decision in ("HOLD_VALUE_UNKNOWN", "HOLD_ACCOUNT_GATE", "SKIP_ECONOMICS"):
+            with self.subTest(decision=decision):
+                result = self.run_dispatch(gate=receipt(decision=decision), work_id="work-17")
+                self.assertFalse(result["dispatch"])
+                self.assertEqual(result["disposition"], "HOLD")
+                self.assertIn(f"ECONOMICS:{decision}", result["reason_codes"])
+                self.assertRegex(result["economic_admission"]["binding_sha256"], r"^[0-9a-f]{64}$")
+
+    def test_exact_byte_digest_mismatch_fails(self):
+        with self.assertRaisesRegex(RevenueDispatchError, "exact-byte"):
+            self.run_dispatch(gate=receipt(), work_id="work-17", expected_bytes_sha="0" * 64)
+
+    def test_policy_digest_mismatch_fails(self):
+        with self.assertRaisesRegex(RevenueDispatchError, "policy sha256 mismatch"):
+            self.run_dispatch(gate=receipt(), work_id="work-17", expected_policy_sha="0" * 64)
 
     def test_source_mismatch_fails(self):
         with self.assertRaisesRegex(RevenueDispatchError, "source mismatch"):
-            self.run_dispatch(
-                gate=receipt(source="https://github.com/acme/other/issues/17"),
-                work_id="work-17",
-            )
+            self.run_dispatch(gate=receipt(source="https://github.com/acme/other/issues/17"), work_id="work-17")
 
     def test_work_id_mismatch_fails(self):
         with self.assertRaisesRegex(RevenueDispatchError, "work_id mismatch"):
             self.run_dispatch(gate=receipt(work_id="other"), work_id="work-17")
 
-    def test_stale_receipt_fails(self):
+    def test_stale_receipt_uses_explicit_dispatch_time(self):
         with self.assertRaisesRegex(RevenueDispatchError, "stale"):
-            self.run_dispatch(
-                gate=receipt(at="2026-09-16T18:00:00Z"), work_id="work-17"
-            )
+            self.run_dispatch(gate=receipt(at="2026-09-16T18:00:00Z"), work_id="work-17")
 
-    def test_future_receipt_fails(self):
+    def test_future_receipt_uses_explicit_dispatch_time(self):
         with self.assertRaisesRegex(RevenueDispatchError, "future"):
-            self.run_dispatch(
-                gate=receipt(at="2026-09-16T21:00:00Z"), work_id="work-17"
-            )
+            self.run_dispatch(gate=receipt(at="2026-09-16T21:00:00Z"), work_id="work-17")
+
+    def test_invalid_dispatch_as_of_fails(self):
+        with self.assertRaisesRegex(RevenueDispatchError, "dispatch_as_of"):
+            self.run_dispatch(gate=receipt(), work_id="work-17", dispatch_as_of="now")
 
     def test_authority_amplification_fails(self):
         bad = receipt()
@@ -191,21 +281,38 @@ class RevenueDispatchTests(unittest.TestCase):
         with self.assertRaisesRegex(RevenueDispatchError, "authority"):
             self.run_dispatch(gate=bad, work_id="work-17")
 
+    def test_authority_extension_fails(self):
+        bad = receipt()
+        bad["authority"]["future_authority"] = False
+        with self.assertRaisesRegex(RevenueDispatchError, "authority schema"):
+            self.run_dispatch(gate=bad, work_id="work-17")
+
     def test_invalid_max_age_bool_fails(self):
         with self.assertRaisesRegex(RevenueDispatchError, "gate_max_age_seconds"):
             self.run_dispatch(gate=receipt(), work_id="work-17", max_age=True)
 
+    def test_tampered_receipt_fails(self):
+        with self.assertRaisesRegex(RevenueDispatchError, "integrity"):
+            self.run_dispatch(gate=receipt(), work_id="work-17", verify=False)
+
+    def test_deterministic_binding_for_same_evidence_and_time(self):
+        gate = receipt()
+        one = self.run_dispatch(gate=gate, work_id="work-17")
+        two = self.run_dispatch(gate=gate, work_id="work-17")
+        self.assertEqual(one["economic_admission"], two["economic_admission"])
+
     @patch("concierge.revenue_dispatch.inspect_bounty_availability")
     @patch("concierge.revenue_dispatch.qualify_live_revenue_intake")
     @patch("concierge.revenue_dispatch.verify_paid_work_receipt")
-    def test_upstream_hold_skips_availability_and_economics(
-        self, verify_mock, intake_mock, avail_mock
-    ):
+    def test_upstream_hold_skips_availability_and_economics(self, verify_mock, intake_mock, avail_mock):
         incoming = intake(dispatch=False, disposition="HOLD")
         incoming["reason_codes"] = ["QUALIFICATION:SATURATED_COMPETITION"]
         intake_mock.return_value = incoming
         result = qualify_available_live_revenue_intake(
-            "acme/widgets", 17, gate_receipt=receipt(), work_id="work-17"
+            "acme/widgets",
+            17,
+            gate_receipt_bytes=raw(receipt()),
+            work_id="work-17",
         )
         avail_mock.assert_not_called()
         verify_mock.assert_not_called()
@@ -213,19 +320,12 @@ class RevenueDispatchTests(unittest.TestCase):
         self.assertEqual(result["economic_admission"]["status"], "NOT_CHECKED")
 
     def test_availability_hold_skips_economics(self):
-        with patch(
-            "concierge.revenue_dispatch.qualify_live_revenue_intake",
-            return_value=intake(),
-        ), patch(
+        with patch("concierge.revenue_dispatch.qualify_live_revenue_intake", return_value=intake()), patch(
             "concierge.revenue_dispatch.inspect_bounty_availability",
-            return_value=availability(
-                dispatch=False, reason="MAINTAINER_TERMINAL_OUTCOME"
-            ),
-        ), patch(
-            "concierge.revenue_dispatch.verify_paid_work_receipt"
-        ) as verify_mock:
+            return_value=availability(dispatch=False, reason="MAINTAINER_TERMINAL_OUTCOME"),
+        ), patch("concierge.revenue_dispatch.verify_paid_work_receipt") as verify_mock:
             result = qualify_available_live_revenue_intake(
-                "acme/widgets", 17, gate_receipt=receipt(), work_id="work-17"
+                "acme/widgets", 17, gate_receipt_bytes=raw(receipt()), work_id="work-17"
             )
         verify_mock.assert_not_called()
         self.assertFalse(result["dispatch"])
@@ -241,11 +341,23 @@ class RevenueDispatchTests(unittest.TestCase):
 
     def test_duplicate_receipt_json_key_rejected(self):
         with tempfile.NamedTemporaryFile("wb", delete=False) as handle:
-            handle.write(
-                b'{"decision":"GO","decision":"SKIP_ECONOMICS"}'
-            )
+            handle.write(b'{"decision":"GO","decision":"SKIP_ECONOMICS"}')
             path = handle.name
         with self.assertRaisesRegex(RevenueDispatchError, "duplicate JSON key"):
+            _load_gate_receipt(path)
+
+    def test_bom_receipt_rejected(self):
+        with tempfile.NamedTemporaryFile("wb", delete=False) as handle:
+            handle.write(b"\xef\xbb\xbf{}")
+            path = handle.name
+        with self.assertRaisesRegex(RevenueDispatchError, "BOM"):
+            _load_gate_receipt(path)
+
+    def test_float_receipt_rejected(self):
+        with tempfile.NamedTemporaryFile("wb", delete=False) as handle:
+            handle.write(b'{"x":1.5}')
+            path = handle.name
+        with self.assertRaisesRegex(RevenueDispatchError, "forbidden float"):
             _load_gate_receipt(path)
 
 
