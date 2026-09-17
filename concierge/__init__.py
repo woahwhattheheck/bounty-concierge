@@ -40,3 +40,13 @@ from . import payoff_path_policy_secure_runtime as _payoff_path_policy_secure_ru
 
 _payoff_path_policy_secure_runtime.install()
 del _payoff_path_policy_secure_runtime
+
+# Seal the reinvestment authority surface during package bootstrap. Python imports a
+# package before returning any of its submodules, so a caller asking for
+# ``concierge._reinvestment_allocator_api`` or ``..._transport`` cannot obtain a
+# mutable private-module reference until the public API has already captured its
+# fresh-process launcher graph. Later private-module/POSIX rebinding therefore cannot
+# become the authority generation exported by ``concierge.reinvestment_allocator``.
+from . import reinvestment_allocator as _reinvestment_allocator_bootstrap
+
+del _reinvestment_allocator_bootstrap
