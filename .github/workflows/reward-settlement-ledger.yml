@@ -1,0 +1,44 @@
+name: Reward Settlement Ledger
+
+on:
+  pull_request:
+    paths:
+      - "concierge/reward_settlement_ledger.py"
+      - "tests/test_reward_settlement_ledger.py"
+      - "docs/REWARD_SETTLEMENT_LEDGER.md"
+      - ".github/workflows/reward-settlement-ledger.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "concierge/reward_settlement_ledger.py"
+      - "tests/test_reward_settlement_ledger.py"
+      - "docs/REWARD_SETTLEMENT_LEDGER.md"
+      - ".github/workflows/reward-settlement-ledger.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reward-settlement-ledger-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused:
+    name: Python 3.13 normal + optimized
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Install test dependency
+        run: python -m pip install 'pytest>=8,<9'
+      - name: Compile focused product
+        run: python -m compileall -q concierge/reward_settlement_ledger.py tests/test_reward_settlement_ledger.py
+      - name: Run focused tests
+        run: python -m pytest -q tests/test_reward_settlement_ledger.py
+      - name: Run focused tests under optimization
+        run: python -O -m pytest -q tests/test_reward_settlement_ledger.py
