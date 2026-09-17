@@ -2,6 +2,16 @@
 """RustChain Bounty Concierge -- CLI tool for bounty hunters."""
 __version__ = "0.1.0"
 
+# Reinvestment authority bootstrap MUST run before any other package submodule
+# is returned to caller code. Python initializes a package before satisfying
+# ``import concierge.<child>``; eager loading here therefore constructs the
+# public isolated-worker closures before ordinary callers can obtain and mutate
+# the importable API/transport helpers. The public module retires its one-shot
+# factory immediately after construction.
+from . import reinvestment_allocator as _reinvestment_allocator_bootstrap
+
+del _reinvestment_allocator_bootstrap
+
 # Install the additive payoff continuity v3 dispatcher before callers import either
 # payoff-path surface. Existing v2 semantics remain delegated to the landed core;
 # normal v1 calls become fail-closed and historical replay moves behind an explicitly
@@ -22,21 +32,3 @@ from . import claim_work_authority_hardening as _claim_work_authority_hardening
 
 _claim_work_authority_hardening.install()
 del _claim_work_authority_hardening
-
-# Capture the verify-only owner-policy trust anchor during package bootstrap, before
-# caller-controlled policy documents are evaluated. A missing/invalid launch-time
-# public key or principal intentionally leaves v3 owner-policy compilation fail-closed
-# until the host restarts with valid authority.
-from . import payoff_path_policy_authority as _payoff_path_policy_authority
-
-del _payoff_path_policy_authority
-
-# Bind the Payoff Policy public/direct entrypoints to bootstrap-captured verifier and
-# semantic functions. This removes dependence on later public module rebinding and
-# ordinary reload, but does not claim that Python closure-held function objects are
-# immutable against arbitrary same-interpreter object-graph mutation. Hosts needing
-# that stronger boundary must run the gate in a controlled fresh interpreter.
-from . import payoff_path_policy_secure_runtime as _payoff_path_policy_secure_runtime
-
-_payoff_path_policy_secure_runtime.install()
-del _payoff_path_policy_secure_runtime
