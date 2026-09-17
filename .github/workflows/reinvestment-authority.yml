@@ -12,9 +12,11 @@ on:
       - "concierge/_reinvestment_allocator_core.source"
       - "tests/test_reinvestment_allocator.py"
       - "tests/test_reinvestment_preimport_bootstrap.py"
+      - "tests/test_reinvestment_allocator_preimport.py"
       - "tests/reinvestment_allocator_case_driver.py"
       - "tests/reinvestment_allocator_test_support.py"
       - "docs/REALIZED_REINVESTMENT_REVIEW.md"
+      - "docs/REALIZED_REINVESTMENT_PREIMPORT_BOUNDARY.md"
       - ".github/workflows/reinvestment-authority.yml"
       - "concierge/revenue_closeout.py"
       - "concierge/revenue_settlement.py"
@@ -31,9 +33,11 @@ on:
       - "concierge/_reinvestment_allocator_core.source"
       - "tests/test_reinvestment_allocator.py"
       - "tests/test_reinvestment_preimport_bootstrap.py"
+      - "tests/test_reinvestment_allocator_preimport.py"
       - "tests/reinvestment_allocator_case_driver.py"
       - "tests/reinvestment_allocator_test_support.py"
       - "docs/REALIZED_REINVESTMENT_REVIEW.md"
+      - "docs/REALIZED_REINVESTMENT_PREIMPORT_BOUNDARY.md"
       - ".github/workflows/reinvestment-authority.yml"
       - "concierge/revenue_closeout.py"
       - "concierge/revenue_settlement.py"
@@ -70,6 +74,7 @@ jobs:
             concierge/_reinvestment_allocator_worker.py \
             tests/test_reinvestment_allocator.py \
             tests/test_reinvestment_preimport_bootstrap.py \
+            tests/test_reinvestment_allocator_preimport.py \
             tests/reinvestment_allocator_case_driver.py \
             tests/reinvestment_allocator_test_support.py
       - name: Run hostile suite

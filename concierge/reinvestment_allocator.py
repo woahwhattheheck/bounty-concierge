@@ -12,20 +12,31 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from ._reinvestment_allocator_api import build_api as _build_api
+from . import _reinvestment_allocator_api as _api
 
 
 class ReinvestmentInputError(ValueError):
     """Malformed, unauthenticated, or unverifiable reinvestment input."""
 
 
+# This factory is intentionally one-shot. concierge.__init__ imports this
+# public surface before a caller can obtain any concierge helper submodule via
+# ordinary package import. Once the exported closures are built, retire both
+# the factory and its transport-factory alias so later helper rebinding cannot
+# rebuild an authority surface with attacker-selected launch primitives.
+_build_api = _api.build_api
 (
     compile_reinvestment_review,
     verify_reinvestment_receipt_current,
     verify_receipt_integrity_only,
     commercial_evidence_scope_sha256,
 ) = _build_api(ReinvestmentInputError, __file__)
-del _build_api
+for _retired_name in ("build_api", "make_worker_invoker"):
+    try:
+        delattr(_api, _retired_name)
+    except AttributeError:
+        pass
+del _retired_name, _build_api, _api
 
 
 def main(argv: Optional[List[str]] = None) -> int:
