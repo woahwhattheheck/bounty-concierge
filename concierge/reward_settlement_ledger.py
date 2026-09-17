@@ -19,8 +19,10 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
+import tempfile
 from typing import Any, Iterable
 
 
@@ -127,8 +129,8 @@ def _timestamp(value: Any) -> str:
 
 
 def _decimal_text(value: Any, *, field: str) -> str:
-    if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
-        raise RewardSettlementInputError(f"{field} must be a decimal")
+    if isinstance(value, bool) or not isinstance(value, (str, int, Decimal)):
+        raise RewardSettlementInputError(f"{field} must be an exact decimal string or integer")
     source = str(value)
     if len(source) > 80:
         raise RewardSettlementInputError(f"{field} representation is too large")
@@ -426,7 +428,28 @@ def _write_json(path: str | None, payload: Any) -> None:
         print(text, end="")
         return
     target = Path(path)
-    target.write_text(text, encoding="utf-8")
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=target.parent,
+            prefix=f".{target.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, target)
+    except OSError as exc:
+        if temporary is not None:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise RewardSettlementInputError(f"cannot write {path}") from exc
 
 
 def main(argv: list[str] | None = None) -> int:
