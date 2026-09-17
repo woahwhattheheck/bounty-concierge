@@ -1,0 +1,63 @@
+name: Paid work effort value gate
+
+on:
+  pull_request:
+    paths:
+      - "concierge/paid_work_effort_value_gate.py"
+      - "concierge/_fleet_economic_admission_v1.py"
+      - "concierge/fleet_economic_admission.py"
+      - "tests/test_paid_work_effort_value_gate.py"
+      - "policies/paid_work_effort_value_v1.json"
+      - "data/paid_work_effort_value_gate/**"
+      - "docs/PAID_WORK_EFFORT_VALUE_GATE.md"
+      - ".github/workflows/paid-work-effort-value-gate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "concierge/paid_work_effort_value_gate.py"
+      - "concierge/_fleet_economic_admission_v1.py"
+      - "concierge/fleet_economic_admission.py"
+      - "tests/test_paid_work_effort_value_gate.py"
+      - "policies/paid_work_effort_value_v1.json"
+      - "data/paid_work_effort_value_gate/**"
+      - "docs/PAID_WORK_EFFORT_VALUE_GATE.md"
+      - ".github/workflows/paid-work-effort-value-gate.yml"
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.13"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Focused integration tests
+        run: >-
+          python -m unittest -v
+          tests/test_paid_work_effort_value_gate.py
+          tests/test_fleet_economic_admission.py
+          tests/test_fleet_economic_source_identity.py
+      - name: Optimized-mode integration tests
+        run: >-
+          python -O -m unittest -v
+          tests/test_paid_work_effort_value_gate.py
+          tests/test_fleet_economic_admission.py
+          tests/test_fleet_economic_source_identity.py
+      - name: Seed demo - one dollar skips
+        run: >-
+          python -m concierge.paid_work_effort_value_gate
+          data/paid_work_effort_value_gate/frantic_one_dollar.json
+          | grep "decision=SKIP_ECONOMICS"
+      - name: Seed demo - noncash value holds
+        run: >-
+          python -m concierge.paid_work_effort_value_gate
+          data/paid_work_effort_value_gate/rustchain_25_rtc_unknown_value.json
+          | grep "decision=HOLD_VALUE_UNKNOWN"
+      - name: Syntax
+        run: >-
+          python -m py_compile
+          concierge/paid_work_effort_value_gate.py
+          tests/test_paid_work_effort_value_gate.py
