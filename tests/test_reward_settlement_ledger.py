@@ -230,6 +230,12 @@ def test_source_digest_is_lowercase_sha256():
         compile_document(source(bad))
 
 
+def test_binary_float_amounts_are_rejected():
+    bad = event("ADVERTISED", "sponsor_publication", 1, denomination={"kind": "currency", "code": "USD", "amount": 0.1})
+    with pytest.raises(RewardSettlementInputError):
+        compile_document(source(bad))
+
+
 def test_cli_compile_verify_and_strict_duplicate_json(tmp_path: Path):
     src = tmp_path / "source.json"
     out = tmp_path / "compiled.json"
@@ -253,3 +259,17 @@ def test_cli_rejects_nan(tmp_path: Path):
     proc = subprocess.run([sys.executable, "-m", "concierge.reward_settlement_ledger", "compile", str(bad)], text=True, capture_output=True)
     check(proc.returncode == 2)
     check("non-finite JSON constant" in proc.stderr)
+
+
+def test_cli_output_atomically_replaces_symlink_without_touching_target(tmp_path: Path):
+    src = tmp_path / "source.json"
+    src.write_text(json.dumps(source(event("ADVERTISED", "sponsor_publication", 1, denomination=money("25")))), encoding="utf-8")
+    victim = tmp_path / "victim.txt"
+    victim.write_text("KEEP", encoding="utf-8")
+    output = tmp_path / "ledger.json"
+    output.symlink_to(victim)
+    proc = subprocess.run([sys.executable, "-m", "concierge.reward_settlement_ledger", "compile", str(src), "-o", str(output)], text=True, capture_output=True)
+    check(proc.returncode == 0, proc.stderr)
+    check(victim.read_text(encoding="utf-8") == "KEEP")
+    check(not output.is_symlink())
+    check(json.loads(output.read_text(encoding="utf-8"))["schema_version"] == 1)
