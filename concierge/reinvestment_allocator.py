@@ -23,6 +23,14 @@ if __name__ == "__main__":
 
     raise SystemExit(_sealed_reinvestment_allocator.main())
 
+_package = sys.modules.get(__package__)
+if _package is not None and getattr(
+    _package, "_REINVESTMENT_AUTHORITY_API_CONSUMED", False
+):
+    raise ImportError(
+        "reinvestment authority public surface was already initialized; reload refused"
+    )
+
 from . import _reinvestment_allocator_api as _api
 
 
@@ -42,7 +50,6 @@ _build_api = _api.build_api
     verify_receipt_integrity_only,
     commercial_evidence_scope_sha256,
 ) = _build_api(ReinvestmentInputError, __file__)
-_package = sys.modules.get(__package__)
 if _package is not None:
     setattr(_package, "_REINVESTMENT_AUTHORITY_API_CONSUMED", True)
 for _retired_name in ("build_api", "make_worker_invoker"):

@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReinvestmentReloadSealTests(unittest.TestCase):
-    """Ordinary reload may not resurrect the boot-only private factory."""
+    """Ordinary reload may not resurrect a consumed authority surface."""
 
     @staticmethod
     def _clean_env():
@@ -43,14 +43,20 @@ def poison(*args, **kwargs):
     raise RuntimeError("poisoned worker factory executed")
 if {poison_transport!r}:
     transport.make_worker_invoker = poison
-blocked = False
+api_blocked = False
 try:
     importlib.reload(api)
 except ImportError as exc:
-    blocked = "already consumed" in str(exc)
-assert blocked, "ordinary importlib.reload resurrected boot-only private API source"
-assert not hasattr(api, "build_api"), "reload failure left build_api reachable"
-assert not hasattr(api, "make_worker_invoker"), "reload failure left API worker factory reachable"
+    api_blocked = "already consumed" in str(exc)
+assert api_blocked, "ordinary importlib.reload(api) resurrected boot-only source"
+assert not hasattr(api, "build_api"), "API reload failure left build_api reachable"
+assert not hasattr(api, "make_worker_invoker"), "API reload failure left worker factory reachable"
+public_blocked = False
+try:
+    importlib.reload(ra)
+except ImportError as exc:
+    public_blocked = "already initialized" in str(exc)
+assert public_blocked, "ordinary importlib.reload(public) attempted a second authority build"
 assert ra.compile_reinvestment_review is compile_fn, "reload attempt replaced public compiler"
 assert poison_calls == [], "reload attempt reached poisoned transport factory"
 print("RELOAD_BLOCKED")
@@ -75,10 +81,10 @@ print("RELOAD_BLOCKED")
         )
         return completed.stdout.strip()
 
-    def test_api_reload_fails_closed_after_bootstrap(self):
+    def test_api_and_public_reload_fail_closed_after_bootstrap(self):
         self.assertEqual(self._run_reload_case(False), "RELOAD_BLOCKED")
 
-    def test_transport_poison_then_api_reload_fails_closed(self):
+    def test_transport_poison_then_reload_fails_closed(self):
         self.assertEqual(self._run_reload_case(True), "RELOAD_BLOCKED")
 
     def test_module_cli_delegates_to_bootstrapped_public_surface(self):
