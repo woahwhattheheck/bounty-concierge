@@ -1,0 +1,42 @@
+name: certified-settlement-collections-queue
+
+on:
+  pull_request:
+    paths:
+      - 'concierge/certified_settlement_collections_queue.py'
+      - 'tests/test_certified_settlement_collections_queue.py'
+      - 'examples/certified_settlement_collections_queue_demo.py'
+      - 'docs/certified-settlement-collections-queue.md'
+      - '.github/workflows/certified-settlement-collections-queue.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'concierge/certified_settlement_collections_queue.py'
+      - 'tests/test_certified_settlement_collections_queue.py'
+      - 'examples/certified_settlement_collections_queue_demo.py'
+      - 'docs/certified-settlement-collections-queue.md'
+      - '.github/workflows/certified-settlement-collections-queue.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.13']
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile
+        run: python -m py_compile concierge/certified_settlement_collections_queue.py tests/test_certified_settlement_collections_queue.py examples/certified_settlement_collections_queue_demo.py
+      - name: Test
+        run: python -m unittest -v tests.test_certified_settlement_collections_queue
+      - name: Test optimized
+        run: python -O -m unittest -v tests.test_certified_settlement_collections_queue
+      - name: Synthetic demo
+        run: python examples/certified_settlement_collections_queue_demo.py >/tmp/certified-settlement-collections-queue-demo.json
