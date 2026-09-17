@@ -1,5 +1,11 @@
 # SPDX-License-Identifier: MIT
-"""Sealed public API factory for externally signed reinvestment review."""
+"""Sealed public API factory for externally signed reinvestment review.
+
+The worker-invoker factory is injected by the source-pinned public bootstrap.
+This module is intentionally not an authority-bearing import boundary: callers
+may import or mutate it, but the public reinvestment surface does not consume
+that module object.
+"""
 from __future__ import annotations
 
 from copy import deepcopy
@@ -10,13 +16,17 @@ import os
 from pathlib import Path
 import re
 import sys
-from typing import Any, Dict, List, Tuple
-
-from ._reinvestment_allocator_transport import make_worker_invoker
+from typing import Any, Callable, Dict, List, Tuple
 
 
-def build_api(error_type: type, module_file: str):
-    """Capture the full parent launch graph before caller code receives it."""
+def build_api(
+    error_type: type,
+    module_file: str,
+    make_worker_invoker: Callable[..., Callable[[Dict[str, Any]], Any]],
+):
+    """Capture the full parent launch graph from a source-pinned factory."""
+    if not callable(make_worker_invoker):
+        raise error_type("worker invoker factory is unavailable")
     dumps = json.dumps
     loads = json.loads
     json_decode_error = json.JSONDecodeError
@@ -223,8 +233,7 @@ def build_api(error_type: type, module_file: str):
         return (
             type(response) is dict
             and set(response) == {"protocol", "valid"}
-            and response.get("protocol")
-            == protocol
+            and response.get("protocol") == protocol
             and type(response.get("valid")) is bool
             and response["valid"]
         )
@@ -238,7 +247,9 @@ def build_api(error_type: type, module_file: str):
         candidate = copy_deep(receipt)
         candidate.pop("receipt_sha256", None)
         try:
-            return compare_digest(sha256(canonical_json(candidate)).hexdigest(), digest)
+            return compare_digest(
+                sha256(canonical_json(candidate)).hexdigest(), digest
+            )
         except error_type:
             return False
 
