@@ -1,0 +1,50 @@
+name: Certified settlement collections queue
+
+on:
+  pull_request:
+    paths:
+      - "concierge/certified_settlement_collections_queue.py"
+      - "concierge/reward_settlement_ledger.py"
+      - "concierge/reward_settlement_certifier.py"
+      - "tests/test_certified_settlement_collections_queue.py"
+      - "examples/certified_settlement_collections_queue_demo.py"
+      - "docs/certified-settlement-collections-queue.md"
+      - ".github/workflows/certified-settlement-collections-queue.yml"
+  push:
+    branches: [main]
+    paths:
+      - "concierge/certified_settlement_collections_queue.py"
+      - "concierge/reward_settlement_ledger.py"
+      - "concierge/reward_settlement_certifier.py"
+      - "tests/test_certified_settlement_collections_queue.py"
+      - "examples/certified_settlement_collections_queue_demo.py"
+      - "docs/certified-settlement-collections-queue.md"
+      - ".github/workflows/certified-settlement-collections-queue.yml"
+
+concurrency:
+  group: certified-settlement-collections-queue-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: >-
+          python -m py_compile
+          concierge/certified_settlement_collections_queue.py
+          tests/test_certified_settlement_collections_queue.py
+          examples/certified_settlement_collections_queue_demo.py
+      - run: python -m unittest -v tests.test_certified_settlement_collections_queue
+      - run: python -O -m unittest -v tests.test_certified_settlement_collections_queue
+      - run: python examples/certified_settlement_collections_queue_demo.py
