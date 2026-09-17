@@ -32,8 +32,9 @@ class ReinvestmentInputError(ValueError):
 
 # Consume the private factory exactly once during trusted package bootstrap.
 # Afterwards, retire both the factory and its API-level transport alias, then
-# install an exact-module meta-path guard so ordinary importlib.reload() is a
-# no-op rather than a second build against caller-mutable helper bindings.
+# install an exact-module meta-path guard so ordinary importlib.reload() of the
+# parent package, public module, or private API module is a no-op rather than a
+# second build against caller-mutable helper bindings.
 _build_api = _api.build_api
 (
     compile_reinvestment_review,
@@ -52,6 +53,7 @@ from . import _reinvestment_allocator_reload_guard as _reload_guard
 _reload_guard.install(
     api_module=_api,
     public_module=sys.modules[__name__],
+    package_module=sys.modules[__package__],
 )
 del _reload_guard, _retired_name, _build_api, _api
 
