@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReinvestmentReloadSealTests(unittest.TestCase):
-    """Ordinary reload may not resurrect a consumed authority surface."""
+    """Ordinary reload preserves the bootstrapped one-shot authority graph."""
 
     @staticmethod
     def _clean_env():
@@ -21,7 +21,7 @@ class ReinvestmentReloadSealTests(unittest.TestCase):
                 env.pop(key, None)
         return env
 
-    def _run_reload_case(self, poison_transport: bool) -> str:
+    def _run_reload_case(self, poison_helpers: bool) -> str:
         command = [sys.executable]
         if sys.flags.optimize:
             command.append("-O")
@@ -32,34 +32,29 @@ sys.path.insert(0, {str(ROOT)!r})
 api = importlib.import_module("concierge._reinvestment_allocator_api")
 transport = importlib.import_module("concierge._reinvestment_allocator_transport")
 ra = importlib.import_module("concierge.reinvestment_allocator")
-package = importlib.import_module("concierge")
 compile_fn = ra.compile_reinvestment_review
-assert getattr(package, "_REINVESTMENT_AUTHORITY_API_CONSUMED", False) is True
 assert not hasattr(api, "build_api"), "boot-only API factory was not retired"
 assert not hasattr(api, "make_worker_invoker"), "API worker-factory alias was not retired"
 poison_calls = []
 def poison(*args, **kwargs):
     poison_calls.append(1)
     raise RuntimeError("poisoned worker factory executed")
-if {poison_transport!r}:
+if {poison_helpers!r}:
+    api.make_worker_invoker = poison
     transport.make_worker_invoker = poison
-api_blocked = False
-try:
-    importlib.reload(api)
-except ImportError as exc:
-    api_blocked = "already consumed" in str(exc)
-assert api_blocked, "ordinary importlib.reload(api) resurrected boot-only source"
-assert not hasattr(api, "build_api"), "API reload failure left build_api reachable"
-assert not hasattr(api, "make_worker_invoker"), "API reload failure left worker factory reachable"
-public_blocked = False
-try:
-    importlib.reload(ra)
-except ImportError as exc:
-    public_blocked = "already initialized" in str(exc)
-assert public_blocked, "ordinary importlib.reload(public) attempted a second authority build"
-assert ra.compile_reinvestment_review is compile_fn, "reload attempt replaced public compiler"
-assert poison_calls == [], "reload attempt reached poisoned transport factory"
-print("RELOAD_BLOCKED")
+api_before = api
+public_before = ra
+assert importlib.reload(api) is api_before
+assert importlib.reload(api) is api_before
+assert not hasattr(api, "build_api"), "ordinary API reload resurrected build_api"
+assert importlib.reload(ra) is public_before
+assert importlib.reload(ra) is public_before
+assert ra.compile_reinvestment_review is compile_fn, "ordinary public reload replaced compiler"
+assert not hasattr(api, "build_api"), "public reload resurrected private factory"
+assert poison_calls == [], "ordinary reload reached poisoned helper factory"
+assert api.__spec__ is not None and api.__spec__.origin == "reinvestment-authority-bootstrap"
+assert ra.__spec__ is not None and ra.__spec__.origin == "reinvestment-authority-bootstrap"
+print("RELOAD_NOOP")
 '''
         completed = subprocess.run(
             command + ["-c", script],
@@ -75,17 +70,17 @@ print("RELOAD_BLOCKED")
             completed.returncode,
             0,
             msg=(
-                f"poison_transport={poison_transport} "
+                f"poison_helpers={poison_helpers} "
                 f"stdout={completed.stdout}\nstderr={completed.stderr}"
             ),
         )
         return completed.stdout.strip()
 
-    def test_api_and_public_reload_fail_closed_after_bootstrap(self):
-        self.assertEqual(self._run_reload_case(False), "RELOAD_BLOCKED")
+    def test_api_and_public_reload_are_noops_after_bootstrap(self):
+        self.assertEqual(self._run_reload_case(False), "RELOAD_NOOP")
 
-    def test_transport_poison_then_reload_fails_closed(self):
-        self.assertEqual(self._run_reload_case(True), "RELOAD_BLOCKED")
+    def test_poisoned_helpers_then_reload_stays_on_captured_graph(self):
+        self.assertEqual(self._run_reload_case(True), "RELOAD_NOOP")
 
     def test_module_cli_delegates_to_bootstrapped_public_surface(self):
         command = [sys.executable]

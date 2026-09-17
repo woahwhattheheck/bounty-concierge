@@ -7,6 +7,7 @@ on:
       - "concierge/reinvestment_allocator.py"
       - "concierge/_reinvestment_allocator_api.py"
       - "concierge/_reinvestment_allocator_cli.py"
+      - "concierge/_reinvestment_allocator_reload_guard.py"
       - "concierge/_reinvestment_allocator_transport.py"
       - "concierge/_reinvestment_allocator_worker.py"
       - "concierge/_reinvestment_allocator_core.source"
@@ -29,6 +30,7 @@ on:
       - "concierge/reinvestment_allocator.py"
       - "concierge/_reinvestment_allocator_api.py"
       - "concierge/_reinvestment_allocator_cli.py"
+      - "concierge/_reinvestment_allocator_reload_guard.py"
       - "concierge/_reinvestment_allocator_transport.py"
       - "concierge/_reinvestment_allocator_worker.py"
       - "concierge/_reinvestment_allocator_core.source"
@@ -72,6 +74,7 @@ jobs:
             concierge/reinvestment_allocator.py \
             concierge/_reinvestment_allocator_api.py \
             concierge/_reinvestment_allocator_cli.py \
+            concierge/_reinvestment_allocator_reload_guard.py \
             concierge/_reinvestment_allocator_transport.py \
             concierge/_reinvestment_allocator_worker.py \
             tests/test_reinvestment_allocator.py \

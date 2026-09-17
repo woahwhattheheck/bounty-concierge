@@ -2,17 +2,6 @@
 """Sealed public API factory for externally signed reinvestment review."""
 from __future__ import annotations
 
-import sys as _bootstrap_sys
-
-_parent_package = _bootstrap_sys.modules.get(__package__)
-if _parent_package is not None and getattr(
-    _parent_package, "_REINVESTMENT_AUTHORITY_API_CONSUMED", False
-):
-    raise ImportError(
-        "reinvestment authority API factory was already consumed during package bootstrap"
-    )
-del _bootstrap_sys, _parent_package
-
 from copy import deepcopy
 import hashlib
 import hmac
