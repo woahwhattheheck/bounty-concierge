@@ -9,15 +9,19 @@ The production surface is fail-closed:
 
 1. A credential-owning authority outside the review process signs the exact
    closeout manifest, payment bindings, effort log, and wallet identity.
-2. The public module starts a fresh `python -I` worker through boot-captured
-   POSIX primitives. The worker is executable-only and cannot be imported as a
-   reusable in-process authority module.
-3. The worker verifies the boot-pinned RSA public key, authority identity,
+2. `concierge` package initialization seals the public reinvestment surface
+   before normal callers can obtain either private bootstrap helper. On the
+   first package import, pre-existing public/API/transport authority names in
+   `sys.modules` are rejected rather than trusted.
+3. The sealed public module starts a fresh `python -I` worker through
+   boot-captured POSIX primitives. The worker is executable-only and cannot be
+   imported as a reusable in-process authority module.
+4. The worker verifies the boot-pinned RSA public key, authority identity,
    exact scope, signature, and five-minute freshness window **before** loading
    any provider or allocator code.
-4. Only then does the worker reacquire current GitHub closeout state and
+5. Only then does the worker reacquire current GitHub closeout state and
    canonical wallet history and compile realized economics.
-5. The returned v4 receipt includes the complete detached-signature envelope,
+6. The returned v4 receipt includes the complete detached-signature envelope,
    the pinned allocator-core Git blob identity, and an explicit authority
    ceiling.
 
@@ -27,8 +31,8 @@ accounting revenue, make a tax conclusion, or promise future returns.
 
 ## Host configuration
 
-Set these variables before importing `concierge.reinvestment_allocator` or
-starting its CLI process:
+Set these variables **before importing `concierge`** (package bootstrap imports
+`concierge.reinvestment_allocator`) or before starting its CLI process:
 
 | Variable | Meaning |
 |---|---|
@@ -37,9 +41,9 @@ starting its CLI process:
 | `REALIZED_REINVESTMENT_AUTHORIZED_PROVIDER` | Bounded identifier for the credential-owning evidence provider. |
 | `REALIZED_REINVESTMENT_AUTHORIZED_PRINCIPAL_SHA256` | Lowercase SHA-256 identity of the authorized principal. |
 
-The module snapshots its launch environment once at import. Changing these
-variables later does not rotate the trust root. Restart the trusted host process
-for an intentional key or provider change.
+Package bootstrap snapshots the reinvestment launch environment once. Changing
+these variables later does not rotate the trust root. Restart the trusted host
+process for an intentional key or provider change.
 
 The worker receives no symmetric signing secret. It carries only the public RSA
 modulus and fixed public exponent `65537`; therefore ordinary review execution
@@ -134,35 +138,56 @@ of trusting a mutable label emitted by the producing process.
 
 ## Isolation and trust boundary
 
-The parent public API never imports the allocator core or provider modules. All signature verification and receipt-minting logic lives in the single executable-only worker; there are no importable worker authority/runtime helper modules. Its
-reviewed API/transport helpers construct one closure at import and retain the
-worker path, interpreter path, process primitives, limits, protocol, and boot
-environment before callers receive the exported functions. The
-worker runs under `python -I`, inserts only its own repository root, verifies the
-external authority first, and then loads the reviewed allocator implementation
-from `_reinvestment_allocator_core.source` only when its decoded Git blob SHA-1
-is exactly `5731fd0652bc94b20d1f3b2de48628f633f550a9`.
+The parent public API never imports the allocator core or provider modules. All
+signature verification and receipt-minting logic lives in the single
+executable-only worker; there are no importable worker authority/runtime helper
+modules. Its reviewed API/transport helpers construct one closure at package
+bootstrap and retain the worker path, interpreter path, process primitives,
+limits, protocol, and boot environment before callers receive the exported
+functions.
+
+Normal attempts to import `_reinvestment_allocator_api` or
+`_reinvestment_allocator_transport` first still execute `concierge` package
+initialization first, so the public closure is already sealed before those
+mutable helper module objects are returned. The first package import also checks
+`sys.modules` before any package side effects and fails closed if the public
+reinvestment module, API helper, or transport helper was manually preseeded in
+the import cache. A normal `importlib.reload(concierge)` after a completed seal
+uses the package's completed-bootstrap sentinel rather than misclassifying the
+already-loaded authority graph as a preseed attack.
+
+The worker runs under `python -I`, inserts only its own repository root, verifies
+the external authority first, and then loads the reviewed allocator
+implementation from `_reinvestment_allocator_core.source` only when its decoded
+Git blob SHA-1 is exactly `5731fd0652bc94b20d1f3b2de48628f633f550a9`.
 
 That `.source` file is a non-importable implementation resource, not a supported
 public authority entrypoint. Any legacy v2 output lacks the v4 detached-signature
 envelope and is rejected by the v4 current-verification surface.
 
 This is not a general same-process sandbox. Code able to replace the Python
-interpreter, package files, exported functions, or operating-system process
-boundary can fabricate local objects. Such an object still cannot carry a valid
-signature from the externally held private key. Consumers making consequential
-decisions must pin and verify the signer identity independently.
+interpreter, package files, exported functions, a completed package sentinel,
+or the operating-system process boundary can fabricate local objects. Such an
+object still cannot carry a valid signature from the externally held private
+key. Consumers making consequential decisions must pin and verify the signer
+identity independently.
 
 ## Test and workflow fence
 
 `tests/test_reinvestment_allocator.py` and its test-only support/driver modules
 build a temporary package containing the production public API helpers,
-executable-only worker helpers, pinned allocator resource, and provider stubs. It covers valid external signatures, forged signatures, scope
-changes, stale/future authority, post-import trust-root changes, post-import
-module and POSIX primitive rebinding, provider-module poisoning, core-resource
-tampering, receipt tampering, caller planning inputs, and legacy-core import
-blocking.
+executable-only worker helpers, pinned allocator resource, and provider stubs. It
+covers valid external signatures, forged signatures, scope changes, stale/future
+authority, post-import trust-root changes, post-import module and POSIX primitive
+rebinding, provider-module poisoning, core-resource tampering, receipt tampering,
+caller planning inputs, and legacy-core import blocking.
 
-`.github/workflows/reinvestment-authority.yml` executes that suite on Python 3.9
-and 3.13 in both normal and `python -O` modes. A queued or absent workflow is
-missing evidence, not a green result.
+`tests/test_reinvestment_preimport_bootstrap.py` separately attacks API-first and
+transport-first imports, then attacks import-cache pre-seeding of the public
+reinvestment module, private API helper, private transport helper, and all three
+together. Each predecessor runs in a fresh child interpreter.
+
+`.github/workflows/reinvestment-authority.yml` executes the full
+`test_reinvestment*.py` suite on Python 3.9 and 3.13 in both normal and
+`python -O` modes. A queued or absent workflow is missing evidence, not a green
+result.
