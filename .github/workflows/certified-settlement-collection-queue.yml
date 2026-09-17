@@ -1,0 +1,60 @@
+name: Certified settlement collection queue
+
+on:
+  pull_request:
+    paths:
+      - "concierge/certified_settlement_collection_queue.py"
+      - "concierge/reward_settlement_certifier.py"
+      - "concierge/reward_settlement_ledger.py"
+      - "tests/test_certified_settlement_collection_queue.py"
+      - "tests/test_certified_settlement_collection_queue_truth_chain.py"
+      - "data/reward_settlement_ledger.synthetic.json"
+      - "docs/certified-settlement-collection-queue.md"
+      - ".github/workflows/certified-settlement-collection-queue.yml"
+  push:
+    branches: [main]
+    paths:
+      - "concierge/certified_settlement_collection_queue.py"
+      - "concierge/reward_settlement_certifier.py"
+      - "concierge/reward_settlement_ledger.py"
+      - "tests/test_certified_settlement_collection_queue.py"
+      - "tests/test_certified_settlement_collection_queue_truth_chain.py"
+      - "data/reward_settlement_ledger.synthetic.json"
+      - "docs/certified-settlement-collection-queue.md"
+      - ".github/workflows/certified-settlement-collection-queue.yml"
+
+concurrency:
+  group: certified-settlement-collection-queue-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile queue and tests
+        run: >-
+          python -m py_compile
+          concierge/certified_settlement_collection_queue.py
+          tests/test_certified_settlement_collection_queue.py
+          tests/test_certified_settlement_collection_queue_truth_chain.py
+      - name: Queue suites
+        run: >-
+          python -m unittest -v
+          tests.test_certified_settlement_collection_queue
+          tests.test_certified_settlement_collection_queue_truth_chain
+      - name: Queue suites under optimized Python
+        run: >-
+          python -O -m unittest -v
+          tests.test_certified_settlement_collection_queue
+          tests.test_certified_settlement_collection_queue_truth_chain
