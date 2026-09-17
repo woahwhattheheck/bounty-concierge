@@ -2,6 +2,31 @@
 """RustChain Bounty Concierge -- CLI tool for bounty hunters."""
 __version__ = "0.1.0"
 
+# BEGIN_REINVESTMENT_AUTHORITY_BOOTSTRAP_SEAL
+# Seal the reinvestment authority surface during package bootstrap. Importing any
+# concierge submodule executes this package initializer first, so callers cannot
+# obtain the private API/transport modules and rebind their launch graph before
+# the public surface captures it. Explicitly discard pre-seeded module entries
+# as well; a same-interpreter caller must not be able to win bootstrap by
+# populating sys.modules before importing concierge.
+import sys as _reinvestment_sys
+
+for _reinvestment_suffix in (
+    "reinvestment_allocator",
+    "_reinvestment_allocator_api",
+    "_reinvestment_allocator_transport",
+):
+    _reinvestment_sys.modules.pop(
+        f"{__name__}.{_reinvestment_suffix}", None
+    )
+del _reinvestment_suffix
+
+from . import reinvestment_allocator as _reinvestment_allocator
+
+del _reinvestment_allocator
+del _reinvestment_sys
+# END_REINVESTMENT_AUTHORITY_BOOTSTRAP_SEAL
+
 # Install the additive payoff continuity v3 dispatcher before callers import either
 # payoff-path surface. Existing v2 semantics remain delegated to the landed core;
 # normal v1 calls become fail-closed and historical replay moves behind an explicitly
