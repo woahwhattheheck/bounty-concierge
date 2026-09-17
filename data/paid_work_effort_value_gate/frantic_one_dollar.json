@@ -1,0 +1,64 @@
+{
+  "schema": "paid-work-effort-value-gate/v1",
+  "as_of": "2026-09-16T20:00:00Z",
+  "policy": {
+    "schema": "paid-work-effort-value-policy/v1",
+    "evidence_max_age_seconds": 86400,
+    "deadline_safety_seconds": 3600,
+    "max_active_claims": 1,
+    "fleet_economic_policy": {
+      "schema": "fleet-economic-policy/v1",
+      "min_batch_items": 2,
+      "max_batch_items": 200,
+      "currencies": {
+        "USD": {
+          "min_single_reward": "100",
+          "min_batch_reward": "500",
+          "min_reward_per_agent_hour": "100"
+        },
+        "RTC": {
+          "min_single_reward": "200",
+          "min_batch_reward": "500",
+          "min_reward_per_agent_hour": "300"
+        }
+      }
+    }
+  },
+  "candidate": {
+    "work_id": "frantic-one-dollar-seed",
+    "canonical_source_url": "https://example.test/frantic-one-dollar-seed",
+    "advertised_payout": {
+      "amount": "1",
+      "currency": "USD",
+      "unit_type": "CASH",
+      "observed_at": "2026-09-16T19:30:00Z"
+    },
+    "estimated_engineering_hours": "1",
+    "model_tool_cost": {
+      "state": "KNOWN",
+      "amount": "0",
+      "currency": "USD"
+    },
+    "deadline_at": "2026-09-17T20:00:00Z",
+    "congestion": {
+      "active_claims": 0,
+      "observed_at": "2026-09-16T19:30:00Z"
+    },
+    "acceptance": {
+      "state": "CONFIRMED",
+      "evidence_url": "https://evidence.example/acceptance",
+      "observed_at": "2026-09-16T19:30:00Z",
+      "authority": "FIRST_PARTY"
+    },
+    "payout_route": {
+      "state": "CONFIRMED",
+      "evidence_url": "https://evidence.example/payout-route",
+      "observed_at": "2026-09-16T19:30:00Z"
+    },
+    "account_kyc": {
+      "state": "READY",
+      "evidence_url": "https://evidence.example/account-kyc",
+      "observed_at": "2026-09-16T19:30:00Z"
+    }
+  }
+}
