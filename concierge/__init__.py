@@ -45,8 +45,23 @@ del _payoff_path_policy_secure_runtime
 # package before returning any of its submodules, so a caller asking for
 # ``concierge._reinvestment_allocator_api`` or ``..._transport`` cannot obtain a
 # mutable private-module reference until the public API has already captured its
-# fresh-process launcher graph. Later private-module/POSIX rebinding therefore cannot
-# become the authority generation exported by ``concierge.reinvestment_allocator``.
+# fresh-process launcher graph. Before capturing, discard any same-interpreter
+# sys.modules pre-seed for the public/API/transport names; otherwise a caller could
+# inject a fake child module before the first ``concierge`` import and make bootstrap
+# consume attacker-owned launch code without ever importing the reviewed files.
+import sys as _reinvestment_bootstrap_sys
+
+for _reinvestment_bootstrap_suffix in (
+    "reinvestment_allocator",
+    "_reinvestment_allocator_api",
+    "_reinvestment_allocator_transport",
+):
+    _reinvestment_bootstrap_sys.modules.pop(
+        f"{__name__}.{_reinvestment_bootstrap_suffix}", None
+    )
+del _reinvestment_bootstrap_suffix
+
 from . import reinvestment_allocator as _reinvestment_allocator_bootstrap
 
 del _reinvestment_allocator_bootstrap
+del _reinvestment_bootstrap_sys
