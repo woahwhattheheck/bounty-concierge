@@ -1,0 +1,51 @@
+name: Reward settlement ledger
+
+on:
+  pull_request:
+    paths:
+      - "concierge/reward_settlement_ledger.py"
+      - "tests/test_reward_settlement_ledger.py"
+      - "data/reward_settlement_ledger.synthetic.json"
+      - "docs/reward-settlement-ledger.md"
+      - ".github/workflows/reward-settlement-ledger.yml"
+  push:
+    branches: [main]
+    paths:
+      - "concierge/reward_settlement_ledger.py"
+      - "tests/test_reward_settlement_ledger.py"
+      - "data/reward_settlement_ledger.synthetic.json"
+      - "docs/reward-settlement-ledger.md"
+      - ".github/workflows/reward-settlement-ledger.yml"
+
+concurrency:
+  group: reward-settlement-ledger-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.13"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m py_compile concierge/reward_settlement_ledger.py tests/test_reward_settlement_ledger.py
+      - run: python -m unittest -v tests.test_reward_settlement_ledger
+      - run: python -O -m unittest -v tests.test_reward_settlement_ledger
+      - run: |
+          rm -rf /tmp/reward-settlement-ledger
+          python -m concierge.reward_settlement_ledger compile \
+            --input data/reward_settlement_ledger.synthetic.json \
+            --out-dir /tmp/reward-settlement-ledger
+          python -m concierge.reward_settlement_ledger verify \
+            --input data/reward_settlement_ledger.synthetic.json \
+            --ledger /tmp/reward-settlement-ledger/ledger.json \
+            --markdown /tmp/reward-settlement-ledger/ledger.md \
+            --receipt /tmp/reward-settlement-ledger/receipt.json
