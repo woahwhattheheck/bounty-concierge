@@ -34,6 +34,30 @@ class ReinvestmentPreimportBootstrapTests(unittest.TestCase):
         )
         return completed.stdout.strip()
 
+    def _run_preseeded_cache(self, module_names: tuple[str, ...]) -> str:
+        command = [sys.executable]
+        if sys.flags.optimize:
+            command.append("-O")
+        script = f'''\nimport sys\nimport types\nsys.path.insert(0, {str(ROOT)!r})\nmodule_names = {module_names!r}\nfor name in module_names:\n    sys.modules[name] = types.ModuleType(name)\ntry:\n    import concierge\nexcept ImportError as exc:\n    message = str(exc)\n    if "module cache was preseeded before package bootstrap" not in message:\n        raise\n    for name in module_names:\n        if name not in message:\n            raise RuntimeError(f"missing preseed name in error: {{name}}")\n    print("PRESEED_BLOCKED")\nelse:\n    raise RuntimeError("preseeded reinvestment authority module cache was accepted")\n'''
+        completed = subprocess.run(
+            command + ["-c", script],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=20,
+            check=False,
+        )
+        self.assertEqual(
+            completed.returncode,
+            0,
+            msg=(
+                f"preseed={module_names}\n"
+                f"stdout={completed.stdout}\nstderr={completed.stderr}"
+            ),
+        )
+        return completed.stdout.strip()
+
     def test_api_first_import_cannot_precede_public_authority_seal(self):
         self.assertEqual(
             self._run_first_private_import("concierge._reinvestment_allocator_api"),
@@ -44,6 +68,36 @@ class ReinvestmentPreimportBootstrapTests(unittest.TestCase):
         self.assertEqual(
             self._run_first_private_import("concierge._reinvestment_allocator_transport"),
             "SEALED",
+        )
+
+    def test_preseeded_public_authority_module_fails_closed(self):
+        self.assertEqual(
+            self._run_preseeded_cache(("concierge.reinvestment_allocator",)),
+            "PRESEED_BLOCKED",
+        )
+
+    def test_preseeded_private_api_module_fails_closed(self):
+        self.assertEqual(
+            self._run_preseeded_cache(("concierge._reinvestment_allocator_api",)),
+            "PRESEED_BLOCKED",
+        )
+
+    def test_preseeded_private_transport_module_fails_closed(self):
+        self.assertEqual(
+            self._run_preseeded_cache(("concierge._reinvestment_allocator_transport",)),
+            "PRESEED_BLOCKED",
+        )
+
+    def test_preseeded_full_authority_cache_fails_closed(self):
+        self.assertEqual(
+            self._run_preseeded_cache(
+                (
+                    "concierge.reinvestment_allocator",
+                    "concierge._reinvestment_allocator_api",
+                    "concierge._reinvestment_allocator_transport",
+                )
+            ),
+            "PRESEED_BLOCKED",
         )
 
 
