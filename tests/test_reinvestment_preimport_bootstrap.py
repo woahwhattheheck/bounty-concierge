@@ -34,6 +34,27 @@ class ReinvestmentPreimportBootstrapTests(unittest.TestCase):
         )
         return completed.stdout.strip()
 
+    def _run_preseeded_module_poison(self) -> str:
+        command = [sys.executable]
+        if sys.flags.optimize:
+            command.append("-O")
+        script = f'''\nimport importlib\nimport sys\nimport types\nsys.path.insert(0, {str(ROOT)!r})\n\nfake_public = types.ModuleType("concierge.reinvestment_allocator")\nfake_public.compile_reinvestment_review = lambda *a, **k: {{"attacker": True}}\n\nfake_api = types.ModuleType("concierge._reinvestment_allocator_api")\ndef poisoned_build_api(*args, **kwargs):\n    def fake_compile(*a, **k):\n        return {{"attacker": True}}\n    return fake_compile, (lambda *a, **k: True), (lambda *a, **k: True), (lambda *a, **k: "0" * 64)\nfake_api.build_api = poisoned_build_api\n\nfake_transport = types.ModuleType("concierge._reinvestment_allocator_transport")\ndef poisoned_make_worker_invoker(*args, **kwargs):\n    raise RuntimeError("preseeded transport poison reached authority launcher")\nfake_transport.make_worker_invoker = poisoned_make_worker_invoker\n\nsys.modules["concierge.reinvestment_allocator"] = fake_public\nsys.modules["concierge._reinvestment_allocator_api"] = fake_api\nsys.modules["concierge._reinvestment_allocator_transport"] = fake_transport\n\nimport concierge\nra = importlib.import_module("concierge.reinvestment_allocator")\napi = importlib.import_module("concierge._reinvestment_allocator_api")\ntransport = importlib.import_module("concierge._reinvestment_allocator_transport")\n\nassert ra is not fake_public\nassert api is not fake_api\nassert transport is not fake_transport\nassert getattr(ra, "__file__", "").endswith("concierge/reinvestment_allocator.py")\nassert getattr(api, "__file__", "").endswith("concierge/_reinvestment_allocator_api.py")\nassert getattr(transport, "__file__", "").endswith("concierge/_reinvestment_allocator_transport.py")\ncompile_fn = ra.compile_reinvestment_review\ncompile_cells = dict(zip(compile_fn.__code__.co_freevars, [cell.cell_contents for cell in compile_fn.__closure__]))\ninvoke_worker = compile_cells.get("invoke_worker")\nassert invoke_worker is not None\nprint("EVICTED")\n'''
+        completed = subprocess.run(
+            command + ["-c", script],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=20,
+            check=False,
+        )
+        self.assertEqual(
+            completed.returncode,
+            0,
+            msg=f"stdout={completed.stdout}\nstderr={completed.stderr}",
+        )
+        return completed.stdout.strip()
+
     def test_api_first_import_cannot_precede_public_authority_seal(self):
         self.assertEqual(
             self._run_first_private_import("concierge._reinvestment_allocator_api"),
@@ -45,6 +66,9 @@ class ReinvestmentPreimportBootstrapTests(unittest.TestCase):
             self._run_first_private_import("concierge._reinvestment_allocator_transport"),
             "SEALED",
         )
+
+    def test_preseeded_public_api_and_transport_modules_are_evicted(self):
+        self.assertEqual(self._run_preseeded_module_poison(), "EVICTED")
 
 
 if __name__ == "__main__":
