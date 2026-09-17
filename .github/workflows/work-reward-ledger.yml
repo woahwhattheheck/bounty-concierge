@@ -1,0 +1,37 @@
+name: Work reward settlement ledger
+
+on:
+  pull_request:
+    paths:
+      - 'concierge/work_reward_ledger.py'
+      - 'tests/test_work_reward_ledger.py'
+      - 'data/work_reward_ledger.synthetic.json'
+      - 'docs/WORK_REWARD_SETTLEMENT_LEDGER.md'
+      - '.github/workflows/work-reward-ledger.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'concierge/work_reward_ledger.py'
+      - 'tests/test_work_reward_ledger.py'
+      - 'data/work_reward_ledger.synthetic.json'
+      - 'docs/WORK_REWARD_SETTLEMENT_LEDGER.md'
+      - '.github/workflows/work-reward-ledger.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ledger:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install pytest
+      - run: python -m pytest -q tests/test_work_reward_ledger.py
+      - run: python -O -m concierge.work_reward_ledger compile data/work_reward_ledger.synthetic.json --format json > /tmp/work-reward-ledger.json
+      - run: python -O -m concierge.work_reward_ledger verify /tmp/work-reward-ledger.json --format markdown > /tmp/work-reward-ledger.md
