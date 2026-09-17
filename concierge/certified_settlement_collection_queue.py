@@ -111,17 +111,41 @@ def _source_view(source: dict[str, Any], as_of_dt: datetime, freshness_seconds: 
     }
 
 
-def _money_basis(case: dict[str, Any]) -> dict[str, Any]:
+def _money_basis(case: dict[str, Any], certified_source_ids: set[str]) -> dict[str, Any]:
+    """Expose declared money without disguising whether its source is certified."""
     for kind, basis in (("SPONSOR_AWARD", "SPONSOR_AWARD"), ("ADVERTISED_BOUNTY", "ADVERTISED_BOUNTY")):
         events = [e for e in case["events"] if e["kind"] == kind]
         if events:
             latest = max(events, key=lambda e: (e["source"]["observed_at"], e["event_id"]))
-            return {"basis": basis, "amount_minor": latest["amount_minor"], "currency": latest["currency"], "unit": "minor"}
+            source_id = latest["source"]["source_id"]
+            return {
+                "basis": basis,
+                "amount_minor": latest["amount_minor"],
+                "currency": latest["currency"],
+                "unit": "minor",
+                "source_id": source_id,
+                "certified": source_id in certified_source_ids,
+            }
     transfers = [e for e in case["events"] if e["kind"] == "TRANSFER"]
     if transfers:
         latest = max(transfers, key=lambda e: (e["source"]["observed_at"], e["event_id"]))
-        return {"basis": "LATEST_TRANSFER", "amount_minor": latest["amount_minor"], "currency": latest["currency"], "unit": "minor"}
-    return {"basis": "NONE", "amount_minor": None, "currency": None, "unit": "minor"}
+        source_id = latest["source"]["source_id"]
+        return {
+            "basis": "LATEST_TRANSFER",
+            "amount_minor": latest["amount_minor"],
+            "currency": latest["currency"],
+            "unit": "minor",
+            "source_id": source_id,
+            "certified": source_id in certified_source_ids,
+        }
+    return {
+        "basis": "NONE",
+        "amount_minor": None,
+        "currency": None,
+        "unit": "minor",
+        "source_id": None,
+        "certified": False,
+    }
 
 
 def _route_view(case: dict[str, Any], certified_source_ids: set[str], as_of_dt: datetime, freshness_seconds: int) -> dict[str, Any]:
@@ -185,6 +209,20 @@ def _latest_transfer_statuses(case: dict[str, Any], certified_source_ids: set[st
     return sorted(event["status"] for event in latest.values())
 
 
+def _certified_truth_chain(case: dict[str, Any], certified_source_ids: set[str]) -> tuple[bool, set[str]]:
+    """Return whether a sponsor award is certified and all certified eligibility decisions."""
+    certified_award = False
+    eligibility: set[str] = set()
+    for event in case["events"]:
+        if event["source"]["source_id"] not in certified_source_ids:
+            continue
+        if event["kind"] == "SPONSOR_AWARD":
+            certified_award = True
+        elif event["kind"] == "ELIGIBILITY":
+            eligibility.add(event["decision"])
+    return certified_award, eligibility
+
+
 def _derive_state(
     case: dict[str, Any],
     ledger_record: dict[str, Any],
@@ -223,8 +261,22 @@ def _derive_state(
     if any(not view["current"] for view in driver_views):
         return "NEEDS_TRUST_EVIDENCE", ["LATEST_CERTIFIED_STAGE_EVIDENCE_STALE_AT_AS_OF"]
 
+    certified_ids = set(cert_record["certified_source_ids"])
+    certified_award, eligibility = _certified_truth_chain(case, certified_ids)
+    if len(eligibility) > 1:
+        return "HOLD_CONTRADICTION", ["CERTIFIED_ELIGIBILITY_CONTRADICTION"]
+    if eligibility == {"INELIGIBLE"}:
+        return "HOLD_CONTRADICTION", ["CERTIFIED_INELIGIBLE"]
+    if certified in {
+        "SPONSOR_AWARD_CERTIFIED",
+        "PAYOUT_TICKET_CERTIFIED",
+        "PAYOUT_RAIL_CERTIFIED",
+        "TRANSFER_EVIDENCE_CERTIFIED",
+    } and not certified_award:
+        return "NEEDS_TRUST_EVIDENCE", ["NO_CERTIFIED_SPONSOR_AWARD"]
+
     if certified == "TRANSFER_EVIDENCE_CERTIFIED":
-        statuses = _latest_transfer_statuses(case, set(cert_record["certified_source_ids"]))
+        statuses = _latest_transfer_statuses(case, certified_ids)
         if "FAILED" in statuses:
             return "HOLD_CONTRADICTION", ["CERTIFIED_TRANSFER_FAILED_TERMINAL"]
         if any(status in {"PENDING", "CONFIRMING"} for status in statuses):
@@ -308,7 +360,7 @@ def build_queue(
             "trusted_registry_current": registry_current,
             "event_age_seconds": event_age_seconds,
             "driver_sources": sorted(driver_views, key=lambda x: (x["observed_at"], x["source_id"])),
-            "money": _money_basis(case),
+            "money": _money_basis(case, certified_ids),
             "certified_paid_by_currency": cert_record["certified_paid_by_currency"],
             "route_evidence": _route_view(case, certified_ids, as_of_dt, freshness_seconds),
             "owner_review_only": True,
