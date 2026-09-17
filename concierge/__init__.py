@@ -2,6 +2,34 @@
 """RustChain Bounty Concierge -- CLI tool for bounty hunters."""
 __version__ = "0.1.0"
 
+# The reinvestment authority seal below relies on package initialization running
+# before any private authority helper is returned to caller code. On the first
+# package import, reject authority-surface names that were manually planted in
+# ``sys.modules`` before this module began executing; otherwise Python's normal
+# import cache would let those attacker-supplied objects bypass that ordering.
+# A legitimate package reload keeps the completed-bootstrap sentinel and does not
+# reinterpret the already-sealed authority graph as a preseed attack.
+import sys as _sys
+
+if not globals().get("_REINVESTMENT_BOOTSTRAP_COMPLETE", False):
+    _reinvestment_preseed_names = (
+        f"{__name__}.reinvestment_allocator",
+        f"{__name__}._reinvestment_allocator_api",
+        f"{__name__}._reinvestment_allocator_transport",
+    )
+    _reinvestment_preseeded = tuple(
+        name for name in _reinvestment_preseed_names if name in _sys.modules
+    )
+    if _reinvestment_preseeded:
+        raise ImportError(
+            "reinvestment authority module cache was preseeded before package bootstrap: "
+            + ", ".join(_reinvestment_preseeded)
+        )
+    del _reinvestment_preseed_names
+    del _reinvestment_preseeded
+
+del _sys
+
 # Install the additive payoff continuity v3 dispatcher before callers import either
 # payoff-path surface. Existing v2 semantics remain delegated to the landed core;
 # normal v1 calls become fail-closed and historical replay moves behind an explicitly
@@ -50,3 +78,4 @@ del _payoff_path_policy_secure_runtime
 from . import reinvestment_allocator as _reinvestment_allocator_bootstrap
 
 del _reinvestment_allocator_bootstrap
+_REINVESTMENT_BOOTSTRAP_COMPLETE = True
