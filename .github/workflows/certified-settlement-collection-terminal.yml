@@ -5,22 +5,30 @@ on:
     paths:
       - 'concierge/certified_settlement_collection_queue.py'
       - 'concierge/certified_settlement_collection_review_packet.py'
+      - 'concierge/accepted_work_collection_bridge.py'
       - 'tests/test_certified_settlement_collection_queue.py'
       - 'tests/test_certified_settlement_collection_review_packet.py'
+      - 'tests/test_accepted_work_collection_bridge.py'
+      - 'tests/test_accepted_work_collection_bridge_source_binding.py'
       - 'examples/certified_settlement_collection_review_packet_demo.py'
       - 'data/reward_settlement_ledger.synthetic.json'
       - 'docs/certified-settlement-collection-queue.md'
+      - 'docs/accepted-work-collection-bridge.md'
       - '.github/workflows/certified-settlement-collection-terminal.yml'
   push:
     branches: [main]
     paths:
       - 'concierge/certified_settlement_collection_queue.py'
       - 'concierge/certified_settlement_collection_review_packet.py'
+      - 'concierge/accepted_work_collection_bridge.py'
       - 'tests/test_certified_settlement_collection_queue.py'
       - 'tests/test_certified_settlement_collection_review_packet.py'
+      - 'tests/test_accepted_work_collection_bridge.py'
+      - 'tests/test_accepted_work_collection_bridge_source_binding.py'
       - 'examples/certified_settlement_collection_review_packet_demo.py'
       - 'data/reward_settlement_ledger.synthetic.json'
       - 'docs/certified-settlement-collection-queue.md'
+      - 'docs/accepted-work-collection-bridge.md'
       - '.github/workflows/certified-settlement-collection-terminal.yml'
 
 permissions:
@@ -42,18 +50,25 @@ jobs:
           python -m py_compile
           concierge/certified_settlement_collection_queue.py
           concierge/certified_settlement_collection_review_packet.py
+          concierge/accepted_work_collection_bridge.py
           tests/test_certified_settlement_collection_queue.py
           tests/test_certified_settlement_collection_review_packet.py
+          tests/test_accepted_work_collection_bridge.py
+          tests/test_accepted_work_collection_bridge_source_binding.py
           examples/certified_settlement_collection_review_packet_demo.py
       - name: Focused tests
         run: >-
           python -m unittest -v
           tests.test_certified_settlement_collection_queue
           tests.test_certified_settlement_collection_review_packet
+          tests.test_accepted_work_collection_bridge
+          tests.test_accepted_work_collection_bridge_source_binding
       - name: Focused tests under optimization
         run: >-
           python -O -m unittest -v
           tests.test_certified_settlement_collection_queue
           tests.test_certified_settlement_collection_review_packet
+          tests.test_accepted_work_collection_bridge
+          tests.test_accepted_work_collection_bridge_source_binding
       - name: Synthetic review-packet demo
         run: python examples/certified_settlement_collection_review_packet_demo.py
