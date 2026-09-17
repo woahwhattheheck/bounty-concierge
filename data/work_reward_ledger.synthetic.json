@@ -1,0 +1,150 @@
+{
+  "schema_version": "bounty.work-reward-events/v1",
+  "events": [
+    {
+      "work_id": "synthetic:frantic/example#384",
+      "sequence": 1,
+      "state": "advertised",
+      "provider": "Frantic",
+      "program": "bug-bounty",
+      "synthetic": true,
+      "evidence": {
+        "source_uri": "https://example.invalid/frantic/listing",
+        "source_kind": "synthetic_fixture",
+        "observed_at": "2026-09-01T00:00:00Z",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "advertised_amount": {"value": "90", "unit": "USD"},
+      "award_amount": null,
+      "provider_reference": null,
+      "payment_rail": null,
+      "settlement": null
+    },
+    {
+      "work_id": "synthetic:frantic/example#384",
+      "sequence": 2,
+      "state": "accepted",
+      "provider": "Frantic",
+      "program": "bug-bounty",
+      "synthetic": true,
+      "evidence": {
+        "source_uri": "https://example.invalid/frantic/accepted",
+        "source_kind": "synthetic_fixture",
+        "observed_at": "2026-09-02T00:00:00Z",
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "advertised_amount": null,
+      "award_amount": null,
+      "provider_reference": {"kind": "submission", "value": "synthetic-pr-384"},
+      "payment_rail": null,
+      "settlement": null
+    },
+    {
+      "work_id": "synthetic:frantic/example#384",
+      "sequence": 3,
+      "state": "awarded",
+      "provider": "Frantic",
+      "program": "bug-bounty",
+      "synthetic": true,
+      "evidence": {
+        "source_uri": "https://example.invalid/frantic/award",
+        "source_kind": "synthetic_fixture",
+        "observed_at": "2026-09-03T00:00:00Z",
+        "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "advertised_amount": null,
+      "award_amount": {"value": "90", "unit": "USD"},
+      "provider_reference": {"kind": "award", "value": "synthetic-award-1"},
+      "payment_rail": null,
+      "settlement": null
+    },
+    {
+      "work_id": "synthetic:frantic/example#384",
+      "sequence": 4,
+      "state": "paid",
+      "provider": "Frantic",
+      "program": "bug-bounty",
+      "synthetic": true,
+      "evidence": {
+        "source_uri": "https://example.invalid/frantic/paid",
+        "source_kind": "synthetic_fixture",
+        "observed_at": "2026-09-04T00:00:00Z",
+        "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      "advertised_amount": null,
+      "award_amount": null,
+      "provider_reference": {"kind": "ticket", "value": "synthetic-ticket-9"},
+      "payment_rail": "stripe",
+      "settlement": {
+        "receipt_id": "synthetic-stripe-payment-1",
+        "amount": {"value": "90", "unit": "USD"},
+        "source_uri": "https://example.invalid/settlement/synthetic-stripe-payment-1",
+        "observed_at": "2026-09-04T00:00:01Z",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "work_id": "synthetic:rustchain/example#315",
+      "sequence": 1,
+      "state": "advertised",
+      "provider": "RustChain",
+      "program": "native-bounty",
+      "synthetic": true,
+      "evidence": {
+        "source_uri": "https://example.invalid/rustchain/listing",
+        "source_kind": "synthetic_fixture",
+        "observed_at": "2026-09-01T00:00:00Z",
+        "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+      },
+      "advertised_amount": {"value": "3000", "unit": "RTC"},
+      "award_amount": null,
+      "provider_reference": null,
+      "payment_rail": null,
+      "settlement": null
+    },
+    {
+      "work_id": "synthetic:rustchain/example#315",
+      "sequence": 2,
+      "state": "awarded",
+      "provider": "RustChain",
+      "program": "native-bounty",
+      "synthetic": true,
+      "evidence": {
+        "source_uri": "https://example.invalid/rustchain/award",
+        "source_kind": "synthetic_fixture",
+        "observed_at": "2026-09-07T00:00:00Z",
+        "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+      },
+      "advertised_amount": null,
+      "award_amount": {"value": "3000", "unit": "RTC"},
+      "provider_reference": {"kind": "award", "value": "synthetic-award-315"},
+      "payment_rail": null,
+      "settlement": null
+    },
+    {
+      "work_id": "synthetic:rustchain/example#315",
+      "sequence": 3,
+      "state": "paid",
+      "provider": "RustChain",
+      "program": "native-bounty",
+      "synthetic": true,
+      "evidence": {
+        "source_uri": "https://example.invalid/rustchain/paid",
+        "source_kind": "synthetic_fixture",
+        "observed_at": "2026-09-08T00:00:00Z",
+        "sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+      },
+      "advertised_amount": null,
+      "award_amount": null,
+      "provider_reference": {"kind": "ticket", "value": "synthetic-wallet-history-ticket"},
+      "payment_rail": "rustchain-wallet",
+      "settlement": {
+        "receipt_id": "synthetic-rtc-tx-1",
+        "amount": {"value": "3000", "unit": "RTC"},
+        "source_uri": "https://example.invalid/settlement/synthetic-rtc-tx-1",
+        "observed_at": "2026-09-08T00:00:01Z",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    }
+  ]
+}
