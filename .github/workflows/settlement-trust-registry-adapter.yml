@@ -1,0 +1,41 @@
+name: settlement-trust-registry-adapter
+
+on:
+  pull_request:
+    paths:
+      - 'concierge/settlement_trust_registry_adapter.py'
+      - 'tests/test_settlement_trust_registry_adapter.py'
+      - 'docs/settlement-trust-registry-adapter.md'
+      - 'examples/settlement_trust_registry_adapter_demo.py'
+      - '.github/workflows/settlement-trust-registry-adapter.yml'
+      - 'concierge/reward_settlement_certifier.py'
+  push:
+    branches: [main]
+    paths:
+      - 'concierge/settlement_trust_registry_adapter.py'
+      - 'tests/test_settlement_trust_registry_adapter.py'
+      - 'docs/settlement-trust-registry-adapter.md'
+      - 'examples/settlement_trust_registry_adapter_demo.py'
+      - '.github/workflows/settlement-trust-registry-adapter.yml'
+      - 'concierge/reward_settlement_certifier.py'
+
+jobs:
+  trust-registry-adapter:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.13']
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile
+        run: python -m py_compile concierge/settlement_trust_registry_adapter.py tests/test_settlement_trust_registry_adapter.py examples/settlement_trust_registry_adapter_demo.py
+      - name: Test
+        run: python -m unittest -q tests.test_settlement_trust_registry_adapter
+      - name: Test optimized
+        run: python -O -m unittest -q tests.test_settlement_trust_registry_adapter
+      - name: Synthetic demo
+        run: python examples/settlement_trust_registry_adapter_demo.py
