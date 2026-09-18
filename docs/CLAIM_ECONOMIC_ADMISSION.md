@@ -9,7 +9,7 @@ Because those instructions can still start expensive speculative work, live clai
 3. canonical bounty preflight remains dispatchable; and
 4. maintainer availability remains clear.
 
-The economics check runs **before provider reads**. A missing, stale, future-dated, tampered, source-mismatched, work-mismatched, policy-mismatched, non-`GO`, or authority-amplified receipt prevents the wrapper from spending live preflight/availability reads.
+The economics check runs **before provider reads**. Live admission reads one retained paid-work request and its receipt through stable regular-file descriptors, re-runs the existing paid-work gate, and requires the supplied receipt to equal that deterministic replay. A missing, stale, future-dated, tampered, source-mismatched, work-mismatched, policy-mismatched, non-`GO`, or authority-amplified artifact prevents the wrapper from spending live preflight/availability reads.
 
 ## Economics remains single-source
 
@@ -35,15 +35,13 @@ concierge claim \
   --issue 42 \
   --wallet WALLET \
   --payoff-bundle /path/to/payoff-bundle \
-  --economic-receipt /path/to/paid-work-receipt.json \
-  --economic-receipt-sha256 <sha256-of-exact-receipt-bytes> \
-  --economic-policy-sha256 <independently-expected-policy-sha256> \
-  --economic-as-of 2026-09-17T20:30:00Z
+  --economic-request /path/to/paid-work-request.json \
+  --economic-receipt /path/to/paid-work-receipt.json
 ```
 
-`--economic-as-of` is explicit canonical UTC at second precision. The receipt may be at most 3,600 seconds old and may not be from the future.
+Live claim freshness is evaluated against the wrapper's process-owned UTC clock at second precision; callers cannot rewind it with a CLI option. The replayed receipt may be at most 3,600 seconds old and may not be from the future.
 
-The expected receipt-byte digest and policy digest must come from the orchestration/evidence record that selected the artifact. Deriving either expected value from the same untrusted file at the call site defeats independent binding.
+The checked-in paid-work policy digest is source-owned by this admission generation. A caller-supplied weaker policy is rejected even if it deterministically compiles a `GO`. The request and receipt remain local evidence, but the receipt cannot self-authorize by merely recomputing its own integrity hash: admission recompiles the request through the existing single valuation engine and requires exact canonical equality with the retained receipt.
 
 ## Failure behavior
 
@@ -54,7 +52,7 @@ A verified success returns an internal proof bound to:
 - repository + issue;
 - payoff-derived work ID;
 - exact canonical issue URL;
-- exact receipt bytes;
+- exact request bytes and exact receipt bytes;
 - receipt self-digest;
 - request digest;
 - policy digest;
