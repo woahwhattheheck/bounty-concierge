@@ -24,7 +24,7 @@ RustChain is a blockchain that rewards real hardware -- especially vintage machi
 | 1 | **Pick your skill level** | See [docs/SKILL_MATRIX.md](docs/SKILL_MATRIX.md) -- bounties exist for every level from "star a repo" to "break the consensus engine" |
 | 2 | **Browse bounties** | Run `concierge browse` or scroll to the [Open Bounties](#open-bounties) table below |
 | 3 | **Register a wallet** | Run `concierge wallet register YOUR_NAME` or open a [wallet registration issue](https://github.com/Scottcjn/rustchain-bounties/issues/new?template=wallet_registration.md) |
-| 4 | **Claim a bounty** | Comment on the GitHub issue with your wallet name and a brief approach description |
+| 4 | **Plan a bounty claim** | Use the fail-closed `concierge claim` instruction flow. It verifies payoff, economics, canonical bounty state, and availability before emitting instructions; see [Claim economics admission](docs/CLAIM_ECONOMIC_ADMISSION.md). It does not post externally. |
 | 5 | **Get paid** | RTC is transferred to your wallet within 24 hours after your PR is merged |
 
 ---
@@ -116,8 +116,15 @@ concierge wallet register my-wallet-name
 # Check wallet balance
 concierge wallet balance my-wallet-name
 
-# Claim a bounty
-concierge claim 491 --wallet my-wallet-name --approach "I will fuzz the fleet detector"
+# Emit live claim instructions only after verified payoff + economics evidence.
+# Wrapper-owned evidence flags are documented in docs/CLAIM_ECONOMIC_ADMISSION.md.
+concierge claim \
+  --repo Scottcjn/rustchain-bounties \
+  --issue 491 \
+  --wallet my-wallet-name \
+  --payoff-bundle /path/to/payoff-bundle \
+  --economic-request /path/to/paid-work-request.json \
+  --economic-receipt /path/to/paid-work-receipt.json
 
 # Browse recent bounties
 concierge browse --limit 5

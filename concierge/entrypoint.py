@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 import sys
 from typing import Any
@@ -14,6 +15,10 @@ from concierge.bounty_availability import (
 )
 from concierge.bounty_preflight import BountyPreflightError, preflight_bounty
 from concierge.bounty_qualification import QualificationInputError
+from concierge.claim_economic_admission import (
+    ClaimEconomicAdmissionError,
+    verify_claim_economic_receipt,
+)
 from concierge.cli import main as _cli_main
 from concierge.payoff_claim_gate import ClaimPayoffError, verify_claim_payoff_bundle
 from concierge.payout_tracker import PayoutLookupError
@@ -130,29 +135,76 @@ def _claim_payoff_bundle(argv: list[str]) -> str:
     return values[0]
 
 
-def _strip_claim_payoff_option(argv: list[str]) -> list[str]:
-    """Remove the wrapper-owned option before handing argv to the argparse CLI."""
+def _claim_economic_options(argv: list[str]) -> dict[str, str]:
+    """Require retained request + receipt evidence for live claims."""
+
+    tail = _claim_tail(argv)
+    if tail is None:
+        raise ClaimEconomicAdmissionError(
+            "ECONOMIC_RECEIPT_REQUIRED",
+            "live claim requires economic admission evidence",
+        )
+    specs = (
+        (
+            "--economic-request",
+            "ECONOMIC_REQUEST_REQUIRED",
+            "live claim requires --economic-request FILE",
+        ),
+        (
+            "--economic-receipt",
+            "ECONOMIC_RECEIPT_REQUIRED",
+            "live claim requires --economic-receipt FILE",
+        ),
+    )
+    result: dict[str, str] = {}
+    for option, missing_code, message in specs:
+        values = _option_values(tail, option)
+        if not values or values[0] is None or values[0] == "":
+            raise ClaimEconomicAdmissionError(missing_code, message)
+        if len(values) != 1:
+            raise ClaimEconomicAdmissionError(
+                "DUPLICATE_ECONOMIC_OPTION",
+                f"live claim accepts exactly one {option} option",
+            )
+        result[option] = values[0]
+    return result
+
+def _strip_claim_wrapper_options(argv: list[str]) -> list[str]:
+    """Remove entrypoint-owned claim options before handing off to argparse."""
+
     try:
         command_index = argv.index("claim")
     except ValueError:
         return list(argv)
 
+    owned = {
+        "--payoff-bundle",
+        "--economic-request",
+        "--economic-receipt",
+    }
     result = list(argv[: command_index + 1])
     tail = argv[command_index + 1 :]
     index = 0
-    prefix = "--payoff-bundle="
     while index < len(tail):
         arg = tail[index]
-        if arg == "--payoff-bundle":
+        matched = next(
+            (
+                option
+                for option in owned
+                if arg == option or arg.startswith(f"{option}=")
+            ),
+            None,
+        )
+        if matched is None:
+            result.append(arg)
+            index += 1
+            continue
+        if arg == matched:
             index += 1
             if index < len(tail) and not tail[index].startswith("-"):
                 index += 1
-            continue
-        if arg.startswith(prefix):
+        else:
             index += 1
-            continue
-        result.append(arg)
-        index += 1
     return result
 
 
@@ -230,52 +282,82 @@ def _availability_block(
     }
 
 
-def _preflight_claim(argv: list[str]) -> None:
-    """Require verified payoff, canonical ACTIONABLE, and available state."""
-    target = _claim_target(argv)
-    if target is None:
-        return
-    repo, issue = target
+def _build_preflight_claim(verify_economic, *, now, utc):
+    """Bind verifier and time source into live preflight."""
 
-    # Owner-supplied payoff evidence is deliberately first.  Do not spend provider
-    # reads on a claim whose compensation path is absent, stale, exhausted,
-    # ambiguous, or bound to a different target.
-    verify_claim_payoff_bundle(repo, issue, _claim_payoff_bundle(argv))
-
-    result = preflight_bounty(repo, issue)
-    if not isinstance(result, dict):
-        raise BountyPreflightError("canonical bounty preflight did not return an object")
-    qualification = result.get("qualification")
-    if not isinstance(qualification, dict) or not isinstance(
-        qualification.get("dispatch"), bool
-    ):
-        raise BountyPreflightError(
-            "canonical bounty preflight returned a malformed qualification"
+    def _preflight_claim(argv: list[str]) -> None:
+        """Require payoff, economics GO, canonical ACTIONABLE, and availability."""
+        target = _claim_target(argv)
+        if target is None:
+            return
+        repo, issue = target
+    
+        # Owner-supplied payoff evidence is deliberately first.  Do not spend provider
+        # reads on a claim whose compensation path is absent, stale, exhausted,
+        # ambiguous, or bound to a different target.
+        payoff_proof = verify_claim_payoff_bundle(
+            repo,
+            issue,
+            _claim_payoff_bundle(argv),
         )
-
-    attempt_count, open_pr_count = _claim_counts(result)
-    if not qualification["dispatch"]:
+    
+        # Economic evidence is also local and deliberately precedes provider reads.
+        # The verifier compiles no new valuation: it consumes the existing paid-work
+        # gate receipt and requires an exact GO bound to this payoff-derived target.
+        economic = _claim_economic_options(argv)
+        decision_as_of = now(utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+        verify_economic(
+            repo,
+            issue,
+            payoff_proof,
+            economic["--economic-request"],
+            economic["--economic-receipt"],
+            decision_as_of=decision_as_of,
+        )
+    
+        result = preflight_bounty(repo, issue)
+        if not isinstance(result, dict):
+            raise BountyPreflightError("canonical bounty preflight did not return an object")
+        qualification = result.get("qualification")
+        if not isinstance(qualification, dict) or not isinstance(
+            qualification.get("dispatch"), bool
+        ):
+            raise BountyPreflightError(
+                "canonical bounty preflight returned a malformed qualification"
+            )
+    
+        attempt_count, open_pr_count = _claim_counts(result)
+        if not qualification["dispatch"]:
+            raise ClaimPreflightBlocked(
+                repo=repo,
+                issue=issue,
+                qualification=qualification,
+                attempt_count=attempt_count,
+                open_pr_count=open_pr_count,
+            )
+    
+        availability = inspect_bounty_availability(repo, issue)
+        availability_block = _availability_block(availability)
+        if availability_block is None:
+            return
+    
         raise ClaimPreflightBlocked(
             repo=repo,
             issue=issue,
-            qualification=qualification,
+            qualification=availability_block,
             attempt_count=attempt_count,
             open_pr_count=open_pr_count,
         )
+    
 
-    availability = inspect_bounty_availability(repo, issue)
-    availability_block = _availability_block(availability)
-    if availability_block is None:
-        return
+    return _preflight_claim
 
-    raise ClaimPreflightBlocked(
-        repo=repo,
-        issue=issue,
-        qualification=availability_block,
-        attempt_count=attempt_count,
-        open_pr_count=open_pr_count,
-    )
 
+_preflight_claim = _build_preflight_claim(
+    verify_claim_economic_receipt,
+    now=datetime.now,
+    utc=timezone.utc,
+)
 
 def _blocked_json(exc: ClaimPreflightBlocked) -> dict[str, Any]:
     """Return only safe preflight fields; never canonical comment bodies."""
@@ -311,6 +393,23 @@ def main() -> None:
                 file=sys.stderr,
             )
         raise SystemExit(2) from None
+    except ClaimEconomicAdmissionError as exc:
+        if _json_requested():
+            print(
+                json.dumps(
+                    {
+                        "error": "claim_economics_unavailable",
+                        "reason_code": exc.code,
+                    },
+                    sort_keys=True,
+                )
+            )
+        else:
+            print(
+                f"Error: claim economics unavailable [{exc.code}]: {exc}",
+                file=sys.stderr,
+            )
+        raise SystemExit(2) from None
     except ClaimPreflightBlocked as exc:
         if _json_requested():
             print(json.dumps(_blocked_json(exc), sort_keys=True))
@@ -332,7 +431,7 @@ def main() -> None:
 
     sanitized_argv = [
         original_argv[0],
-        *_strip_claim_payoff_option(original_argv[1:]),
+        *_strip_claim_wrapper_options(original_argv[1:]),
     ]
     try:
         sys.argv = sanitized_argv
