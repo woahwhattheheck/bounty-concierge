@@ -45,7 +45,11 @@ def acceptance_source(case_id: str, observed_at: str = "2026-09-17T00:10:00Z", a
 
 
 def acceptance_manifest(doc, *, case_ids=None, observed_at="2026-09-17T00:10:00Z", authority="SPONSOR"):
-    wanted = set(case_ids or [case["case_id"] for case in doc["cases"]])
+    wanted = set(
+        case_ids
+        if case_ids is not None
+        else [case["case_id"] for case in doc["cases"]]
+    )
     rows = []
     for case in doc["cases"]:
         if case["case_id"] not in wanted:

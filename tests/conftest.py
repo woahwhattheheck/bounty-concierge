@@ -43,6 +43,7 @@ os.environ.setdefault("BOUNTY_PAYOFF_POLICY_AUTHORIZED_PRINCIPAL_SHA256", _TEST_
 from concierge import payoff_path_gate as gate  # noqa: E402
 from concierge import payoff_path_gate_core as core  # noqa: E402
 from concierge import payoff_path_policy_authority as authority  # noqa: E402
+from concierge.sponsor_adjudication.authority import TEST_UNSIGNED_ENV  # noqa: E402
 
 
 def _canonical_bytes(value):
@@ -78,6 +79,26 @@ def _authorize(document, monkeypatch):
     }
     monkeypatch.setenv(authority.CAPTURED_AT_ENV, captured)
     monkeypatch.setenv(authority.SIGNATURE_ENV, _signature(payload))
+
+
+# Pre-authority sponsor-adjudication semantic modules exercise the historical
+# unsigned state machine.  The dedicated sponsor-adjudication workflow supplies
+# the same host switch; the blanket pytest run needs it scoped to exactly those
+# modules so authority suites still see the real fail-closed path.
+_SPONSOR_UNSIGNED_MODULES = frozenset(
+    {
+        "test_sponsor_adjudication",
+        "test_sponsor_adjudication_hardening",
+    }
+)
+
+
+@pytest.fixture(autouse=True)
+def _unsigned_env_for_pre_authority_sponsor_suite(request, monkeypatch):
+    module_name = getattr(request.module, "__name__", "")
+    if module_name.rsplit(".", 1)[-1] in _SPONSOR_UNSIGNED_MODULES:
+        monkeypatch.setenv(TEST_UNSIGNED_ENV, "1")
+    yield
 
 
 @pytest.fixture(autouse=True)

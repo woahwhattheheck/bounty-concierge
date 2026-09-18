@@ -10,7 +10,7 @@ from concierge import revenue_settlement as rs
 from concierge import settlement_registry as sr
 
 
-def closeout(*, pr=7, amount="10"):
+def closeout(*, pr=7, amount="10", merged_at="2026-09-13T00:00:00Z"):
     return {
         "repo": "Sponsor/project",
         "pr": pr,
@@ -18,6 +18,7 @@ def closeout(*, pr=7, amount="10"):
         "currency": "RTC",
         "advertised_amount": amount,
         "cash_status": "not_inferred",
+        "merged_at": merged_at,
     }
 
 
