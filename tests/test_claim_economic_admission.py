@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Exact paid-work economics must bind one payoff-proven live claim target."""
+"""Paid-work economics must be replayed from retained request bytes before claim instructions."""
 
 from __future__ import annotations
 
@@ -99,53 +99,67 @@ def _payoff(work_id="work-42"):
     }
 
 
-def _write(tmp_path: Path, receipt: dict, *, raw: bytes | None = None):
+def _write(path: Path, value: dict, raw: bytes | None = None) -> bytes:
     payload = raw if raw is not None else json.dumps(
-        receipt, sort_keys=True, separators=(",", ":")
+        value, sort_keys=True, separators=(",", ":")
     ).encode("utf-8")
-    path = tmp_path / "economic-receipt.json"
     path.write_bytes(payload)
-    return path, payload, hashlib.sha256(payload).hexdigest()
+    return payload
 
 
-def _verify(tmp_path: Path, receipt: dict, **overrides):
-    path, payload, digest = _write(tmp_path, receipt)
-    kwargs = {
-        "expected_receipt_bytes_sha256": digest,
-        "expected_policy_sha256": receipt["policy_sha256"],
-        "decision_as_of": "2026-09-17T20:30:00Z",
-    }
+def _verify(tmp_path: Path, request: dict, receipt: dict | None = None, **overrides):
+    receipt = compile_paid_work_effort_value_gate(request) if receipt is None else receipt
+    request_path = tmp_path / "economic-request.json"
+    receipt_path = tmp_path / "economic-receipt.json"
+    _write(request_path, request)
+    _write(receipt_path, receipt)
+    kwargs = {"decision_as_of": "2026-09-17T20:30:00Z"}
     kwargs.update(overrides)
     return gate.verify_claim_economic_receipt(
         "acme/widget",
         42,
         _payoff(),
-        path,
+        request_path,
+        receipt_path,
         **kwargs,
     )
 
 
-def test_verified_go_binds_payoff_work_target_and_exact_bytes(tmp_path):
-    receipt = compile_paid_work_effort_value_gate(_request())
-    proof = _verify(tmp_path, receipt)
+def _rehash_receipt(receipt: dict) -> None:
+    body = dict(receipt)
+    body.pop("receipt_sha256", None)
+    receipt["receipt_sha256"] = hashlib.sha256(
+        json.dumps(
+            body,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
 
-    assert proof["schema"] == "claim-economic-admission-proof/v1"
+
+def test_verified_go_replays_request_and_binds_target(tmp_path):
+    request = _request()
+    proof = _verify(tmp_path, request)
+    assert proof["schema"] == "claim-economic-admission-proof/v2"
     assert proof["decision"] == "GO"
     assert proof["work_id"] == "work-42"
     assert proof["canonical_issue_url"] == "https://github.com/acme/widget/issues/42"
     assert proof["age_seconds"] == 1800
     assert proof["verified"] is True
     assert proof["authority"] == "INTERNAL_CLAIM_INSTRUCTION_ADMISSION_ONLY_NO_EXTERNAL_ACTION"
+    assert len(proof["gate_request_bytes_sha256"]) == 64
+    assert len(proof["gate_receipt_bytes_sha256"]) == 64
     assert len(proof["binding_sha256"]) == 64
 
 
 def test_noncash_unknown_value_cannot_emit_claim_instructions(tmp_path):
-    receipt = compile_paid_work_effort_value_gate(
-        _request(amount="14", currency="RTC", unit_type="NONCASH")
-    )
+    request = _request(amount="14", currency="RTC", unit_type="NONCASH")
+    receipt = compile_paid_work_effort_value_gate(request)
     assert receipt["decision"] == "HOLD_VALUE_UNKNOWN"
     with pytest.raises(gate.ClaimEconomicAdmissionError) as caught:
-        _verify(tmp_path, receipt)
+        _verify(tmp_path, request, receipt)
     assert caught.value.code == "ECONOMICS_HOLD_VALUE_UNKNOWN"
 
 
@@ -153,46 +167,36 @@ def test_noncash_unknown_value_cannot_emit_claim_instructions(tmp_path):
     "field,value,code",
     [
         ("work_id", "other-work", "ECONOMIC_WORK_MISMATCH"),
-        (
-            "source",
-            "https://github.com/acme/other/issues/42",
-            "ECONOMIC_SOURCE_MISMATCH",
-        ),
+        ("source", "https://github.com/acme/other/issues/42", "ECONOMIC_SOURCE_MISMATCH"),
     ],
 )
-def test_work_and_source_mismatch_fail_closed(tmp_path, field, value, code):
-    receipt = compile_paid_work_effort_value_gate(_request(**{field: value}))
+def test_replayed_work_and_source_mismatch_fail_closed(tmp_path, field, value, code):
+    request = _request(**{field: value})
     with pytest.raises(gate.ClaimEconomicAdmissionError) as caught:
-        _verify(tmp_path, receipt)
+        _verify(tmp_path, request)
     assert caught.value.code == code
 
 
-def test_exact_bytes_and_policy_are_independently_bound(tmp_path):
-    receipt = compile_paid_work_effort_value_gate(_request())
-    path, payload, digest = _write(tmp_path, receipt)
-
+def test_rehashed_forged_go_cannot_override_replayed_hold(tmp_path):
+    request = _request(amount="14", currency="RTC", unit_type="NONCASH")
+    forged = compile_paid_work_effort_value_gate(request)
+    forged["decision"] = "GO"
+    forged["reason_codes"] = ["ALL_GATES_CLEAR"]
+    _rehash_receipt(forged)
+    assert gate.verify_receipt(forged) is True
     with pytest.raises(gate.ClaimEconomicAdmissionError) as caught:
-        gate.verify_claim_economic_receipt(
-            "acme/widget",
-            42,
-            _payoff(),
-            path,
-            expected_receipt_bytes_sha256="0" * 64,
-            expected_policy_sha256=receipt["policy_sha256"],
-            decision_as_of="2026-09-17T20:30:00Z",
-        )
-    assert caught.value.code == "ECONOMIC_RECEIPT_BYTES_MISMATCH"
+        _verify(tmp_path, request, forged)
+    assert caught.value.code == "ECONOMIC_RECEIPT_REPLAY_MISMATCH"
 
+
+def test_weak_caller_policy_cannot_mint_live_admission(tmp_path):
+    request = _request(amount="14", currency="RTC")
+    request["policy"]["fleet_economic_policy"]["currencies"]["RTC"]["min_single_reward"] = "1"
+    request["policy"]["fleet_economic_policy"]["currencies"]["RTC"]["min_reward_per_agent_hour"] = "1"
+    receipt = compile_paid_work_effort_value_gate(request)
+    assert receipt["decision"] == "GO"
     with pytest.raises(gate.ClaimEconomicAdmissionError) as caught:
-        gate.verify_claim_economic_receipt(
-            "acme/widget",
-            42,
-            _payoff(),
-            path,
-            expected_receipt_bytes_sha256=digest,
-            expected_policy_sha256="0" * 64,
-            decision_as_of="2026-09-17T20:30:00Z",
-        )
+        _verify(tmp_path, request, receipt)
     assert caught.value.code == "ECONOMIC_POLICY_MISMATCH"
 
 
@@ -203,18 +207,19 @@ def test_exact_bytes_and_policy_are_independently_bound(tmp_path):
         ("2026-09-17T21:00:01Z", "ECONOMIC_RECEIPT_STALE"),
     ],
 )
-def test_explicit_decision_time_enforces_future_and_stale_boundaries(
-    tmp_path, decision_as_of, code
-):
-    receipt = compile_paid_work_effort_value_gate(_request())
+def test_decision_time_enforces_future_and_stale_boundaries(tmp_path, decision_as_of, code):
     with pytest.raises(gate.ClaimEconomicAdmissionError) as caught:
-        _verify(tmp_path, receipt, decision_as_of=decision_as_of)
+        _verify(tmp_path, _request(), decision_as_of=decision_as_of)
     assert caught.value.code == code
 
 
 def test_payoff_proof_identity_is_mandatory(tmp_path):
-    receipt = compile_paid_work_effort_value_gate(_request())
-    path, payload, digest = _write(tmp_path, receipt)
+    request = _request()
+    receipt = compile_paid_work_effort_value_gate(request)
+    request_path = tmp_path / "economic-request.json"
+    receipt_path = tmp_path / "economic-receipt.json"
+    _write(request_path, request)
+    _write(receipt_path, receipt)
     bad = _payoff()
     bad["issue"] = 43
     with pytest.raises(gate.ClaimEconomicAdmissionError) as caught:
@@ -222,68 +227,74 @@ def test_payoff_proof_identity_is_mandatory(tmp_path):
             "acme/widget",
             42,
             bad,
-            path,
-            expected_receipt_bytes_sha256=digest,
-            expected_policy_sha256=receipt["policy_sha256"],
+            request_path,
+            receipt_path,
             decision_as_of="2026-09-17T20:30:00Z",
         )
     assert caught.value.code == "INVALID_PAYOFF_BINDING"
 
 
-def test_duplicate_json_key_is_rejected_before_semantic_verification(tmp_path):
-    receipt = compile_paid_work_effort_value_gate(_request())
-    raw = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    raw = raw[:-1] + b',"decision":"GO"}'
-    path, payload, digest = _write(tmp_path, receipt, raw=raw)
+@pytest.mark.parametrize("artifact", ["request", "receipt"])
+def test_duplicate_json_key_is_rejected_before_semantic_replay(tmp_path, artifact):
+    request = _request()
+    receipt = compile_paid_work_effort_value_gate(request)
+    request_path = tmp_path / "economic-request.json"
+    receipt_path = tmp_path / "economic-receipt.json"
+    request_raw = json.dumps(request, sort_keys=True, separators=(",", ":")).encode()
+    receipt_raw = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()
+    if artifact == "request":
+        request_raw = request_raw[:-1] + b',"schema":"paid-work-effort-value-gate/v1"}'
+    else:
+        receipt_raw = receipt_raw[:-1] + b',"decision":"GO"}'
+    _write(request_path, request, raw=request_raw)
+    _write(receipt_path, receipt, raw=receipt_raw)
     with pytest.raises(gate.ClaimEconomicAdmissionError) as caught:
         gate.verify_claim_economic_receipt(
-            "acme/widget",
-            42,
-            _payoff(),
-            path,
-            expected_receipt_bytes_sha256=digest,
-            expected_policy_sha256=receipt["policy_sha256"],
+            "acme/widget", 42, _payoff(), request_path, receipt_path,
             decision_as_of="2026-09-17T20:30:00Z",
         )
     assert caught.value.code == "INVALID_ECONOMIC_RECEIPT"
 
 
-def test_authority_amplification_fails_even_when_outer_receipt_is_rehashed(tmp_path):
-    receipt = compile_paid_work_effort_value_gate(_request())
-    changed = deepcopy(receipt)
-    changed["authority"]["external_claim_authority"] = True
-    body = dict(changed)
-    body.pop("receipt_sha256")
-    changed["receipt_sha256"] = hashlib.sha256(
-        json.dumps(
-            body,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-            allow_nan=False,
-        ).encode("utf-8")
-    ).hexdigest()
-    with pytest.raises(gate.ClaimEconomicAdmissionError) as caught:
-        _verify(tmp_path, changed)
-    assert caught.value.code == "INVALID_ECONOMIC_AUTHORITY"
-
-
-def test_symlink_receipt_path_is_rejected(tmp_path):
-    receipt = compile_paid_work_effort_value_gate(_request())
-    target, payload, digest = _write(tmp_path, receipt)
-    link = tmp_path / "linked.json"
-    try:
-        link.symlink_to(target)
-    except (OSError, NotImplementedError):
-        pytest.skip("symlinks unavailable")
+@pytest.mark.parametrize("artifact", ["request", "receipt"])
+def test_huge_integer_token_is_typed_fail_closed(tmp_path, artifact):
+    request = _request()
+    receipt = compile_paid_work_effort_value_gate(request)
+    request_path = tmp_path / "economic-request.json"
+    receipt_path = tmp_path / "economic-receipt.json"
+    _write(request_path, request)
+    _write(receipt_path, receipt)
+    target = request_path if artifact == "request" else receipt_path
+    target.write_bytes(b'{"x":' + (b"9" * 5000) + b"}")
     with pytest.raises(gate.ClaimEconomicAdmissionError) as caught:
         gate.verify_claim_economic_receipt(
-            "acme/widget",
-            42,
-            _payoff(),
-            link,
-            expected_receipt_bytes_sha256=digest,
-            expected_policy_sha256=receipt["policy_sha256"],
+            "acme/widget", 42, _payoff(), request_path, receipt_path,
+            decision_as_of="2026-09-17T20:30:00Z",
+        )
+    assert caught.value.code == "INVALID_ECONOMIC_RECEIPT"
+
+
+@pytest.mark.parametrize("artifact", ["request", "receipt"])
+def test_symlinked_economic_artifact_is_rejected(tmp_path, artifact):
+    request = _request()
+    receipt = compile_paid_work_effort_value_gate(request)
+    request_path = tmp_path / "economic-request.json"
+    receipt_path = tmp_path / "economic-receipt.json"
+    _write(request_path, request)
+    _write(receipt_path, receipt)
+    original = request_path if artifact == "request" else receipt_path
+    link = tmp_path / f"linked-{artifact}.json"
+    try:
+        link.symlink_to(original)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable")
+    if artifact == "request":
+        request_path = link
+    else:
+        receipt_path = link
+    with pytest.raises(gate.ClaimEconomicAdmissionError) as caught:
+        gate.verify_claim_economic_receipt(
+            "acme/widget", 42, _payoff(), request_path, receipt_path,
             decision_as_of="2026-09-17T20:30:00Z",
         )
     assert caught.value.code == "INVALID_ECONOMIC_RECEIPT"
