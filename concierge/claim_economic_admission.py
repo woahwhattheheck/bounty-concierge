@@ -57,50 +57,74 @@ class ClaimEconomicAdmissionError(ValueError):
         super().__init__(message)
 
 
-def _sha256(value: Any, field: str) -> str:
-    if type(value) is not str or _SHA256_RE.fullmatch(value) is None:
-        raise ClaimEconomicAdmissionError(
+def _sha256(
+    value: Any,
+    field: str,
+    *,
+    _sha_re=_SHA256_RE,
+    _error_type=ClaimEconomicAdmissionError,
+) -> str:
+    if type(value) is not str or _sha_re.fullmatch(value) is None:
+        raise _error_type(
             "INVALID_ECONOMIC_BINDING",
             f"{field} must be lowercase sha256",
         )
     return value
 
 
-def _exact_utc(value: Any, field: str) -> tuple[str, datetime]:
-    if type(value) is not str or _TIMESTAMP_RE.fullmatch(value) is None:
-        raise ClaimEconomicAdmissionError(
+def _exact_utc(
+    value: Any,
+    field: str,
+    *,
+    _timestamp_re=_TIMESTAMP_RE,
+    _strptime=_strptime,
+    _utc=_utc,
+    _error_type=ClaimEconomicAdmissionError,
+) -> tuple[str, datetime]:
+    if type(value) is not str or _timestamp_re.fullmatch(value) is None:
+        raise _error_type(
             "INVALID_ECONOMIC_TIME",
             f"{field} must be exact UTC seconds",
         )
     try:
-        parsed = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(
-            tzinfo=timezone.utc
+        parsed = _strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=_utc
         )
     except ValueError as exc:
-        raise ClaimEconomicAdmissionError(
+        raise _error_type(
             "INVALID_ECONOMIC_TIME",
             f"{field} is invalid",
         ) from exc
     if parsed.strftime("%Y-%m-%dT%H:%M:%SZ") != value:
-        raise ClaimEconomicAdmissionError(
+        raise _error_type(
             "INVALID_ECONOMIC_TIME",
             f"{field} is not canonical UTC",
         )
     return value, parsed
 
 
-def _max_age(value: Any) -> int:
+def _max_age(
+    value: Any,
+    *,
+    _error_type=ClaimEconomicAdmissionError,
+) -> int:
     if type(value) is not int or not 1 <= value <= 86400:
-        raise ClaimEconomicAdmissionError(
+        raise _error_type(
             "INVALID_ECONOMIC_BINDING",
             "max_age_seconds must be an integer in 1..86400",
         )
     return value
 
 
-def _canonical_sha256(value: Any) -> str:
+def _canonical_sha256(
+    value: Any,
+    *,
+    _json_dumps=json.dumps,
+    _sha256_digest=hashlib.sha256,
+    _error_type=ClaimEconomicAdmissionError,
+) -> str:
     try:
-        payload = json.dumps(
+        payload = _json_dumps(
             value,
             ensure_ascii=False,
             sort_keys=True,
@@ -108,64 +132,88 @@ def _canonical_sha256(value: Any) -> str:
             allow_nan=False,
         ).encode("utf-8")
     except (TypeError, ValueError) as exc:
-        raise ClaimEconomicAdmissionError(
+        raise _error_type(
             "INVALID_ECONOMIC_BINDING",
             "economic binding is not canonical JSON",
         ) from exc
-    return hashlib.sha256(payload).hexdigest()
+    return _sha256_digest(payload).hexdigest()
 
 
-def _reject_float(raw: str) -> Any:
-    raise ClaimEconomicAdmissionError(
+def _reject_float(
+    raw: str,
+    *,
+    _error_type=ClaimEconomicAdmissionError,
+) -> Any:
+    raise _error_type(
         "INVALID_ECONOMIC_RECEIPT",
         "economic receipt contains a forbidden floating-point number",
     )
 
 
-def _reject_constant(raw: str) -> Any:
-    raise ClaimEconomicAdmissionError(
+def _reject_constant(
+    raw: str,
+    *,
+    _error_type=ClaimEconomicAdmissionError,
+) -> Any:
+    raise _error_type(
         "INVALID_ECONOMIC_RECEIPT",
         "economic artifact contains a forbidden non-finite constant",
     )
 
 
-def _parse_int(raw: str) -> int:
+def _parse_int(
+    raw: str,
+    *,
+    _max_digits=_MAX_SAFE_JSON_INT_DIGITS,
+    _max_safe=_MAX_SAFE_JSON_INT,
+    _error_type=ClaimEconomicAdmissionError,
+) -> int:
     digits = raw[1:] if raw.startswith("-") else raw
-    if not digits or len(digits) > _MAX_SAFE_JSON_INT_DIGITS:
-        raise ClaimEconomicAdmissionError(
+    if not digits or len(digits) > _max_digits:
+        raise _error_type(
             "INVALID_ECONOMIC_RECEIPT",
             "economic artifact contains an unsafe integer",
         )
     try:
         value = int(raw)
     except ValueError as exc:
-        raise ClaimEconomicAdmissionError(
+        raise _error_type(
             "INVALID_ECONOMIC_RECEIPT",
             "economic artifact contains an unsafe integer",
         ) from exc
-    if abs(value) > _MAX_SAFE_JSON_INT:
-        raise ClaimEconomicAdmissionError(
+    if abs(value) > _max_safe:
+        raise _error_type(
             "INVALID_ECONOMIC_RECEIPT",
             "economic artifact contains an unsafe integer",
         )
     return value
 
 
-def _strict_json(payload: bytes) -> dict[str, Any]:
-    if type(payload) is not bytes or not payload or len(payload) > _MAX_RECEIPT_BYTES:
-        raise ClaimEconomicAdmissionError(
+def _strict_json(
+    payload: bytes,
+    *,
+    _max_bytes=_MAX_RECEIPT_BYTES,
+    _json_loads=json.loads,
+    _json_decode_error=json.JSONDecodeError,
+    _reject_float_fn=_reject_float,
+    _reject_constant_fn=_reject_constant,
+    _parse_int_fn=_parse_int,
+    _error_type=ClaimEconomicAdmissionError,
+) -> dict[str, Any]:
+    if type(payload) is not bytes or not payload or len(payload) > _max_bytes:
+        raise _error_type(
             "INVALID_ECONOMIC_RECEIPT",
             "economic receipt has an invalid byte length",
         )
     if payload.startswith(b"\xef\xbb\xbf"):
-        raise ClaimEconomicAdmissionError(
+        raise _error_type(
             "INVALID_ECONOMIC_RECEIPT",
             "economic receipt must not contain a UTF-8 BOM",
         )
     try:
         text = payload.decode("utf-8", errors="strict")
     except UnicodeError as exc:
-        raise ClaimEconomicAdmissionError(
+        raise _error_type(
             "INVALID_ECONOMIC_RECEIPT",
             "economic receipt is not strict UTF-8",
         ) from exc
@@ -174,7 +222,7 @@ def _strict_json(payload: bytes) -> dict[str, Any]:
         result: dict[str, Any] = {}
         for key, value in pairs:
             if key in result:
-                raise ClaimEconomicAdmissionError(
+                raise _error_type(
                     "INVALID_ECONOMIC_RECEIPT",
                     "economic receipt contains a duplicate JSON key",
                 )
@@ -182,109 +230,125 @@ def _strict_json(payload: bytes) -> dict[str, Any]:
         return result
 
     try:
-        parsed = json.loads(
+        parsed = _json_loads(
             text,
             object_pairs_hook=unique_object,
-            parse_float=_reject_float,
-            parse_constant=_reject_constant,
-            parse_int=_parse_int,
+            parse_float=_reject_float_fn,
+            parse_constant=_reject_constant_fn,
+            parse_int=_parse_int_fn,
         )
-    except ClaimEconomicAdmissionError:
+    except _error_type:
         raise
-    except (json.JSONDecodeError, ValueError, OverflowError, RecursionError) as exc:
-        raise ClaimEconomicAdmissionError(
+    except (_json_decode_error, ValueError, OverflowError, RecursionError) as exc:
+        raise _error_type(
             "INVALID_ECONOMIC_RECEIPT",
             "economic receipt is not valid JSON",
         ) from exc
     if type(parsed) is not dict:
-        raise ClaimEconomicAdmissionError(
+        raise _error_type(
             "INVALID_ECONOMIC_RECEIPT",
             "economic receipt must be a JSON object",
         )
     return parsed
 
 
-def _read_bounded_regular(path: str | Path) -> bytes:
-    source = Path(path)
+def _read_bounded_regular(
+    path: str | Path,
+    *,
+    _path_type=Path,
+    _is_link=stat_module.S_ISLNK,
+    _is_reg=stat_module.S_ISREG,
+    _max_bytes=_MAX_RECEIPT_BYTES,
+    _o_rdonly=os.O_RDONLY,
+    _o_binary=getattr(os, "O_BINARY", 0),
+    _o_cloexec=getattr(os, "O_CLOEXEC", 0),
+    _o_nofollow=getattr(os, "O_NOFOLLOW", 0),
+    _open_fd=os.open,
+    _fstat=os.fstat,
+    _read_fd=os.read,
+    _close_fd=os.close,
+    _error_type=ClaimEconomicAdmissionError,
+) -> bytes:
+    source = _path_type(path)
     try:
         initial = source.lstat()
     except OSError as exc:
-        raise ClaimEconomicAdmissionError(
+        raise _error_type(
             "INVALID_ECONOMIC_RECEIPT",
             "economic artifact could not be statted",
         ) from exc
-    if stat_module.S_ISLNK(initial.st_mode) or not stat_module.S_ISREG(initial.st_mode):
-        raise ClaimEconomicAdmissionError(
+    if _is_link(initial.st_mode) or not _is_reg(initial.st_mode):
+        raise _error_type(
             "INVALID_ECONOMIC_RECEIPT",
             "economic artifact path must be one real regular file",
         )
-    if initial.st_size <= 0 or initial.st_size > _MAX_RECEIPT_BYTES:
-        raise ClaimEconomicAdmissionError(
+    if initial.st_size <= 0 or initial.st_size > _max_bytes:
+        raise _error_type(
             "INVALID_ECONOMIC_RECEIPT",
             "economic artifact has an invalid byte length",
         )
 
-    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0)
-    flags |= getattr(os, "O_NOFOLLOW", 0)
+    flags = _o_rdonly | _o_binary | _o_cloexec
+    flags |= _o_nofollow
     try:
-        fd = os.open(source, flags)
+        fd = _open_fd(source, flags)
     except OSError as exc:
-        raise ClaimEconomicAdmissionError(
+        raise _error_type(
             "INVALID_ECONOMIC_RECEIPT",
             "economic artifact could not be opened without following links",
         ) from exc
     try:
-        opened = os.fstat(fd)
+        opened = _fstat(fd)
         if (
-            not stat_module.S_ISREG(opened.st_mode)
+            not _is_reg(opened.st_mode)
             or (opened.st_dev, opened.st_ino) != (initial.st_dev, initial.st_ino)
             or opened.st_size != initial.st_size
         ):
-            raise ClaimEconomicAdmissionError(
+            raise _error_type(
                 "INVALID_ECONOMIC_RECEIPT",
                 "economic artifact generation changed before read",
             )
         chunks: list[bytes] = []
         total = 0
         while True:
-            chunk = os.read(fd, 65536)
+            chunk = _read_fd(fd, 65536)
             if not chunk:
                 break
             total += len(chunk)
-            if total > _MAX_RECEIPT_BYTES:
-                raise ClaimEconomicAdmissionError(
+            if total > _max_bytes:
+                raise _error_type(
                     "INVALID_ECONOMIC_RECEIPT",
                     "economic artifact grew beyond byte limit",
                 )
             chunks.append(chunk)
-        after = os.fstat(fd)
+        after = _fstat(fd)
         if (
             (after.st_dev, after.st_ino) != (opened.st_dev, opened.st_ino)
             or after.st_size != opened.st_size
             or getattr(after, "st_mtime_ns", int(after.st_mtime * 1_000_000_000))
             != getattr(opened, "st_mtime_ns", int(opened.st_mtime * 1_000_000_000))
         ):
-            raise ClaimEconomicAdmissionError(
+            raise _error_type(
                 "INVALID_ECONOMIC_RECEIPT",
                 "economic artifact changed while being read",
             )
         payload = b"".join(chunks)
         if len(payload) != opened.st_size:
-            raise ClaimEconomicAdmissionError(
+            raise _error_type(
                 "INVALID_ECONOMIC_RECEIPT",
                 "economic artifact byte count changed while being read",
             )
         return payload
-    except ClaimEconomicAdmissionError:
+    except _error_type:
         raise
     except OSError as exc:
-        raise ClaimEconomicAdmissionError(
+        raise _error_type(
             "INVALID_ECONOMIC_RECEIPT",
             "economic artifact could not be read",
         ) from exc
     finally:
         try:
-            os.close(fd)
+            _close_fd(fd)
         except OSError:
             pass
 
@@ -292,26 +356,29 @@ def _payoff_context(
     repo: str,
     issue: int,
     payoff_proof: dict[str, Any],
+    *,
+    _payoff_schema=_PAYOFF_PROOF_SCHEMA,
+    _error_type=ClaimEconomicAdmissionError,
 ) -> tuple[str, str]:
-    if type(payoff_proof) is not dict or payoff_proof.get("schema") != _PAYOFF_PROOF_SCHEMA:
-        raise ClaimEconomicAdmissionError(
+    if type(payoff_proof) is not dict or payoff_proof.get("schema") != _payoff_schema:
+        raise _error_type(
             "INVALID_PAYOFF_BINDING",
             "claim economics requires one verified payoff-claim proof",
         )
     if payoff_proof.get("repo") != repo or payoff_proof.get("issue") != issue:
-        raise ClaimEconomicAdmissionError(
+        raise _error_type(
             "INVALID_PAYOFF_BINDING",
             "payoff proof target does not match the live claim target",
         )
     work_id = payoff_proof.get("work_id")
     if type(work_id) is not str or not work_id or work_id != work_id.strip():
-        raise ClaimEconomicAdmissionError(
+        raise _error_type(
             "INVALID_PAYOFF_BINDING",
             "payoff proof work_id is unavailable",
         )
     canonical_issue_url = f"https://github.com/{repo}/issues/{issue}"
     if payoff_proof.get("canonical_issue_url") != canonical_issue_url:
-        raise ClaimEconomicAdmissionError(
+        raise _error_type(
             "INVALID_PAYOFF_BINDING",
             "payoff proof canonical issue URL does not match the live claim target",
         )
