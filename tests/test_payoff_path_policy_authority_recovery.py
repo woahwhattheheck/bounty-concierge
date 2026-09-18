@@ -293,7 +293,12 @@ class PayoffPathPolicyAuthorityRecoveryTests(unittest.TestCase):
             modulus_hex=ATTACKER_RSA_N_HEX,
             private_d_hex=ATTACKER_RSA_D_HEX,
         )
-        with self.assertRaisesRegex(gate.PayoffPathError, "RSA signature mismatch"):
+        # The attacker modulus exceeds the retained trust anchor, so a forged
+        # signature may be rejected as out of range before comparison; both are
+        # fail-closed rejections of the same substituted-key forgery.
+        with self.assertRaisesRegex(
+            gate.PayoffPathError, r"RSA signature (mismatch|is out of range)"
+        ):
             gate.compile_gate(forged, AS_OF, self.receipt0)
 
         # Ordinary reload also preserves first-bootstrap identity, and direct attribute

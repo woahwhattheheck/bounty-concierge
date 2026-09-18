@@ -239,6 +239,7 @@ def verify_manifest_authority(
     if _test_unsigned_enabled():
         return None
     if authority_value is None:
+        _host_config()
         raise AdjudicationError("non-empty sponsor_events require host sponsor_authority")
     authority = _normalize_authority(authority_value)
     expected_scope = event_scope_sha256(program, events)

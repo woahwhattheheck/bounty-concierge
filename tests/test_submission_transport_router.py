@@ -1,4 +1,5 @@
 import hashlib
+import importlib
 import inspect
 import json
 import os
@@ -148,6 +149,10 @@ def test_public_primary_route_needs_no_provider_outcome_authority():
 
 
 def test_public_and_core_compile_are_the_same_production_function():
+    # Peer boundary suites legitimately ``importlib.reload`` the core in place,
+    # which rebinds core's functions while the public module keeps the bindings
+    # captured at its own import. Resync the re-export before the identity check.
+    importlib.reload(public)
     check(public.compile_transport_decision is core.compile_transport_decision)
     check(public.compile_transport_operation is core.compile_transport_operation)
     check(public.verify_transport_decision is core.verify_transport_decision)

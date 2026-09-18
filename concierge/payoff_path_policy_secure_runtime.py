@@ -30,7 +30,8 @@ its bootstrap-captured entrypoints remain active. Hosts restart to load new v3 c
 Threat boundary. In scope: ordinary caller documents; post-bootstrap environment
 mutation; authority/v3 module public/private *binding* replacement; mutation of the
 public/original verifier function's metadata; and ordinary ``importlib.reload(v3)``.
-Out of scope as same-interpreter/host takeover: traversing a supported callable's
+Out of scope as same-interpreter/host takeover — each capability below is
+outside this runtime's threat boundary: traversing a supported callable's
 closure to mutate a captured/private function or its defaults/globals; closure-cell
 surgery; ``sys.meta_path`` surgery; bytecode/function-code replacement; installed-
 source replacement; mutating imported runtime/interpreter primitives; replacement

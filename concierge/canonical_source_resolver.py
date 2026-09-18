@@ -46,6 +46,11 @@ _QUALIFIED_REF_RE = re.compile(
     + _TEXT_REF_SUFFIX_GUARD
 )
 _TEXT_REF_ASCII_TOKEN_PUNCT = frozenset("./?#%=&+~-")
+# ``str.isidentifier`` excludes Join_Control codepoints (U+200C ZWNJ, U+200D
+# ZWJ) even though XID_Continue admits them, so the identifier predicate alone
+# cannot see an adjacent joiner. They remain token continuation for
+# contamination purposes and are guarded explicitly.
+_TEXT_REF_JOIN_CONTROL = frozenset("‌‍")
 _MAX_TEXT_CHARS = 250_000
 _MAX_SOURCE_URLS = 100
 
@@ -55,11 +60,12 @@ def _is_text_token_char(char: str) -> bool:
 
     ``str.isidentifier`` follows Unicode XID rules. Prefixing one character with
     an ASCII starter turns that predicate into a compact XID_Continue test and
-    covers combining marks, joiners, connector punctuation, non-ASCII digits,
-    and Other_ID_Continue characters such as U+00B7 MIDDLE DOT. URL/reference
+    covers combining marks, connector punctuation, non-ASCII digits, and
+    Other_ID_Continue characters such as U+00B7 MIDDLE DOT. Join_Control
+    codepoints are covered by the explicit set above, and URL/reference
     punctuation that is not an identifier continuation is handled explicitly.
     """
-    if char in _TEXT_REF_ASCII_TOKEN_PUNCT:
+    if char in _TEXT_REF_ASCII_TOKEN_PUNCT or char in _TEXT_REF_JOIN_CONTROL:
         return True
     return ("a" + char).isidentifier()
 
