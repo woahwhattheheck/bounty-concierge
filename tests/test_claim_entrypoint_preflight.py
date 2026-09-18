@@ -61,7 +61,15 @@ def _argv(*, repo="acme/widget", json_out=False, dry=False):
 
 def _override_economic_verifier(monkeypatch, verifier):
     monkeypatch.setattr(e, "verify_claim_economic_receipt", verifier)
-    monkeypatch.setattr(e, "_preflight_claim", e._build_preflight_claim(verifier))
+    monkeypatch.setattr(
+        e,
+        "_preflight_claim",
+        e._build_preflight_claim(
+            verifier,
+            now=datetime.now,
+            utc=timezone.utc,
+        ),
+    )
 
 
 def _allow(monkeypatch, seen=None):
@@ -161,15 +169,25 @@ def test_live_claim_orders_authorities_strips_option_and_restores_argv(monkeypat
     assert e.sys.argv is original
 
 
+def test_live_preflight_has_no_clock_defaults():
+    assert e._preflight_claim.__defaults__ is None
+    assert e._preflight_claim.__kwdefaults__ is None
+
+
 def test_live_preflight_uses_process_owned_utc_clock(monkeypatch):
     seen = []
     _allow(monkeypatch, seen)
     trusted_now = datetime(2026, 9, 17, 20, 30, 0, tzinfo=timezone.utc)
-    e._preflight_claim(
-        _argv(),
-        _now=lambda tz: trusted_now.astimezone(tz),
-        _utc=timezone.utc,
+    monkeypatch.setattr(
+        e,
+        "_preflight_claim",
+        e._build_preflight_claim(
+            e.verify_claim_economic_receipt,
+            now=lambda tz: trusted_now.astimezone(tz),
+            utc=timezone.utc,
+        ),
     )
+    e._preflight_claim(_argv())
     assert seen[1][:6] == (
         "economics",
         "acme/widget",
@@ -209,14 +227,8 @@ def test_live_preflight_ignores_public_economic_verifier_rebinding(monkeypatch, 
     args = _argv()
     args[args.index(ECONOMIC_REQUEST)] = str(tmp_path / "missing-request.json")
     args[args.index(ECONOMIC_RECEIPT)] = str(tmp_path / "missing-receipt.json")
-    trusted_now = datetime(2026, 9, 17, 20, 30, 0, tzinfo=timezone.utc)
-
     with pytest.raises(e.ClaimEconomicAdmissionError) as caught:
-        e._preflight_claim(
-            args,
-            _now=lambda tz: trusted_now.astimezone(tz),
-            _utc=timezone.utc,
-        )
+        e._preflight_claim(args)
 
     assert caught.value.code == "INVALID_ECONOMIC_RECEIPT"
     assert e._preflight_claim is original
