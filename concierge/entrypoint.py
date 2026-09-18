@@ -286,6 +286,8 @@ def _preflight_claim(
     argv: list[str],
     _now=datetime.now,
     _utc=timezone.utc,
+    *,
+    _verify_economic=verify_claim_economic_receipt,
 ) -> None:
     """Require payoff, economics GO, canonical ACTIONABLE, and availability."""
     target = _claim_target(argv)
@@ -307,7 +309,7 @@ def _preflight_claim(
     # gate receipt and requires an exact GO bound to this payoff-derived target.
     economic = _claim_economic_options(argv)
     decision_as_of = _now(_utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
-    verify_claim_economic_receipt(
+    _verify_economic(
         repo,
         issue,
         payoff_proof,
