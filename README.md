@@ -123,10 +123,8 @@ concierge claim \
   --issue 491 \
   --wallet my-wallet-name \
   --payoff-bundle /path/to/payoff-bundle \
-  --economic-receipt /path/to/paid-work-receipt.json \
-  --economic-receipt-sha256 <sha256-of-exact-receipt-bytes> \
-  --economic-policy-sha256 <independently-expected-policy-sha256> \
-  --economic-as-of 2026-09-17T20:30:00Z
+  --economic-request /path/to/paid-work-request.json \
+  --economic-receipt /path/to/paid-work-receipt.json
 
 # Browse recent bounties
 concierge browse --limit 5
