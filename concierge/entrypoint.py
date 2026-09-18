@@ -282,14 +282,10 @@ def _availability_block(
     }
 
 
-def _build_preflight_claim(verify_economic):
-    """Bind one immutable economics verifier generation into live preflight."""
+def _build_preflight_claim(verify_economic, *, now, utc):
+    """Bind verifier and time source into live preflight."""
 
-    def _preflight_claim(
-        argv: list[str],
-        _now=datetime.now,
-        _utc=timezone.utc,
-    ) -> None:
+    def _preflight_claim(argv: list[str]) -> None:
         """Require payoff, economics GO, canonical ACTIONABLE, and availability."""
         target = _claim_target(argv)
         if target is None:
@@ -309,7 +305,7 @@ def _build_preflight_claim(verify_economic):
         # The verifier compiles no new valuation: it consumes the existing paid-work
         # gate receipt and requires an exact GO bound to this payoff-derived target.
         economic = _claim_economic_options(argv)
-        decision_as_of = _now(_utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+        decision_as_of = now(utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
         verify_economic(
             repo,
             issue,
@@ -357,7 +353,11 @@ def _build_preflight_claim(verify_economic):
     return _preflight_claim
 
 
-_preflight_claim = _build_preflight_claim(verify_claim_economic_receipt)
+_preflight_claim = _build_preflight_claim(
+    verify_claim_economic_receipt,
+    now=datetime.now,
+    utc=timezone.utc,
+)
 
 def _blocked_json(exc: ClaimPreflightBlocked) -> dict[str, Any]:
     """Return only safe preflight fields; never canonical comment bodies."""
