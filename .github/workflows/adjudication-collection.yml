@@ -29,6 +29,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
       - name: Unit tests
         run: python -m unittest tests.test_adjudication_collection tests.test_adjudication_collection_exact_types -v
       - name: Optimized-mode unit tests

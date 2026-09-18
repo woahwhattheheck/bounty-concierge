@@ -31,6 +31,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
       - name: Compile
         run: python -m py_compile concierge/settlement_trust_registry_adapter.py tests/test_settlement_trust_registry_adapter.py examples/settlement_trust_registry_adapter_demo.py
       - name: Test
