@@ -7,14 +7,18 @@ on:
       - "concierge/reinvestment_allocator.py"
       - "concierge/_reinvestment_allocator_api.py"
       - "concierge/_reinvestment_allocator_cli.py"
+      - "concierge/_reinvestment_allocator_reload_guard.py"
       - "concierge/_reinvestment_allocator_transport.py"
       - "concierge/_reinvestment_allocator_worker.py"
       - "concierge/_reinvestment_allocator_core.source"
       - "tests/test_reinvestment_allocator.py"
       - "tests/test_reinvestment_preimport_bootstrap.py"
+      - "tests/test_reinvestment_allocator_preimport.py"
+      - "tests/test_reinvestment_allocator_reload_seal.py"
       - "tests/reinvestment_allocator_case_driver.py"
       - "tests/reinvestment_allocator_test_support.py"
       - "docs/REALIZED_REINVESTMENT_REVIEW.md"
+      - "docs/REALIZED_REINVESTMENT_PREIMPORT_BOUNDARY.md"
       - ".github/workflows/reinvestment-authority.yml"
       - "concierge/revenue_closeout.py"
       - "concierge/revenue_settlement.py"
@@ -26,14 +30,18 @@ on:
       - "concierge/reinvestment_allocator.py"
       - "concierge/_reinvestment_allocator_api.py"
       - "concierge/_reinvestment_allocator_cli.py"
+      - "concierge/_reinvestment_allocator_reload_guard.py"
       - "concierge/_reinvestment_allocator_transport.py"
       - "concierge/_reinvestment_allocator_worker.py"
       - "concierge/_reinvestment_allocator_core.source"
       - "tests/test_reinvestment_allocator.py"
       - "tests/test_reinvestment_preimport_bootstrap.py"
+      - "tests/test_reinvestment_allocator_preimport.py"
+      - "tests/test_reinvestment_allocator_reload_seal.py"
       - "tests/reinvestment_allocator_case_driver.py"
       - "tests/reinvestment_allocator_test_support.py"
       - "docs/REALIZED_REINVESTMENT_REVIEW.md"
+      - "docs/REALIZED_REINVESTMENT_PREIMPORT_BOUNDARY.md"
       - ".github/workflows/reinvestment-authority.yml"
       - "concierge/revenue_closeout.py"
       - "concierge/revenue_settlement.py"
@@ -66,10 +74,13 @@ jobs:
             concierge/reinvestment_allocator.py \
             concierge/_reinvestment_allocator_api.py \
             concierge/_reinvestment_allocator_cli.py \
+            concierge/_reinvestment_allocator_reload_guard.py \
             concierge/_reinvestment_allocator_transport.py \
             concierge/_reinvestment_allocator_worker.py \
             tests/test_reinvestment_allocator.py \
             tests/test_reinvestment_preimport_bootstrap.py \
+            tests/test_reinvestment_allocator_preimport.py \
+            tests/test_reinvestment_allocator_reload_seal.py \
             tests/reinvestment_allocator_case_driver.py \
             tests/reinvestment_allocator_test_support.py
       - name: Run hostile suite
@@ -80,3 +91,5 @@ jobs:
           else
             python -m unittest discover -s tests -p 'test_reinvestment*.py' -v
           fi
+
+# Provider synchronization pulse: Z-Argosy-1454 / 2026-09-17. No semantic CI change.

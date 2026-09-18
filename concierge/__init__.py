@@ -45,23 +45,34 @@ del _payoff_path_policy_secure_runtime
 # package before returning any of its submodules, so a caller asking for
 # ``concierge._reinvestment_allocator_api`` or ``..._transport`` cannot obtain a
 # mutable private-module reference until the public API has already captured its
-# fresh-process launcher graph. Before capturing, discard any same-interpreter
-# sys.modules pre-seed for the public/API/transport names; otherwise a caller could
-# inject a fake child module before the first ``concierge`` import and make bootstrap
-# consume attacker-owned launch code without ever importing the reviewed files.
+# fresh-process launcher graph. On the first successful package initialization,
+# discard any same-interpreter sys.modules pre-seed for the public/API/transport names;
+# otherwise a caller could inject a fake child module before the first ``concierge``
+# import and make bootstrap consume attacker-owned launch code without ever importing
+# the reviewed files.
+#
+# ``importlib.reload(concierge)`` executes this source again in the existing package
+# module dictionary. The completion marker is written only after that first bootstrap
+# succeeds. Ordinary parent-package reload therefore preserves the exact sealed child
+# module objects instead of evicting them and stranding their exact-object reload
+# guard. Deliberate mutation/deletion of package globals remains same-interpreter state
+# surgery and is outside this cooperative-runtime boundary.
 import sys as _reinvestment_bootstrap_sys
 
-for _reinvestment_bootstrap_suffix in (
-    "reinvestment_allocator",
-    "_reinvestment_allocator_api",
-    "_reinvestment_allocator_transport",
-):
-    _reinvestment_bootstrap_sys.modules.pop(
-        f"{__name__}.{_reinvestment_bootstrap_suffix}", None
-    )
-del _reinvestment_bootstrap_suffix
+if not globals().get("_REINVESTMENT_BOOTSTRAP_COMPLETE", False):
+    for _reinvestment_bootstrap_suffix in (
+        "reinvestment_allocator",
+        "_reinvestment_allocator_api",
+        "_reinvestment_allocator_transport",
+    ):
+        _reinvestment_bootstrap_sys.modules.pop(
+            f"{__name__}.{_reinvestment_bootstrap_suffix}", None
+        )
+    del _reinvestment_bootstrap_suffix
 
-from . import reinvestment_allocator as _reinvestment_allocator_bootstrap
+    from . import reinvestment_allocator as _reinvestment_allocator_bootstrap
 
-del _reinvestment_allocator_bootstrap
+    del _reinvestment_allocator_bootstrap
+    _REINVESTMENT_BOOTSTRAP_COMPLETE = True
+
 del _reinvestment_bootstrap_sys
