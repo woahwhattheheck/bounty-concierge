@@ -322,7 +322,7 @@ def _build_verify_claim_economic_receipt(
     *,
     payoff_context,
     exact_utc,
-    max_age,
+    max_age_parser,
     read_bounded_regular,
     sha256_digest,
     strict_json,
@@ -361,7 +361,7 @@ def _build_verify_claim_economic_receipt(
             decision_as_of,
             "decision_as_of",
         )
-        max_age = max_age(max_age_seconds)
+        max_age_value = max_age_parser(max_age_seconds)
     
         request_payload = read_bounded_regular(request_path)
         request_bytes_sha = sha256_digest(request_payload).hexdigest()
@@ -374,8 +374,8 @@ def _build_verify_claim_economic_receipt(
                 "economic request failed paid-work semantic replay",
             ) from exc
         replayed_policy_sha = sha256_field(
-            replayed_receipt.get("policysha256_field"),
-            "replayed economic policysha256_field",
+            replayed_receipt.get("policy_sha256"),
+            "replayed economic policy_sha256",
         )
         if replayed_policy_sha != expected_policy_sha256:
             raise error_type(
@@ -386,7 +386,7 @@ def _build_verify_claim_economic_receipt(
         payload = read_bounded_regular(receipt_path)
         actual_bytes_sha = sha256_digest(payload).hexdigest()
         receipt = strict_json(payload)
-        if _canonicalsha256_field(receipt) != _canonicalsha256_field(replayed_receipt):
+        if canonical_sha256(receipt) != canonical_sha256(replayed_receipt):
             raise error_type(
                 "ECONOMIC_RECEIPT_REPLAY_MISMATCH",
                 "economic receipt does not equal deterministic replay of its retained request",
@@ -408,8 +408,8 @@ def _build_verify_claim_economic_receipt(
             )
     
         receipt_policy_sha = sha256_field(
-            receipt.get("policysha256_field"),
-            "economic receipt policysha256_field",
+            receipt.get("policy_sha256"),
+            "economic receipt policy_sha256",
         )
         if receipt_policy_sha != expected_policy_sha256:
             raise error_type(
@@ -417,12 +417,12 @@ def _build_verify_claim_economic_receipt(
                 "economic receipt policy sha256 mismatch",
             )
         request_sha = sha256_field(
-            receipt.get("requestsha256_field"),
-            "economic receipt requestsha256_field",
+            receipt.get("request_sha256"),
+            "economic receipt request_sha256",
         )
         receipt_sha = sha256_field(
-            receipt.get("receiptsha256_field"),
-            "economic receipt receiptsha256_field",
+            receipt.get("receipt_sha256"),
+            "economic receipt receipt_sha256",
         )
     
         gate_as_of_text, gate_dt = exact_utc(
@@ -435,7 +435,7 @@ def _build_verify_claim_economic_receipt(
                 "ECONOMIC_RECEIPT_FUTURE",
                 "economic receipt is from the future",
             )
-        if age_seconds > max_age:
+        if age_seconds > max_age_value:
             raise error_type(
                 "ECONOMIC_RECEIPT_STALE",
                 "economic receipt is stale",
@@ -467,18 +467,18 @@ def _build_verify_claim_economic_receipt(
             "issue": issue,
             "work_id": work_id,
             "canonical_issue_url": canonical_issue_url,
-            "gate_request_bytessha256_field": request_bytes_sha,
-            "gate_receipt_bytessha256_field": actual_bytes_sha,
-            "gate_receiptsha256_field": receipt_sha,
-            "gate_requestsha256_field": request_sha,
-            "policysha256_field": receipt_policy_sha,
+            "gate_request_bytes_sha256": request_bytes_sha,
+            "gate_receipt_bytes_sha256": actual_bytes_sha,
+            "gate_receipt_sha256": receipt_sha,
+            "gate_request_sha256": request_sha,
+            "policy_sha256": receipt_policy_sha,
             "gate_as_of": gate_as_of_text,
             "decision_as_of": decision_as_of_text,
             "age_seconds": age_seconds,
-            "max_age_seconds": max_age,
+            "max_age_seconds": max_age_value,
             "decision": decision,
         }
-        binding_sha = _canonicalsha256_field(binding)
+        binding_sha = canonical_sha256(binding)
     
         if decision != "GO":
             raise error_type(
@@ -488,7 +488,7 @@ def _build_verify_claim_economic_receipt(
     
         return {
             **binding,
-            "bindingsha256_field": binding_sha,
+            "binding_sha256": binding_sha,
             "verified": True,
             "authority": "INTERNAL_CLAIM_INSTRUCTION_ADMISSION_ONLY_NO_EXTERNAL_ACTION",
         }
@@ -500,7 +500,7 @@ def _build_verify_claim_economic_receipt(
 verify_claim_economic_receipt = _build_verify_claim_economic_receipt(
     payoff_context=_payoff_context,
     exact_utc=_exact_utc,
-    max_age=_max_age,
+    max_age_parser=_max_age,
     read_bounded_regular=_read_bounded_regular,
     sha256_digest=hashlib.sha256,
     strict_json=_strict_json,
