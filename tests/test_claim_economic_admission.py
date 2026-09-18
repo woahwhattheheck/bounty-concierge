@@ -139,6 +139,20 @@ def _rehash_receipt(receipt: dict) -> None:
     ).hexdigest()
 
 
+def test_source_owned_policy_digest_matches_checked_in_policy():
+    checked_in = json.loads(
+        Path("policies/paid_work_effort_value_v1.json").read_text(encoding="utf-8")
+    )
+    canonical = json.dumps(
+        checked_in,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    assert hashlib.sha256(canonical).hexdigest() == gate._EXPECTED_POLICY_SHA256
+
+
 def test_verified_go_replays_request_and_binds_target(tmp_path):
     request = _request()
     proof = _verify(tmp_path, request)
