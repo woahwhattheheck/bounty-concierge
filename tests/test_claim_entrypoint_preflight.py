@@ -8,10 +8,8 @@ import pytest
 from concierge import entrypoint as e
 
 BUNDLE = "/tmp/payoff-bundle"
+ECONOMIC_REQUEST = "/tmp/economic-request.json"
 ECONOMIC_RECEIPT = "/tmp/economic-receipt.json"
-ECONOMIC_RECEIPT_SHA = "a" * 64
-ECONOMIC_POLICY_SHA = "b" * 64
-ECONOMIC_AS_OF = "2026-09-17T20:30:00Z"
 
 
 def _result(disposition="ACTIONABLE", codes=(), attempts=1, prs=1):
@@ -52,14 +50,10 @@ def _argv(*, repo="acme/widget", json_out=False, dry=False):
         "alice",
         "--payoff-bundle",
         BUNDLE,
+        "--economic-request",
+        ECONOMIC_REQUEST,
         "--economic-receipt",
         ECONOMIC_RECEIPT,
-        "--economic-receipt-sha256",
-        ECONOMIC_RECEIPT_SHA,
-        "--economic-policy-sha256",
-        ECONOMIC_POLICY_SHA,
-        "--economic-as-of",
-        ECONOMIC_AS_OF,
     ]
     return out + (["--dry-run"] if dry else [])
 
@@ -80,10 +74,9 @@ def _allow(monkeypatch, seen=None):
         repo,
         issue,
         payoff_proof,
+        request_path,
         receipt_path,
         *,
-        expected_receipt_bytes_sha256,
-        expected_policy_sha256,
         decision_as_of,
     ):
         if seen is not None:
@@ -93,13 +86,12 @@ def _allow(monkeypatch, seen=None):
                     repo,
                     issue,
                     payoff_proof["work_id"],
+                    request_path,
                     receipt_path,
-                    expected_receipt_bytes_sha256,
-                    expected_policy_sha256,
                     decision_as_of,
                 )
             )
-        return {"schema": "claim-economic-admission-proof/v1", "verified": True}
+        return {"schema": "claim-economic-admission-proof/v2", "verified": True}
 
     monkeypatch.setattr(e, "verify_claim_payoff_bundle", payoff)
     monkeypatch.setattr(e, "verify_claim_economic_receipt", economics)
@@ -129,13 +121,12 @@ def test_live_claim_orders_authorities_strips_option_and_restores_argv(monkeypat
         seen.append(("cli", list(e.sys.argv)))
         for wrapper_option in (
             "--payoff-bundle",
+            "--economic-request",
             "--economic-receipt",
-            "--economic-receipt-sha256",
-            "--economic-policy-sha256",
-            "--economic-as-of",
         ):
             assert wrapper_option not in e.sys.argv
         assert BUNDLE not in e.sys.argv
+        assert ECONOMIC_REQUEST not in e.sys.argv
         assert ECONOMIC_RECEIPT not in e.sys.argv
 
     monkeypatch.setattr(e, "_cli_main", cli)
@@ -151,16 +142,15 @@ def test_live_claim_orders_authorities_strips_option_and_restores_argv(monkeypat
         "availability",
     ]
     assert seen[0] == ("payoff", "acme/widget", 42, BUNDLE)
-    assert seen[1] == (
+    assert seen[1][:6] == (
         "economics",
         "acme/widget",
         42,
         "work-42",
+        ECONOMIC_REQUEST,
         ECONOMIC_RECEIPT,
-        ECONOMIC_RECEIPT_SHA,
-        ECONOMIC_POLICY_SHA,
-        ECONOMIC_AS_OF,
     )
+    assert seen[1][6].endswith("Z")
     assert seen[4][0] == "cli"
     assert e.sys.argv is original
 
@@ -181,10 +171,8 @@ def test_short_repo_and_equals_forms_are_normalized(monkeypatch):
             "--wallet",
             "alice",
             f"--payoff-bundle={BUNDLE}",
+            f"--economic-request={ECONOMIC_REQUEST}",
             f"--economic-receipt={ECONOMIC_RECEIPT}",
-            f"--economic-receipt-sha256={ECONOMIC_RECEIPT_SHA}",
-            f"--economic-policy-sha256={ECONOMIC_POLICY_SHA}",
-            f"--economic-as-of={ECONOMIC_AS_OF}",
         ],
     )
 
@@ -197,7 +185,9 @@ def test_short_repo_and_equals_forms_are_normalized(monkeypatch):
         "availability",
     ]
     assert seen[0] == ("payoff", "Scottcjn/widget", 42, BUNDLE)
-    assert seen[1][1:4] == ("Scottcjn/widget", 42, "work-42")
+    assert seen[1][1:6] == (
+        "Scottcjn/widget", 42, "work-42", ECONOMIC_REQUEST, ECONOMIC_RECEIPT
+    )
 
 
 @pytest.mark.parametrize(
@@ -360,10 +350,8 @@ def test_dry_run_help_and_non_claim_skip_new_authorities(monkeypatch):
     assert calls[0][-1] == "--dry-run"
     for wrapper_option in (
         "--payoff-bundle",
+        "--economic-request",
         "--economic-receipt",
-        "--economic-receipt-sha256",
-        "--economic-policy-sha256",
-        "--economic-as-of",
     ):
         assert all(wrapper_option not in call for call in calls)
     # A malformed preview flag must not swallow the next real option.
@@ -483,7 +471,7 @@ def test_duplicate_economic_option_fails_before_provider(monkeypatch, capsys):
     monkeypatch.setattr(
         e.sys,
         "argv",
-        _argv() + ["--economic-as-of", ECONOMIC_AS_OF],
+        _argv() + ["--economic-receipt", ECONOMIC_RECEIPT],
     )
 
     with pytest.raises(SystemExit) as caught:
