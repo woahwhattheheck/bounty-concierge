@@ -390,6 +390,7 @@ def _build_verify_claim_economic_receipt(
     payoff_context,
     exact_utc,
     max_age_parser,
+    max_age_seconds,
     read_bounded_regular,
     sha256_digest,
     strict_json,
@@ -410,6 +411,7 @@ def _build_verify_claim_economic_receipt(
     expected_authority_keys = frozenset(key for key, _ in expected_authority_items)
     supported_decisions = frozenset(supported_decisions)
     proof_schema = str(proof_schema)
+    max_age_value = max_age_parser(max_age_seconds)
 
     def verify_claim_economic_receipt(
         repo: str,
@@ -419,7 +421,6 @@ def _build_verify_claim_economic_receipt(
         receipt_path: str | Path,
         *,
         decision_as_of: str,
-        max_age_seconds: int = _DEFAULT_MAX_AGE_SECONDS,
     ) -> dict[str, Any]:
         """Verify one exact economics GO before live claim instructions are emitted."""
     
@@ -428,7 +429,6 @@ def _build_verify_claim_economic_receipt(
             decision_as_of,
             "decision_as_of",
         )
-        max_age_value = max_age_parser(max_age_seconds)
     
         request_payload = read_bounded_regular(request_path)
         request_bytes_sha = sha256_digest(request_payload).hexdigest()
@@ -568,6 +568,7 @@ verify_claim_economic_receipt = _build_verify_claim_economic_receipt(
     payoff_context=_payoff_context,
     exact_utc=_exact_utc,
     max_age_parser=_max_age,
+    max_age_seconds=_DEFAULT_MAX_AGE_SECONDS,
     read_bounded_regular=_read_bounded_regular,
     sha256_digest=hashlib.sha256,
     strict_json=_strict_json,
