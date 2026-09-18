@@ -36,6 +36,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: python -m pip install -e .
       - run: python -m py_compile concierge/reward_settlement_ledger.py tests/test_reward_settlement_ledger.py
       - run: python -m unittest -v tests.test_reward_settlement_ledger
       - run: python -O -m unittest -v tests.test_reward_settlement_ledger

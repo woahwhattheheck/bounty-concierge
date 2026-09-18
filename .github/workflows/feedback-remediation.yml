@@ -32,6 +32,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
       - run: python -m py_compile concierge/feedback_remediation.py tests/test_feedback_remediation.py tests/test_feedback_remediation_chain.py
       - run: python -m unittest tests.test_feedback_remediation tests.test_feedback_remediation_chain
       - run: python -O -m unittest tests.test_feedback_remediation tests.test_feedback_remediation_chain

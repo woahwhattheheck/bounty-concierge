@@ -41,7 +41,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install test dependency
-        run: python -m pip install 'pytest>=8,<9'
+        run: python -m pip install -r requirements.txt 'pytest>=8,<9'
       - name: Compile calibration source
         run: python -m py_compile concierge/forecast_calibration.py tests/test_forecast_calibration.py
       - name: Run calibration tests

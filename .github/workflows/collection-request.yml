@@ -31,6 +31,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
       - name: Compile
         run: python -m py_compile concierge/collection_request.py tests/test_collection_request.py
       - name: Tests
