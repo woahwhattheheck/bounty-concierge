@@ -77,8 +77,8 @@ def _exact_utc(
     field: str,
     *,
     _timestamp_re=_TIMESTAMP_RE,
-    _strptime=_strptime,
-    _utc=_utc,
+    _strptime=datetime.strptime,
+    _utc=timezone.utc,
     _error_type=ClaimEconomicAdmissionError,
 ) -> tuple[str, datetime]:
     if type(value) is not str or _timestamp_re.fullmatch(value) is None:
