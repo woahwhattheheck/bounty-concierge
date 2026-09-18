@@ -59,6 +59,15 @@ def _argv(*, repo="acme/widget", json_out=False, dry=False):
     return out + (["--dry-run"] if dry else [])
 
 
+def _override_economic_verifier(monkeypatch, verifier):
+    monkeypatch.setattr(e, "verify_claim_economic_receipt", verifier)
+    monkeypatch.setitem(
+        e._preflight_claim.__kwdefaults__,
+        "_verify_economic",
+        verifier,
+    )
+
+
 def _allow(monkeypatch, seen=None):
     def payoff(repo, issue, bundle):
         if seen is not None:
@@ -95,7 +104,7 @@ def _allow(monkeypatch, seen=None):
         return {"schema": "claim-economic-admission-proof/v2", "verified": True}
 
     monkeypatch.setattr(e, "verify_claim_payoff_bundle", payoff)
-    monkeypatch.setattr(e, "verify_claim_economic_receipt", economics)
+    _override_economic_verifier(monkeypatch, economics)
     monkeypatch.setattr(
         e,
         "preflight_bounty",
@@ -174,6 +183,48 @@ def test_live_preflight_uses_process_owned_utc_clock(monkeypatch):
         ECONOMIC_RECEIPT,
     )
     assert seen[1][6] == "2026-09-17T20:30:00Z"
+
+
+def test_live_preflight_ignores_public_economic_verifier_rebinding(monkeypatch, tmp_path):
+    original = e._preflight_claim.__kwdefaults__["_verify_economic"]
+    assert original is not None
+    monkeypatch.setattr(
+        e,
+        "verify_claim_economic_receipt",
+        lambda *_args, **_kwargs: {"verified": True},
+    )
+    monkeypatch.setattr(
+        e,
+        "verify_claim_payoff_bundle",
+        lambda repo, issue, _bundle: {
+            "schema": "payoff-claim-proof/v2",
+            "repo": repo,
+            "issue": issue,
+            "canonical_issue_url": f"https://github.com/{repo}/issues/{issue}",
+            "work_id": "work-42",
+        },
+    )
+    monkeypatch.setattr(e, "preflight_bounty", lambda *_: pytest.fail("provider"))
+    monkeypatch.setattr(
+        e,
+        "inspect_bounty_availability",
+        lambda *_: pytest.fail("provider"),
+    )
+
+    args = _argv()
+    args[args.index(ECONOMIC_REQUEST)] = str(tmp_path / "missing-request.json")
+    args[args.index(ECONOMIC_RECEIPT)] = str(tmp_path / "missing-receipt.json")
+    trusted_now = datetime(2026, 9, 17, 20, 30, 0, tzinfo=timezone.utc)
+
+    with pytest.raises(e.ClaimEconomicAdmissionError) as caught:
+        e._preflight_claim(
+            args,
+            _now=lambda tz: trusted_now.astimezone(tz),
+            _utc=timezone.utc,
+        )
+
+    assert caught.value.code == "INVALID_ECONOMIC_RECEIPT"
+    assert e._preflight_claim.__kwdefaults__["_verify_economic"] is original
 
 
 def test_short_repo_and_equals_forms_are_normalized(monkeypatch):
@@ -511,7 +562,7 @@ def test_economic_hold_is_safe_json_and_short_circuits_provider(monkeypatch, cap
             "hostile receipt text DO NOT ECHO",
         )
 
-    monkeypatch.setattr(e, "verify_claim_economic_receipt", fail)
+    _override_economic_verifier(monkeypatch, fail)
     monkeypatch.setattr(e, "preflight_bounty", lambda *_: pytest.fail("provider"))
     monkeypatch.setattr(
         e, "inspect_bounty_availability", lambda *_: pytest.fail("provider")
