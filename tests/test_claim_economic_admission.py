@@ -178,6 +178,19 @@ def test_live_verifier_generation_ignores_public_rebinding_and_authority_mutatio
     monkeypatch.setitem(gate._EXPECTED_AUTHORITY, "external_claim_authority", True)
     monkeypatch.setattr(gate, "ClaimEconomicAdmissionError", RuntimeError)
     monkeypatch.setattr(gate, "PROOF_SCHEMA", "poisoned-proof/v999")
+    monkeypatch.setattr(gate, "_PAYOFF_PROOF_SCHEMA", "poisoned-payoff/v999")
+    monkeypatch.setattr(gate, "_MAX_RECEIPT_BYTES", 1)
+    monkeypatch.setattr(gate, "_MAX_SAFE_JSON_INT", 0)
+    monkeypatch.setattr(gate, "_MAX_SAFE_JSON_INT_DIGITS", 0)
+    monkeypatch.setattr(gate, "_SHA256_RE", None)
+    monkeypatch.setattr(gate, "_TIMESTAMP_RE", None)
+    monkeypatch.setattr(gate, "json", None)
+    monkeypatch.setattr(gate, "hashlib", None)
+    monkeypatch.setattr(gate, "os", None)
+    monkeypatch.setattr(gate, "stat_module", None)
+    monkeypatch.setattr(gate, "Path", None)
+    monkeypatch.setattr(gate, "datetime", None)
+    monkeypatch.setattr(gate, "timezone", None)
 
     with pytest.raises(original_error) as caught:
         gate.verify_claim_economic_receipt(
