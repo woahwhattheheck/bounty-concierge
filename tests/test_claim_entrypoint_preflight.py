@@ -181,6 +181,10 @@ def test_short_repo_and_equals_forms_are_normalized(monkeypatch):
             "--wallet",
             "alice",
             f"--payoff-bundle={BUNDLE}",
+            f"--economic-receipt={ECONOMIC_RECEIPT}",
+            f"--economic-receipt-sha256={ECONOMIC_RECEIPT_SHA}",
+            f"--economic-policy-sha256={ECONOMIC_POLICY_SHA}",
+            f"--economic-as-of={ECONOMIC_AS_OF}",
         ],
     )
 
@@ -354,7 +358,14 @@ def test_dry_run_help_and_non_claim_skip_new_authorities(monkeypatch):
         e.main()
 
     assert calls[0][-1] == "--dry-run"
-    assert all("--payoff-bundle" not in call for call in calls)
+    for wrapper_option in (
+        "--payoff-bundle",
+        "--economic-receipt",
+        "--economic-receipt-sha256",
+        "--economic-policy-sha256",
+        "--economic-as-of",
+    ):
+        assert all(wrapper_option not in call for call in calls)
     # A malformed preview flag must not swallow the next real option.
     assert "--wallet" in calls[2]
 
