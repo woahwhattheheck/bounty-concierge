@@ -29,7 +29,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install dependencies
-        run: python -m pip install -r requirements.txt
+        run: python -m pip install -e .
       - run: python -m py_compile concierge/paid_work_economics_portfolio.py tests/test_paid_work_economics_portfolio.py examples/paid_work_economics_portfolio_demo.py
       - run: python -m unittest -v tests.test_paid_work_economics_portfolio
       - run: python -O -m unittest -v tests.test_paid_work_economics_portfolio
