@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
 """Installed claim composes payoff, economics, preflight, and availability."""
 
+from datetime import datetime, timezone
 import json
 
 import pytest
@@ -153,6 +154,26 @@ def test_live_claim_orders_authorities_strips_option_and_restores_argv(monkeypat
     assert seen[1][6].endswith("Z")
     assert seen[4][0] == "cli"
     assert e.sys.argv is original
+
+
+def test_live_preflight_uses_process_owned_utc_clock(monkeypatch):
+    seen = []
+    _allow(monkeypatch, seen)
+    trusted_now = datetime(2026, 9, 17, 20, 30, 0, tzinfo=timezone.utc)
+    e._preflight_claim(
+        _argv(),
+        _now=lambda tz: trusted_now.astimezone(tz),
+        _utc=timezone.utc,
+    )
+    assert seen[1][:6] == (
+        "economics",
+        "acme/widget",
+        42,
+        "work-42",
+        ECONOMIC_REQUEST,
+        ECONOMIC_RECEIPT,
+    )
+    assert seen[1][6] == "2026-09-17T20:30:00Z"
 
 
 def test_short_repo_and_equals_forms_are_normalized(monkeypatch):
