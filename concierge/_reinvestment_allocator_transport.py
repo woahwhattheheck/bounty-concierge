@@ -42,7 +42,9 @@ def make_worker_invoker(
     select_fds = select.select
     monotonic = time.monotonic
     sleep = time.sleep
-    sigkill = signal.SIGKILL
+    # POSIX-only constant; the kill sites below are unreachable on hosts
+    # without posix_spawn because the capability gate raises first.
+    sigkill = getattr(signal, "SIGKILL", None)
     spawn_dup2 = getattr(os, "POSIX_SPAWN_DUP2", None)
     spawn_close = getattr(os, "POSIX_SPAWN_CLOSE", None)
     wait_nohang = getattr(os, "WNOHANG", None)
