@@ -318,151 +318,201 @@ def _payoff_context(
     return work_id, canonical_issue_url
 
 
-def verify_claim_economic_receipt(
-    repo: str,
-    issue: int,
-    payoff_proof: dict[str, Any],
-    request_path: str | Path,
-    receipt_path: str | Path,
+def _build_verify_claim_economic_receipt(
     *,
-    decision_as_of: str,
-    max_age_seconds: int = _DEFAULT_MAX_AGE_SECONDS,
-) -> dict[str, Any]:
-    """Verify one exact economics GO before live claim instructions are emitted."""
+    payoff_context,
+    exact_utc,
+    max_age,
+    read_bounded_regular,
+    sha256_digest,
+    strict_json,
+    compile_gate,
+    gate_input_error,
+    sha256_field,
+    canonical_sha256,
+    verify_gate_receipt,
+    expected_policy_sha256,
+    expected_authority_items,
+    supported_decisions,
+    error_type,
+    proof_schema,
+):
+    """Freeze the live economic-admission dependency generation at first import."""
+    expected_policy_sha256 = str(expected_policy_sha256)
+    expected_authority_items = tuple(expected_authority_items)
+    expected_authority_keys = frozenset(key for key, _ in expected_authority_items)
+    supported_decisions = frozenset(supported_decisions)
+    proof_schema = str(proof_schema)
 
-    work_id, canonical_issue_url = _payoff_context(repo, issue, payoff_proof)
-    decision_as_of_text, decision_dt = _exact_utc(
-        decision_as_of,
-        "decision_as_of",
-    )
-    max_age = _max_age(max_age_seconds)
-
-    request_payload = _read_bounded_regular(request_path)
-    request_bytes_sha = hashlib.sha256(request_payload).hexdigest()
-    request = _strict_json(request_payload)
-    try:
-        replayed_receipt = compile_paid_work_effort_value_gate(request)
-    except PaidWorkGateInputError as exc:
-        raise ClaimEconomicAdmissionError(
-            "INVALID_ECONOMIC_REQUEST",
-            "economic request failed paid-work semantic replay",
-        ) from exc
-    replayed_policy_sha = _sha256(
-        replayed_receipt.get("policy_sha256"),
-        "replayed economic policy_sha256",
-    )
-    if replayed_policy_sha != _EXPECTED_POLICY_SHA256:
-        raise ClaimEconomicAdmissionError(
-            "ECONOMIC_POLICY_MISMATCH",
-            "economic request does not use the source-owned admission policy",
+    def verify_claim_economic_receipt(
+        repo: str,
+        issue: int,
+        payoff_proof: dict[str, Any],
+        request_path: str | Path,
+        receipt_path: str | Path,
+        *,
+        decision_as_of: str,
+        max_age_seconds: int = _DEFAULT_MAX_AGE_SECONDS,
+    ) -> dict[str, Any]:
+        """Verify one exact economics GO before live claim instructions are emitted."""
+    
+        work_id, canonical_issue_url = payoff_context(repo, issue, payoff_proof)
+        decision_as_of_text, decision_dt = exact_utc(
+            decision_as_of,
+            "decision_as_of",
         )
-
-    payload = _read_bounded_regular(receipt_path)
-    actual_bytes_sha = hashlib.sha256(payload).hexdigest()
-    receipt = _strict_json(payload)
-    if _canonical_sha256(receipt) != _canonical_sha256(replayed_receipt):
-        raise ClaimEconomicAdmissionError(
-            "ECONOMIC_RECEIPT_REPLAY_MISMATCH",
-            "economic receipt does not equal deterministic replay of its retained request",
+        max_age = max_age(max_age_seconds)
+    
+        request_payload = read_bounded_regular(request_path)
+        request_bytes_sha = sha256_digest(request_payload).hexdigest()
+        request = strict_json(request_payload)
+        try:
+            replayed_receipt = compile_gate(request)
+        except gate_input_error as exc:
+            raise error_type(
+                "INVALID_ECONOMIC_REQUEST",
+                "economic request failed paid-work semantic replay",
+            ) from exc
+        replayed_policy_sha = sha256_field(
+            replayed_receipt.get("policysha256_field"),
+            "replayed economic policysha256_field",
         )
-    if verify_receipt(receipt) is not True:
-        raise ClaimEconomicAdmissionError(
-            "INVALID_ECONOMIC_RECEIPT",
-            "economic receipt failed self-integrity verification",
-        )
-    if receipt.get("work_id") != work_id:
-        raise ClaimEconomicAdmissionError(
-            "ECONOMIC_WORK_MISMATCH",
-            "economic receipt work_id does not match the payoff proof",
-        )
-    if receipt.get("canonical_source_url") != canonical_issue_url:
-        raise ClaimEconomicAdmissionError(
-            "ECONOMIC_SOURCE_MISMATCH",
-            "economic receipt source does not match the exact GitHub claim target",
-        )
-
-    receipt_policy_sha = _sha256(
-        receipt.get("policy_sha256"),
-        "economic receipt policy_sha256",
-    )
-    if receipt_policy_sha != _EXPECTED_POLICY_SHA256:
-        raise ClaimEconomicAdmissionError(
-            "ECONOMIC_POLICY_MISMATCH",
-            "economic receipt policy sha256 mismatch",
-        )
-    request_sha = _sha256(
-        receipt.get("request_sha256"),
-        "economic receipt request_sha256",
-    )
-    receipt_sha = _sha256(
-        receipt.get("receipt_sha256"),
-        "economic receipt receipt_sha256",
-    )
-
-    gate_as_of_text, gate_dt = _exact_utc(
-        receipt.get("as_of"),
-        "economic receipt as_of",
-    )
-    age_seconds = int((decision_dt - gate_dt).total_seconds())
-    if age_seconds < 0:
-        raise ClaimEconomicAdmissionError(
-            "ECONOMIC_RECEIPT_FUTURE",
-            "economic receipt is from the future",
-        )
-    if age_seconds > max_age:
-        raise ClaimEconomicAdmissionError(
-            "ECONOMIC_RECEIPT_STALE",
-            "economic receipt is stale",
-        )
-
-    decision = receipt.get("decision")
-    if decision not in _SUPPORTED_DECISIONS:
-        raise ClaimEconomicAdmissionError(
-            "INVALID_ECONOMIC_RECEIPT",
-            "economic receipt decision is unsupported",
-        )
-
-    authority = receipt.get("authority")
-    if type(authority) is not dict or set(authority) != set(_EXPECTED_AUTHORITY):
-        raise ClaimEconomicAdmissionError(
-            "INVALID_ECONOMIC_AUTHORITY",
-            "economic receipt authority schema is unsupported",
-        )
-    for key, expected in _EXPECTED_AUTHORITY.items():
-        if authority.get(key) is not expected:
-            raise ClaimEconomicAdmissionError(
-                "INVALID_ECONOMIC_AUTHORITY",
-                "economic receipt authority value is invalid",
+        if replayed_policy_sha != expected_policy_sha256:
+            raise error_type(
+                "ECONOMIC_POLICY_MISMATCH",
+                "economic request does not use the source-owned admission policy",
             )
-
-    binding = {
-        "schema": PROOF_SCHEMA,
-        "repo": repo,
-        "issue": issue,
-        "work_id": work_id,
-        "canonical_issue_url": canonical_issue_url,
-        "gate_request_bytes_sha256": request_bytes_sha,
-        "gate_receipt_bytes_sha256": actual_bytes_sha,
-        "gate_receipt_sha256": receipt_sha,
-        "gate_request_sha256": request_sha,
-        "policy_sha256": receipt_policy_sha,
-        "gate_as_of": gate_as_of_text,
-        "decision_as_of": decision_as_of_text,
-        "age_seconds": age_seconds,
-        "max_age_seconds": max_age,
-        "decision": decision,
-    }
-    binding_sha = _canonical_sha256(binding)
-
-    if decision != "GO":
-        raise ClaimEconomicAdmissionError(
-            f"ECONOMICS_{decision}",
-            "paid-work economics does not authorize live claim instructions",
+    
+        payload = read_bounded_regular(receipt_path)
+        actual_bytes_sha = sha256_digest(payload).hexdigest()
+        receipt = strict_json(payload)
+        if _canonicalsha256_field(receipt) != _canonicalsha256_field(replayed_receipt):
+            raise error_type(
+                "ECONOMIC_RECEIPT_REPLAY_MISMATCH",
+                "economic receipt does not equal deterministic replay of its retained request",
+            )
+        if verify_gate_receipt(receipt) is not True:
+            raise error_type(
+                "INVALID_ECONOMIC_RECEIPT",
+                "economic receipt failed self-integrity verification",
+            )
+        if receipt.get("work_id") != work_id:
+            raise error_type(
+                "ECONOMIC_WORK_MISMATCH",
+                "economic receipt work_id does not match the payoff proof",
+            )
+        if receipt.get("canonical_source_url") != canonical_issue_url:
+            raise error_type(
+                "ECONOMIC_SOURCE_MISMATCH",
+                "economic receipt source does not match the exact GitHub claim target",
+            )
+    
+        receipt_policy_sha = sha256_field(
+            receipt.get("policysha256_field"),
+            "economic receipt policysha256_field",
         )
+        if receipt_policy_sha != expected_policy_sha256:
+            raise error_type(
+                "ECONOMIC_POLICY_MISMATCH",
+                "economic receipt policy sha256 mismatch",
+            )
+        request_sha = sha256_field(
+            receipt.get("requestsha256_field"),
+            "economic receipt requestsha256_field",
+        )
+        receipt_sha = sha256_field(
+            receipt.get("receiptsha256_field"),
+            "economic receipt receiptsha256_field",
+        )
+    
+        gate_as_of_text, gate_dt = exact_utc(
+            receipt.get("as_of"),
+            "economic receipt as_of",
+        )
+        age_seconds = int((decision_dt - gate_dt).total_seconds())
+        if age_seconds < 0:
+            raise error_type(
+                "ECONOMIC_RECEIPT_FUTURE",
+                "economic receipt is from the future",
+            )
+        if age_seconds > max_age:
+            raise error_type(
+                "ECONOMIC_RECEIPT_STALE",
+                "economic receipt is stale",
+            )
+    
+        decision = receipt.get("decision")
+        if decision not in supported_decisions:
+            raise error_type(
+                "INVALID_ECONOMIC_RECEIPT",
+                "economic receipt decision is unsupported",
+            )
+    
+        authority = receipt.get("authority")
+        if type(authority) is not dict or frozenset(authority) != expected_authority_keys:
+            raise error_type(
+                "INVALID_ECONOMIC_AUTHORITY",
+                "economic receipt authority schema is unsupported",
+            )
+        for key, expected in expected_authority_items:
+            if authority.get(key) is not expected:
+                raise error_type(
+                    "INVALID_ECONOMIC_AUTHORITY",
+                    "economic receipt authority value is invalid",
+                )
+    
+        binding = {
+            "schema": proof_schema,
+            "repo": repo,
+            "issue": issue,
+            "work_id": work_id,
+            "canonical_issue_url": canonical_issue_url,
+            "gate_request_bytessha256_field": request_bytes_sha,
+            "gate_receipt_bytessha256_field": actual_bytes_sha,
+            "gate_receiptsha256_field": receipt_sha,
+            "gate_requestsha256_field": request_sha,
+            "policysha256_field": receipt_policy_sha,
+            "gate_as_of": gate_as_of_text,
+            "decision_as_of": decision_as_of_text,
+            "age_seconds": age_seconds,
+            "max_age_seconds": max_age,
+            "decision": decision,
+        }
+        binding_sha = _canonicalsha256_field(binding)
+    
+        if decision != "GO":
+            raise error_type(
+                f"ECONOMICS_{decision}",
+                "paid-work economics does not authorize live claim instructions",
+            )
+    
+        return {
+            **binding,
+            "bindingsha256_field": binding_sha,
+            "verified": True,
+            "authority": "INTERNAL_CLAIM_INSTRUCTION_ADMISSION_ONLY_NO_EXTERNAL_ACTION",
+        }
+    
 
-    return {
-        **binding,
-        "binding_sha256": binding_sha,
-        "verified": True,
-        "authority": "INTERNAL_CLAIM_INSTRUCTION_ADMISSION_ONLY_NO_EXTERNAL_ACTION",
-    }
+    return verify_claim_economic_receipt
+
+
+verify_claim_economic_receipt = _build_verify_claim_economic_receipt(
+    payoff_context=_payoff_context,
+    exact_utc=_exact_utc,
+    max_age=_max_age,
+    read_bounded_regular=_read_bounded_regular,
+    sha256_digest=hashlib.sha256,
+    strict_json=_strict_json,
+    compile_gate=compile_paid_work_effort_value_gate,
+    gate_input_error=PaidWorkGateInputError,
+    sha256_field=_sha256,
+    canonical_sha256=_canonical_sha256,
+    verify_gate_receipt=verify_receipt,
+    expected_policy_sha256=_EXPECTED_POLICY_SHA256,
+    expected_authority_items=tuple(sorted(_EXPECTED_AUTHORITY.items())),
+    supported_decisions=frozenset(_SUPPORTED_DECISIONS),
+    error_type=ClaimEconomicAdmissionError,
+    proof_schema=PROOF_SCHEMA,
+)
+del _build_verify_claim_economic_receipt
