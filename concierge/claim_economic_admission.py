@@ -15,16 +15,25 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
+import stat as stat_module
 from typing import Any
 
-from concierge.paid_work_effort_value_gate import verify_receipt
+from concierge.paid_work_effort_value_gate import (
+    PaidWorkGateInputError,
+    compile_paid_work_effort_value_gate,
+    verify_receipt,
+)
 
-PROOF_SCHEMA = "claim-economic-admission-proof/v1"
+PROOF_SCHEMA = "claim-economic-admission-proof/v2"
 _PAYOFF_PROOF_SCHEMA = "payoff-claim-proof/v2"
 _MAX_RECEIPT_BYTES = 1024 * 1024
 _DEFAULT_MAX_AGE_SECONDS = 3600
+_MAX_SAFE_JSON_INT = (1 << 53) - 1
+_MAX_SAFE_JSON_INT_DIGITS = len(str(_MAX_SAFE_JSON_INT))
+_EXPECTED_POLICY_SHA256 = "1d0833b700e886b77a83c156ebf06b57b315f9fff489acd3e64878ac028a57a6"
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 _EXPECTED_AUTHORITY = {
@@ -116,8 +125,30 @@ def _reject_float(raw: str) -> Any:
 def _reject_constant(raw: str) -> Any:
     raise ClaimEconomicAdmissionError(
         "INVALID_ECONOMIC_RECEIPT",
-        "economic receipt contains a forbidden non-finite constant",
+        "economic artifact contains a forbidden non-finite constant",
     )
+
+
+def _parse_int(raw: str) -> int:
+    digits = raw[1:] if raw.startswith("-") else raw
+    if not digits or len(digits) > _MAX_SAFE_JSON_INT_DIGITS:
+        raise ClaimEconomicAdmissionError(
+            "INVALID_ECONOMIC_RECEIPT",
+            "economic artifact contains an unsafe integer",
+        )
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ClaimEconomicAdmissionError(
+            "INVALID_ECONOMIC_RECEIPT",
+            "economic artifact contains an unsafe integer",
+        ) from exc
+    if abs(value) > _MAX_SAFE_JSON_INT:
+        raise ClaimEconomicAdmissionError(
+            "INVALID_ECONOMIC_RECEIPT",
+            "economic artifact contains an unsafe integer",
+        )
+    return value
 
 
 def _strict_json(payload: bytes) -> dict[str, Any]:
@@ -156,10 +187,11 @@ def _strict_json(payload: bytes) -> dict[str, Any]:
             object_pairs_hook=unique_object,
             parse_float=_reject_float,
             parse_constant=_reject_constant,
+            parse_int=_parse_int,
         )
     except ClaimEconomicAdmissionError:
         raise
-    except json.JSONDecodeError as exc:
+    except (json.JSONDecodeError, ValueError, OverflowError, RecursionError) as exc:
         raise ClaimEconomicAdmissionError(
             "INVALID_ECONOMIC_RECEIPT",
             "economic receipt is not valid JSON",
@@ -172,35 +204,89 @@ def _strict_json(payload: bytes) -> dict[str, Any]:
     return parsed
 
 
-def _read_receipt(path: str | Path) -> bytes:
+def _read_bounded_regular(path: str | Path) -> bytes:
     source = Path(path)
     try:
-        if source.is_symlink():
+        initial = source.lstat()
+    except OSError as exc:
+        raise ClaimEconomicAdmissionError(
+            "INVALID_ECONOMIC_RECEIPT",
+            "economic artifact could not be statted",
+        ) from exc
+    if stat_module.S_ISLNK(initial.st_mode) or not stat_module.S_ISREG(initial.st_mode):
+        raise ClaimEconomicAdmissionError(
+            "INVALID_ECONOMIC_RECEIPT",
+            "economic artifact path must be one real regular file",
+        )
+    if initial.st_size <= 0 or initial.st_size > _MAX_RECEIPT_BYTES:
+        raise ClaimEconomicAdmissionError(
+            "INVALID_ECONOMIC_RECEIPT",
+            "economic artifact has an invalid byte length",
+        )
+
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(source, flags)
+    except OSError as exc:
+        raise ClaimEconomicAdmissionError(
+            "INVALID_ECONOMIC_RECEIPT",
+            "economic artifact could not be opened without following links",
+        ) from exc
+    try:
+        opened = os.fstat(fd)
+        if (
+            not stat_module.S_ISREG(opened.st_mode)
+            or (opened.st_dev, opened.st_ino) != (initial.st_dev, initial.st_ino)
+            or opened.st_size != initial.st_size
+        ):
             raise ClaimEconomicAdmissionError(
                 "INVALID_ECONOMIC_RECEIPT",
-                "economic receipt path must not be a symlink",
+                "economic artifact generation changed before read",
             )
-        stat = source.stat()
-        if not source.is_file() or stat.st_size <= 0 or stat.st_size > _MAX_RECEIPT_BYTES:
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > _MAX_RECEIPT_BYTES:
+                raise ClaimEconomicAdmissionError(
+                    "INVALID_ECONOMIC_RECEIPT",
+                    "economic artifact grew beyond byte limit",
+                )
+            chunks.append(chunk)
+        after = os.fstat(fd)
+        if (
+            (after.st_dev, after.st_ino) != (opened.st_dev, opened.st_ino)
+            or after.st_size != opened.st_size
+            or getattr(after, "st_mtime_ns", int(after.st_mtime * 1_000_000_000))
+            != getattr(opened, "st_mtime_ns", int(opened.st_mtime * 1_000_000_000))
+        ):
             raise ClaimEconomicAdmissionError(
                 "INVALID_ECONOMIC_RECEIPT",
-                "economic receipt path is not one bounded regular file",
+                "economic artifact changed while being read",
             )
-        payload = source.read_bytes()
+        payload = b"".join(chunks)
+        if len(payload) != opened.st_size:
+            raise ClaimEconomicAdmissionError(
+                "INVALID_ECONOMIC_RECEIPT",
+                "economic artifact byte count changed while being read",
+            )
+        return payload
     except ClaimEconomicAdmissionError:
         raise
     except OSError as exc:
         raise ClaimEconomicAdmissionError(
             "INVALID_ECONOMIC_RECEIPT",
-            "economic receipt could not be read",
+            "economic artifact could not be read",
         ) from exc
-    if len(payload) != stat.st_size:
-        raise ClaimEconomicAdmissionError(
-            "INVALID_ECONOMIC_RECEIPT",
-            "economic receipt changed while being read",
-        )
-    return payload
-
+    finally:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
 
 def _payoff_context(
     repo: str,
@@ -236,39 +322,49 @@ def verify_claim_economic_receipt(
     repo: str,
     issue: int,
     payoff_proof: dict[str, Any],
+    request_path: str | Path,
     receipt_path: str | Path,
     *,
-    expected_receipt_bytes_sha256: str,
-    expected_policy_sha256: str,
     decision_as_of: str,
     max_age_seconds: int = _DEFAULT_MAX_AGE_SECONDS,
 ) -> dict[str, Any]:
     """Verify one exact economics GO before live claim instructions are emitted."""
 
     work_id, canonical_issue_url = _payoff_context(repo, issue, payoff_proof)
-    expected_bytes_sha = _sha256(
-        expected_receipt_bytes_sha256,
-        "expected_receipt_bytes_sha256",
-    )
-    expected_policy_sha = _sha256(
-        expected_policy_sha256,
-        "expected_policy_sha256",
-    )
     decision_as_of_text, decision_dt = _exact_utc(
         decision_as_of,
         "decision_as_of",
     )
     max_age = _max_age(max_age_seconds)
 
-    payload = _read_receipt(receipt_path)
-    actual_bytes_sha = hashlib.sha256(payload).hexdigest()
-    if actual_bytes_sha != expected_bytes_sha:
+    request_payload = _read_bounded_regular(request_path)
+    request_bytes_sha = hashlib.sha256(request_payload).hexdigest()
+    request = _strict_json(request_payload)
+    try:
+        replayed_receipt = compile_paid_work_effort_value_gate(request)
+    except PaidWorkGateInputError as exc:
         raise ClaimEconomicAdmissionError(
-            "ECONOMIC_RECEIPT_BYTES_MISMATCH",
-            "economic receipt exact-byte sha256 mismatch",
+            "INVALID_ECONOMIC_REQUEST",
+            "economic request failed paid-work semantic replay",
+        ) from exc
+    replayed_policy_sha = _sha256(
+        replayed_receipt.get("policy_sha256"),
+        "replayed economic policy_sha256",
+    )
+    if replayed_policy_sha != _EXPECTED_POLICY_SHA256:
+        raise ClaimEconomicAdmissionError(
+            "ECONOMIC_POLICY_MISMATCH",
+            "economic request does not use the source-owned admission policy",
         )
 
+    payload = _read_bounded_regular(receipt_path)
+    actual_bytes_sha = hashlib.sha256(payload).hexdigest()
     receipt = _strict_json(payload)
+    if _canonical_sha256(receipt) != _canonical_sha256(replayed_receipt):
+        raise ClaimEconomicAdmissionError(
+            "ECONOMIC_RECEIPT_REPLAY_MISMATCH",
+            "economic receipt does not equal deterministic replay of its retained request",
+        )
     if verify_receipt(receipt) is not True:
         raise ClaimEconomicAdmissionError(
             "INVALID_ECONOMIC_RECEIPT",
@@ -289,7 +385,7 @@ def verify_claim_economic_receipt(
         receipt.get("policy_sha256"),
         "economic receipt policy_sha256",
     )
-    if receipt_policy_sha != expected_policy_sha:
+    if receipt_policy_sha != _EXPECTED_POLICY_SHA256:
         raise ClaimEconomicAdmissionError(
             "ECONOMIC_POLICY_MISMATCH",
             "economic receipt policy sha256 mismatch",
@@ -345,6 +441,7 @@ def verify_claim_economic_receipt(
         "issue": issue,
         "work_id": work_id,
         "canonical_issue_url": canonical_issue_url,
+        "gate_request_bytes_sha256": request_bytes_sha,
         "gate_receipt_bytes_sha256": actual_bytes_sha,
         "gate_receipt_sha256": receipt_sha,
         "gate_request_sha256": request_sha,
