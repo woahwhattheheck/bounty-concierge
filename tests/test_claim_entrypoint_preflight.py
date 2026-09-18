@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Installed claim composes payoff, preflight, and availability authority."""
+"""Installed claim composes payoff, economics, preflight, and availability."""
 
 import json
 
@@ -8,6 +8,10 @@ import pytest
 from concierge import entrypoint as e
 
 BUNDLE = "/tmp/payoff-bundle"
+ECONOMIC_RECEIPT = "/tmp/economic-receipt.json"
+ECONOMIC_RECEIPT_SHA = "a" * 64
+ECONOMIC_POLICY_SHA = "b" * 64
+ECONOMIC_AS_OF = "2026-09-17T20:30:00Z"
 
 
 def _result(disposition="ACTIONABLE", codes=(), attempts=1, prs=1):
@@ -48,6 +52,14 @@ def _argv(*, repo="acme/widget", json_out=False, dry=False):
         "alice",
         "--payoff-bundle",
         BUNDLE,
+        "--economic-receipt",
+        ECONOMIC_RECEIPT,
+        "--economic-receipt-sha256",
+        ECONOMIC_RECEIPT_SHA,
+        "--economic-policy-sha256",
+        ECONOMIC_POLICY_SHA,
+        "--economic-as-of",
+        ECONOMIC_AS_OF,
     ]
     return out + (["--dry-run"] if dry else [])
 
@@ -56,9 +68,41 @@ def _allow(monkeypatch, seen=None):
     def payoff(repo, issue, bundle):
         if seen is not None:
             seen.append(("payoff", repo, issue, bundle))
-        return {}
+        return {
+            "schema": "payoff-claim-proof/v2",
+            "repo": repo,
+            "issue": issue,
+            "canonical_issue_url": f"https://github.com/{repo}/issues/{issue}",
+            "work_id": "work-42",
+        }
+
+    def economics(
+        repo,
+        issue,
+        payoff_proof,
+        receipt_path,
+        *,
+        expected_receipt_bytes_sha256,
+        expected_policy_sha256,
+        decision_as_of,
+    ):
+        if seen is not None:
+            seen.append(
+                (
+                    "economics",
+                    repo,
+                    issue,
+                    payoff_proof["work_id"],
+                    receipt_path,
+                    expected_receipt_bytes_sha256,
+                    expected_policy_sha256,
+                    decision_as_of,
+                )
+            )
+        return {"schema": "claim-economic-admission-proof/v1", "verified": True}
 
     monkeypatch.setattr(e, "verify_claim_payoff_bundle", payoff)
+    monkeypatch.setattr(e, "verify_claim_economic_receipt", economics)
     monkeypatch.setattr(
         e,
         "preflight_bounty",
@@ -83,8 +127,16 @@ def test_live_claim_orders_authorities_strips_option_and_restores_argv(monkeypat
 
     def cli():
         seen.append(("cli", list(e.sys.argv)))
-        assert "--payoff-bundle" not in e.sys.argv
+        for wrapper_option in (
+            "--payoff-bundle",
+            "--economic-receipt",
+            "--economic-receipt-sha256",
+            "--economic-policy-sha256",
+            "--economic-as-of",
+        ):
+            assert wrapper_option not in e.sys.argv
         assert BUNDLE not in e.sys.argv
+        assert ECONOMIC_RECEIPT not in e.sys.argv
 
     monkeypatch.setattr(e, "_cli_main", cli)
     original = _argv()
@@ -92,12 +144,24 @@ def test_live_claim_orders_authorities_strips_option_and_restores_argv(monkeypat
 
     e.main()
 
-    assert seen[:3] == [
-        ("payoff", "acme/widget", 42, BUNDLE),
-        ("preflight", "acme/widget", 42),
-        ("availability", "acme/widget", 42),
+    assert [item[0] for item in seen[:4]] == [
+        "payoff",
+        "economics",
+        "preflight",
+        "availability",
     ]
-    assert seen[3][0] == "cli"
+    assert seen[0] == ("payoff", "acme/widget", 42, BUNDLE)
+    assert seen[1] == (
+        "economics",
+        "acme/widget",
+        42,
+        "work-42",
+        ECONOMIC_RECEIPT,
+        ECONOMIC_RECEIPT_SHA,
+        ECONOMIC_POLICY_SHA,
+        ECONOMIC_AS_OF,
+    )
+    assert seen[4][0] == "cli"
     assert e.sys.argv is original
 
 
@@ -122,11 +186,14 @@ def test_short_repo_and_equals_forms_are_normalized(monkeypatch):
 
     e.main()
 
-    assert seen == [
-        ("payoff", "Scottcjn/widget", 42, BUNDLE),
-        ("preflight", "Scottcjn/widget", 42),
-        ("availability", "Scottcjn/widget", 42),
+    assert [item[0] for item in seen] == [
+        "payoff",
+        "economics",
+        "preflight",
+        "availability",
     ]
+    assert seen[0] == ("payoff", "Scottcjn/widget", 42, BUNDLE)
+    assert seen[1][1:4] == ("Scottcjn/widget", 42, "work-42")
 
 
 @pytest.mark.parametrize(
@@ -169,7 +236,12 @@ def test_short_repo_and_equals_forms_are_normalized(monkeypatch):
 def test_missing_malformed_or_duplicate_bundle_fails_before_authority(
     monkeypatch, capsys, args, code
 ):
-    for name in ("verify_claim_payoff_bundle", "preflight_bounty", "_cli_main"):
+    for name in (
+        "verify_claim_payoff_bundle",
+        "verify_claim_economic_receipt",
+        "preflight_bounty",
+        "_cli_main",
+    ):
         monkeypatch.setattr(e, name, lambda *x, n=name: pytest.fail(n))
     monkeypatch.setattr(e.sys, "argv", args)
 
@@ -264,6 +336,7 @@ def test_terminal_availability_blocks_without_exposing_source(monkeypatch, capsy
 def test_dry_run_help_and_non_claim_skip_new_authorities(monkeypatch):
     for name in (
         "verify_claim_payoff_bundle",
+        "verify_claim_economic_receipt",
         "preflight_bounty",
         "inspect_bounty_availability",
     ):
@@ -359,3 +432,81 @@ def test_malformed_preflight_fails_closed(monkeypatch):
         e.main()
 
     assert caught.value.code == 2
+
+def test_missing_economic_option_fails_after_payoff_before_provider(monkeypatch, capsys):
+    seen = []
+
+    def payoff(repo, issue, bundle):
+        seen.append(("payoff", repo, issue, bundle))
+        return {
+            "schema": "payoff-claim-proof/v2",
+            "repo": repo,
+            "issue": issue,
+            "canonical_issue_url": f"https://github.com/{repo}/issues/{issue}",
+            "work_id": "work-42",
+        }
+
+    monkeypatch.setattr(e, "verify_claim_payoff_bundle", payoff)
+    monkeypatch.setattr(
+        e, "verify_claim_economic_receipt", lambda *_a, **_k: pytest.fail("economic")
+    )
+    monkeypatch.setattr(e, "preflight_bounty", lambda *_: pytest.fail("provider"))
+    monkeypatch.setattr(e, "_cli_main", lambda: pytest.fail("cli"))
+    args = _argv()
+    index = args.index("--economic-receipt")
+    del args[index : index + 2]
+    monkeypatch.setattr(e.sys, "argv", args)
+
+    with pytest.raises(SystemExit) as caught:
+        e.main()
+
+    assert caught.value.code == 2
+    assert seen == [("payoff", "acme/widget", 42, BUNDLE)]
+    assert "ECONOMIC_RECEIPT_REQUIRED" in capsys.readouterr().err
+
+
+def test_duplicate_economic_option_fails_before_provider(monkeypatch, capsys):
+    _allow(monkeypatch)
+    monkeypatch.setattr(e, "preflight_bounty", lambda *_: pytest.fail("provider"))
+    monkeypatch.setattr(e, "_cli_main", lambda: pytest.fail("cli"))
+    monkeypatch.setattr(
+        e.sys,
+        "argv",
+        _argv() + ["--economic-as-of", ECONOMIC_AS_OF],
+    )
+
+    with pytest.raises(SystemExit) as caught:
+        e.main()
+
+    assert caught.value.code == 2
+    assert "DUPLICATE_ECONOMIC_OPTION" in capsys.readouterr().err
+
+
+def test_economic_hold_is_safe_json_and_short_circuits_provider(monkeypatch, capsys):
+    _allow(monkeypatch)
+
+    def fail(*_a, **_k):
+        raise e.ClaimEconomicAdmissionError(
+            "ECONOMICS_HOLD_VALUE_UNKNOWN",
+            "hostile receipt text DO NOT ECHO",
+        )
+
+    monkeypatch.setattr(e, "verify_claim_economic_receipt", fail)
+    monkeypatch.setattr(e, "preflight_bounty", lambda *_: pytest.fail("provider"))
+    monkeypatch.setattr(
+        e, "inspect_bounty_availability", lambda *_: pytest.fail("provider")
+    )
+    monkeypatch.setattr(e, "_cli_main", lambda: pytest.fail("cli"))
+    monkeypatch.setattr(e.sys, "argv", _argv(json_out=True))
+
+    with pytest.raises(SystemExit) as caught:
+        e.main()
+
+    output = capsys.readouterr().out
+    assert caught.value.code == 2
+    assert json.loads(output) == {
+        "error": "claim_economics_unavailable",
+        "reason_code": "ECONOMICS_HOLD_VALUE_UNKNOWN",
+    }
+    assert "DO NOT ECHO" not in output
+
