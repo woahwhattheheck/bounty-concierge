@@ -61,11 +61,7 @@ def _argv(*, repo="acme/widget", json_out=False, dry=False):
 
 def _override_economic_verifier(monkeypatch, verifier):
     monkeypatch.setattr(e, "verify_claim_economic_receipt", verifier)
-    monkeypatch.setitem(
-        e._preflight_claim.__kwdefaults__,
-        "_verify_economic",
-        verifier,
-    )
+    monkeypatch.setattr(e, "_preflight_claim", e._build_preflight_claim(verifier))
 
 
 def _allow(monkeypatch, seen=None):
@@ -186,8 +182,7 @@ def test_live_preflight_uses_process_owned_utc_clock(monkeypatch):
 
 
 def test_live_preflight_ignores_public_economic_verifier_rebinding(monkeypatch, tmp_path):
-    original = e._preflight_claim.__kwdefaults__["_verify_economic"]
-    assert original is not None
+    original = e._preflight_claim
     monkeypatch.setattr(
         e,
         "verify_claim_economic_receipt",
@@ -224,7 +219,7 @@ def test_live_preflight_ignores_public_economic_verifier_rebinding(monkeypatch, 
         )
 
     assert caught.value.code == "INVALID_ECONOMIC_RECEIPT"
-    assert e._preflight_claim.__kwdefaults__["_verify_economic"] is original
+    assert e._preflight_claim is original
 
 
 def test_short_repo_and_equals_forms_are_normalized(monkeypatch):
