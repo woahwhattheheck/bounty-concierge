@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 import sys
 from typing import Any
@@ -135,7 +136,7 @@ def _claim_payoff_bundle(argv: list[str]) -> str:
 
 
 def _claim_economic_options(argv: list[str]) -> dict[str, str]:
-    """Require exact wrapper-owned economic evidence options for live claims."""
+    """Require retained request + receipt evidence for live claims."""
 
     tail = _claim_tail(argv)
     if tail is None:
@@ -145,24 +146,14 @@ def _claim_economic_options(argv: list[str]) -> dict[str, str]:
         )
     specs = (
         (
+            "--economic-request",
+            "ECONOMIC_REQUEST_REQUIRED",
+            "live claim requires --economic-request FILE",
+        ),
+        (
             "--economic-receipt",
             "ECONOMIC_RECEIPT_REQUIRED",
             "live claim requires --economic-receipt FILE",
-        ),
-        (
-            "--economic-receipt-sha256",
-            "ECONOMIC_RECEIPT_SHA256_REQUIRED",
-            "live claim requires --economic-receipt-sha256 SHA256",
-        ),
-        (
-            "--economic-policy-sha256",
-            "ECONOMIC_POLICY_SHA256_REQUIRED",
-            "live claim requires --economic-policy-sha256 SHA256",
-        ),
-        (
-            "--economic-as-of",
-            "ECONOMIC_AS_OF_REQUIRED",
-            "live claim requires --economic-as-of UTC",
         ),
     )
     result: dict[str, str] = {}
@@ -178,7 +169,6 @@ def _claim_economic_options(argv: list[str]) -> dict[str, str]:
         result[option] = values[0]
     return result
 
-
 def _strip_claim_wrapper_options(argv: list[str]) -> list[str]:
     """Remove entrypoint-owned claim options before handing off to argparse."""
 
@@ -189,10 +179,8 @@ def _strip_claim_wrapper_options(argv: list[str]) -> list[str]:
 
     owned = {
         "--payoff-bundle",
+        "--economic-request",
         "--economic-receipt",
-        "--economic-receipt-sha256",
-        "--economic-policy-sha256",
-        "--economic-as-of",
     }
     result = list(argv[: command_index + 1])
     tail = argv[command_index + 1 :]
@@ -294,7 +282,11 @@ def _availability_block(
     }
 
 
-def _preflight_claim(argv: list[str]) -> None:
+def _preflight_claim(
+    argv: list[str],
+    _now=datetime.now,
+    _utc=timezone.utc,
+) -> None:
     """Require payoff, economics GO, canonical ACTIONABLE, and availability."""
     target = _claim_target(argv)
     if target is None:
@@ -314,14 +306,14 @@ def _preflight_claim(argv: list[str]) -> None:
     # The verifier compiles no new valuation: it consumes the existing paid-work
     # gate receipt and requires an exact GO bound to this payoff-derived target.
     economic = _claim_economic_options(argv)
+    decision_as_of = _now(_utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
     verify_claim_economic_receipt(
         repo,
         issue,
         payoff_proof,
+        economic["--economic-request"],
         economic["--economic-receipt"],
-        expected_receipt_bytes_sha256=economic["--economic-receipt-sha256"],
-        expected_policy_sha256=economic["--economic-policy-sha256"],
-        decision_as_of=economic["--economic-as-of"],
+        decision_as_of=decision_as_of,
     )
 
     result = preflight_bounty(repo, issue)
