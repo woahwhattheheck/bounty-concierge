@@ -139,6 +139,59 @@ def _rehash_receipt(receipt: dict) -> None:
     ).hexdigest()
 
 
+def test_live_verifier_generation_ignores_public_rebinding_and_authority_mutation(
+    monkeypatch, tmp_path
+):
+    request = _request(amount="14", currency="RTC", unit_type="NONCASH")
+    receipt = compile_paid_work_effort_value_gate(request)
+    assert receipt["decision"] == "HOLD_VALUE_UNKNOWN"
+    request_path = tmp_path / "economic-request.json"
+    receipt_path = tmp_path / "economic-receipt.json"
+    _write(request_path, request)
+    _write(receipt_path, receipt)
+
+    original_error = gate.ClaimEconomicAdmissionError
+    forged = deepcopy(receipt)
+    forged["decision"] = "GO"
+    forged["reason_codes"] = ["ALL_GATES_CLEAR"]
+    _rehash_receipt(forged)
+
+    monkeypatch.setattr(gate, "compile_paid_work_effort_value_gate", lambda _request: forged)
+    monkeypatch.setattr(gate, "verify_receipt", lambda _receipt: True)
+    monkeypatch.setattr(
+        gate,
+        "_payoff_context",
+        lambda *_args: ("work-42", "https://github.com/acme/widget/issues/42"),
+    )
+    monkeypatch.setattr(
+        gate,
+        "_exact_utc",
+        lambda *_args: ("2026-09-17T20:30:00Z", object()),
+    )
+    monkeypatch.setattr(gate, "_max_age", lambda _value: 86400)
+    monkeypatch.setattr(gate, "_read_bounded_regular", lambda _path: b"{}")
+    monkeypatch.setattr(gate, "_strict_json", lambda _payload: forged)
+    monkeypatch.setattr(gate, "_sha256", lambda *_args: "0" * 64)
+    monkeypatch.setattr(gate, "_canonical_sha256", lambda _value: "0" * 64)
+    monkeypatch.setattr(gate, "_EXPECTED_POLICY_SHA256", "0" * 64)
+    monkeypatch.setattr(gate, "_SUPPORTED_DECISIONS", frozenset({"GO"}))
+    monkeypatch.setitem(gate._EXPECTED_AUTHORITY, "external_claim_authority", True)
+    monkeypatch.setattr(gate, "ClaimEconomicAdmissionError", RuntimeError)
+    monkeypatch.setattr(gate, "PROOF_SCHEMA", "poisoned-proof/v999")
+
+    with pytest.raises(original_error) as caught:
+        gate.verify_claim_economic_receipt(
+            "acme/widget",
+            42,
+            _payoff(),
+            request_path,
+            receipt_path,
+            decision_as_of="2026-09-17T20:30:00Z",
+        )
+
+    assert caught.value.code == "ECONOMICS_HOLD_VALUE_UNKNOWN"
+
+
 def test_source_owned_policy_digest_matches_checked_in_policy():
     checked_in = json.loads(
         Path("policies/paid_work_effort_value_v1.json").read_text(encoding="utf-8")
