@@ -1,0 +1,2 @@
+# Sealed source blobs are hash-pinned as LF git blobs; keep LF on checkout.
+*.source text eol=lf

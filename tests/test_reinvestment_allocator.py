@@ -177,4 +177,27 @@ class IsolatedReinvestmentAuthorityTests(ReinvestmentCaseBase):
         self.assertIn("executable-only", docs)
         self.assertIn("not an authorization to spend", docs)
 
+class ReinvestmentAllocatorPortabilityTests(ReinvestmentCaseBase):
+    def test_missing_posix_spawn_fails_closed_not_at_import(self):
+        """Hosts without posix_spawn/SIGKILL must fail closed at invoke time."""
+        from unittest import mock
+        from concierge.reinvestment_allocator import ReinvestmentInputError
+        from concierge._reinvestment_allocator_transport import make_worker_invoker
+
+        with mock.patch.object(os, "posix_spawn", None, create=True):
+            invoke_worker = make_worker_invoker(
+                error_type=ReinvestmentInputError,
+                canonical_json=lambda value: json.dumps(value).encode("utf-8"),
+                parse_json=lambda raw, label: json.loads(raw.decode("utf-8")),
+                sealed_environment_items=tuple(sorted(os.environ.items())),
+                executable=sys.executable,
+                worker_path=__file__,
+                max_json_bytes=1024,
+                max_worker_stderr_bytes=1024,
+                max_worker_seconds=1.0,
+            )
+            with self.assertRaisesRegex(
+                ReinvestmentInputError, "POSIX spawn support"
+            ):
+                invoke_worker({"request": "probe"})
 
