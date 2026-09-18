@@ -205,6 +205,11 @@ def test_live_verifier_generation_ignores_public_rebinding_and_authority_mutatio
     assert caught.value.code == "ECONOMICS_HOLD_VALUE_UNKNOWN"
 
 
+def test_live_verifier_has_no_default_age_surface():
+    assert gate.verify_claim_economic_receipt.__defaults__ is None
+    assert gate.verify_claim_economic_receipt.__kwdefaults__ is None
+
+
 def test_source_owned_policy_digest_matches_checked_in_policy():
     checked_in = json.loads(
         Path("policies/paid_work_effort_value_v1.json").read_text(encoding="utf-8")
