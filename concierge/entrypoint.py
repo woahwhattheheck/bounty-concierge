@@ -282,76 +282,82 @@ def _availability_block(
     }
 
 
-def _preflight_claim(
-    argv: list[str],
-    _now=datetime.now,
-    _utc=timezone.utc,
-    *,
-    _verify_economic=verify_claim_economic_receipt,
-) -> None:
-    """Require payoff, economics GO, canonical ACTIONABLE, and availability."""
-    target = _claim_target(argv)
-    if target is None:
-        return
-    repo, issue = target
+def _build_preflight_claim(verify_economic):
+    """Bind one immutable economics verifier generation into live preflight."""
 
-    # Owner-supplied payoff evidence is deliberately first.  Do not spend provider
-    # reads on a claim whose compensation path is absent, stale, exhausted,
-    # ambiguous, or bound to a different target.
-    payoff_proof = verify_claim_payoff_bundle(
-        repo,
-        issue,
-        _claim_payoff_bundle(argv),
-    )
-
-    # Economic evidence is also local and deliberately precedes provider reads.
-    # The verifier compiles no new valuation: it consumes the existing paid-work
-    # gate receipt and requires an exact GO bound to this payoff-derived target.
-    economic = _claim_economic_options(argv)
-    decision_as_of = _now(_utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
-    _verify_economic(
-        repo,
-        issue,
-        payoff_proof,
-        economic["--economic-request"],
-        economic["--economic-receipt"],
-        decision_as_of=decision_as_of,
-    )
-
-    result = preflight_bounty(repo, issue)
-    if not isinstance(result, dict):
-        raise BountyPreflightError("canonical bounty preflight did not return an object")
-    qualification = result.get("qualification")
-    if not isinstance(qualification, dict) or not isinstance(
-        qualification.get("dispatch"), bool
-    ):
-        raise BountyPreflightError(
-            "canonical bounty preflight returned a malformed qualification"
+    def _preflight_claim(
+        argv: list[str],
+        _now=datetime.now,
+        _utc=timezone.utc,
+    ) -> None:
+        """Require payoff, economics GO, canonical ACTIONABLE, and availability."""
+        target = _claim_target(argv)
+        if target is None:
+            return
+        repo, issue = target
+    
+        # Owner-supplied payoff evidence is deliberately first.  Do not spend provider
+        # reads on a claim whose compensation path is absent, stale, exhausted,
+        # ambiguous, or bound to a different target.
+        payoff_proof = verify_claim_payoff_bundle(
+            repo,
+            issue,
+            _claim_payoff_bundle(argv),
         )
-
-    attempt_count, open_pr_count = _claim_counts(result)
-    if not qualification["dispatch"]:
+    
+        # Economic evidence is also local and deliberately precedes provider reads.
+        # The verifier compiles no new valuation: it consumes the existing paid-work
+        # gate receipt and requires an exact GO bound to this payoff-derived target.
+        economic = _claim_economic_options(argv)
+        decision_as_of = _now(_utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+        verify_economic(
+            repo,
+            issue,
+            payoff_proof,
+            economic["--economic-request"],
+            economic["--economic-receipt"],
+            decision_as_of=decision_as_of,
+        )
+    
+        result = preflight_bounty(repo, issue)
+        if not isinstance(result, dict):
+            raise BountyPreflightError("canonical bounty preflight did not return an object")
+        qualification = result.get("qualification")
+        if not isinstance(qualification, dict) or not isinstance(
+            qualification.get("dispatch"), bool
+        ):
+            raise BountyPreflightError(
+                "canonical bounty preflight returned a malformed qualification"
+            )
+    
+        attempt_count, open_pr_count = _claim_counts(result)
+        if not qualification["dispatch"]:
+            raise ClaimPreflightBlocked(
+                repo=repo,
+                issue=issue,
+                qualification=qualification,
+                attempt_count=attempt_count,
+                open_pr_count=open_pr_count,
+            )
+    
+        availability = inspect_bounty_availability(repo, issue)
+        availability_block = _availability_block(availability)
+        if availability_block is None:
+            return
+    
         raise ClaimPreflightBlocked(
             repo=repo,
             issue=issue,
-            qualification=qualification,
+            qualification=availability_block,
             attempt_count=attempt_count,
             open_pr_count=open_pr_count,
         )
+    
 
-    availability = inspect_bounty_availability(repo, issue)
-    availability_block = _availability_block(availability)
-    if availability_block is None:
-        return
+    return _preflight_claim
 
-    raise ClaimPreflightBlocked(
-        repo=repo,
-        issue=issue,
-        qualification=availability_block,
-        attempt_count=attempt_count,
-        open_pr_count=open_pr_count,
-    )
 
+_preflight_claim = _build_preflight_claim(verify_claim_economic_receipt)
 
 def _blocked_json(exc: ClaimPreflightBlocked) -> dict[str, Any]:
     """Return only safe preflight fields; never canonical comment bodies."""
