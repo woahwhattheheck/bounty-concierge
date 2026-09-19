@@ -1,0 +1,52 @@
+{
+  "schema": "vesuvius-1839-unc-attach-packet/v1",
+  "upstream": {
+    "repository": "ScrollPrize/villa",
+    "commit": "f07d33be6a00d12ace7d6a9465efe17c78ed7b47",
+    "issue": 1839
+  },
+  "economics": {
+    "program": "Vesuvius Progress Prizes",
+    "cadence": "monthly",
+    "deadline": "2026-09-30T23:59:00-07:00",
+    "tiers_usd": [
+      1000,
+      2500,
+      10000,
+      20000
+    ],
+    "guaranteed": false
+  },
+  "files": [
+    {
+      "path": "volume-cartographer/apps/VC3D/UnifiedBrowserDialog.cpp",
+      "original_blob": "950d1be0d4048fa7dabd826128c9fb2a8c6c78a0",
+      "replacement_blob": "b51dd357b1e35e2f7893ae8b408ad7b281955d5e"
+    },
+    {
+      "path": "volume-cartographer/apps/VC3D/MenuActionController.cpp",
+      "original_blob": "bc9fdcc680f3e4bfc068eb474508afb589b841c9",
+      "replacement_blob": "51c3b0e36328602fe99b24261fc58b4c1795d2d5"
+    },
+    {
+      "path": "volume-cartographer/apps/VC3D/test/test_unified_browser_dialog.cpp",
+      "original_blob": "7b87032a3df43f590bc21481d1a8052e2d088b5e",
+      "replacement_blob": "e975769f62d002f5ea26ad6adf172d1e431b972a"
+    },
+    {
+      "path": ".github/workflows/vc3d-windows.yml",
+      "original_blob": "a4b5c2fb79aa1d922f11a9f6f89c2d99a77a3e35",
+      "replacement_blob": "1816eb7285bb7ae6a6f6e15f83da889dc566cf8e"
+    }
+  ],
+  "verification": {
+    "target": "unified_browser_dialog",
+    "windows_required": true,
+    "before_after_evidence_required_for_prize_submission": true
+  },
+  "authority": {
+    "upstream_pr_created": false,
+    "prize_award_claimed": false,
+    "payment_authority": false
+  }
+}
