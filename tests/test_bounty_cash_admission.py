@@ -20,7 +20,7 @@ class T(unittest.TestCase):
     def test_floor_routing(self):
         for amount,disp,target in [('50','ACTIVE','#bug-bounty'),('49.99','MAYBE_SAVE_UP','#bounty-pile-10-49'),('10','MAYBE_SAVE_UP','#bounty-pile-10-49'),('9.99','PRUNE',None)]:
             with self.subTest(amount=amount):
-                r=self.c([ev(amount)]); self.assertEqual((r['disposition'],r['target_channel']),(disp,target)); self.assertTrue(gate.verify_receipt(r))
+                p=req([ev(amount)]); r=gate.compile_bounty_cash_admission(p); self.assertEqual((r['disposition'],r['target_channel']),(disp,target)); self.assertTrue(gate.verify_receipt(p,r))
         self.assertFalse(self.c([ev('50')])['authority']['external_claim_authority'])
     def test_unpriced_maybe_and_tokens_hold(self):
         for row,reason in [(ev(kind='UNPRICED',guaranteed=False),'REWARD_VALUE_UNCONFIRMED'),(ev(kind='MAYBE_REWARDED',guaranteed=False),'REWARD_VALUE_UNCONFIRMED'),(ev('1000','RTC'),'NON_USD_DENOMINATION_NO_CONVERSION')]:
@@ -49,8 +49,9 @@ class T(unittest.TestCase):
         with self.assertRaises(gate.BountyCashAdmissionError): gate.compile_bounty_cash_admission(bad)
         bad=req(); bad['candidate']['reward_evidence'][0]['amount']=50
         with self.assertRaises(gate.BountyCashAdmissionError): gate.compile_bounty_cash_admission(bad)
-        r=self.c([ev('75')]); changed=copy.deepcopy(r); changed['disposition']='PRUNE'; self.assertFalse(gate.verify_receipt(changed))
+        p=req([ev('75')]); r=gate.compile_bounty_cash_admission(p); changed=copy.deepcopy(r); changed['disposition']='PRUNE'; body=dict(changed); body.pop('receipt_sha256',None); changed['receipt_sha256']=gate._sha(body); self.assertFalse(gate.verify_receipt(p,changed))
     def test_request_and_receipt_deterministic(self):
-        p=req([ev('75')]); self.assertEqual(gate.compile_bounty_cash_admission(p),gate.compile_bounty_cash_admission(copy.deepcopy(p)))
+        p=req([ev('75')]); r=gate.compile_bounty_cash_admission(p); self.assertEqual(r,gate.compile_bounty_cash_admission(copy.deepcopy(p))); self.assertTrue(gate.verify_receipt(p,r))
+        wrong=req([ev('49')]); self.assertFalse(gate.verify_receipt(wrong,r))
 
 if __name__=='__main__': unittest.main()
