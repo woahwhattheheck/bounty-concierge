@@ -1,0 +1,79 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-076/R-registry-promotion-architecture",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Forge",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Stellar-devs-dashboard/Stellar-dev-dashboard",
+    "issue_number": 84,
+    "issue_state": "open",
+    "github_assignee": null,
+    "default_branch": "master",
+    "head_sha": "6f02134e3fa89f8adde208af8eef99017f5f1bea",
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    },
+    "matching_open_pr": false
+  },
+  "blobs": {
+    "package_json": "a8b86f76515fed3e3c38ed05f804f44dc7eca312",
+    "app": "1afa6c7e6e717e4068ab964857c8796099e8e8e0",
+    "sidebar": "84b0eb49dabebfeb4fc263f9d46fb8178371ccf0",
+    "contracts_dashboard": "d379b14790d41a6393334ee0f00069c9f220e01b",
+    "deployment_library": "baea13f1daaf0d2a0065b7b051b59fbe0955c7c3",
+    "deployment_ui": "90a2e0737aea5faae06367b75a7eec23311b0871",
+    "deployment_tracker": "ca81f318abd854d8d8ba92688dca0c6372e0b688",
+    "wasm_processor": "499b6db1d36b6f881c8ff6e82d8cc622abaca98f",
+    "storage": "ae519a00772ebe8bfc02eae851619385ca649fb3",
+    "state_sync": "225c213d48772369780793dc3a6934e889496419",
+    "stellar": "564f26c224e0219b93aabd6a4f6614b0b661dc99",
+    "contract_storage": "618d21e926b91cb8b3aea282196b763806a1a6f6",
+    "audit_trail": "c712b29c2da88a36ac546be72ceb7cdaca2985ac",
+    "compatibility_types": "1c45309df67a5b65f393ab04c02c0ab716622df3",
+    "compatibility_persistence": "affd52c7db49dd2b5c2ab12ec39b4834451bbdc4",
+    "compatibility_redaction": "27fbd991a7715ee7f5faa44b122ebd55f7a0076d",
+    "compatibility_audit": "937559fd46c32ba81c9e7e4f6ff2fcc7ec6c761f",
+    "devops_deployment_safety": "41e393ce56b69b7c84a6d617ce4b6df05cfbcee6"
+  },
+  "source_findings": [
+    "current deployment library synthesizes contract id and transaction hash locally rather than establishing authoritative chain deployment evidence",
+    "deployment UI simulates a confirmation delay and can display Network confirmed for that local receipt",
+    "mainnet deployment helper is simulation-only",
+    "WASMProcessor falls back from SHA-256 to a non-cryptographic 32-bit FNV-like hash",
+    "generic app storage silently falls back from IndexedDB to localStorage, which is unsuitable for atomic registry semantics",
+    "BroadcastChannel exists and is reusable as an invalidation transport but registry writes need persisted revision conflict detection",
+    "Stellar network config already exposes passphrase and Soroban RPC seams",
+    "contractStorage already provides direct contract-instance reads useful for instance drift",
+    "compatibility subsystem already demonstrates schema versioning, redaction, import validation, bounded timeouts, overrides and degraded states",
+    "global audit trail is bounded/clearable and should not be the sole durable registry history",
+    "devops canary/Kubernetes risk scoring is not an authoritative Soroban promotion gate"
+  ],
+  "architecture": {
+    "evidence_classes": [
+      "confirmed-chain",
+      "external-observed",
+      "unverified",
+      "simulation",
+      "legacy-synthetic"
+    ],
+    "artifact_digest": "sha-256 only for trusted identity",
+    "database": "dedicated stellar-deployment-registry IndexedDB; no localStorage mutation fallback",
+    "concurrency": "per-entity revision plus monotonic registryRevision; BroadcastChannel invalidation after commit",
+    "drift": "on-chain executable WASM hash plus canonical instance-state hash with freshness and partial-scope labels",
+    "promotion": "deterministic fail-closed state machine; unknown/unavailable blocks",
+    "import": "bounded validate-migrate-sanitize-preview-atomic-commit",
+    "audit": "transactional registry events; optional local hash chain is tamper-evident, not externally immutable",
+    "external_reconciliation": "preserve unknown historical fields; never fabricate deployer/constructor/creation tx",
+    "ui": "new lazy deploymentRegistry tab with registry, environment diff, promotion, provenance, timeline, import/export"
+  },
+  "disposition": "READY_FOR_ASSIGNMENT_WITH_EVIDENCE_CLASS_REPAIR_AS_FIRST_CLASS_DEPENDENCY",
+  "authority": {
+    "upstream_source_mutated": false,
+    "provider_application_submitted": false,
+    "provider_assignment_claimed": false,
+    "live_network_transaction_executed": false,
+    "reward_or_payment_claimed": false
+  }
+}
