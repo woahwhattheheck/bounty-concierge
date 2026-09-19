@@ -23,7 +23,8 @@ ROOT = Path(__file__).resolve().parents[1]
 AS_OF = "2026-09-17T20:30:00Z"
 SOURCE_FILES = (
     "_fleet_economic_admission_v1.py", "fleet_economic_admission.py",
-    "paid_work_effort_value_gate.py", "_claim_economic_admission_impl.py",
+    "paid_work_dollar_floor.py", "paid_work_effort_value_gate.py",
+    "_claim_economic_admission_impl.py",
 )
 
 
@@ -39,8 +40,14 @@ def request(amount="300", hours="1", unit_type="CASH"):
             "work_id": "work-42",
             "canonical_source_url": "https://github.com/acme/widget/issues/42",
             "advertised_payout": {
-                "amount": amount, "currency": "USD", "unit_type": unit_type,
+                "state": "VERIFIED",
+                "evidence_url": "https://github.com/acme/widget/issues/42",
                 "observed_at": "2026-09-17T19:30:00Z",
+                "amount_semantics": "FIXED",
+                "amount": amount,
+                "currency": "USD",
+                "unit_type": unit_type,
+                "authority": "FIRST_PARTY",
             },
             "estimated_engineering_hours": hours,
             "model_tool_cost": {"state": "KNOWN", "amount": "10", "currency": "USD"},
