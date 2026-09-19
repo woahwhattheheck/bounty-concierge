@@ -279,6 +279,17 @@ class ActivationGateTests(unittest.TestCase):
     def test_assigned_with_open_prerequisite_waits(self):
         receipt = self.compile(request(
             queue_disposition="IMPLEMENTATION_ELIGIBLE",
+            dependency_disposition="DEPENDENCY_WAIT",
+            fulfillment_disposition="HOLD",
+            continuity_state="ASSIGNED",
+        ))
+        self.assertEqual(receipt["disposition"], "WAIT_DEPENDENCIES")
+        self.assertIn("PREREQUISITE_ISSUES_OPEN", receipt["reason_codes"])
+
+    def test_assigned_with_closed_prerequisite_missing_landing_evidence_waits(self):
+        receipt = self.compile(request(
+            queue_disposition="IMPLEMENTATION_ELIGIBLE",
+            dependency_disposition="DEPENDENCIES_CLEAR",
             fulfillment_disposition="FULFILLMENT_WAIT",
             continuity_state="ASSIGNED",
         ))
