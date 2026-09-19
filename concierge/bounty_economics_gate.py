@@ -73,6 +73,8 @@ def _string(
         raise BountyEconomicsInputError(f"{field} exceeds {max_chars} characters")
     if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in value):
         raise BountyEconomicsInputError(f"{field} must not contain control characters")
+    if any(0xD800 <= ord(ch) <= 0xDFFF for ch in value):
+        raise BountyEconomicsInputError(f"{field} must not contain lone surrogates")
     return value
 
 
