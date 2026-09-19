@@ -1,0 +1,88 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-stellar-kraal-frontend-26-R",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Kestrel",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Stellar-kraal/stellar-kraal-frontend",
+    "default_branch": "main",
+    "head_sha": "390605df2d60ee605bc366e10e79b460b6122a6a",
+    "issue_number": 26,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 1,
+    "open_pr_found": false,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Stellar-kraal/repo/stellar-kraal-frontend/issue/26",
+    "assignment_state": "unassigned",
+    "apply_visible": true,
+    "applications_visible": 1,
+    "one_application_per_user": true,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "surfaces": {
+    "marketplace": {
+      "path": "app/investor/page.tsx",
+      "blob": "47cce301706a565a7df60ef28a1e334306324639",
+      "header_scope_missing": true,
+      "status_text_present": true
+    },
+    "register_modal": {
+      "path": "app/farmer/page.tsx",
+      "blob": "38feec2977188abb66edf4efadcc98ff017dc3ba",
+      "dialog_semantics": false,
+      "focus_trap": false,
+      "focus_restore": false,
+      "escape_close": false
+    },
+    "mobile_wallet_modal": {
+      "path": "components/MobileWalletModal.tsx",
+      "blob": "c265b380ad559eb5e37bc30f7460791ad3435b0c",
+      "dialog_semantics": true,
+      "escape_close": true,
+      "focus_trap": false,
+      "focus_restore": false
+    },
+    "axe_test": {
+      "path": "e2e/scenarios/09-mobile-wallet-qr.spec.ts",
+      "blob": "135cdd8612ec71e683991c12ebb8ccd73a6b8846",
+      "axe_playwright": true
+    },
+    "portfolio_test": {
+      "path": "e2e/scenarios/04-portfolio-view.spec.ts",
+      "blob": "f0ea5a5a0350035ced66734b945eab28b90bb076",
+      "axe_scan": false
+    },
+    "workflow": {
+      "path": ".github/workflows/e2e.yml",
+      "blob": "750e769a5c36288c39221b11921467194faf8d65",
+      "playwright_is_gate": true
+    },
+    "package": {
+      "path": "package.json",
+      "blob": "71798fc65814b87d9a9d0bb22ff14e6a44258c21",
+      "axe_playwright_dependency": true
+    }
+  },
+  "disposition": {
+    "fleet_route": "APPLY_WITH_SOURCE_SPECIFIC_PLAN_THEN_WAIT_ASSIGNMENT",
+    "implementation_started": false,
+    "implementation_assignment_gated": true
+  },
+  "authority": {
+    "advisory_only": true,
+    "provider_application_authority": false,
+    "provider_assignment_authority": false,
+    "upstream_implementation_authority": false,
+    "submission_authority": false,
+    "payment_or_wallet_authority": false
+  }
+}
