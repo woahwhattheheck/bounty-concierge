@@ -20,6 +20,7 @@ cash basis before cash thresholds are applied.
 | Fixed/range USD amount exists but its USD basis is not verified | `HOLD_UNVERIFIED_CASH` | economics verification only |
 | Unpriced or discretionary without a verified amount | `HOLD_UNPRICED` | economics verification only |
 | Token/points/native units without a verified USD cash basis | `HOLD_TOKEN_ONLY` | economics verification only |
+| Economics observation older than the caller's explicit freshness window | `HOLD_STALE_ECONOMICS` | economics verification only |
 
 A range is never promoted optimistically from its maximum. For example, a
 verified "$20-$100" offer crosses the $50 scheduling boundary and therefore
@@ -40,14 +41,22 @@ HOLDs until the economics are narrowed or explicitly promoted by the owner.
     "min_usd_cents": 5000,
     "max_usd_cents": 5000,
     "native_currency": null,
-    "native_amount": null
-  }
+    "native_amount": null,
+    "observed_at": "2026-09-19T23:00:00Z"
+  },
+  "evaluated_at": "2026-09-19T23:05:00Z",
+  "max_snapshot_age_seconds": 900
 }
 ```
 
 Kinds are `FIXED`, `RANGE`, `UNPRICED`, `DISCRETIONARY`, and
 `TOKEN_ONLY`. `TOKEN_ONLY` requires the native currency and amount for honest
 recordkeeping, but those values are never converted by this module.
+
+The caller must also bind when the economics were observed, the evaluation time,
+and an explicit freshness window (1 second through 7 days). Future evidence is
+rejected; stale evidence HOLDs. This prevents an old $50+ listing from remaining
+automatically active after its reward terms change.
 
 ## Verification and authority
 
