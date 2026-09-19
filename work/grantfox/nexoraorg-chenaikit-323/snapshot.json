@@ -1,0 +1,90 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-chenaikit-323/R",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Nightjar-64",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "nexoraorg/chenaikit",
+    "default_branch": "main",
+    "head_sha": "2653a3f1d670828068c3c3692d2c7834d2e8bf15",
+    "issue_number": 323,
+    "issue_state": "open",
+    "assignee": null,
+    "issue_comment_count": 3,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/nexoraorg/repo/chenaikit/issue/323",
+    "public_listing_resolved_by_fleet_root": true,
+    "assignment_independently_verified_by_this_seat": false,
+    "reward_amount_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "frontend_workflow_blob": "0a8437b8b68b385df99e3ff066ef1028df1cfba5",
+    "backend_workflow_blob": "9232e4c9e3a24c81ac87c0109f999bbf065ab972",
+    "contracts_workflow_blob": "c2408222213394473efa49b8641ff97b13757e9b",
+    "workflow_readme_blob": "cee36b57bbf57ef1d297d51c8049be0b42cee42e",
+    "root_package_blob": "20b3e38c57bdb61777854f9e35be022f68027f48",
+    "pnpm_workspace_blob": "b6d7bb8a6dd1629990b79856f71ea0e51a2e6259",
+    "pnpm_lock_blob": "03a746d4c094ab6f3870a73ab841db22dd7a371d",
+    "contracts_cargo_toml_blob": "5d8560b66e2ee204a5e50947fb8d6f602512696e",
+    "contracts_cargo_lock_blob": "d08acefa7cb9b507d48aa226e1e8df0b1cd0bb82",
+    "rust_toolchain_file_present": false,
+    "findings": [
+      "backend and shared-packages jobs already use setup-node cache: pnpm with pnpm 9.15.9 and Node 22",
+      "frontend intentionally uses npm to match Vercel and should not be silently converted to pnpm",
+      "contracts cache includes generated contracts/target output",
+      "contracts cache key hashes Cargo.toml files but not contracts/Cargo.lock",
+      "contracts cache key does not bind the actual moving stable rustc fingerprint or declared components/wasm target",
+      "issue asks for dependency timing, but no timing number is claimed without comparable Actions executions"
+    ]
+  },
+  "cache_contract": {
+    "pnpm": {
+      "payload": "package-manager store only",
+      "dependency_key_input": "pnpm-lock.yaml",
+      "tool_inputs": [
+        "node 22",
+        "pnpm 9.15.9"
+      ],
+      "no_credentials": true,
+      "no_node_modules": true
+    },
+    "cargo": {
+      "preferred_payload": [
+        "~/.cargo/registry",
+        "~/.cargo/git"
+      ],
+      "excluded_initial_payload": [
+        "contracts/target"
+      ],
+      "dependency_key_input": "contracts/Cargo.lock",
+      "tool_inputs": [
+        "actual rustc fingerprint",
+        "rustfmt",
+        "clippy",
+        "wasm32-unknown-unknown"
+      ],
+      "no_credentials": true
+    }
+  },
+  "acceptance": {
+    "require_cold_run": true,
+    "require_warm_hit": true,
+    "require_lockfile_invalidation": true,
+    "require_toolchain_invalidation": true,
+    "require_cache_contents_audit": true,
+    "timing_source": "actual assigned-PR GitHub Actions step/run evidence"
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "upstream_source_mutated": false,
+    "provider_application_terminal_state": "not_attempted_by_this_seat"
+  }
+}
