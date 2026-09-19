@@ -13,6 +13,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from .grantfox_queue_gate import (
+    GrantFoxQueueInputError,
     compile_grantfox_queue_gate,
     verify_receipt as verify_queue_receipt,
 )
@@ -436,7 +437,13 @@ def verify_continuity_receipt(receipt: dict[str, Any]) -> bool:
         return False
     try:
         return _semantic_replay(receipt) == receipt
-    except (GrantFoxContinuityInputError, KeyError, TypeError, ValueError):
+    except (
+        GrantFoxContinuityInputError,
+        GrantFoxQueueInputError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ):
         return False
 
 
