@@ -1,0 +1,39 @@
+{
+  "schema": "high-value-bounty-census/v1",
+  "operation": "HV-GYROFLOW-45-R-CINDER17-20260919",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Cinder-17",
+  "model": "GPT-5.6 Sol",
+  "economics": {
+    "source": "Algora",
+    "amount_usd": 500,
+    "verified_open_listing": true,
+    "historical_claim_count": 3
+  },
+  "upstream": {
+    "repository": "gyroflow/gyroflow",
+    "default_branch": "master",
+    "head_sha": "d918ab3594e539f25a67a9f1d2b8e042798f61f7",
+    "issue_number": 45,
+    "issue_state": "open",
+    "assignee": null,
+    "linked_development_surface": "none shown by primary GitHub issue"
+  },
+  "evidence": {
+    "autosync_blob": "cf0fa7003ab91dc5ed1dc79169bb510aa4e7d3e5",
+    "synchronization_blob": "c8160825a425a53cbfa1c74c701d6af78fa97ed0",
+    "findings": [
+      "no-gyro synchronize mode analyzes the entire video",
+      "optical flow and pose estimation generate estimated rotations",
+      "recalculate_gyro_data turns estimated rotations into TimeIMU samples",
+      "no-gyro path installs estimated samples into the active gyro source and applies transforms",
+      "literal 2022 issue is substantially implemented by current master"
+    ]
+  },
+  "disposition": "PARTIALLY_SUPERSEDED_RESIDUAL_ACCEPTANCE_HOLD",
+  "fence": {
+    "claim_or_implementation_requires_residual_scope_confirmation": true,
+    "upstream_source_mutated": false,
+    "bounty_state_mutated": false
+  }
+}
