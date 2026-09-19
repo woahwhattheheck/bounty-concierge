@@ -8,7 +8,7 @@ It exists to stop a finished implementation from dying in a local session and to
 
 - `DIRECT_BRANCH_PR`: upstream write access, branch/PR primitives, and an actual content-write path were observed.
 - `OWNED_FORK_PR`: a writable installed fork owned by the observed actor, branch/PR primitives, and an actual content-write path were observed.
-- `REUSE_EXISTING_PR`: an upstream PR is observed **open**; refresh and continue that carrier. Closed, merged, or unknown-state carriers hold instead of silently opening duplicate work.
+- `REUSE_EXISTING_PR`: an upstream PR is observed **open** and the provider assignment gate already permits this actor to continue implementation; refresh and continue that carrier. An open PR never overrides an assignment to another actor, unknown assignment state, or an assignment-required wait/application state. Closed, merged, or unknown-state carriers hold instead of silently opening duplicate work.
 - `APPLICATION_ONLY`: repository rules require provider assignment and no application has been sent yet.
 - `WAIT_ASSIGNMENT`: the application exists but assignment has not arrived.
 - `HOLD_ASSIGNED_TO_OTHER`: do not duplicate another assignee's implementation.
