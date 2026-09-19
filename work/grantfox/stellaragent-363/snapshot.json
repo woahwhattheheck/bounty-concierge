@@ -1,0 +1,49 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX-STELLARAGENT-363-R-CINDER17-20260919",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Cinder-17",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "StellarAgent-AI-Agent-Payment-Rails/Stellar-agentic",
+    "default_branch": "main",
+    "head_sha": "f92f0fcdfbfe4342184154e5cd4d3efd9168630f",
+    "issue_number": 363,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 2,
+    "matching_pr_found": false
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/StellarAgent-AI-Agent-Payment-Rails/repo/Stellar-agentic/issue/363",
+    "assignment_state": "unassigned",
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false,
+    "application_run_state": "pending"
+  },
+  "evidence": {
+    "core_package_blob": "db6101002878b09b61e4f581e4fe38de867be38a",
+    "stellar_agent_blob": "d9405cbab09482c0d012f522f5cc6d49b672f38c",
+    "invocation_blob": "88a7e88478462b182aa877eb5e336fb446131072",
+    "queries_blob": "242e63881b6ae29d9da51aeaee680ce8e5bed2f4",
+    "errors_blob": "3b764e801980d17ecb9bd814dfe74216b0cd78a2",
+    "cli_blob": "8c1c9b16b60e24a6dfb0a31b58a0a45b4aa80eee",
+    "integration_example_blob": "5664b2c1a6a16f0341a72d617e211038321d2401",
+    "deployment_example_blob": "3200f8b201d50507f1e37626468491c14ab9965e",
+    "findings": [
+      "current main has real openChannel/payForAPI Soroban mutation paths",
+      "new generated testnet agent is Friendbot-funded",
+      "spend limit panic maps to SPEND_LIMIT_EXCEEDED",
+      "README package name differs from packages/core package name",
+      "no checked-in ready testnet deployment",
+      "deployment requires seven contracts and five trusted nodes",
+      "CLI is route-preview only"
+    ]
+  },
+  "fence": {
+    "implementation_requires_provider_assignment": true,
+    "upstream_push_permission_via_connector": false,
+    "testnet_only_for_money_path": true
+  }
+}
