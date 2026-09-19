@@ -314,6 +314,55 @@ class GrantFoxContinuityTests(unittest.TestCase):
         changed["state"] = "PAID"
         self.assertFalse(verify_continuity_receipt(changed))
 
+    def test_rehashed_state_and_lifecycle_edit_is_rejected(self):
+        receipt = compile_continuity(request([
+            ev("APPLICATION_RECEIPT", 1, receipt_url=APPLICATION)
+        ]))
+        changed = deepcopy(receipt)
+        changed["state"] = "ASSIGNED"
+        changed["advisory_next_action"] = "IMPLEMENT_ASSIGNED_SCOPE"
+        changed["lifecycle"]["assigned"] = True
+        body = dict(changed)
+        body.pop("receipt_sha256")
+        changed["receipt_sha256"] = sha(body)
+        self.assertFalse(verify_continuity_receipt(changed))
+
+    def test_rehashed_hold_clearance_is_rejected(self):
+        receipt = compile_continuity(request([
+            ev("APPLICATION_RECEIPT", 1, receipt_url=APPLICATION),
+            ev(
+                "SNAPSHOT",
+                2,
+                issue_state="open",
+                actor_applied=False,
+                assigned_to=None,
+                linked_pr_urls=[],
+            ),
+        ]))
+        self.assertEqual(receipt["disposition"], "HOLD_RECONCILE")
+        changed = deepcopy(receipt)
+        changed["disposition"] = "CONTINUE"
+        changed["reason_codes"] = []
+        changed["advisory_next_action"] = "WAIT_FOR_PROVIDER_ASSIGNMENT"
+        body = dict(changed)
+        body.pop("receipt_sha256")
+        changed["receipt_sha256"] = sha(body)
+        self.assertFalse(verify_continuity_receipt(changed))
+
+    def test_rehashed_payment_promotion_without_events_is_rejected(self):
+        receipt = compile_continuity(request([
+            ev("APPLICATION_RECEIPT", 1, receipt_url=APPLICATION)
+        ]))
+        changed = deepcopy(receipt)
+        changed["state"] = "PAID"
+        changed["advisory_next_action"] = "COMPLETE_PAID_AND_ARCHIVE_RECEIPTS"
+        changed["lifecycle"]["payment_sent"] = True
+        changed["lifecycle"]["payment_received"] = True
+        body = dict(changed)
+        body.pop("receipt_sha256")
+        changed["receipt_sha256"] = sha(body)
+        self.assertFalse(verify_continuity_receipt(changed))
+
     def test_cli_hold_exit_code_and_json_roundtrip(self):
         payload = request([
             ev("APPLICATION_RECEIPT", 1, receipt_url=APPLICATION),
