@@ -1,0 +1,46 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-058-R-ZZ-SOLSTICE",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Solstice",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Gryd-lock/grydlock-testkit",
+    "default_branch": "main",
+    "head_sha": "7064404d6e7c44df1f980d532d23901651d79426",
+    "issue_number": 9,
+    "issue_state": "open",
+    "assignee": null,
+    "matching_pr_found": false
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Gryd-lock/repo/grydlock-testkit/issue/9",
+    "assignment_state": "unassigned",
+    "apply_control_observed": true,
+    "one_application_per_user": true,
+    "application_submitted": false,
+    "prior_application_comment_count": 2,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "scores_blob": "f27d17c781a9059cc1304af93def554391b63876",
+    "changelog_blob": "2eddb818a16f7483ed5a83b3d9949b17fd978d62",
+    "ci_workflow_blob": "53ce3ea3359798fd8b34d3a06728ae8110f7277c",
+    "score_entry_count": 12,
+    "score_snapshot_present": false,
+    "current_changelog_guard": "requires nonempty existing Unreleased content for fixture changes; does not bind exact score-change intent"
+  },
+  "disposition": {
+    "fleet_route": "APPLY_THEN_WAIT_FOR_ASSIGNMENT",
+    "implementation_started": false,
+    "next_action": "SUBMIT_PROVIDER_APPLICATION_AND_REFRESH_ASSIGNMENT"
+  },
+  "authority": {
+    "advisory_only": true,
+    "provider_assignment_authority": false,
+    "upstream_implementation_authority": false,
+    "payment_or_wallet_authority": false
+  }
+}
