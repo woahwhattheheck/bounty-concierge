@@ -1,0 +1,63 @@
+{
+  "schema": "grantfox-preassignment-baseline/v1",
+  "lane_id": "GFOX2-20260919-114",
+  "identity": {
+    "repository_full_name": "Ajo-contrib/soroban-ajo",
+    "issue_number": 957,
+    "issue_url": "https://github.com/Ajo-contrib/soroban-ajo/issues/957",
+    "listing_url": "https://contribute.grantfox.xyz/org/Ajo-contrib/repo/soroban-ajo/issue/957"
+  },
+  "provider_observation": {
+    "assignment": "Unassigned",
+    "apply_route_visible": true,
+    "linked_pr_urls": [
+      "https://github.com/Ajo-contrib/soroban-ajo/pull/1002"
+    ],
+    "reward_interpretation": "possible_discretionary_only",
+    "labels": [
+      "medium",
+      "frontend",
+      "Maybe Rewarded",
+      "GrantFox OSS",
+      "performance",
+      "Third Campaign"
+    ]
+  },
+  "upstream": {
+    "default_branch": "master",
+    "commit_sha": "1b87ea7344ae3d871e54abff05eabe5113bd2956",
+    "permissions": {
+      "pull": true,
+      "push": false
+    },
+    "blobs": {
+      ".github/workflows/performance.yml": "9a1a7398b0d9c69df454a497ccd4603b5dc19044",
+      "frontend/src/utils/monitoring.ts": "693545aef639ac7fb897ca7eb058ffc739b5764b",
+      "frontend/package.json": "8e106ae316ec4e836ce15ff74ccd6ae734945198"
+    }
+  },
+  "donor_pr": {
+    "number": 1002,
+    "state": "closed",
+    "merged": false,
+    "head_sha": "6224c916dcadb1c28342ee8bf0803692dd8e5106",
+    "base_sha": "ed63314021e4bd7974c5d9d562321cd2852c9776",
+    "maintainer_close_reason": "missing GrantFox assignment",
+    "submitted_reviews": 0
+  },
+  "findings": [
+    "performance workflow targets main/develop although repository default branch is master",
+    "current over-budget path warns but does not fail",
+    "current missing-build-output path is informational rather than fail-closed",
+    "source analyzer scans imports and is not an emitted-artifact budget check",
+    "runtime monitoring budget is 500*1024 bytes per observed script resource",
+    "donor PR has useful built-output logic but preserves the workflow branch-filter mismatch"
+  ],
+  "authority": {
+    "advisory_only": true,
+    "provider_application_authority": false,
+    "implementation_write_authority": false,
+    "submission_authority": false,
+    "award_or_payment_verified": false
+  }
+}
