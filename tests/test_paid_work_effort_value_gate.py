@@ -25,7 +25,7 @@ POLICY = {
         "max_batch_items": 200,
         "currencies": {
             "USD": {
-                "min_single_reward": "100",
+                "min_single_reward": "50",
                 "min_batch_reward": "500",
                 "min_reward_per_agent_hour": "100",
             },
@@ -123,6 +123,17 @@ class PaidWorkEffortValueGateTests(unittest.TestCase):
         self.assertFalse(
             receipt["authority"]["payment_cash_or_revenue_authority"]
         )
+
+    def test_75_dollar_fast_job_can_reach_downstream_go(self):
+        receipt = compile_paid_work_effort_value_gate(
+            request(candidate(amount="75", hours="0.5", cost="0"))
+        )
+        self.assertEqual(receipt["decision"], "GO")
+        self.assertTrue(receipt["economics"]["gross_economically_eligible"])
+        self.assertEqual(
+            receipt["economics"]["net_reward_after_model_tool_cost"], "75"
+        )
+        self.assertTrue(verify_receipt(receipt))
 
     def test_frantic_one_dollar_seed_skips_economics(self):
         receipt = compile_paid_work_effort_value_gate(

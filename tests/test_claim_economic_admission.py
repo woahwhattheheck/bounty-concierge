@@ -25,7 +25,7 @@ POLICY = {
         "max_batch_items": 200,
         "currencies": {
             "USD": {
-                "min_single_reward": "100",
+                "min_single_reward": "50",
                 "min_batch_reward": "500",
                 "min_reward_per_agent_hour": "100",
             },
