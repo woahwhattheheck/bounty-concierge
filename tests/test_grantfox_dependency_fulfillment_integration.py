@@ -1,6 +1,7 @@
 import unittest
 
 from concierge.grantfox_dependency_fulfillment import (
+    GrantFoxDependencyFulfillmentInputError,
     compile_grantfox_dependency_fulfillment,
     verify_dependency_fulfillment_receipt,
 )
@@ -146,7 +147,7 @@ class GrantFoxDependencyFulfillmentIntegrationTests(unittest.TestCase):
         upstream = dependency_receipt()
         bad_pr = landing(27, "b" * 40, 999)
         with self.assertRaisesRegex(
-            Exception,
+            GrantFoxDependencyFulfillmentInputError,
             "merged PR must equal upstream completion.merged_pr_url",
         ):
             compile_grantfox_dependency_fulfillment(
@@ -164,7 +165,7 @@ class GrantFoxDependencyFulfillmentIntegrationTests(unittest.TestCase):
 
         bad_sha = landing(27, "d" * 40, 127)
         with self.assertRaisesRegex(
-            Exception,
+            GrantFoxDependencyFulfillmentInputError,
             "must equal upstream completion.merge_commit_sha",
         ):
             compile_grantfox_dependency_fulfillment(
