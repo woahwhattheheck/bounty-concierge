@@ -1,0 +1,114 @@
+{
+  "captured_at": "2026-09-19",
+  "owner": "ZZ-Solstice-Palisade / GPT-5.6 Sol",
+  "operator_policy": {
+    "active_new_work": "verified fixed USD cash >= 50",
+    "pile": "USD 10-49",
+    "unpriced_maybe_rewarded": "HOLD_UNPRICED",
+    "gated_fixed_cash": "Do not implement until claim/account/CLA/assignment/approval gate is satisfied"
+  },
+  "midas": {
+    "sources": [
+      "https://www.midas.ceo/developers",
+      "https://github.com/bujiproject-art/agentmidasopendevteam/blob/main/BOUNTIES.md",
+      "https://github.com/bujiproject-art/agentmidasopendevteam"
+    ],
+    "economics": {
+      "app_bounty_count": 41,
+      "advertised_app_bounty_sum_usd": 10050,
+      "openclaw_bounty_count": 4,
+      "advertised_openclaw_sum_usd": 1550,
+      "combined_advertised_face_value_usd": 11600,
+      "payout": "Stripe on approval",
+      "entitlement_warning": "Advertised face value is not an award or claim. Claim state, eligibility and approval remain required."
+    },
+    "gates": [
+      "free signup",
+      "CLA",
+      "claim/collision check",
+      "provider claim issue/application",
+      "security review",
+      "approval"
+    ],
+    "priority_claim_census": [
+      {
+        "id": 18,
+        "name": "Revenue Dashboard",
+        "usd": 500
+      },
+      {
+        "id": 12,
+        "name": "Affiliate Dashboard Pro",
+        "usd": 500
+      },
+      {
+        "id": 34,
+        "name": "Healthcare Appointment System",
+        "usd": 500
+      },
+      {
+        "id": 15,
+        "name": "Team Genealogy Tree",
+        "usd": 400
+      },
+      {
+        "id": 19,
+        "name": "Payment Gateway Manager",
+        "usd": 400
+      },
+      {
+        "id": 30,
+        "name": "Restaurant POS Interface",
+        "usd": 400
+      },
+      {
+        "id": 33,
+        "name": "Law Firm Case Manager",
+        "usd": 400
+      },
+      {
+        "id": 22,
+        "name": "Live Chat Widget",
+        "usd": 350
+      },
+      {
+        "id": 31,
+        "name": "Real Estate Listing Portal",
+        "usd": 350
+      }
+    ],
+    "state": "GATED_FIXED_CASH"
+  },
+  "grantfox_fwc26": {
+    "query": "is:issue is:open label:\"GrantFox OSS\" label:\"Maybe Rewarded\" label:\"Official Campaign | FWC26\"",
+    "economic_state": "HOLD_UNPRICED",
+    "reason": "Issue bodies say may be rewarded; this census established no fixed USD amount.",
+    "examples": [
+      "AgriTrust-Protocol/AgriTrust-Contracts#150",
+      "StableRoute-Org/Stableroute-backend#551",
+      "Agentpay-Org/Agentpay-contracts#449",
+      "Agentpay-Org/Agentpay-contracts#451",
+      "Agentpay-Org/Agentpay-frontend#628",
+      "Agentpay-Org/Agentpay-frontend#629",
+      "Liquifact/Liquifact-contracts#1199",
+      "QuickLendX/quicklendx-frontend#62",
+      "QuickLendX/quicklendx-frontend#31",
+      "aid-linkk/aidlink-frontend#30",
+      "aid-linkk/aidlink-frontend#33",
+      "aid-linkk/aidlink-frontend#27",
+      "AnchorKit-1/Anchorkit-1#60",
+      "Flux-DeFi/LiquidFlow#163",
+      "Gryd-lock/grydlock-testkit#24",
+      "Gryd-lock/grydlock-testkit#11",
+      "Gryd-lock/grydlock-testkit#10"
+    ]
+  },
+  "required_pre_take_checks": [
+    "exact reward economics",
+    "claim/application/assignment gate",
+    "assignee + issue comments + matching open PR collision census",
+    "current default-branch SHA and source-gap revalidation",
+    "repository non-archived/write path viability",
+    "single implementation owner custody"
+  ]
+}
