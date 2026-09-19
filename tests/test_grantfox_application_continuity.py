@@ -268,6 +268,24 @@ class GrantFoxContinuityTests(unittest.TestCase):
                 ev("ASSIGNMENT_RECEIPT", 2, receipt_url=APPLICATION, assigned_to="woahwhattheheck"),
             ]))
 
+    def test_queue_actor_mismatch_is_rejected_when_observed(self):
+        q = queue_receipt()
+        q["provider_snapshot"] = {"actor_login": "someone-else"}
+        body = dict(q); body.pop("receipt_sha256")
+        q["receipt_sha256"] = sha(body)
+        with self.assertRaisesRegex(GrantFoxContinuityInputError, "differs from queue receipt actor"):
+            compile_continuity(request([
+                ev("APPLICATION_RECEIPT", 1, receipt_url=APPLICATION)
+            ], queue_receipt=q))
+
+    def test_noncanonical_github_owner_segment_is_rejected(self):
+        q = queue_receipt(canonical_issue_url="https://github.com/Gryd-lock@alias/grydlock-testkit/issues/33")
+        body = dict(q); body.pop("receipt_sha256")
+        q["receipt_sha256"] = sha(body)
+        with self.assertRaises(GrantFoxContinuityInputError):
+            compile_continuity(request([ev("APPLICATION_RECEIPT", 1, receipt_url=APPLICATION)], queue_receipt=q))
+
+
     def test_queue_receipt_tamper_is_rejected(self):
         q = queue_receipt()
         q["identity"]["issue_number"] = 99
