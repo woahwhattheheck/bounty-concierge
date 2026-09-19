@@ -1,12 +1,13 @@
 # GrantFox activation gate
 
-`concierge.grantfox_activation_gate` composes the four independent GrantFox
+`concierge.grantfox_activation_gate` composes the five independent GrantFox
 control receipts that workers otherwise have to interpret separately:
 
 1. `grantfox-queue-gate/v1` — current provider queue/application state.
 2. the verified GrantFox source-readiness receipt — pinned repository/source state.
 3. `grantfox-dependency-readiness-receipt/v1` — explicit prerequisite issue readiness, including an explicit zero-dependency receipt.
-4. `grantfox-application-continuity/v1` — monotonic durable lifecycle evidence.
+4. `grantfox-dependency-fulfillment-receipt/v1` — fresh proof that every declared prerequisite capability actually landed on the observed default-branch ancestry.
+5. `grantfox-application-continuity/v1` — monotonic durable lifecycle evidence.
 
 The gate is intentionally advisory-only. It performs no provider application,
 assignment, GitHub write, submission, adjudication, sponsor contact, payment, or
@@ -38,7 +39,7 @@ The activation gate fails closed across those seams.
 }
 ```
 
-All four receipts must verify using their native verifier. The gate then binds:
+All five receipts must verify using their native verifier. The gate then binds:
 
 - case-insensitive owner/repository + exact issue number;
 - exact actor between queue and continuity;
@@ -46,6 +47,8 @@ All four receipts must verify using their native verifier. The gate then binds:
   receipt;
 - the dependency receipt's embedded source receipt byte-for-byte to the supplied
   source receipt;
+- the fulfillment receipt's embedded dependency receipt byte-for-byte to the
+  supplied dependency receipt;
 - the continuity receipt's queue anchor SHA-256 to that same queue receipt.
 
 A digest swap, actor swap, or issue swap is an input error rather than a HOLD.
@@ -63,7 +66,8 @@ A digest swap, actor swap, or issue swap is an input error rather than a HOLD.
 - **`IMPLEMENT_ASSIGNED_SCOPE`** — the only implementation activation. It
   requires queue=`IMPLEMENTATION_ELIGIBLE`, continuity=`ASSIGNED`,
   continuity disposition not held, same actor/issue/queue/source anchors,
-  source=`SOURCE_ALIGNED`, and dependency=`DEPENDENCIES_CLEAR`.
+  source=`SOURCE_ALIGNED`, dependency=`DEPENDENCIES_CLEAR`, and
+  fulfillment=`DEPENDENCIES_FULFILLED`.
 - **`HOLD_SOURCE`** — source is `HOLD`, or an assigned scope has source drift.
 - **`HOLD_DEPENDENCIES`** — dependency evidence is itself stale or held and
   must be refreshed or reconciled.
@@ -133,3 +137,16 @@ request carries a verified dependency-readiness receipt. Issues with no
 prerequisites use an explicit empty dependency list, which compiles to
 `DEPENDENCIES_CLEAR`. Assigned issues with verified open prerequisites compile
 to `WAIT_DEPENDENCIES` and cannot produce `IMPLEMENT_ASSIGNED_SCOPE`.
+
+## Fulfillment rule
+
+Closure-level dependency readiness is necessary but not sufficient for implementation.
+The activation request must also carry a verified
+`grantfox-dependency-fulfillment-receipt/v1` that embeds the exact supplied
+dependency-readiness receipt. `FULFILLMENT_WAIT` maps to
+`WAIT_DEPENDENCIES`; fulfillment `HOLD` maps to `HOLD_DEPENDENCIES`;
+only `DEPENDENCIES_FULFILLED` can reach `IMPLEMENT_ASSIGNED_SCOPE`.
+
+For an issue with no prerequisites, the explicit chain is
+`dependencies: []` plus `landings: []`, which compiles to
+`DEPENDENCIES_FULFILLED` without inventing prerequisite evidence.
