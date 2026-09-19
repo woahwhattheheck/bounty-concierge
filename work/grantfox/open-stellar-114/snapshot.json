@@ -1,0 +1,70 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-OPEN-STELLAR-114/R-dependency-map",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Solstice",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Bitcoindefi/Open-Stellar",
+    "default_branch": "main",
+    "head_sha": "2edade4dda9f4f417845ae0ba74cb186d7dd6474",
+    "connector_permissions": {
+      "pull": true,
+      "push": false,
+      "admin": false
+    },
+    "issue_114": {
+      "state": "open",
+      "assignee": null,
+      "comments": 3
+    },
+    "issue_113": {
+      "state": "open",
+      "assignee": "Unclebaffa",
+      "comments": 6
+    },
+    "issue_156": {
+      "state": "open",
+      "assignee": null,
+      "comments": 7
+    }
+  },
+  "grantfox": {
+    "issue_114_url": "https://contribute.grantfox.xyz/org/Bitcoindefi/repo/Open-Stellar/issue/114",
+    "issue_114_assigned_to": "Unassigned",
+    "issue_114_apply_visible": true,
+    "issue_113_assigned_to": "Unclebaffa",
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "main_dependency_paths": {
+    "lib/task-market/offers.ts": false,
+    "lib/task-offers/store.ts": false,
+    "lib/task-offers/escrow.ts": false,
+    "app/api/task-offers/route.ts": false,
+    "app/api/task-offers/[id]/route.ts": false
+  },
+  "old_pr_440": {
+    "state": "open",
+    "head_sha": "09a6e7374bec86fd17f4d6dce58bb62d2841939f",
+    "source_blob": "bed1531e242f900d56623d8091a467f9646d1259",
+    "route_blob": "2b4acc11dafdb58e89d664db69fe88eb9ee62034",
+    "detail_route_blob": "6063f79936c734ca0a8feb7dfbbef4d19d60c5b2",
+    "test_blob": "6fa1c1bfdc4f817381558d50f0a07cc0b6202339",
+    "authoritative_dependency": false,
+    "observed_mismatches": [
+      "process-local globalThis Map store",
+      "escrow/refund represented by generated tracking IDs rather than real funds operations",
+      "decimal Number reward parsing rather than integer smallest-unit arithmetic",
+      "no idempotency-key creation path"
+    ]
+  },
+  "implementation_gate": {
+    "wait_for_issue_113_landed_canonical_state_machine": true,
+    "do_not_create_second_state_machine": true,
+    "upstream_source_mutated": false,
+    "provider_assignment_mutated": false,
+    "funds_or_reward_mutated": false
+  }
+}
