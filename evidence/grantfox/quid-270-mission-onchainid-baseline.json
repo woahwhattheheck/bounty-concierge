@@ -1,0 +1,73 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-QUID270/R-onchainid-baseline",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Solstice-Helix",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Quid-proquo/Quid",
+    "default_branch": "main",
+    "head_sha": "bd6b3b0571b10cc5f9a720e0ae37ee0542a2df82",
+    "issue_number": 270,
+    "issue_state": "open",
+    "issue_comments": 0,
+    "issue_assignees": [],
+    "labels": [
+      "backend",
+      "creator",
+      "Maybe Rewarded",
+      "GrantFox OSS",
+      "priority",
+      "Official Campaign | FWC26"
+    ],
+    "matching_open_prs_found": 0,
+    "declared_dependencies": "None"
+  },
+  "connector_observation": {
+    "repository_permissions": {
+      "pull": true,
+      "push": false,
+      "admin": false,
+      "maintain": false,
+      "triage": false
+    }
+  },
+  "evidence": {
+    "schema_sha": "f7580cafaba8a11c5a85569af680367d8fb5070b",
+    "init_migration_sha": "dbe0052b567c3c6f42d3ccae2c42a37da2086ac8",
+    "service_sha": "ce63f0a157b4b5a462e2943539d722ceac708295",
+    "service_tests_sha": "7d8dbcefa350992626582cee8c5de2e0f38a9450",
+    "readme_sha": "fae70c9c56c938db164fcd71f9ada5ee813126d3",
+    "package_sha": "4e2635d43699318b0c79ffb7abf6aea6795c2685",
+    "migration_directories": [
+      "20260101000000_init",
+      "20260324000000_add_mission_draft_model",
+      "20260728000000_add_submission_rejection_reason"
+    ],
+    "gap": "Mission has no onChainId field/index/migration and MissionsService has no get-by-chain-id helper",
+    "readme_signal": "backend README explicitly lists persist onChainId after on-chain create as an MVP gap",
+    "disposition": "SOURCE_GAP_CONFIRMED_ASSIGNMENT_GATED"
+  },
+  "acceptance": {
+    "proposed_field": "onChainId String? @unique @map(\"on_chain_id\")",
+    "nullable_to_preserve_existing_rows": true,
+    "forward_migration_only": true,
+    "service_helper_required": true,
+    "new_public_route_required": false,
+    "database_owns_uniqueness": true,
+    "no_publish_or_indexer_scope_creep": true,
+    "verification_commands": [
+      "npm run prisma:generate",
+      "npm run build",
+      "npm test -- --runInBand",
+      "npm run test:e2e"
+    ]
+  },
+  "fence": {
+    "upstream_source_mutated": false,
+    "provider_application_performed": false,
+    "assignment_obtained": false,
+    "live_database_migrated": false,
+    "reward_or_payment_verified": false
+  }
+}
