@@ -101,6 +101,22 @@ class TestParseReward:
         reward = bounty_index.parse_reward("", "Reward is 42 RTC for this task")
         assert reward == 42.0
 
+    def test_does_not_bridge_newline_from_unrelated_number_to_rtc_wallet(self):
+        """A URL/comment ID on one line must not become an RTC reward later."""
+        body = (
+            "Flower proof:\n"
+            "https://github.com/Scottcjn/rustchain-bounties/pull/16982"
+            "#issuecomment-5722881083\n\n"
+            "RTC wallet:\n"
+            "RTCaefa6fef8bd9b1447320d96f997eb972ccac4863"
+        )
+        assert bounty_index.parse_reward("Claim: May Flowers Star Pack", body) == 0.0
+
+    def test_parse_reward_allows_horizontal_tab_before_rtc(self):
+        """Horizontal whitespace remains valid within one reward line."""
+        assert bounty_index.parse_reward("", "Reward is 42\tRTC") == 42.0
+
+
 
 class TestEstimateDifficulty:
     """Tests for difficulty estimation with exact tier assertions."""
