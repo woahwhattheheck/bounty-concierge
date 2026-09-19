@@ -44,27 +44,55 @@ _ATTEMPT_PHRASE_RE = re.compile(
     r"i(?:'d|\s+would)\s+like\s+to\s+work\s+on\s+this(?:\s+bounty)?)\b"
 )
 _MAINTAINER_PAUSE_PATTERNS = (
+    # Imperative forms are anchored to a sentence/line boundary so descriptive
+    # prose such as "this does not stop new work" cannot acquire dispatch authority.
     re.compile(
-        r"(?i)\bhold\s+off(?:\s+(?:with|on))?\s+"
-        r"(?:any\s+|new\s+)?(?:attempts?|claims?|pull\s+requests?|prs?|"
-        r"submissions?|implementations?|work)\b"
+        r"(?im)(?:^|[.!?]\\s+)(?:please\\s+)?hold\\s+off(?:\\s+(?:with|on))?\\s+"
+        r"(?:any\\s+|new\\s+)?(?:attempts?|claims?|pull\\s+requests?|prs?|"
+        r"submissions?|implementations?|work)\\b"
     ),
     re.compile(
-        r"(?i)\b(?:please\s+)?do\s+not\s+(?:"
-        r"start\s+(?:any\s+|new\s+)?(?:work|implementation|attempts?)|"
-        r"attempt\s+(?:this\s+|the\s+)?(?:bounty|issue|work)|"
-        r"claim\s+(?:this\s+|the\s+)?(?:bounty|issue)|"
-        r"(?:submit|open)\s+(?:a\s+|any\s+|new\s+|another\s+)?"
-        r"(?:pull\s+requests?|prs?|claims?|submissions?)"
-        r")\b"
+        r"(?im)(?:^|[.!?]\\s+)(?:please\\s+)?(?:do\\s+not|don't)\\s+(?:"
+        r"start\\s+(?:any\\s+|new\\s+)?(?:work|implementation|attempts?)|"
+        r"attempt\\s+(?:this\\s+|the\\s+)?(?:bounty|issue|work)|"
+        r"claim\\s+(?:this\\s+|the\\s+)?(?:bounty|issue)|"
+        r"(?:submit|open)\\s+(?:a\\s+|any\\s+|new\\s+|another\\s+)?"
+        r"(?:pull\\s+requests?|prs?|claims?|submissions?)"
+        r")\\b"
+    ),
+    # Explicit maintainer policy statements are authoritative even when they
+    # are not phrased as imperatives.
+    re.compile(
+        r"(?i)\\bwe(?:'re|\\s+are)\\s+(?:not\\s+(?:(?:going\\s+to\\s+be|currently)\\s+)?|"
+        r"no\\s+longer\\s+)accepting\\s+(?:any\\s+|new\\s+|more\\s+)?(?:bounty\\s+)?"
+        r"(?:attempts?|claims?|pull\\s+requests?|prs?|submissions?)\\b"
     ),
     re.compile(
-        r"(?i)\bno\s+(?:new\s+|more\s+)?"
-        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?)\b"
+        r"(?i)\\bwe\\s+(?:will\\s+not|won't)\\s+(?:be\\s+)?accept(?:ing)?\\s+"
+        r"(?:any\\s+|new\\s+|more\\s+)?(?:bounty\\s+)?"
+        r"(?:attempts?|claims?|pull\\s+requests?|prs?|submissions?)\\b"
     ),
     re.compile(
-        r"(?i)\bstop\s+(?:new\s+)?"
-        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|implementation|work)\b"
+        r"(?i)\\b(?:new|further|more)\\s+"
+        r"(?:attempts?|claims?|pull\\s+requests?|prs?|submissions?)\\s+"
+        r"(?:are|remain)\\s+(?:currently\\s+|temporarily\\s+)?paused\\b"
+    ),
+    re.compile(
+        r"(?im)(?:^|[.!?]\\s+)(?:please\\s+)?wait\\s+before\\s+"
+        r"(?:submitting|opening|starting|claiming|attempting)\\b"
+    ),
+    re.compile(
+        r"(?im)(?:^|[.!?]\\s+)(?:please\\s+)?stop\\s+(?:all\\s+|new\\s+|further\\s+)?"
+        r"(?:attempts?|claims?|pull\\s+requests?|prs?|submissions?|implementation|work)\\b"
+    ),
+    # "No new/more ..." is too ambiguous by itself. Require a temporal
+    # directive continuation; historical prose ("no new claims were filed")
+    # must not pause dispatch.
+    re.compile(
+        r"(?im)(?:^|[.!?]\\s+)no\\s+(?:new|more|further)\\s+"
+        r"(?:attempts?|claims?|pull\\s+requests?|prs?|submissions?)\\s+"
+        r"(?:until\\b|while\\b|for\\s+now\\b|right\\s+now\\b|"
+        r"at\\s+this\\s+time\\b|effective\\b)"
     ),
 )
 
