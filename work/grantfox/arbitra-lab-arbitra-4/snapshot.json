@@ -1,0 +1,79 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-arbitra-4-R-ZZ-SOL-DELTA",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Delta",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Arbitra-Lab/Arbitra",
+    "default_branch": "main",
+    "head_sha": "b98c3f7eb6ee283c97ef7bfd8917280a8197b698",
+    "issue_number": 4,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 1,
+    "open_pr_count": 0,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Arbitra-Lab/repo/Arbitra/issue/4",
+    "public_assignment_state": "Unassigned",
+    "application_route_visible": true,
+    "one_application_per_user": true,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false,
+    "application_attempt": {
+      "status": "not_started",
+      "submitted_verified": false
+    }
+  },
+  "evidence": {
+    "frontend_package_blob": "827361835145b256b32bab942a3f321583d931ba",
+    "vitest_config_blob": "b3313748cb5b383f842f4afae9b02fabdcda2b69",
+    "auth_store_test_blob": "61f6841c37ca9174632c8ccc2d71ffee135ec843",
+    "vitest": {
+      "environment": "jsdom",
+      "include": "**/__tests__/**/*.test.{ts,tsx}",
+      "coverage_package_installed": true,
+      "coverage_script_present": false,
+      "coverage_threshold_present": false,
+      "ci_coverage_enforced": false
+    },
+    "existing_test_groups": [
+      "components/error",
+      "lib",
+      "security",
+      "store"
+    ],
+    "critical_surfaces": [
+      "frontend/components/auth/WalletConnectButton.tsx",
+      "frontend/components/auth/ProtectedRoute.tsx",
+      "frontend/app/user/disputes",
+      "frontend/app/admin/disputes",
+      "frontend/app/user/contracts",
+      "frontend/components/stellar"
+    ],
+    "live_network_allowed_for_tests": false
+  },
+  "post_assignment": {
+    "required": [
+      "wallet and password component tests",
+      "user dispute tests",
+      "admin arbitration tests",
+      "escrow/contract integration tests",
+      "shared deterministic fixtures",
+      "coverage-v8 command and threshold",
+      "CI coverage enforcement",
+      "70 percent or greater documented coverage"
+    ]
+  },
+  "fence": {
+    "implementation_requires_provider_or_maintainer_assignment": true,
+    "funded_wallet_or_mainnet_test_use": false,
+    "upstream_source_mutated": false
+  }
+}
