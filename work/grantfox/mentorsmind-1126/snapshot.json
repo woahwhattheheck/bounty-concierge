@@ -1,1 +1,28 @@
-{"issue":1126}
+{
+  "schema": "grantfox-source-baseline/v1",
+  "identity": {
+    "owner": "MentorsMind",
+    "repo": "MentorsMind-Contract",
+    "issue_number": 1126
+  },
+  "upstream": {
+    "ref": "main",
+    "sha": "e90e16fc3a78122949ce63af7308320c59acb112"
+  },
+  "source_blobs": {
+    "kyc_lib": "f00b859cf0be66f3b310d938db4cc5cefc59ac12",
+    "kyc_tests": "a824f4e0c348c89faf9a8fa7637397d26c2110d2",
+    "cross_contract_recovery": "598f1fe599fcdbe32add4262b1cc4b9c72a5021e",
+    "shared_lib": "23a2cd36472129ce1357c24c1f0bb3159ae39246"
+  },
+  "findings": [
+    "execute_with_recovery returns rollback marker but does not snapshot or restore storage",
+    "trigger_rollback only constructs CrossContractRecoveryState",
+    "KYC register_identity recovery closure has no error branch",
+    "KYC register_identity discards recovery Result and unconditionally emits success/returns true",
+    "wrapped write is CrossPlatformIdentity rather than DataKey::Kyc state named by issue acceptance",
+    "RecoveryState acceptance name refers to failure_tracking while recovery helper exports CrossContractRecoveryState",
+    "no KYC recovery regression found"
+  ],
+  "disposition": "SOURCE_DRIFT_REPLAN_WAIT_FOR_ASSIGNMENT"
+}
