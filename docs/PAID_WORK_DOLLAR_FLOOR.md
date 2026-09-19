@@ -66,7 +66,7 @@ as too expensive for its expected effort.
 
 ```json
 {
-  "schema": "paid-work-dollar-floor/v1",
+  "schema": "paid-work-dollar-floor/v2",
   "evaluated_at": "2026-09-19T23:00:00Z",
   "policy": {
     "schema": "paid-work-dollar-floor-policy/v1",
@@ -82,6 +82,7 @@ as too expensive for its expected effort.
     "canonical_source_url": "https://github.com/org/repo/issues/123",
     "payout_evidence": {
       "state": "VERIFIED",
+      "amount_semantics": "FIXED",
       "amount": "75",
       "currency": "USD",
       "unit_type": "CASH",
@@ -103,7 +104,7 @@ For an amount not yet verified, use only:
 }
 ```
 
-Do not include an amount, currency, unit type, or authority in an
+Do not include amount semantics, amount/range fields, currency, unit type, or authority in an
 `UNVERIFIED` record.
 
 ## CLI
