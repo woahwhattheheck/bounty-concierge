@@ -1,0 +1,59 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-nftopia-384/R-contract-path-census",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Rook-73",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "NFTopia-Foundation/nftopia-stellar",
+    "default_branch": "main",
+    "head_sha": "535c03fd8ee344ad73282d4aef76139befc4b24a",
+    "issue_number": 384,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 4,
+    "matching_pr_found": false,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "assignment": "unassigned",
+    "labels": [
+      "Rust",
+      "Soroban",
+      "GrantFox",
+      "Maybe Rewarded",
+      "GrantFox OSS",
+      "Third Campaign"
+    ],
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "auction_engine_blob": "2b4070876eedb731e7560a42c6d81a25de1f0b6a",
+    "frontrun_protection_blob": "e5a7d7b0b59f3183c2e9656177bf5f7ba4ef125d",
+    "auction_store_blob": "624ab896a0137777f73b1874682f0a11e0c01ba6",
+    "asset_utils_blob": "a073d6edc410a3a94832987422b5145852d6cb0b",
+    "error_blob": "09d5aa83f9d2f7f76b8b1b17341b9b665c3329fa",
+    "test_blob": "2866535d36324e512f27cd6895a471c8c7016ea5",
+    "stale_issue_claims": [
+      "starting_price<=0 already rejected",
+      "reserve_price<0 already rejected",
+      "direct/commit place_bid zero amount already rejected",
+      "zero-price regression test already exists"
+    ],
+    "residuals": [
+      "commitment construction does not bind bidder, auction_id, or bid_amount",
+      "reveal_bid bypasses validate_bid_amount before refund/state transition",
+      "per-auction bid history append is unbounded",
+      "absolute dust threshold policy is unresolved across dynamic token decimals"
+    ]
+  },
+  "fence": {
+    "implementation_requires_provider_or_maintainer_assignment": true,
+    "upstream_mutated": false
+  }
+}

@@ -188,6 +188,51 @@ class PublicationRouteGateTests(unittest.TestCase):
         receipt = compile_publication_route(observation(provider_assignment="unknown"))
         self.assertEqual(receipt["disposition"], "HOLD_ASSIGNMENT_UNKNOWN")
 
+    def test_open_existing_pr_cannot_bypass_provider_assignment_gate(self):
+        existing_pr = {
+            "existing_pr_url": "https://github.com/GrantChain/GrantFox/pull/99",
+            "existing_pr_state": "open",
+        }
+        cases = (
+            ({"provider_assignment": "other"}, "HOLD_ASSIGNED_TO_OTHER"),
+            ({"provider_assignment": "unknown"}, "HOLD_ASSIGNMENT_UNKNOWN"),
+            (
+                {
+                    "provider_requires_assignment": True,
+                    "provider_assignment": "none",
+                    "actor_applied": False,
+                },
+                "APPLICATION_ONLY",
+            ),
+            (
+                {
+                    "provider_requires_assignment": True,
+                    "provider_assignment": "none",
+                    "actor_applied": True,
+                },
+                "WAIT_ASSIGNMENT",
+            ),
+        )
+        for provider, expected in cases:
+            with self.subTest(expected=expected):
+                receipt = compile_publication_route(
+                    observation(**existing_pr, **provider)
+                )
+                self.assertEqual(receipt["disposition"], expected)
+                self.assertNotEqual(receipt["disposition"], "REUSE_EXISTING_PR")
+
+    def test_open_existing_pr_reuse_is_allowed_after_actor_assignment(self):
+        receipt = compile_publication_route(
+            observation(
+                existing_pr_url="https://github.com/GrantChain/GrantFox/pull/99",
+                existing_pr_state="open",
+                provider_requires_assignment=True,
+                provider_assignment="actor",
+                actor_applied=True,
+            )
+        )
+        self.assertEqual(receipt["disposition"], "REUSE_EXISTING_PR")
+
     def test_existing_upstream_pr_is_reused_before_new_branch_routing(self):
         receipt = compile_publication_route(
             observation(

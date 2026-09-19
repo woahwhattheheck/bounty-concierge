@@ -1,0 +1,51 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-110-R-PARALLAX-Q7N4",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ–Parallax-Q7N4",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Gryd-lock/grydlock-testkit",
+    "default_branch": "main",
+    "head_sha": "7064404d6e7c44df1f980d532d23901651d79426",
+    "issue_number": 19,
+    "issue_state": "open",
+    "assignee": null
+  },
+  "provider": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Gryd-lock/repo/grydlock-testkit/issue/19",
+    "application_submitted_by_worker": false,
+    "refresh_required": true,
+    "reason": "concurrent provider/application snapshots disagreed on applicant count"
+  },
+  "evidence": {
+    "blobs": {
+      "scripts/lib/taxonomy.mjs": "44b6890344e7a01f108af0a9ced5f1caf7e945df",
+      "CONTRIBUTING.md": "f2e18f5f1db2390c8c294c1c35bc63f6a86dec31",
+      "scripts/__fixtures__/expected-counts.json": "5ff39c9bf47388b81e0523ffd3365be167da30ab",
+      "CHANGELOG.md": "2eddb818a16f7483ed5a83b3d9949b17fd978d62"
+    },
+    "current_fixture_count": 12,
+    "cold_start_risk_pattern_present_in_taxonomy": true,
+    "cold_start_fixture_present": false,
+    "score_bands": {
+      "clean": "0-25",
+      "suspicious": "40-70",
+      "malicious": "75-100"
+    }
+  },
+  "residual": {
+    "reuse_existing_risk_pattern": true,
+    "add_2_to_3_synthetic_accounts": true,
+    "preserve_synthetic_only": true,
+    "required_commands": [
+      "npm run validate",
+      "npm test"
+    ]
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "application_submitted": false,
+    "upstream_source_mutated": false
+  }
+}
