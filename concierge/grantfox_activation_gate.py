@@ -172,6 +172,9 @@ def compile_activation(request: dict[str, Any]) -> dict[str, Any]:
         elif fdisp == "FULFILLMENT_WAIT":
             disposition = "WAIT_DEPENDENCIES"
             reasons.append("PREREQUISITE_LANDING_EVIDENCE_MISSING")
+        elif fdisp == "HOLD" and ddisp == "DEPENDENCY_WAIT":
+            disposition = "WAIT_DEPENDENCIES"
+            reasons.append("PREREQUISITE_ISSUES_OPEN")
         elif fdisp == "HOLD":
             disposition = "HOLD_DEPENDENCIES"
             reasons.append("DEPENDENCY_FULFILLMENT_HOLD")
