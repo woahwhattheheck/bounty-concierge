@@ -168,3 +168,18 @@ python -m py_compile \
 ```
 
 Focused hostiles cover one-RTC microtasks, high-reward/low-rate work, aggregate batch floors, aggregate rate floors, anti-subsidy behavior, exact and aliased duplicate identities, mixed-currency batch keys, hostile URL ingress, float/bool/non-finite numeric ingress, missing policy, no cross-currency winner, deterministic receipts, tamper detection, and the CLI authority ceiling.
+
+
+## Swarm bounty authority boundary
+
+This compiler remains useful for generic native-currency economics, including
+non-USD/noncash planning domains, but its receipt explicitly carries
+`swarm_bounty_dispatch_authority=false`. A native-currency result such as
+`SINGLE_ELIGIBLE` is therefore not enough to enter the swarm bounty claim or
+implementation path.
+
+New swarm bounty admission flows through `paid_work_dollar_floor` first and
+only an ACTIVE dollar-floor ancestor can reach `paid_work_effort_value_gate`
+GO. This separation preserves reusable economics while preventing token-only or
+micro-bounty direct callers from bypassing the owner's $50 active floor.
+
