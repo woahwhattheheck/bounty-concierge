@@ -121,3 +121,24 @@ The CLI returns `0` only for `ACTIVE_REVIEW`; pile/prune/hold outcomes return
 Every receipt states that it is advisory only and grants no external claim,
 submission, outbound-contact, payment, cash/revenue, FX, or noncash-valuation
 authority.
+
+
+## Amount semantics and source generation
+
+Dollar-floor request schema v2 requires VERIFIED payout evidence to declare one
+of three amount semantics:
+
+- `FIXED`: one exact amount.
+- `RANGE`: explicit minimum and maximum. The minimum is the guaranteed amount
+  used for routing and downstream economics. A range wholly at or above $50 can
+  enter active review; a range wholly inside $10–49.99 stays in the pile; a
+  range crossing either routing boundary holds for clarification.
+- `UP_TO`: a ceiling only. A ceiling never promotes active work because it
+  proves no guaranteed/current amount.
+
+The 10/50 policy, accepted evidence authorities, and authority ceiling are
+captured in a private immutable generation at module import. Public module
+mirrors exist for diagnostics/backward inspection only; rebinding or mutating
+them does not change production compile/verify behavior. Lone surrogate code
+points are rejected before canonical UTF-8 hashing.
+
