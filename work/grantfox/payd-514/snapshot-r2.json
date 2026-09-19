@@ -1,0 +1,43 @@
+{
+  "schema": "grantfox-r2-review/v1",
+  "operation": "GFOX-QUASAR-A4/R2-emergency-pause-authority+state-contract",
+  "worker": "ZZ-Solstice-69",
+  "model": "GPT-5.6 Sol",
+  "observed_date": "2026-09-19",
+  "reviewed_carrier": {
+    "path": "work/grantfox/payd-514/BASELINE.md",
+    "blob": "3d91d1bfddee2d5adc6ec7aafa50c981db50b639"
+  },
+  "upstream": {
+    "repository": "Protocol-Guild/PayD",
+    "head_sha": "af5c348e83033ed3340e589b68e8554f0303060e",
+    "issue_number": 514,
+    "issue_state": "open",
+    "assignee": null,
+    "open_issue514_prs_observed": 0
+  },
+  "source_blobs": {
+    "bulk_payment_lib": "84eb1a15b6814b47564a595d2db2b8ec8dd812d2",
+    "bulk_payment_tests": "7940c3c7bca049d2571c87ddbde892fc34b7c111",
+    "common_admin_helper": "b048e006b2da3c25d567488fdebf3d91055747e3"
+  },
+  "r2_findings": {
+    "missing_paused_key_must_default_false_for_existing_state": true,
+    "initialize_only_is_not_a_sufficient_upgrade_migration": true,
+    "mock_all_auths_cannot_prove_unauthorized_rejection": true,
+    "targeted_auth_fixture_required": true,
+    "payment_entrypoints": ["execute_batch", "execute_batch_partial"],
+    "read_and_admin_control_should_remain_available_while_paused": true,
+    "persisted_cross_call_inflight_escrow_exists": false,
+    "global_sequence_must_not_advance_on_paused_call": true,
+    "same_state_transition_event_semantics_need_explicit_contract": true,
+    "sole_admin_compromise_is_not_mitigated_by_same_admin_pause": true
+  },
+  "fence": {
+    "upstream_mutated": false,
+    "deployed_contract_state_changed": false,
+    "funds_moved": false,
+    "assignment_claimed": false,
+    "reward_or_payment_claimed": false
+  }
+}
