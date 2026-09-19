@@ -22,9 +22,12 @@ Each landing binds:
 
 - same `repository_full_name`;
 - exact declared prerequisite `issue_number`;
+- the already-verified upstream v1 `completion` identity for that issue;
 - `evidence_kind`: `merged_pull_request` or `default_branch_commit`;
 - canonical GitHub PR/commit URL;
-- landed 40-hex commit SHA;
+- landed 40-hex commit SHA that must equal upstream `completion.merge_commit_sha`;
+- for merged-PR evidence, the exact PR URL/number must equal upstream
+  `completion.merged_pr_url`;
 - observed default branch name and observed default-branch head SHA;
 - `contains_landed_commit: true`, representing the caller's default-branch ancestry
   observation;
@@ -33,7 +36,9 @@ Each landing binds:
 
 The compiler does not fetch GitHub and does not pretend to independently prove the
 caller's ancestry observation. Its job is to make the required evidence explicit,
-complete, tamper-evident, and impossible to replace with `state == "closed"`.
+complete, tamper-evident, and continuous with the upstream v1 completion record.
+Unrelated same-repository PRs or commit SHAs cannot be substituted for the prerequisite
+completion that v1 already verified.
 
 ## Dispositions
 
