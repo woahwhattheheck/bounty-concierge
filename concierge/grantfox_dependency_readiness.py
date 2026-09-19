@@ -131,8 +131,6 @@ def _normalize_dependencies(
 ) -> tuple[list[dict[str, Any]], bool]:
     if type(value) is not list:
         raise GrantFoxDependencyReadinessInputError("dependencies must be a list")
-    if not value:
-        raise GrantFoxDependencyReadinessInputError("dependencies must not be empty")
     if len(value) > _MAX_DEPENDENCIES:
         raise GrantFoxDependencyReadinessInputError(
             f"dependencies must contain at most {_MAX_DEPENDENCIES} entries"
