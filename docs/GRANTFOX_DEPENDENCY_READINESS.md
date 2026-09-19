@@ -34,7 +34,8 @@ The compiler consumes:
       "issue_url": "https://github.com/Gryd-lock/grydlock-testkit/issues/27",
       "state": "open",
       "observed_at": "2026-09-19T22:01:00Z",
-      "basis": "Issue #33 explicitly says to build on describe-transactions tooling."
+      "basis": "Issue #33 explicitly says to build on describe-transactions tooling.",
+      "completion": null
     }
   ],
   "evaluated_at": "2026-09-19T22:02:00Z",
@@ -45,8 +46,13 @@ The compiler consumes:
 Every dependency must use the source receipt's owner/repository, exact canonical
 GitHub issue URL, a distinct positive issue number, `open` or `closed` state, a
 fresh observation time, and a non-empty `basis` explaining why it is a real
-prerequisite. Duplicate issues, self-dependencies, cross-repository aliases, and
-non-canonical URLs fail closed.
+prerequisite. A closed issue is not completion evidence by itself. Closed
+prerequisites must also include `completion.kind="source_present"`, a 40-character
+`completion.commit_sha` exactly equal to the verified source receipt's pinned
+repository commit, and a non-empty completion basis. Open prerequisites must not
+carry completion evidence. Duplicate issues, self-dependencies, cross-repository
+aliases, non-canonical URLs, closure-only claims, and completion evidence for a
+different source generation fail closed.
 
 The same-repository restriction is intentional for v1. Cross-repository
 dependencies require a stronger identity and source-binding contract rather than
@@ -56,8 +62,9 @@ silently trusting a URL string.
 
 ### `DEPENDENCIES_CLEAR`
 
-All prerequisite observations are fresh and closed, and the embedded source
-receipt is `SOURCE_ALIGNED`.
+All prerequisite observations are fresh and closed, every closed prerequisite
+has explicit `source_present` completion evidence bound to the exact pinned
+repository commit, and the embedded source receipt is `SOURCE_ALIGNED`.
 
 Advisory next action:
 `CONTINUE_WITH_PROVIDER_AND_ASSIGNMENT_GATES`.
@@ -116,6 +123,7 @@ Every receipt hard-codes:
 }
 ```
 
-Dependency clearance says only that declared prerequisite issue observations are
-closed and fresh. It never assigns a bounty, proves a reward, authorizes a
-provider application, or authorizes source/payment mutation.
+Dependency clearance says only that declared prerequisite observations are
+closed, fresh, and accompanied by source-present completion evidence bound to the
+verified pinned source generation. It never assigns a bounty, proves a reward,
+authorizes a provider application, or authorizes source/payment mutation.
