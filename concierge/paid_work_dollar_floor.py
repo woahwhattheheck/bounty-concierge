@@ -39,6 +39,15 @@ _DECISIONS = frozenset(
         "HOLD_VALUE_NONCOMPARABLE",
     }
 )
+_SOURCE_POLICY = {
+    "schema": _POLICY_SCHEMA,
+    "currency": "USD",
+    "pile_floor": "10",
+    "active_floor": "50",
+    "max_evidence_age_seconds": 86400,
+    "pile_route": "bounty-pile-10-49",
+    "active_route": "main-bounty-queue",
+}
 _AUTHORITY = {
     "advisory_only": True,
     "external_claim_authority": False,
@@ -167,7 +176,9 @@ def _timestamp(value: Any, field: str) -> datetime:
     return parsed.replace(tzinfo=timezone.utc)
 
 
-def _strict_https_url(value: Any, field: str) -> str:
+def _strict_https_url(
+    value: Any, field: str, *, allow_fragment: bool = False
+) -> str:
     raw = _text(value, field, max_chars=2048)
     if any(ch.isspace() for ch in raw) or "\\" in raw:
         raise DollarFloorInputError(
@@ -190,7 +201,7 @@ def _strict_https_url(value: Any, field: str) -> str:
         raise DollarFloorInputError(
             f"{field} must not contain userinfo or an explicit port"
         )
-    if parsed.fragment:
+    if parsed.fragment and not allow_fragment:
         raise DollarFloorInputError(f"{field} must not contain a fragment")
     return raw
 
@@ -245,7 +256,7 @@ def _normalize_policy(raw: Any) -> dict[str, Any]:
     active_route = _text(
         policy["active_route"], "policy.active_route", max_chars=128
     )
-    return {
+    normalized = {
         "schema": _POLICY_SCHEMA,
         "currency": "USD",
         "pile_floor": _amount_text(pile_floor),
@@ -254,6 +265,11 @@ def _normalize_policy(raw: Any) -> dict[str, Any]:
         "pile_route": pile_route,
         "active_route": active_route,
     }
+    if normalized != _SOURCE_POLICY:
+        raise DollarFloorInputError(
+            "policy must equal the source-owned paid-work dollar floor"
+        )
+    return normalized
 
 
 def compile_paid_work_dollar_floor(
@@ -303,6 +319,7 @@ def compile_paid_work_dollar_floor(
     evidence_url = _strict_https_url(
         evidence["evidence_url"],
         "candidate.payout_evidence.evidence_url",
+        allow_fragment=True,
     )
     observed = _timestamp(
         evidence["observed_at"],
@@ -425,7 +442,7 @@ def compile_paid_work_dollar_floor(
 
 
 def verify_receipt(receipt: dict[str, Any]) -> bool:
-    """Verify receipt integrity and the advisory authority ceiling."""
+    """Verify integrity, authority, source policy, and semantic replay."""
     if type(receipt) is not dict:
         return False
     if receipt.get("schema") != _RECEIPT_SCHEMA:
@@ -445,9 +462,48 @@ def verify_receipt(receipt: dict[str, Any]) -> bool:
     if _sha256_json(body) != digest:
         return False
     policy = body.get("policy")
-    if type(policy) is not dict:
+    if (
+        type(policy) is not dict
+        or policy != _SOURCE_POLICY
+        or body.get("policy_sha256") != _sha256_json(policy)
+    ):
         return False
-    return body.get("policy_sha256") == _sha256_json(policy)
+
+    evidence = body.get("payout_evidence")
+    if type(evidence) is not dict:
+        return False
+    request_evidence = {
+        "state": evidence.get("state"),
+        "evidence_url": evidence.get("evidence_url"),
+        "observed_at": evidence.get("observed_at"),
+    }
+    if evidence.get("state") == "VERIFIED":
+        request_evidence.update(
+            {
+                "amount": evidence.get("amount"),
+                "currency": evidence.get("currency"),
+                "unit_type": evidence.get("unit_type"),
+                "authority": evidence.get("authority"),
+            }
+        )
+    try:
+        replayed = compile_paid_work_dollar_floor(
+            {
+                "schema": _REQUEST_SCHEMA,
+                "evaluated_at": body.get("evaluated_at"),
+                "policy": policy,
+                "candidate": {
+                    "work_id": body.get("work_id"),
+                    "canonical_source_url": body.get(
+                        "canonical_source_url"
+                    ),
+                    "payout_evidence": request_evidence,
+                },
+            }
+        )
+    except (DollarFloorInputError, TypeError, ValueError):
+        return False
+    return replayed == receipt
 
 
 def format_summary(receipt: dict[str, Any]) -> str:
@@ -483,6 +539,11 @@ def _strict_json_bytes(payload: bytes, source: str) -> dict[str, Any]:
             out[key] = value
         return out
 
+    def reject_float(value: str) -> Any:
+        raise DollarFloorInputError(
+            f"{source} contains a floating-point number"
+        )
+
     def reject_constant(value: str) -> Any:
         raise DollarFloorInputError(
             f"{source} contains unsupported numeric constant {value}"
@@ -492,7 +553,7 @@ def _strict_json_bytes(payload: bytes, source: str) -> dict[str, Any]:
         value = json.loads(
             text,
             object_pairs_hook=unique,
-            parse_float=str,
+            parse_float=reject_float,
             parse_int=int,
             parse_constant=reject_constant,
         )
