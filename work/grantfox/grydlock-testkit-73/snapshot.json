@@ -1,0 +1,123 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX-FRESH-GRYD-73/R1-governance-source-audit",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Forge",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Gryd-lock/grydlock-testkit",
+    "default_branch": "main",
+    "head_sha": "7064404d6e7c44df1f980d532d23901651d79426",
+    "issue_number": 73,
+    "issue_state": "open",
+    "github_assignee": null,
+    "visible_issue_comments": 1,
+    "open_pr_carrier": false,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "evidence": {
+    "blobs": {
+      "destinations": "c8f918089f700982d7347cc1d8af8d8677fd5774",
+      "scores": "f27d17c781a9059cc1304af93def554391b63876",
+      "contributing": "f2e18f5f1db2390c8c294c1c35bc63f6a86dec31",
+      "fixture_validator": "90ea1abb6136d939aa4d1e0ac422b23f74fa6362",
+      "ci": "53ce3ea3359798fd8b34d3a06728ae8110f7277c"
+    },
+    "fixture_counts": {
+      "total": 12,
+      "clean": 4,
+      "suspicious": 3,
+      "malicious": 5
+    },
+    "scores": {
+      "clean": [
+        4,
+        6,
+        3,
+        2
+      ],
+      "suspicious": [
+        55,
+        62,
+        58
+      ],
+      "malicious": [
+        92,
+        89,
+        85,
+        95,
+        97
+      ]
+    },
+    "documented_label_score_bands": {
+      "clean": [
+        0,
+        25
+      ],
+      "suspicious": [
+        40,
+        70
+      ],
+      "malicious": [
+        75,
+        100
+      ]
+    }
+  },
+  "cross_repo": {
+    "research": {
+      "repository": "Gryd-lock/grydlock-research",
+      "head_sha": "24bab091f5ec9dc98af1a69bacaeb547b15d980b",
+      "readme_blob": "c20c29f7cb90dc4a20a74ca8d1964e64d6bff2aa",
+      "warning_tiers": {
+        "low": [
+          0,
+          20
+        ],
+        "elevated": [
+          21,
+          50
+        ],
+        "high": [
+          51,
+          75
+        ],
+        "critical": [
+          76,
+          100
+        ]
+      }
+    },
+    "adapter": {
+      "repository": "Gryd-lock/grydlock-oracle-adapter",
+      "head_sha": "81b09e371694998d5c42e66be656aaaef409c176",
+      "evidence_contract_doc_blob": "4df34e6d3a1043b56b356ba0a12090e6038cddca",
+      "privacy_provenance_doc_blob": "7b578e52414f83232249bcc73955537830a1ec1c"
+    }
+  },
+  "findings": [
+    "label and score are separately hand-authored without machine-readable decision provenance",
+    "fixture validator checks schema/range/counts but not label-score bands, evidence, reviewer agreement, calibration version, or exception authority",
+    "CI changelog gate accepts non-empty prose rather than a structured review receipt",
+    "documented testkit label-score bands overlap multiple research warning tiers",
+    "current fixture scores happen to avoid most boundary conflicts, masking the policy ambiguity",
+    "adapter already has evidence-bearing decision and privacy-safe provenance concepts worth aligning with"
+  ],
+  "proposal": {
+    "model": "hybrid independent label review plus versioned deterministic score calibration",
+    "label_gate": "two independent reviewers; disagreement requires adjudication",
+    "score_gate": "accepted label provenance plus calibration manifest and anchors",
+    "exceptions": "explicit bounded machine-readable exception record",
+    "legacy": "legacy_import receipt; do not fabricate historical reviewers",
+    "disposition": "READY_FOR_ASSIGNMENT_NOT_IMPLEMENTATION"
+  },
+  "authority": {
+    "upstream_source_mutated": false,
+    "provider_application_submitted": false,
+    "provider_assignment_claimed": false,
+    "reward_or_payment_claimed": false
+  }
+}
