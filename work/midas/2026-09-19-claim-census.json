@@ -1,0 +1,752 @@
+{
+  "schema": "midas-public-claim-census/v1",
+  "captured_date": "2026-09-19",
+  "owner": "ZZ-Asterion / GPT-5.6 Sol",
+  "source": {
+    "repository": "bujiproject-art/agentmidasopendevteam",
+    "default_branch": "main",
+    "bounty_board_path": "BOUNTIES.md",
+    "bounty_board_blob_sha": "c25821c4f33bef3710d3a440c5faa94ea5440f58",
+    "public_history_endpoint": "issues?state=all&per_page=100",
+    "public_history_object_count": 25
+  },
+  "economics": {
+    "bounty_count": 41,
+    "advertised_face_value_usd": 10050,
+    "payment_text": "Stripe on approval",
+    "entitlement": false
+  },
+  "collision_summary": {
+    "numbered_rows_with_public_thread_or_pr": 22,
+    "numbered_rows_without_public_thread": 19,
+    "clear_high_value_rows_usd_350_plus": [
+      {
+        "number": 12,
+        "app": "Affiliate Dashboard Pro",
+        "usd": 500
+      },
+      {
+        "number": 18,
+        "app": "Revenue Dashboard",
+        "usd": 500
+      },
+      {
+        "number": 34,
+        "app": "Healthcare Appointment System",
+        "usd": 500
+      },
+      {
+        "number": 15,
+        "app": "Team Genealogy Tree",
+        "usd": 400
+      },
+      {
+        "number": 19,
+        "app": "Payment Gateway Manager",
+        "usd": 400
+      },
+      {
+        "number": 30,
+        "app": "Restaurant POS Interface",
+        "usd": 400
+      },
+      {
+        "number": 33,
+        "app": "Law Firm Case Manager",
+        "usd": 400
+      },
+      {
+        "number": 22,
+        "app": "Live Chat Widget",
+        "usd": 350
+      },
+      {
+        "number": 31,
+        "app": "Real Estate Listing Portal",
+        "usd": 350
+      }
+    ]
+  },
+  "authority_and_gates": {
+    "external_repository_permission": "pull-only through current GitHub integration",
+    "create_issue_attempt": {
+      "bounty_number": 18,
+      "app": "Revenue Dashboard",
+      "advertised_usd": 500,
+      "result": "BLOCKED",
+      "provider_error": "403 Resource not accessible by integration"
+    },
+    "source_scaffold": "public repository is documentation-only; target application/package/test scaffold not present",
+    "required_before_implementation": [
+      "fresh public collision recheck",
+      "provider issue-write capable seat or browser",
+      "target application/source scaffold and acceptance criteria",
+      "documented signup/CLA requirements before qualifying PR",
+      "no entitlement/payment assertion before approval"
+    ]
+  },
+  "rows": [
+    {
+      "number": 1,
+      "app": "Contact Management Dashboard",
+      "description": "Full CRUD contact manager with search, filters, and tags",
+      "usd": 150,
+      "difficulty": "Intermediate",
+      "public_refs": [
+        {
+          "github_number": 8,
+          "kind": "issue",
+          "state": "open",
+          "title": "Bounty #1 Contact Management Dashboard ($150): scope and integration availability",
+          "author": "MarkZ1966github",
+          "created_at": "2026-09-07T20:24:12Z",
+          "updated_at": "2026-09-07T21:04:03Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/8"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 2,
+      "app": "Deal Pipeline Board",
+      "description": "Kanban-style deal tracker with drag-and-drop stages",
+      "usd": 200,
+      "difficulty": "Intermediate",
+      "public_refs": [
+        {
+          "github_number": 18,
+          "kind": "issue",
+          "state": "open",
+          "title": "Bounty #2 Deal Pipeline Board ($200): availability and UI integration scope",
+          "author": "MatthewFeroz",
+          "created_at": "2026-09-08T05:17:20Z",
+          "updated_at": "2026-09-08T05:33:12Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/18"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 3,
+      "app": "Email Campaign Builder",
+      "description": "Visual email template builder with scheduling and analytics",
+      "usd": 300,
+      "difficulty": "Advanced",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 4,
+      "app": "Lead Scoring Engine",
+      "description": "ML-based lead scoring with configurable rules and thresholds",
+      "usd": 250,
+      "difficulty": "Advanced",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 5,
+      "app": "Sales Forecasting Widget",
+      "description": "Revenue prediction dashboard with trend analysis",
+      "usd": 200,
+      "difficulty": "Intermediate",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 6,
+      "app": "Meeting Scheduler",
+      "description": "Calendar integration for booking client meetings",
+      "usd": 100,
+      "difficulty": "Beginner",
+      "public_refs": [
+        {
+          "github_number": 14,
+          "kind": "issue",
+          "state": "open",
+          "title": "Bounty #6 Meeting Scheduler ($100): source, acceptance, and fixed payout terms",
+          "author": "saphid",
+          "created_at": "2026-09-08T00:25:05Z",
+          "updated_at": "2026-09-08T00:25:05Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/14"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 7,
+      "app": "Blog Publishing System",
+      "description": "MDX-based blog with SEO, scheduling, and analytics",
+      "usd": 200,
+      "difficulty": "Intermediate",
+      "public_refs": [
+        {
+          "github_number": 23,
+          "kind": "issue",
+          "state": "open",
+          "title": "Bounty #7 Blog Publishing System ($200): availability and PayPal payout",
+          "author": "galook",
+          "created_at": "2026-09-08T14:59:41Z",
+          "updated_at": "2026-09-08T14:59:41Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/23"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 8,
+      "app": "Social Media Scheduler",
+      "description": "Multi-platform post scheduler with preview and analytics",
+      "usd": 300,
+      "difficulty": "Advanced",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 9,
+      "app": "Podcast Manager",
+      "description": "Episode upload, RSS feed generation, and player embed",
+      "usd": 200,
+      "difficulty": "Intermediate",
+      "public_refs": [
+        {
+          "github_number": 17,
+          "kind": "issue",
+          "state": "open",
+          "title": "Bounty #9 Podcast Manager ($200): availability and integration scope",
+          "author": "ChuckGPTX",
+          "created_at": "2026-09-08T05:13:47Z",
+          "updated_at": "2026-09-08T05:13:47Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/17"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 10,
+      "app": "Video Content Library",
+      "description": "Video hosting dashboard with tagging and search",
+      "usd": 150,
+      "difficulty": "Intermediate",
+      "public_refs": [
+        {
+          "github_number": 7,
+          "kind": "issue",
+          "state": "open",
+          "title": "Claiming Bounty #10 — Video Content Library ($150): integration details",
+          "author": "sipiyou39",
+          "created_at": "2026-09-07T20:01:43Z",
+          "updated_at": "2026-09-07T20:01:43Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/7"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 11,
+      "app": "Content Calendar",
+      "description": "Drag-and-drop content planning calendar with team assignments",
+      "usd": 100,
+      "difficulty": "Beginner",
+      "public_refs": [
+        {
+          "github_number": 6,
+          "kind": "issue",
+          "state": "open",
+          "title": "Bounty #11 Content Calendar ($100): availability, integration scope and payout",
+          "author": "jaden3824",
+          "created_at": "2026-09-07T12:27:50Z",
+          "updated_at": "2026-09-07T12:27:50Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/6"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 12,
+      "app": "Affiliate Dashboard Pro",
+      "description": "Advanced affiliate analytics with Two-Up commission visualization",
+      "usd": 500,
+      "difficulty": "Critical",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 13,
+      "app": "Referral Link Manager",
+      "description": "Custom link builder with UTM tracking and QR codes",
+      "usd": 200,
+      "difficulty": "Intermediate",
+      "public_refs": [
+        {
+          "github_number": 21,
+          "kind": "issue",
+          "state": "open",
+          "title": "Bounty #13 Referral Link Manager ($200): claim and integration requirements",
+          "author": "a670493528",
+          "created_at": "2026-09-08T10:21:15Z",
+          "updated_at": "2026-09-08T10:21:15Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/21"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 14,
+      "app": "Commission Calculator Widget",
+      "description": "Interactive earnings estimator for affiliate recruitment",
+      "usd": 150,
+      "difficulty": "Beginner",
+      "public_refs": [
+        {
+          "github_number": 3,
+          "kind": "issue",
+          "state": "open",
+          "title": "[BOUNTY #14] Claiming: Commission Calculator Widget",
+          "author": "adamlhorri-cmyk",
+          "created_at": "2026-09-02T23:22:02Z",
+          "updated_at": "2026-09-17T17:19:28Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/3"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 15,
+      "app": "Team Genealogy Tree",
+      "description": "Visual affiliate tree with depth, compression, and passup logic",
+      "usd": 400,
+      "difficulty": "Advanced",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 16,
+      "app": "Invoice Generator",
+      "description": "Professional invoice creation with PDF export and Stripe integration",
+      "usd": 300,
+      "difficulty": "Advanced",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 17,
+      "app": "Expense Tracker",
+      "description": "Business expense categorization with receipt upload",
+      "usd": 200,
+      "difficulty": "Intermediate",
+      "public_refs": [
+        {
+          "github_number": 10,
+          "kind": "issue",
+          "state": "open",
+          "title": "Bounty #17 Expense Tracker ($200): availability and integration scope",
+          "author": "ibrinzila",
+          "created_at": "2026-09-07T21:24:22Z",
+          "updated_at": "2026-09-07T21:32:23Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/10"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 18,
+      "app": "Revenue Dashboard",
+      "description": "Real-time MRR, ARR, churn, and LTV metrics",
+      "usd": 500,
+      "difficulty": "Critical",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 19,
+      "app": "Payment Gateway Manager",
+      "description": "Multi-gateway payment processing with retry logic",
+      "usd": 400,
+      "difficulty": "Advanced",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 20,
+      "app": "Ticket System",
+      "description": "Support ticket creation, assignment, and SLA tracking",
+      "usd": 250,
+      "difficulty": "Intermediate",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 21,
+      "app": "Knowledge Base Builder",
+      "description": "Searchable KB with categories, AI-powered search, and feedback",
+      "usd": 300,
+      "difficulty": "Advanced",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 22,
+      "app": "Live Chat Widget",
+      "description": "Embeddable chat widget with agent routing and canned responses",
+      "usd": 350,
+      "difficulty": "Advanced",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 23,
+      "app": "FAQ Manager",
+      "description": "Dynamic FAQ page with search and category filters",
+      "usd": 100,
+      "difficulty": "Beginner",
+      "public_refs": [
+        {
+          "github_number": 2,
+          "kind": "PR",
+          "state": "open",
+          "title": "Bounty #23: FAQ Manager",
+          "author": "mdmcl-pixel",
+          "created_at": "2026-08-31T17:34:35Z",
+          "updated_at": "2026-08-31T17:46:24Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/pull/2"
+        },
+        {
+          "github_number": 1,
+          "kind": "issue",
+          "state": "open",
+          "title": "[Bounty Claim] #23 FAQ Manager — mdmcl-pixel",
+          "author": "mdmcl-pixel",
+          "created_at": "2026-08-31T17:28:53Z",
+          "updated_at": "2026-08-31T17:28:53Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/1"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 24,
+      "app": "Funnel Visualizer",
+      "description": "Conversion funnel builder with drop-off analysis",
+      "usd": 250,
+      "difficulty": "Intermediate",
+      "public_refs": [
+        {
+          "github_number": 20,
+          "kind": "issue",
+          "state": "open",
+          "title": "Bounty #24 Funnel Visualizer ($250): proposed scope and integration requirements",
+          "author": "Th0masclassic",
+          "created_at": "2026-09-08T09:07:00Z",
+          "updated_at": "2026-09-08T09:07:00Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/20"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 25,
+      "app": "A/B Testing Framework",
+      "description": "Split testing engine with statistical significance calculator",
+      "usd": 300,
+      "difficulty": "Advanced",
+      "public_refs": [
+        {
+          "github_number": 25,
+          "kind": "issue",
+          "state": "open",
+          "title": "[BOUNTY #25] Application: A/B Testing Framework ($300)",
+          "author": "xavierhure-coder",
+          "created_at": "2026-09-08T21:59:36Z",
+          "updated_at": "2026-09-08T21:59:36Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/25"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 26,
+      "app": "User Session Replay",
+      "description": "Session recording and heatmap visualization",
+      "usd": 200,
+      "difficulty": "Intermediate",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 27,
+      "app": "Employee Directory",
+      "description": "Team member profiles with org chart and search",
+      "usd": 150,
+      "difficulty": "Beginner",
+      "public_refs": [
+        {
+          "github_number": 4,
+          "kind": "issue",
+          "state": "open",
+          "title": "Item #27 Employee Directory ($150): availability and integration scope",
+          "author": "jusungxpark",
+          "created_at": "2026-09-06T20:57:19Z",
+          "updated_at": "2026-09-06T20:57:19Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/4"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 28,
+      "app": "Leave Management",
+      "description": "PTO request and approval workflow with calendar view",
+      "usd": 200,
+      "difficulty": "Intermediate",
+      "public_refs": [
+        {
+          "github_number": 16,
+          "kind": "issue",
+          "state": "open",
+          "title": "Bounty #28 Leave Management ($200): availability and application scaffold",
+          "author": "Lcc-CL",
+          "created_at": "2026-09-08T05:11:15Z",
+          "updated_at": "2026-09-08T05:11:15Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/16"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 29,
+      "app": "Onboarding Checklist",
+      "description": "New hire onboarding flow with progress tracking",
+      "usd": 100,
+      "difficulty": "Beginner",
+      "public_refs": [
+        {
+          "github_number": 5,
+          "kind": "issue",
+          "state": "open",
+          "title": "Bounty #29 ($100): eligibility, integration scope and Pakistan payout",
+          "author": "Talha24Akram",
+          "created_at": "2026-09-06T22:59:55Z",
+          "updated_at": "2026-09-10T08:57:00Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/5"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 30,
+      "app": "Restaurant POS Interface",
+      "description": "Point-of-sale UI for restaurants with menu management",
+      "usd": 400,
+      "difficulty": "Advanced",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 31,
+      "app": "Real Estate Listing Portal",
+      "description": "Property listing manager with map integration and virtual tours",
+      "usd": 350,
+      "difficulty": "Advanced",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 32,
+      "app": "Fitness Class Scheduler",
+      "description": "Class booking system for gyms with instructor management",
+      "usd": 200,
+      "difficulty": "Intermediate",
+      "public_refs": [
+        {
+          "github_number": 19,
+          "kind": "issue",
+          "state": "open",
+          "title": "Bounty #32 Fitness Class Scheduler ($200): funding, integration scope and payout",
+          "author": "SGuPhox172",
+          "created_at": "2026-09-08T08:35:36Z",
+          "updated_at": "2026-09-11T19:16:09Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/19"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 33,
+      "app": "Law Firm Case Manager",
+      "description": "Case tracking with document management and billing",
+      "usd": 400,
+      "difficulty": "Advanced",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 34,
+      "app": "Healthcare Appointment System",
+      "description": "Patient scheduling with HIPAA-compliant data handling",
+      "usd": 500,
+      "difficulty": "Critical",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 35,
+      "app": "Spanish Language Pack",
+      "description": "Full UI translation to Spanish with locale detection",
+      "usd": 100,
+      "difficulty": "Beginner",
+      "public_refs": [
+        {
+          "github_number": 12,
+          "kind": "issue",
+          "state": "open",
+          "title": "Bounty #35 Spanish Language Pack ($100): source files and payout eligibility",
+          "author": "Braylindorf",
+          "created_at": "2026-09-07T22:36:39Z",
+          "updated_at": "2026-09-07T22:36:39Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/12"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 36,
+      "app": "French Language Pack",
+      "description": "Full UI translation to French with locale detection",
+      "usd": 100,
+      "difficulty": "Beginner",
+      "public_refs": [
+        {
+          "github_number": 13,
+          "kind": "issue",
+          "state": "open",
+          "title": "Bounty #36 French Language Pack ($100): availability, source files and PayPal payout",
+          "author": "PAOBAI233",
+          "created_at": "2026-09-07T22:46:46Z",
+          "updated_at": "2026-09-07T22:46:46Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/13"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 37,
+      "app": "Portuguese Language Pack",
+      "description": "Full UI translation to Portuguese with locale detection",
+      "usd": 100,
+      "difficulty": "Beginner",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 38,
+      "app": "i18n Framework Setup",
+      "description": "Internationalization infrastructure with dynamic locale loading",
+      "usd": 250,
+      "difficulty": "Intermediate",
+      "public_refs": [
+        {
+          "github_number": 24,
+          "kind": "issue",
+          "state": "open",
+          "title": "Bounty #38 i18n Framework ($250): availability and integration scope",
+          "author": "sxholarr-prog",
+          "created_at": "2026-09-08T16:10:58Z",
+          "updated_at": "2026-09-08T16:10:58Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/24"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 39,
+      "app": "Landing Page Template Kit",
+      "description": "5 conversion-optimized landing page templates",
+      "usd": 200,
+      "difficulty": "Intermediate",
+      "public_refs": [
+        {
+          "github_number": 11,
+          "kind": "issue",
+          "state": "open",
+          "title": "Bounty #39 Landing Page Template Kit ($200): availability and acceptance scope",
+          "author": "IlyaAnisim0v",
+          "created_at": "2026-09-07T21:41:16Z",
+          "updated_at": "2026-09-07T21:48:50Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/11"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 40,
+      "app": "Icon & Illustration Pack",
+      "description": "Custom icon set (50+) matching Agent Midas brand guidelines",
+      "usd": 150,
+      "difficulty": "Beginner",
+      "public_refs": [
+        {
+          "github_number": 15,
+          "kind": "issue",
+          "state": "open",
+          "title": "Bounty #40 ($150): original SVG icon pack scope and availability",
+          "author": "BxRKings",
+          "created_at": "2026-09-08T02:36:26Z",
+          "updated_at": "2026-09-08T04:58:24Z",
+          "url": "https://github.com/bujiproject-art/agentmidasopendevteam/issues/15"
+        }
+      ],
+      "public_collision_state": "PUBLIC_THREAD_OR_PR_PRESENT",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    },
+    {
+      "number": 41,
+      "app": "Video Tutorial Series",
+      "description": "10 tutorial videos covering SDK, API, and dashboard features",
+      "usd": 300,
+      "difficulty": "Intermediate",
+      "public_refs": [],
+      "public_collision_state": "NO_NUMBERED_PUBLIC_THREAD",
+      "implementation_state": "GATED_SOURCE_AND_PROVIDER_WRITE"
+    }
+  ]
+}
