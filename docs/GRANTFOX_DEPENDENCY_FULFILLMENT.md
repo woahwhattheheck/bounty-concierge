@@ -91,3 +91,7 @@ Exit codes:
 - `0`: `DEPENDENCIES_FULFILLED`
 - `2`: `FULFILLMENT_WAIT` or `HOLD`
 - argparse error: malformed, contradictory, stale-identity, or tampered input
+
+## Zero-prerequisite issues
+
+A verified dependency-readiness receipt with explicit `dependencies: []` is a complete statement that the issue has no declared prerequisites. The fulfillment compiler therefore accepts `landings: []` for that exact case and emits `DEPENDENCIES_FULFILLED`; it never treats a missing dependency receipt as implicit clearance.
