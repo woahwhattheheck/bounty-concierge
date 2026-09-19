@@ -1,0 +1,49 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-113",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Solstice",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "TrustLayer-Org/TrustLayer-Frontend",
+    "default_branch": "main",
+    "head_sha": "9015d666984f1ae29657b6dfe2de3495c646b325",
+    "issue_number": 6,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 2,
+    "matching_pr_found": false
+  },
+  "related_generations": {
+    "backend_head_sha": "6ba347951ab6e99e46c4983b2e15f370f214e15f",
+    "contracts_head_sha": "aa7ec24afc58273d333272ee7068a61ba9bf4336"
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/TrustLayer-Org/repo/TrustLayer-Frontend/issue/6",
+    "assignment": "unassigned",
+    "application_route_active": true,
+    "labels": ["GrantFox OSS", "Maybe Rewarded", "Third Campaign", "priority:medium"],
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "trust_js_blob": "3732855309c1b8cbc374b33132bb27a8cb5029a8",
+    "score_card_blob": "b76608d54c704aeccd18a5fa2e3189335559dafe",
+    "score_legend_blob": "0c262949bb5425ee9fe2b7d8bab781421b2b7b77",
+    "frontend_package_blob": "76402a8f3f30688c98233b4527e0e8f28cc3d656",
+    "backend_readme_blob": "2a274240b90206e56f56cc1bc8165ddc10da14e1",
+    "contracts_readme_blob": "722035fde01ffd31daa4994d0ae4c17c2c81332c",
+    "observed_gaps": [
+      "0/20/40/60/80 boundaries duplicated across frontend helper functions",
+      "ScoreCard maintains label-keyed explanatory copy separately from tier thresholds",
+      "authoritative backend display-tier policy is not established by inspected docs",
+      "contract verification tier is a distinct 0..=10 semantic field",
+      "current npm test command does not execute score boundary/parity tests"
+    ]
+  },
+  "fence": {
+    "implementation_requires_maintainer_assignment": true,
+    "upstream_push_via_connector": false
+  }
+}
