@@ -13,6 +13,7 @@ from concierge.grantfox_activation_gate import (
     verify_activation_receipt,
 )
 from concierge.grantfox_application_continuity import compile_continuity
+from concierge.grantfox_dependency_fulfillment import compile_grantfox_dependency_fulfillment
 from concierge.grantfox_dependency_readiness import compile_grantfox_dependency_readiness
 from concierge.grantfox_queue_gate import compile_grantfox_queue_gate
 from concierge.grantfox_source_readiness import compile_grantfox_source_readiness
@@ -20,6 +21,7 @@ from concierge.grantfox_source_readiness import compile_grantfox_source_readines
 
 def request(queue_disposition="APPLY_ELIGIBLE", source_disposition="SOURCE_ALIGNED",
             dependency_disposition="DEPENDENCIES_CLEAR",
+            fulfillment_disposition="DEPENDENCIES_FULFILLED",
             continuity_state="DISCOVERED", continuity_disposition="CONTINUE"):
     queue = {
         "schema": "grantfox-queue-gate/v1",
@@ -52,6 +54,17 @@ def request(queue_disposition="APPLY_ELIGIBLE", source_disposition="SOURCE_ALIGN
         },
         "source_receipt": deepcopy(source),
     }
+    fulfillment = {
+        "schema": "grantfox-dependency-fulfillment-receipt/v1",
+        "fulfillment_disposition": fulfillment_disposition,
+        "fulfillment_receipt_sha256": "e" * 64,
+        "identity": {
+            "owner": "quicklendx",
+            "repo": "quicklendx-frontend",
+            "issue_number": 16,
+        },
+        "dependency_receipt": deepcopy(dependency),
+    }
     continuity = {
         "schema": "grantfox-application-continuity/v1",
         "disposition": continuity_disposition,
@@ -70,6 +83,7 @@ def request(queue_disposition="APPLY_ELIGIBLE", source_disposition="SOURCE_ALIGN
         "queue_receipt": queue,
         "source_receipt": source,
         "dependency_receipt": dependency,
+        "fulfillment_receipt": fulfillment,
         "continuity_receipt": continuity,
     }
 
@@ -116,6 +130,13 @@ def native_request(*, assigned=False):
         "evaluated_at": "2026-09-19T22:00:25Z",
         "max_snapshot_age_seconds": 900,
     })
+    fulfillment = compile_grantfox_dependency_fulfillment({
+        "schema": "grantfox-dependency-fulfillment/v1",
+        "dependency_receipt": dependency,
+        "landings": [],
+        "evaluated_at": "2026-09-19T22:00:26Z",
+        "max_snapshot_age_seconds": 900,
+    })
     if assigned:
         events = [
             {
@@ -153,6 +174,7 @@ def native_request(*, assigned=False):
         "queue_receipt": queue,
         "source_receipt": source,
         "dependency_receipt": dependency,
+        "fulfillment_receipt": fulfillment,
         "continuity_receipt": continuity,
     }
 
