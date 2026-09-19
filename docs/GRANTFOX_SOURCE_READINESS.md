@@ -121,8 +121,16 @@ against current source.
 Each replacement must:
 
 1. point to a missing expectation already declared in the request;
-2. name the current path or symbol that supersedes it; and
-3. carry at least one path + blob-SHA evidence record.
+2. name a replacement path or symbol that is **also declared as a present
+   expectation** in the same pinned request; and
+3. carry one or more path + blob-SHA evidence records drawn from that replacement
+   target expectation's exact normalized matches.
+
+This target-binding rule prevents arbitrary witness bytes from laundering a
+missing source reference into `SOURCE_DRIFT_REPLAN`. A path replacement is
+therefore bound to evidence for that exact path, while a symbol replacement is
+bound to the declared matches for that exact symbol. Unrelated or undeclared
+replacement evidence fails closed.
 
 A replacement is **not** permission to implement. It only means the stale
 reference has enough pinned evidence for the worker to rewrite the plan.
