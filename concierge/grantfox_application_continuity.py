@@ -82,7 +82,7 @@ def _time(v: Any, name: str) -> datetime:
 
 def _url(v: Any, name: str) -> tuple[str, str, str]:
     v = _text(v, name)
-    if len(v) > 2048 or any(c.isspace() for c in v) or "\" in v or "%" in v:
+    if len(v) > 2048 or any(c.isspace() for c in v) or "\\" in v or "%" in v:
         raise GrantFoxContinuityInputError(f"{name} is not a strict URL")
     try:
         p, port = urlsplit(v), urlsplit(v).port
