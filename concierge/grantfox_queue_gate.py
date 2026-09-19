@@ -319,8 +319,16 @@ def compile_grantfox_queue_gate(request: dict[str, Any]) -> dict[str, Any]:
     return {**body, "receipt_sha256": _sha256_json(body)}
 
 
-def verify_receipt(receipt: dict[str, Any]) -> bool:
-    """Verify deterministic receipt integrity and the advisory authority ceiling."""
+def verify_receipt(
+    receipt: dict[str, Any], *, semantic: bool = False
+) -> bool:
+    """Verify integrity; optionally recompile the embedded provider semantics.
+
+    The default preserves the v1 integrity-only contract used by older callers.
+    Trust boundaries that can unlock implementation pass semantic=True so a
+    self-consistent rehash cannot rewrite the queue state machine independently
+    of the retained provider snapshot.
+    """
     if type(receipt) is not dict:
         return False
     digest = receipt.get("receipt_sha256")
@@ -339,7 +347,39 @@ def verify_receipt(receipt: dict[str, Any]) -> bool:
         "payment_or_wallet_authority": False,
     }:
         return False
-    return _sha256_json(body) == digest
+    if _sha256_json(body) != digest:
+        return False
+    if not semantic:
+        return True
+
+    try:
+        identity = _require_object(body.get("identity"), "identity")
+        snapshot = _require_object(body.get("provider_snapshot"), "provider_snapshot")
+        expected = compile_grantfox_queue_gate(
+            {
+                "schema": _SCHEMA,
+                "listing_url": identity.get("listing_url"),
+                "canonical_issue_url": identity.get("canonical_issue_url"),
+                "issue_state": snapshot.get("issue_state"),
+                "actor_login": snapshot.get("actor_login"),
+                "assigned_to": snapshot.get("assigned_to"),
+                "actor_applied": snapshot.get("actor_applied"),
+                "application_count": snapshot.get("application_count"),
+                "application_pressure_threshold": snapshot.get(
+                    "application_pressure_threshold"
+                ),
+                "linked_pr_urls": snapshot.get("linked_pr_urls"),
+                "labels": snapshot.get("labels"),
+                "observed_at": snapshot.get("observed_at"),
+                "evaluated_at": snapshot.get("evaluated_at"),
+                "max_snapshot_age_seconds": snapshot.get(
+                    "max_snapshot_age_seconds"
+                ),
+            }
+        )
+    except (GrantFoxQueueInputError, KeyError, TypeError, ValueError):
+        return False
+    return expected == receipt
 
 
 def format_summary(receipt: dict[str, Any]) -> str:

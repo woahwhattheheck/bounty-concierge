@@ -36,7 +36,10 @@ The activation gate fails closed across those seams.
 }
 ```
 
-All three receipts must verify using their native verifier. The gate then binds:
+The queue receipt must pass semantic replay from its embedded provider snapshot;
+the source receipt must pass its native source-readiness verifier; and the
+continuity receipt must replay successfully against the exact supplied queue
+receipt. The gate then binds:
 
 - case-insensitive owner/repository + exact issue number;
 - exact actor between queue and continuity;
@@ -72,11 +75,14 @@ continuity receipts under `evidence`. Verification does not trust the outer
 activation SHA-256 by itself. `verify_activation_receipt()`:
 
 1. requires the exact activation receipt and evidence field sets;
-2. re-runs all three native receipt verifiers;
-3. re-checks issue, actor, and queue-anchor equality through
+2. semantically recompiles the queue receipt from its retained provider
+   snapshot instead of trusting a rehashed queue body;
+3. re-runs source-readiness verification and contextually recompiles continuity
+   from its normalized events against that exact queue receipt;
+4. re-checks issue, actor, and queue-anchor equality through
    `compile_activation()`;
-4. recomputes the activation state machine from the retained native evidence; and
-5. requires exact equality with the supplied activation receipt, including its
+5. recomputes the activation state machine from the retained native evidence; and
+6. requires exact equality with the supplied activation receipt, including its
    digest.
 
 Therefore, changing a non-implementation receipt to

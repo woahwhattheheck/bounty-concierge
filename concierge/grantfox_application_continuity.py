@@ -337,7 +337,17 @@ def compile_continuity(request: dict[str, Any]) -> dict[str, Any]:
     return {**body, "receipt_sha256": _hash(body)}
 
 
-def verify_continuity_receipt(receipt: dict[str, Any]) -> bool:
+def verify_continuity_receipt(
+    receipt: dict[str, Any],
+    queue_receipt: dict[str, Any] | None = None,
+) -> bool:
+    """Verify integrity and optionally replay continuity against its queue anchor.
+
+    The one-argument form remains backward compatible and checks deterministic
+    integrity. Supplying the queue receipt upgrades verification to contextual
+    semantics: the queue must semantically verify, then the continuity ledger is
+    recompiled from retained normalized events and compared byte-for-byte.
+    """
     if type(receipt) is not dict or receipt.get("schema") != SCHEMA or receipt.get("authority") != AUTHORITY:
         return False
     digest = receipt.get("receipt_sha256")
@@ -345,7 +355,30 @@ def verify_continuity_receipt(receipt: dict[str, Any]) -> bool:
         return False
     body = dict(receipt)
     body.pop("receipt_sha256", None)
-    return _hash(body) == digest
+    if _hash(body) != digest:
+        return False
+    if queue_receipt is None:
+        return True
+    if not verify_queue_receipt(queue_receipt, semantic=True):
+        return False
+
+    try:
+        identity = _obj(receipt.get("identity"), "receipt.identity")
+        actor = _login(identity.get("actor_login"), "receipt.identity.actor_login")
+        events = receipt.get("events")
+        if type(events) is not list:
+            return False
+        expected = compile_continuity(
+            {
+                "schema": SCHEMA,
+                "queue_receipt": queue_receipt,
+                "actor_login": actor,
+                "events": events,
+            }
+        )
+    except (GrantFoxContinuityInputError, KeyError, TypeError, ValueError):
+        return False
+    return expected == receipt
 
 
 def format_summary(receipt: dict[str, Any]) -> str:
