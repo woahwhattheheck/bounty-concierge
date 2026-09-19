@@ -50,9 +50,13 @@ _MAINTAINER_PAUSE_PATTERNS = (
         r"submissions?|implementations?|work)\b"
     ),
     re.compile(
-        r"(?i)\b(?:please\s+)?do\s+not\s+"
-        r"(?:start|attempt|claim|submit|open)\b[^.\n]{0,80}\b"
-        r"(?:this\s+)?(?:bounty|issue|work|implementation|pull\s+request|pr)\b"
+        r"(?i)\b(?:please\s+)?do\s+not\s+(?:"
+        r"start\s+(?:any\s+|new\s+)?(?:work|implementation|attempts?)|"
+        r"attempt\s+(?:this\s+|the\s+)?(?:bounty|issue|work)|"
+        r"claim\s+(?:this\s+|the\s+)?(?:bounty|issue)|"
+        r"(?:submit|open)\s+(?:a\s+|any\s+|new\s+|another\s+)?"
+        r"(?:pull\s+requests?|prs?|claims?|submissions?)"
+        r")\b"
     ),
     re.compile(
         r"(?i)\bno\s+(?:new\s+|more\s+)?"
