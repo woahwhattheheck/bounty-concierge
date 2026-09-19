@@ -1,0 +1,52 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-096",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Moraine-29",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Liquifact/Liquifact-contracts",
+    "default_branch": "main",
+    "head_sha": "d5a08576e02bf9626e4f82b3b4efd01ec2af27d2",
+    "issue_number": 1199,
+    "issue_state": "open",
+    "assignee": null,
+    "preexisting_comment_count": 3,
+    "matching_open_pr_found": false
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Liquifact/repo/Liquifact-contracts/issue/1199",
+    "assignment_required_before_implementation": true,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false,
+    "application_run_id": "012fa40f-5d27-4e04-9816-c4686f39a184",
+    "application_status_at_packet": "pending"
+  },
+  "evidence": {
+    "keys_blob": "bf15d509483d331524d68b5b030f05212160bc50",
+    "storage_notes_blob": "72fae5081e36a1e47ccc432fb852dd8edbe0a982",
+    "escrow_lib_blob": "b1532440af33744b6d3c55189407b1e65d62119d",
+    "current_partial_implementations": [
+      "typed DataKey constructor helpers already exist",
+      "call sites still use DataKey::Variant literals inline",
+      "persistent investor keys already receive write-time TTL extension",
+      "permissionless bump_ttl already exists",
+      "instance and persistent storage lifetime semantics are documented"
+    ],
+    "remaining_contract": [
+      "migrate remaining call sites through existing keys module",
+      "preserve existing key discriminants and XDR/storage identity",
+      "centralize storage-class-specific lifetime policy",
+      "add appropriate access-time TTL extension",
+      "prove raw/helper key compatibility and cross-feature non-collision",
+      "prove TTL extension without unrelated business-state mutation"
+    ]
+  },
+  "fence": {
+    "implementation_waits_for_assignment": true,
+    "storage_migration_in_scope": false,
+    "archival_tiering_in_scope": false,
+    "upstream_connector_permission_probe": "403 Resource not accessible by integration"
+  }
+}
