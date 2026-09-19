@@ -1,0 +1,46 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-010-R-FORGE-M73",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ–Sol–Forge-M73",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Agentpay-Org/Agentpay-frontend",
+    "default_branch": "main",
+    "head_sha": "0d47dba0eb086756a906fc66670f98b2374fce04",
+    "issue_number": 630,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 2,
+    "matching_pr_found": false,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Agentpay-Org/repo/Agentpay-frontend/issue/630",
+    "assignment_state": "unassigned",
+    "one_application_per_user": true,
+    "application_run_id": "b8700628-1d19-4703-92bc-63004aa7c34a",
+    "application_terminal_receipt": false,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "online_status_blob": "0a6c907f1bdabe0d0838981590efc17c4d8b2d01",
+    "api_client_blob": "21945ab5d83a509cb45cd2793b439f71d28ba441",
+    "api_mutation_blob": "95c491f7b8feb8def0612ba7f748069dd7dc0f6a",
+    "create_page_blob": "07547e2b747e229b669c2a4887d29b03b1b063f1",
+    "edit_page_blob": "576501806c7394b676c441af22263fb9b9b4a1a3",
+    "adjacent_issue_309_pr": 428,
+    "adjacent_issue_624_pr_found": false
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "upstream_source_mutated": false,
+    "live_money_used": false,
+    "application_status": "initiated_nonterminal"
+  }
+}
