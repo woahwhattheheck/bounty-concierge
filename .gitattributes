@@ -3,5 +3,6 @@
 # The private claim replay graph also pins these exact Python source blobs.
 concierge/_fleet_economic_admission_v1.py text eol=lf
 concierge/fleet_economic_admission.py text eol=lf
+concierge/paid_work_dollar_floor.py text eol=lf
 concierge/paid_work_effort_value_gate.py text eol=lf
 concierge/_claim_economic_admission_impl.py text eol=lf
