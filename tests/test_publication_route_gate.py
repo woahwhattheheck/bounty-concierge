@@ -38,6 +38,7 @@ def observation(**overrides):
         "installed_fork_push_access": None,
         "publication_primitives": PRIMITIVES,
         "existing_pr_url": None,
+        "existing_pr_state": None,
         "provider_requires_assignment": False,
         "provider_assignment": "none",
         "actor_applied": False,
@@ -95,6 +96,17 @@ class PublicationRouteGateTests(unittest.TestCase):
         )
         self.assertEqual(receipt["disposition"], "OWNED_FORK_PR")
 
+    def test_writable_foreign_fork_is_not_treated_as_actor_owned(self):
+        receipt = compile_publication_route(
+            observation(
+                installed_fork_repo="someone-else/GrantFox",
+                installed_fork_push_access=True,
+            )
+        )
+        self.assertEqual(receipt["disposition"], "HANDOFF_REQUIRED")
+        self.assertIn("INSTALLED_FORK_NOT_ACTOR_OWNED", receipt["reason_codes"])
+        self.assertFalse(receipt["observed_publication_path"]["installed_fork_actor_owned"])
+
     def test_missing_publication_primitives_requires_handoff(self):
         receipt = compile_publication_route(
             observation(integration_access="write", publication_primitives=["create_file"])
@@ -146,15 +158,46 @@ class PublicationRouteGateTests(unittest.TestCase):
             observation(
                 integration_access="write",
                 existing_pr_url="https://github.com/GrantChain/GrantFox/pull/99",
+                existing_pr_state="open",
             )
         )
         self.assertEqual(receipt["disposition"], "REUSE_EXISTING_PR")
         self.assertEqual(receipt["target"]["existing_pr_url"], "https://github.com/GrantChain/GrantFox/pull/99")
+        self.assertEqual(receipt["target"]["existing_pr_state"], "open")
+
+    def test_unknown_existing_pr_state_holds_instead_of_reusing(self):
+        receipt = compile_publication_route(
+            observation(
+                integration_access="write",
+                existing_pr_url="https://github.com/GrantChain/GrantFox/pull/99",
+                existing_pr_state="unknown",
+            )
+        )
+        self.assertEqual(receipt["disposition"], "HOLD_EXISTING_PR_STATE_UNKNOWN")
+
+    def test_closed_or_merged_existing_pr_holds_before_new_work(self):
+        for state in ("closed", "merged"):
+            with self.subTest(state=state):
+                receipt = compile_publication_route(
+                    observation(
+                        integration_access="write",
+                        existing_pr_url="https://github.com/GrantChain/GrantFox/pull/99",
+                        existing_pr_state=state,
+                    )
+                )
+                self.assertEqual(receipt["disposition"], "HOLD_EXISTING_PR_NOT_OPEN")
+
+    def test_existing_pr_url_and_state_must_move_together(self):
+        with self.assertRaisesRegex(PublicationRouteInputError, "must be null"):
+            compile_publication_route(observation(existing_pr_state="open"))
 
     def test_existing_pr_must_belong_to_upstream(self):
         with self.assertRaisesRegex(PublicationRouteInputError, "belong to upstream_repo"):
             compile_publication_route(
-                observation(existing_pr_url="https://github.com/other/repo/pull/99")
+                observation(
+                    existing_pr_url="https://github.com/other/repo/pull/99",
+                    existing_pr_state="open",
+                )
             )
 
     def test_nondefault_required_base_is_preserved_not_rewritten(self):
