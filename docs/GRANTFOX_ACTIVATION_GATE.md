@@ -65,6 +65,29 @@ A digest swap, actor swap, or issue swap is an input error rather than a HOLD.
 Lifecycle states `SUBMITTED`, `APPROVED`, `PAYMENT_SENT`, `PAID`, and
 `REJECTED` can never produce implementation activation.
 
+## Verifiable evidence envelope
+
+An activation receipt retains the complete native queue, source-readiness, and
+continuity receipts under `evidence`. Verification does not trust the outer
+activation SHA-256 by itself. `verify_activation_receipt()`:
+
+1. requires the exact activation receipt and evidence field sets;
+2. re-runs all three native receipt verifiers;
+3. re-checks issue, actor, and queue-anchor equality through
+   `compile_activation()`;
+4. recomputes the activation state machine from the retained native evidence; and
+5. requires exact equality with the supplied activation receipt, including its
+   digest.
+
+Therefore, changing a non-implementation receipt to
+`IMPLEMENT_ASSIGNED_SCOPE` and recomputing only
+`activation_receipt_sha256` still fails verification. Extra semantic fields
+also fail closed.
+
+Receipts created by the earlier self-hash-only implementation do not contain the
+native evidence envelope. They intentionally fail the repaired verifier and
+must be regenerated from the original native receipts.
+
 ## CLI
 
 ```bash
@@ -89,6 +112,7 @@ Every output fixes all mutation authorities to false:
 }
 ```
 
-The activation receipt is canonical-JSON SHA-256 bound. Its digest proves only
-the deterministic composition result; it is not provider authority and it does
-not turn a possible/discretionary reward into an award or payment.
+The activation receipt is canonical-JSON SHA-256 bound, but verification also
+replays the native verifiers and activation state machine from the retained
+evidence. The digest remains tamper evidence only; it is not provider authority
+and it does not turn a possible/discretionary reward into an award or payment.
