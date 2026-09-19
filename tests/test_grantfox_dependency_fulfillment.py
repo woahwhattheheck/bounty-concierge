@@ -85,6 +85,18 @@ class GrantFoxDependencyFulfillmentTests(unittest.TestCase):
     def tearDown(self):
         self.verify_patch.stop()
 
+    def test_zero_dependencies_fulfill_with_zero_landings(self):
+        upstream = dependency_receipt()
+        upstream["evidence"]["dependencies"] = []
+        receipt = compile_grantfox_dependency_fulfillment(
+            request(dependency_receipt=upstream, landings=[])
+        )
+        self.assertEqual(receipt["fulfillment_disposition"], "DEPENDENCIES_FULFILLED")
+        self.assertEqual(receipt["fulfillment_summary"]["dependency_count"], 0)
+        self.assertEqual(receipt["fulfillment_summary"]["landing_evidence_count"], 0)
+        self.assertEqual(receipt["fulfillment_summary"]["missing_issue_numbers"], [])
+        self.assertTrue(verify_dependency_fulfillment_receipt(receipt))
+
     def test_closed_issues_without_landing_evidence_wait(self):
         receipt = compile_grantfox_dependency_fulfillment(request(landings=[]))
         self.assertEqual(receipt["fulfillment_disposition"], "FULFILLMENT_WAIT")
