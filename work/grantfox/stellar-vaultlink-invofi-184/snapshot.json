@@ -1,0 +1,102 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "ZZA-GFOX-INVOFI-184-R-ZZ-SOL-FIREBREAK",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Firebreak",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Stellar-VaultLink/invofi",
+    "default_branch": "main",
+    "head_sha": "afc37076869e590fdc660e68df6f767fbfdbf1f6",
+    "issue_number": 184,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 2,
+    "matching_open_pr_found": false,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "contract_repository": {
+    "repository": "Stellar-VaultLink/invofi-contracts",
+    "default_branch": "master",
+    "head_sha": "cebe97a83325da025a9d5ce212a56f8d2fbfcca7",
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Stellar-VaultLink/repo/invofi/issue/184",
+    "public_assignment_state": "Unassigned",
+    "application_route_visible": true,
+    "applications_per_user": 1,
+    "application_transport": "direct GitHub comment",
+    "existing_application_comments": 2,
+    "labels": [
+      "medium",
+      "infra",
+      "ci",
+      "GrantFox OSS"
+    ],
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "adr_repo_boundary_blob": "cd7752cb3c77a29d34e37e0c5895f958ac364e6d",
+    "contract_abi_blob": "ddd06c1284a6635876ef2a78a494f9b86fbb582d",
+    "typed_builder_blob": "dbbd59fc0d6a96b6d4b53f3b9a0ddc2234be7bd8",
+    "registry_adapter_blob": "be5d135bc7fbdea68aa48647f9dc63eb766dca46",
+    "financing_adapter_blob": "3a9e7a360a1c67858ceeef1f2e2a3b444af11a14",
+    "repayment_adapter_blob": "95acf5c63ab3477d06f1a257ba3ec9d8cc3d8abc",
+    "position_token_adapter_blob": "579982e60c376d4b365c29d0142361fa6f38127b",
+    "ci_blob": "7f6c287ee5e02cc73c68bb8fceb99e8343277782",
+    "sdk_parity_blob": "00ee7be2655ffc4d47c968b330bb93da648430fb",
+    "sdk_package_blob": "186f6d3652edf3a0a5c54fcfdc439afc935be718",
+    "typed_abi_entry_count": 14,
+    "typed_onchain_methods": [
+      "register_invoice",
+      "get_invoice",
+      "cancel_invoice",
+      "create_offer",
+      "get_offer",
+      "accept_offer",
+      "reject_offer",
+      "get_position_token",
+      "repay_invoice",
+      "mark_overdue",
+      "reclaim_invoice",
+      "balance",
+      "decimals",
+      "transfer"
+    ],
+    "findings": [
+      "contract-abi.ts is already the SDK typed method-table authority and documents Stellar contract inspection regeneration",
+      "existing check-sdk-parity.js only prevents raw frontend contract usage and does not compare deployed/spec signatures",
+      "current CI already carries fixed registry, financing, and repayment testnet contract IDs",
+      "normal CI can remain hermetic by comparing committed normalized spec bytes rather than live RPC",
+      "source_account is SDK invocation context and must not be naively treated as an on-chain argument",
+      "position-token token_id selects a dynamic contract instance and must not be naively treated as an on-chain method argument"
+    ]
+  },
+  "acceptance_contract": {
+    "breaking_drift_nonzero": [
+      "covered method missing or renamed",
+      "required on-chain parameter added or removed",
+      "on-chain parameter name/order drift when semantically relevant",
+      "incompatible on-chain parameter type",
+      "missing or malformed contract snapshot"
+    ],
+    "additive_onchain_method": "informational_exit_zero",
+    "routine_ci_live_rpc_required": false,
+    "refresh_is_explicit_networked_operator_action": true,
+    "runtime_version_negotiation_in_scope": false
+  },
+  "fence": {
+    "implementation_requires_provider_or_maintainer_assignment": true,
+    "upstream_source_mutated": false,
+    "provider_application_terminal_state": "pending_at_packet_creation"
+  }
+}
