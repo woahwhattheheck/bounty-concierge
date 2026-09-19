@@ -1,0 +1,35 @@
+{
+  "schema": "grantfox-source-baseline/v1",
+  "target": {
+    "repository": "Secureflow-protocol/secureflow",
+    "issue": 15,
+    "title": "[Backend] Stellar signature auth to protect private API routes",
+    "source_branch": "main",
+    "source_sha": "5a52f4ad2c6da8d29bc4a2ebb65d904251ab81c6"
+  },
+  "census": {
+    "issue_state": "open",
+    "assignees": 0,
+    "issue_comments": 0,
+    "closing_prs_closes_15": 0,
+    "closing_prs_fixes_15": 0,
+    "slack_exact_repo_issue_hits": 0,
+    "upstream_pull": true,
+    "upstream_push": false,
+    "reward_amount_verified": false
+  },
+  "source_evidence": [
+    {"path":"backend/src/index.ts","blob":"55c811abfcdea34737454aad8962ed3d31486547","finding":"all /v1 routes use static API-secret middleware"},
+    {"path":"backend/src/middleware/auth.ts","blob":"131126f4d9429717dc2ec7e488ecfd24013ee38d","finding":"static Bearer API_SECRET comparison; no wallet principal"},
+    {"path":"backend/src/routes/messages.ts","blob":"6614f3238feca854f2c9e11e6b18646ecc20447f","finding":"sender/read identities are caller-supplied addresses"},
+    {"path":"backend/src/routes/notifications.ts","blob":"a633e4fb51c752da556f8d046fc19d10879fe9d7","finding":"notification owner identity is caller-supplied"},
+    {"path":"backend/package.json","blob":"ea044fcd675e0c38c65daabeab1ba2b6ff08a3e8","finding":"Stellar SDK present; JWT/test dependencies absent"}
+  ],
+  "disposition": {
+    "source_gap_confirmed": true,
+    "implementation_ready_after_assignment_recensus": true,
+    "upstream_source_mutation_performed": false,
+    "provider_application_performed": false,
+    "implementation_fenced_pending_assignment": true
+  }
+}
