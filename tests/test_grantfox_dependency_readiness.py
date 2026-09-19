@@ -104,6 +104,15 @@ class GrantFoxDependencyReadinessTests(unittest.TestCase):
         self.assertFalse(receipt["authority"]["provider_application_authority"])
         self.assertTrue(verify_dependency_readiness_receipt(receipt))
 
+    def test_zero_prerequisites_clear(self):
+        receipt = compile_grantfox_dependency_readiness(
+            request(dependencies=[])
+        )
+        self.assertEqual(receipt["dependency_disposition"], "DEPENDENCIES_CLEAR")
+        self.assertEqual(receipt["dependency_summary"]["dependency_count"], 0)
+        self.assertEqual(receipt["reason_codes"], [])
+        self.assertTrue(verify_dependency_readiness_receipt(receipt))
+
     def test_all_closed_prerequisites_clear(self):
         receipt = compile_grantfox_dependency_readiness(
             request(
