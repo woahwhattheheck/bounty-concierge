@@ -19,6 +19,11 @@ def dependency_receipt(disposition="DEPENDENCIES_CLEAR"):
             "observed_at": "2026-09-19T22:01:00Z",
             "snapshot_age_seconds": 60,
             "basis": "Issue #33 explicitly requires #27.",
+            "completion": {
+                "status": "LANDED",
+                "merged_pr_url": "https://github.com/Gryd-lock/grydlock-testkit/pull/127",
+                "merge_commit_sha": f"{27:040x}",
+            },
         },
         {
             "repository_full_name": "Gryd-lock/grydlock-testkit",
@@ -28,6 +33,11 @@ def dependency_receipt(disposition="DEPENDENCIES_CLEAR"):
             "observed_at": "2026-09-19T22:01:00Z",
             "snapshot_age_seconds": 60,
             "basis": "Issue #33 explicitly requires #4.",
+            "completion": {
+                "status": "LANDED",
+                "merged_pr_url": "https://github.com/Gryd-lock/grydlock-testkit/pull/104",
+                "merge_commit_sha": f"{4:040x}",
+            },
         },
     ]
     return {
@@ -148,6 +158,52 @@ class GrantFoxDependencyFulfillmentTests(unittest.TestCase):
                     ]
                 )
             )
+
+    def test_landing_merge_sha_must_match_upstream_completion(self):
+        with self.assertRaisesRegex(
+            GrantFoxDependencyFulfillmentInputError,
+            "must equal upstream completion.merge_commit_sha",
+        ):
+            compile_grantfox_dependency_fulfillment(
+                request(
+                    landings=[
+                        landing(27, landed_commit_sha="d" * 40),
+                        landing(4, kind="default_branch_commit"),
+                    ]
+                )
+            )
+
+    def test_merged_pr_identity_must_match_upstream_completion(self):
+        swapped = landing(
+            27,
+            evidence_url="https://github.com/Gryd-lock/grydlock-testkit/pull/999",
+            pull_request_number=999,
+        )
+        with self.assertRaisesRegex(
+            GrantFoxDependencyFulfillmentInputError,
+            "merged PR must equal upstream completion.merged_pr_url",
+        ):
+            compile_grantfox_dependency_fulfillment(
+                request(
+                    landings=[
+                        swapped,
+                        landing(4, kind="default_branch_commit"),
+                    ]
+                )
+            )
+
+    def test_default_branch_commit_may_restate_exact_upstream_merge_sha(self):
+        receipt = compile_grantfox_dependency_fulfillment(
+            request(
+                landings=[
+                    landing(27, kind="default_branch_commit"),
+                    landing(4, kind="default_branch_commit"),
+                ]
+            )
+        )
+        self.assertEqual(
+            receipt["fulfillment_disposition"], "DEPENDENCIES_FULFILLED"
+        )
 
     def test_tamper_breaks_verification(self):
         receipt = compile_grantfox_dependency_fulfillment(request())
