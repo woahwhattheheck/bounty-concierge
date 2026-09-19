@@ -16,6 +16,7 @@ import pytest
 
 from concierge import claim_economic_admission as gate
 from concierge import paid_work_effort_value_gate as pwev
+from concierge import paid_work_dollar_floor as dollar_floor
 from concierge import fleet_economic_admission as fleet
 from concierge import _fleet_economic_admission_v1 as base
 
@@ -108,6 +109,11 @@ def test_below_hourly_floor_cannot_be_reminted_by_public_compiler(monkeypatch, t
     (pwev, "re", None),
     (pwev, "_RECEIPT_SCHEMA", "changed"),
     (pwev, "_ALLOWED_DECISIONS", frozenset()),
+    (dollar_floor, "_SOURCE_POLICY", {"active_floor": "1"}),
+    (dollar_floor, "_ALLOWED_AUTHORITIES", frozenset({"OTHER"})),
+    (dollar_floor, "_AUTHORITY", {"external_claim_authority": True}),
+    (dollar_floor, "compile_paid_work_dollar_floor", lambda *_: {}),
+    (dollar_floor, "verify_receipt", lambda *_: False),
     (fleet, "compile_fleet_economic_admission", lambda *_: {}),
     (fleet, "verify_receipt", lambda *_: False),
     (fleet, "_source_identity", lambda *_: "changed"),
@@ -188,8 +194,9 @@ def test_off_posix_ctime_precision_does_not_reject_same_source_generation(monkey
 
 def test_cold_generation_preserves_public_module_identity(tmp_path):
     modules = {name: sys.modules[name] for name in (
-        "concierge.paid_work_effort_value_gate", "concierge.fleet_economic_admission",
-        "concierge._fleet_economic_admission_v1", "concierge.claim_economic_admission",
+        "concierge.paid_work_dollar_floor", "concierge.paid_work_effort_value_gate",
+        "concierge.fleet_economic_admission", "concierge._fleet_economic_admission_v1",
+        "concierge.claim_economic_admission",
     )}
     load = copied_generation(tmp_path)
     verifier = load(gate.ClaimEconomicAdmissionError)
