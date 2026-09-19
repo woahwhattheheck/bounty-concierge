@@ -88,14 +88,16 @@ def compile_activation(request: dict[str, Any]) -> dict[str, Any]:
     dependency = _obj(r.get("dependency_receipt"), "dependency_receipt")
     continuity = _obj(r.get("continuity_receipt"), "continuity_receipt")
 
-    if not verify_queue_receipt(queue):
-        raise GrantFoxActivationInputError("queue_receipt does not verify")
+    if not verify_queue_receipt(queue, semantic=True):
+        raise GrantFoxActivationInputError("queue_receipt does not verify semantically")
     if not verify_source_readiness_receipt(source):
         raise GrantFoxActivationInputError("source_receipt does not verify")
     if not verify_dependency_readiness_receipt(dependency):
         raise GrantFoxActivationInputError("dependency_receipt does not verify")
-    if not verify_continuity_receipt(continuity):
-        raise GrantFoxActivationInputError("continuity_receipt does not verify")
+    if not verify_continuity_receipt(continuity, queue):
+        raise GrantFoxActivationInputError(
+            "continuity_receipt does not verify against queue semantics"
+        )
 
     qid = _identity(queue, "queue_receipt", actor=False)
     sid = _identity(source, "source_receipt", actor=False)

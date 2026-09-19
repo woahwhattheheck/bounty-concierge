@@ -12,6 +12,7 @@ from concierge.grantfox_application_continuity import (
     compile_continuity,
     verify_continuity_receipt,
 )
+from concierge.grantfox_queue_gate import compile_grantfox_queue_gate
 
 
 def sha(value):
@@ -313,6 +314,49 @@ class GrantFoxContinuityTests(unittest.TestCase):
         changed = deepcopy(first)
         changed["state"] = "PAID"
         self.assertFalse(verify_continuity_receipt(changed))
+
+    def test_contextual_verifier_rejects_rehashed_lifecycle_forgery(self):
+        q = compile_grantfox_queue_gate(
+            {
+                "schema": "grantfox-queue-gate/v1",
+                "listing_url": (
+                    "https://contribute.grantfox.xyz/org/Gryd-lock/"
+                    "repo/grydlock-testkit/issue/33"
+                ),
+                "canonical_issue_url": (
+                    "https://github.com/Gryd-lock/grydlock-testkit/issues/33"
+                ),
+                "issue_state": "open",
+                "actor_login": "woahwhattheheck",
+                "assigned_to": None,
+                "actor_applied": True,
+                "application_count": 1,
+                "application_pressure_threshold": 3,
+                "linked_pr_urls": [],
+                "labels": ["GrantFox OSS"],
+                "observed_at": "2026-09-19T21:00:00Z",
+                "evaluated_at": "2026-09-19T21:00:10Z",
+                "max_snapshot_age_seconds": 900,
+            }
+        )
+        receipt = compile_continuity(
+            request(
+                [ev("APPLICATION_RECEIPT", 1, receipt_url=APPLICATION)],
+                queue_receipt=q,
+            )
+        )
+        self.assertTrue(verify_continuity_receipt(receipt, q))
+
+        forged = deepcopy(receipt)
+        forged["state"] = "ASSIGNED"
+        forged["advisory_next_action"] = "IMPLEMENT_ASSIGNED_SCOPE"
+        forged["lifecycle"]["assigned"] = True
+        body = dict(forged)
+        body.pop("receipt_sha256", None)
+        forged["receipt_sha256"] = sha(body)
+
+        self.assertTrue(verify_continuity_receipt(forged))
+        self.assertFalse(verify_continuity_receipt(forged, q))
 
     def test_cli_hold_exit_code_and_json_roundtrip(self):
         payload = request([
