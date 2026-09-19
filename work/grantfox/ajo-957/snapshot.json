@@ -1,0 +1,53 @@
+{
+  "schema": "grantfox-source-readiness-snapshot/v1",
+  "captured_at": "2026-09-19T22:46:00Z",
+  "identity": {
+    "repository_full_name": "Ajo-contrib/soroban-ajo",
+    "issue_number": 957,
+    "issue_url": "https://github.com/Ajo-contrib/soroban-ajo/issues/957"
+  },
+  "source": {
+    "default_branch": "master",
+    "commit_sha": "1b87ea7344ae3d871e54abff05eabe5113bd2956",
+    "blobs": {
+      ".github/workflows/performance.yml": "9a1a7398b0d9c69df454a497ccd4603b5dc19044",
+      "frontend/src/utils/monitoring.ts": "693545aef639ac7fb897ca7eb058ffc739b5764b",
+      "frontend/scripts/analyze-bundle.ts": "1b7812566db396b372e3fdb3706e6503ba6af7c6",
+      "frontend/package.json": "8e106ae316ec4e836ce15ff74ccd6ae734945198"
+    }
+  },
+  "github": {
+    "issue_state": "open",
+    "assignees": [],
+    "open_issue_closing_prs": 0,
+    "linked_historical_pr": {
+      "number": 1002,
+      "state": "closed",
+      "merged": false,
+      "head_sha": "6224c916dcadb1c28342ee8bf0803692dd8e5106",
+      "closure_basis": "Maintainer required GrantFox OSS assignment before resubmission."
+    }
+  },
+  "provider": {
+    "public_page": "https://contribute.grantfox.xyz/org/Ajo-contrib/repo/soroban-ajo/issue/957",
+    "assignment_state": "Unassigned",
+    "apply_route_visible": true,
+    "reward_amount_verified": false
+  },
+  "findings": {
+    "workflow_budget_bytes": 524288,
+    "workflow_metric": "total built JS under frontend/.next/static",
+    "workflow_overage_exit": "success-warning-only",
+    "workflow_missing_artifacts_exit": "success-message-only",
+    "runtime_budget_bytes": 512000,
+    "runtime_metric": "individual downloaded script transfer size",
+    "source_analyzer_enforces_build_output": false
+  },
+  "authority": {
+    "pre_assignment_only": true,
+    "implementation": false,
+    "provider_application": false,
+    "submission": false,
+    "payment_or_wallet": false
+  }
+}
