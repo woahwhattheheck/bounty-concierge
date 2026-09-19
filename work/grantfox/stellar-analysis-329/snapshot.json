@@ -1,0 +1,80 @@
+{
+  "schema": "grantfox-source-fence/v1",
+  "upstream": {
+    "repository": "Stellar-Analysis/frontend",
+    "issue_number": 329,
+    "issue_url": "https://github.com/Stellar-Analysis/frontend/issues/329",
+    "issue_state": "open",
+    "comments": 0,
+    "assignees": [],
+    "labels": [
+      "GrantFox OSS",
+      "Maybe Rewarded",
+      "Third Campaign"
+    ],
+    "matching_open_prs": []
+  },
+  "connector": {
+    "repository_permissions": {
+      "pull": true,
+      "push": false,
+      "admin": false,
+      "maintain": false,
+      "triage": false
+    },
+    "collaborator_permission_probe": "403 Resource not accessible by integration",
+    "interpretation": "connector-scope result only; no human-account permission inference"
+  },
+  "canonical_main": {
+    "commit": "482ee456369418ef82c4056718cb82d3468f762b",
+    "blobs": {
+      "README.md": "a7546f7a6f85709fccd21e136cd8b12bae820652",
+      "package.json": "2b1c6ac1f83096666c7fd6d5ba3fd22780e6b8eb",
+      "pnpm-lock.yaml": "7ecba249d1b7cd41e629e2fff2782ed6805186f5"
+    },
+    "absent_paths": [
+      "backend/Cargo.toml",
+      "backend/src/lib.rs",
+      "Cargo.toml"
+    ],
+    "observed_substrate": {
+      "frontend": "Next.js 16 / React 19 / Vitest",
+      "redis_dependency": false,
+      "request_signing_module": false,
+      "hmac_module": false,
+      "nonce_module": false
+    }
+  },
+  "historical_backend": {
+    "ancestor_commit": "d8bae439cbaeb0f6b3a4fb36ffe212993c3af617",
+    "ancestor_backend_cargo_blob": "5f15f0b4c473a688ff5a42767c4ad9abdb477b8d",
+    "relationship_to_canonical_main": {
+      "main_ahead_by": 41,
+      "main_behind_by": 0
+    },
+    "canonical_main_diff": "backend/** removed",
+    "open_pr_386": {
+      "base_commit": "d8bae439cbaeb0f6b3a4fb36ffe212993c3af617",
+      "head_commit": "3da2886f213203d52f5f09ed52bed7fb7d1511d5",
+      "head_backend_cargo_blob": "365a21fb317157449e26308fbbe84709b826a3a5",
+      "redis_dependency": "redis 0.27",
+      "authority": "unmerged evidence only; not a canonical dependency"
+    }
+  },
+  "disposition": "SOURCE_DRIFT_CANONICAL_BACKEND_ABSENT",
+  "implementation_gate": "MAINTAINER_MUST_NAME_CANONICAL_BACKEND_AND_SIGNING_CLOCK_CONTRACT",
+  "security_invariants": [
+    "atomic shared nonce claim across replicas",
+    "signature binds version,key-id,timestamp,nonce,method,path/query,body-or-body-digest",
+    "nonce retention covers entire remaining signature-valid horizon",
+    "clock boundary and future-timestamp policy are explicit",
+    "nonce-store failure fails closed",
+    "no signing secret leakage"
+  ],
+  "authority": {
+    "provider_application": false,
+    "provider_assignment": false,
+    "upstream_write": false,
+    "reward_or_payment": false
+  }
+}
