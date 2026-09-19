@@ -29,9 +29,10 @@ AUTHORITY = {
     "payment_or_wallet_authority": False,
 }
 LOGIN = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")
-GH_ISSUE = re.compile(r"^/([^/]+)/([^/]+)/issues/([1-9][0-9]*)/?$")
-GH_PR = re.compile(r"^/([^/]+)/([^/]+)/pull/([1-9][0-9]*)/?$")
-GFOX = re.compile(r"^/org/([^/]+)/repo/([^/]+)/issue/([1-9][0-9]*)/?$")
+SEG = r"[A-Za-z0-9_.-]+"
+GH_ISSUE = re.compile(rf"^/({SEG})/({SEG})/issues/([1-9][0-9]*)/?$")
+GH_PR = re.compile(rf"^/({SEG})/({SEG})/pull/([1-9][0-9]*)/?$")
+GFOX = re.compile(rf"^/org/({SEG})/repo/({SEG})/issue/([1-9][0-9]*)/?$")
 COMMENT = re.compile(r"^issuecomment-([1-9][0-9]*)$")
 CURRENCY = re.compile(r"^[A-Z][A-Z0-9]{2,7}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -82,7 +83,7 @@ def _time(v: Any, name: str) -> datetime:
 
 def _url(v: Any, name: str) -> tuple[str, str, str]:
     v = _text(v, name)
-    if len(v) > 2048 or any(c.isspace() for c in v) or "\\" in v or "%" in v:
+    if len(v) > 2048 or any(c.isspace() or ord(c) == 0x7F for c in v) or "\\" in v or "%" in v:
         raise GrantFoxContinuityInputError(f"{name} is not a strict URL")
     try:
         p, port = urlsplit(v), urlsplit(v).port
@@ -165,6 +166,10 @@ def compile_continuity(request: dict[str, Any]) -> dict[str, Any]:
         raise GrantFoxContinuityInputError(f"schema must equal {SCHEMA}")
     ident, issue, queue_digest = _queue_anchor(r.get("queue_receipt"))
     actor = _login(r.get("actor_login"), "actor_login")
+    provider_snapshot = _obj(r["queue_receipt"].get("provider_snapshot"), "queue_receipt.provider_snapshot")
+    queue_actor = provider_snapshot.get("actor_login")
+    if queue_actor is not None and _login(queue_actor, "queue_receipt.provider_snapshot.actor_login") != actor:
+        raise GrantFoxContinuityInputError("actor_login differs from queue receipt actor")
     events = r.get("events")
     if type(events) is not list:
         raise GrantFoxContinuityInputError("events must be a list")
