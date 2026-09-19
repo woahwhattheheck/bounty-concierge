@@ -1,0 +1,63 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-070-R-ZZ-SOL-FIREBREAK",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Firebreak",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Prompt-Hash-Stellar/prompt-hash",
+    "branch": "main",
+    "head_sha": "30f2581523d63153d0b092a72b8fbdfa71050a1b",
+    "issue": 242,
+    "issue_state": "open",
+    "assignee": null,
+    "visible_comments": 3,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "state": "Unassigned",
+    "apply_visible": true,
+    "one_application_per_user": true,
+    "implementation_pr_surfaced": false,
+    "application_terminal_state": "pending_browser_run"
+  },
+  "blobs": {
+    "similarity_detection": "79a0d06ae0aa2b55bdfcf10054a14ed134e62291",
+    "similarity_queue": "d6f931a5714a4290e806c1ffd62ec98551b66a95",
+    "similarity_worker": "7465d930df0f2634650cf9a3a66c896f338a731c",
+    "similarity_job_model": "534d7113ea55c87c7b646ff69d7e34f56107b6e4",
+    "prompt_model": "b319b9287845522e95334014c4ff87311927eb03",
+    "server_startup": "898dd85c72d94db8f78671484af8c58665dc7e70",
+    "prompt_routes": "29453ea2a80fa0e5fbfe5c44486e31751476e0e5",
+    "create_form": "1e4eacac09d39a391986058484aa6724800d0d5d",
+    "similarity_test": "48c5578697b11a4e42d307621a73171cd91d6fe5",
+    "report_model": "c0b12e5dbd34af26b878b1bf88c05855db436e00",
+    "controllers": "762cea91136bb5d9f4d79be345bd7dd111608a2f",
+    "review_routes": "c60986151e9359133c5355503a7857fde37e16bc"
+  },
+  "findings": [
+    "similarity engine already exists; missing publication enforcement and appeal lifecycle",
+    "current scanForSimilarity is async queue enqueue plus clean-looking compatibility placeholder",
+    "server startup does not start similarity worker",
+    "budget-exceeded worker loop can still mark partial scan completed",
+    "candidate scan is bounded and recent-first, so clean is not automatically exhaustive",
+    "creator flow encrypts and calls Soroban directly with no similarity preflight",
+    "Express create/publish routes are explicitly deprecated/read-only",
+    "current admin report read checks only presence of bearer token and is not sufficient override authority",
+    "current similarityDetection test asserts obsolete synchronous behavior"
+  ],
+  "policy": {
+    "allow_requires_complete": true,
+    "suspicious": "review",
+    "highly_similar": "block",
+    "partial_or_budget_exceeded": "review",
+    "worker_unavailable": "review",
+    "client_force_override_allowed": false,
+    "deprecated_express_publish_restored": false,
+    "protocol_level_enforcement_claimed": false
+  },
+  "implementation_assignment_gated": true
+}
