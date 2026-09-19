@@ -1,0 +1,56 @@
+{
+  "schema": "grantfox-source-baseline/v1",
+  "identity": {
+    "owner": "MentorsMind",
+    "repo": "MentorsMind-Contract",
+    "issue_number": 1128
+  },
+  "upstream": {
+    "ref": "main",
+    "sha": "e90e16fc3a78122949ce63af7308320c59acb112"
+  },
+  "github": {
+    "state": "OPEN",
+    "assignees": [],
+    "comments": 0
+  },
+  "grantfox": {
+    "observed_date": "2026-09-19",
+    "assignment": "Unassigned",
+    "apply_available": true,
+    "applications_per_user": 1
+  },
+  "blobs": {
+    "oracle_lib": "1d68d0063f505cc308cf9e57739065c77ad19de2",
+    "shared_mev_protection": "9f7114fa5f4b0e7a18f136a7297b016933fa7d9a",
+    "shared_ttl_utils": "9941970fc476ebb43998e2a27cd867664bacd25f",
+    "oracle_manipulation_tests": "04b56f05cf3854b49fa2589a340add98be75ff17",
+    "flash_loan_doc": "5ac2510d05b2d84b05f3097faddd2df023547a49",
+    "oracle_cargo": "dd0a9f8f4a9159b016555ed62ef0b901a48b3d8f"
+  },
+  "findings": [
+    "oracle imports record_mev_monitoring but not compute_mev_redistribution",
+    "current oracle lib has no get_twap entrypoint",
+    "active get_price read has no caller address parameter",
+    "docs and integration tests still reference get_twap",
+    "record_mev_monitoring emits and returns a record but does not persist it",
+    "compute_mev_redistribution requires transaction_volume, not price deviation",
+    "existing MEV flag derives from interaction count rather than TWAP deviation",
+    "existing submission-time MEV path has a feeder actor and must not be conflated with read monitoring",
+    "repository already provides a standard temporary TTL policy"
+  ],
+  "unresolved_design": [
+    "reader identity and public ABI",
+    "reader authentication policy",
+    "deviation-to-MEV-flag mapping",
+    "read-time transaction_volume semantics",
+    "temporary monitoring key cardinality",
+    "aggregated-read monitoring multiplicity"
+  ],
+  "recommended_checks": [
+    "cargo test -p mentorminds-oracle",
+    "oracle manipulation integration tests after API reconciliation",
+    "flash loan oracle regression tests after API reconciliation"
+  ],
+  "disposition": "WAIT_FOR_PROVIDER_ASSIGNMENT_AND_SPEC_CLARIFICATION"
+}
