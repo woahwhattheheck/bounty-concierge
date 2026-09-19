@@ -1,0 +1,39 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-101/R-pagination-current-main-map",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Rook",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Stellar-MarkeyPay/Stellar-MarketPay",
+    "default_branch": "main",
+    "head_sha": "42250890ecb5b76228675167f47452e54fb28977",
+    "issue_number": 175,
+    "issue_state": "open"
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Stellar-MarkeyPay/repo/Stellar-MarketPay/issue/175",
+    "public_assignment_state": "Unassigned",
+    "visible_application_comments": 1,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "notification_service_sha": "e25a11332a26e0139d928486feaa6cc45acab39d",
+    "notification_frontend_sha": "540e9ff933b574692e361025d983758b033a280d",
+    "job_service_sha": "af5466811135687dc028c8382093ed87b43a45df",
+    "jobs_route_sha": "7aced8530899513aaed3b505729411609fc6e099",
+    "application_service_sha": "1749c23373c02c97eadc1673c4e96369f55ea961",
+    "graphql_pagination_sha": "65d65ce6d2f95329f11d637d1ec1d8846f61fd00",
+    "frontend_api_sha": "a5edc12a9f8935b7f1de6ea07eb149f09422d4df",
+    "notification_gap": "cursor omits id tie-breaker",
+    "jobs_gap": "cursor omits leading active-boost sort key",
+    "applications_gap": "full materialization plus in-memory/offset-backed pagination",
+    "disposition": "SOURCE_GAPS_CONFIRMED_ASSIGNMENT_GATED"
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "upstream_source_mutated": false
+  }
+}

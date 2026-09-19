@@ -1,0 +1,44 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-100/R-BOLA-source-baseline",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Rook",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Stellar-MarkeyPay/Stellar-MarketPay",
+    "default_branch": "main",
+    "head_sha": "42250890ecb5b76228675167f47452e54fb28977",
+    "issue_number": 162,
+    "issue_state": "open"
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Stellar-MarkeyPay/repo/Stellar-MarketPay/issue/162",
+    "public_assignment_state": "Unassigned",
+    "visible_application_comments": 1,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "applications_route_sha": "1f1248b7fec9a2dd3199988da8fc651bbd20da9d",
+    "application_service_sha": "1749c23373c02c97eadc1673c4e96369f55ea961",
+    "server_sha": "c31c2520c2f154056f5712c793e07c246bfc6d43",
+    "profiles_route_sha": "e4cabe46e9553063150e5f9367ddd62beb4a1d99",
+    "saved_searches_route_sha": "997b43dcac4ede0bbcb17cc4c149b1bf9ec89f4f",
+    "message_routes_sha": "b0472271301d8eb0c8f3a8ee5cbb3a6c1daf0f0b",
+    "unauthenticated_application_mutations": [
+      "POST /api/applications",
+      "POST /api/applications/job/:jobId/close-bidding",
+      "POST /api/applications/:id/reveal",
+      "POST /api/applications/:id/accept",
+      "DELETE /api/applications/:id"
+    ],
+    "duplicate_shadowed_profile_route": "POST /api/profiles/:publicKey/endorse",
+    "disposition": "SOURCE_GAP_CONFIRMED_ASSIGNMENT_GATED"
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "upstream_source_mutated": false,
+    "live_service_exploit_performed": false
+  }
+}
