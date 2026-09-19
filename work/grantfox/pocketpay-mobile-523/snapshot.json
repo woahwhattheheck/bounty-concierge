@@ -1,0 +1,60 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-pocketpay-mobile-523/R-qr-receive-source-audit",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Crux-83",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Axionvera/pocketpay-mobile",
+    "default_branch": "main",
+    "head_sha": "c3a24abacb45030eb4fef41aabc46b312aaf54a3",
+    "issue_number": 523,
+    "issue_state": "open",
+    "assignee": null,
+    "public_dev_carrier": false,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Axionvera/repo/pocketpay-mobile/issue/523",
+    "public_assignment_state": "Unassigned",
+    "visible_application_comments": 0,
+    "application_route_visible": true,
+    "one_application_per_user": true,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "qr_payload_blob": "6556a1742e7c219f15c8b5e186056369857acdcb",
+    "receive_screen_blob": "088b7a6aef30e9e7958ec22c8a9c07f533b1aac6",
+    "validation_blob": "3401c0bb763b27fbb8f20028cee69da7bcdc989f",
+    "network_environment_blob": "4bda5630ccb6a28c49efd0d5e69bc43c0b27f8c3",
+    "qr_payload_tests_blob": "18475a70e3f1d6779f9ca6312b4b4a8e9e384722",
+    "qr_docs_blob": "24b09221f8e5d2fb47abbb9c3eea4bb93d18af18",
+    "observed_gaps": [
+      "invalid amount is omitted while QR remains renderable",
+      "invalid memo is omitted while QR remains renderable",
+      "receive payload boundary does not validate destination",
+      "receive payload boundary does not validate configured network",
+      "incomplete asset pair is silently dropped",
+      "focused tests do not prove invalid request blocks QR/share"
+    ]
+  },
+  "design": {
+    "disposition": "READY_FOR_ASSIGNMENT_NOT_IMPLEMENTATION",
+    "principles": [
+      "compose existing validators",
+      "do not silently discard invalid optional fields",
+      "fail closed for QR/share",
+      "preserve bare-address copy fallback",
+      "keep emitted URI standards-compatible"
+    ]
+  },
+  "fence": {
+    "implementation_requires_provider_or_maintainer_assignment": true,
+    "upstream_source_mutated": false
+  }
+}
