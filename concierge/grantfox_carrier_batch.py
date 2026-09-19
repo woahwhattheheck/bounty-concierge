@@ -44,6 +44,31 @@ _AUTHORITY = {
     "submission_authority": False,
     "payment_or_wallet_authority": False,
 }
+_RULE = (
+    "Only CLEAR_FOR_QUEUE_EVALUATION may continue to provider/source "
+    "queue evaluation; every other disposition is suppressed or held "
+    "for review."
+)
+_RECEIPT_KEYS = {
+    "schema",
+    "child_request_schema",
+    "child_receipt_schema",
+    "issue_count",
+    "counts",
+    "issues_by_disposition",
+    "summary",
+    "authority",
+    "children",
+    "batch_receipt_sha256",
+}
+_SUMMARY_KEYS = {
+    "clear_for_queue_count",
+    "suppressed_or_review_count",
+    "relevant_carrier_count",
+    "active_or_merged_carrier_count",
+    "process_closed_reusable_carrier_count",
+    "rule",
+}
 
 
 def _sha256_json(value: Any) -> str:
@@ -160,11 +185,7 @@ def compile_grantfox_carrier_batch(request: dict[str, Any]) -> dict[str, Any]:
             "relevant_carrier_count": total_relevant_carriers,
             "active_or_merged_carrier_count": active_or_merged_carriers,
             "process_closed_reusable_carrier_count": reusable_process_closed_carriers,
-            "rule": (
-                "Only CLEAR_FOR_QUEUE_EVALUATION may continue to provider/source "
-                "queue evaluation; every other disposition is suppressed or held "
-                "for review."
-            ),
+            "rule": _RULE,
         },
         "authority": dict(_AUTHORITY),
         "children": children,
@@ -174,7 +195,7 @@ def compile_grantfox_carrier_batch(request: dict[str, Any]) -> dict[str, Any]:
 
 def verify_carrier_batch_receipt(receipt: dict[str, Any]) -> bool:
     """Verify child receipts, ordering, counts, summaries, authority, and digest."""
-    if type(receipt) is not dict:
+    if type(receipt) is not dict or set(receipt) != _RECEIPT_KEYS:
         return False
     digest = receipt.get("batch_receipt_sha256")
     if type(digest) is not str or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
@@ -242,7 +263,9 @@ def verify_carrier_batch_receipt(receipt: dict[str, Any]) -> bool:
         + counts["HOLD"]
     )
     summary = body.get("summary")
-    if type(summary) is not dict:
+    if type(summary) is not dict or set(summary) != _SUMMARY_KEYS:
+        return False
+    if summary.get("rule") != _RULE:
         return False
     if summary.get("clear_for_queue_count") != counts["CLEAR_FOR_QUEUE_EVALUATION"]:
         return False
