@@ -22,6 +22,8 @@ def request(queue_disposition="APPLY_ELIGIBLE", source_disposition="SOURCE_ALIGN
             "owner": "QuickLendX",
             "repo": "quicklendx-frontend",
             "issue_number": 16,
+        },
+        "provider_snapshot": {
             "actor_login": "woahwhattheheck",
         },
     }
@@ -131,6 +133,13 @@ class ActivationGateTests(unittest.TestCase):
         payload["continuity_receipt"]["identity"]["actor_login"] = "someone-else"
         with self.assertRaisesRegex(GrantFoxActivationInputError, "actors differ"):
             self.compile(payload)
+
+    def test_real_queue_actor_location_is_used(self):
+        payload = request()
+        self.assertNotIn("actor_login", payload["queue_receipt"]["identity"])
+        payload["queue_receipt"]["provider_snapshot"]["actor_login"] = "WOAHWHATTHEHECK"
+        receipt = self.compile(payload)
+        self.assertEqual(receipt["identity"]["actor_login"], "woahwhattheheck")
 
     def test_issue_swap_fails_closed(self):
         payload = request()
