@@ -1,0 +1,75 @@
+{
+  "schema": "grantfox-source-baseline/v1",
+  "operation": "GFOX-FRESH-GRYD-47/R-freshness-audit-contract",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Hyperion-9F4",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Gryd-lock/grydlock-testkit",
+    "default_branch": "main",
+    "commit_sha": "7064404d6e7c44df1f980d532d23901651d79426",
+    "push_permission": false,
+    "issue": {
+      "number": 47,
+      "state": "open",
+      "assignees": [],
+      "application_comment_count": 2,
+      "matching_pull_requests": []
+    },
+    "dependency_issue": {
+      "number": 2,
+      "state": "open",
+      "purpose": "formal JSON Schema for destinations.json with strict property validation"
+    }
+  },
+  "blobs": {
+    "destinations_json": "c8f918089f700982d7347cc1d8af8d8677fd5774",
+    "validate_fixtures": "90ea1abb6136d939aa4d1e0ac422b23f74fa6362",
+    "package_json": "7d674c82cfca132d720a02dbc56d45df3979e950",
+    "ci_workflow": "53ce3ea3359798fd8b34d3a06728ae8110f7277c",
+    "consumer_contract_workflow": "05968b778c3ad91e096e4e954c79fa9178662092",
+    "contributing": "f2e18f5f1db2390c8c294c1c35bc63f6a86dec31",
+    "changelog": "2eddb818a16f7483ed5a83b3d9949b17fd978d62"
+  },
+  "current_source": {
+    "destination_count": 12,
+    "destinations_with_last_reviewed": 0,
+    "formal_destination_schema_present": false,
+    "freshness_date_validation_present": false,
+    "scheduled_freshness_workflow_present": false,
+    "all_fixture_status": "synthetic-only"
+  },
+  "contract": {
+    "last_reviewed": {
+      "required": false,
+      "representation": "YYYY-MM-DD",
+      "missing": "due",
+      "impossible_or_future": "invalid",
+      "default_threshold_days": 180,
+      "stale_comparison": "age_days > threshold_days",
+      "ordering": "destination id ascending"
+    },
+    "tests": [
+      "missing date is due",
+      "181 days is stale at threshold 180",
+      "exactly 180 days is not stale at threshold 180",
+      "recent date is not due",
+      "calendar and leap-day boundary",
+      "malformed impossible and future dates are invalid",
+      "input order does not change sorted due output",
+      "threshold override changes expected boundary",
+      "empty input yields empty due set"
+    ],
+    "coordination": [
+      "issue #2 strict schema must allow optional last_reviewed",
+      "fixture-file date changes require changelog coverage",
+      "do not invent review timestamps for unreviewed rows"
+    ]
+  },
+  "disposition": {
+    "source": "SOURCE_ALIGNED",
+    "implementation": "ASSIGNMENT_GATED",
+    "upstream_mutation": false,
+    "provider_mutation": false
+  }
+}
