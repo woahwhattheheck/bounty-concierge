@@ -28,7 +28,7 @@ This means an issue-specific sponsor classification of `$20` correctly overrides
 
 ## Availability
 
-The router requires a fresh observed state. Closed work is pruned, work assigned to another contributor is held, unknown/stale availability is held, and only open-unassigned / open-assigned-to-us candidates proceed to value routing.
+The router requires a fresh observed state. Closed work is pruned, work assigned to another contributor is held, unknown/stale availability is held, and only open-unassigned / open-assigned-to-us candidates proceed to value routing. The availability `source_url` must exactly equal the candidate's canonical source URL, so an OPEN observation from one issue cannot be transplanted onto another candidate.
 
 ## USD and USDC
 
