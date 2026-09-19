@@ -6,8 +6,8 @@ It exists to stop a finished implementation from dying in a local session and to
 
 ## Dispositions
 
-- `DIRECT_BRANCH_PR`: upstream write access and the minimum branch/PR primitives were observed.
-- `OWNED_FORK_PR`: a writable installed fork owned by the observed actor and branch/PR primitives were observed.
+- `DIRECT_BRANCH_PR`: upstream write access, branch/PR primitives, and an actual content-write path were observed.
+- `OWNED_FORK_PR`: a writable installed fork owned by the observed actor, branch/PR primitives, and an actual content-write path were observed.
 - `REUSE_EXISTING_PR`: an upstream PR is observed **open**; refresh and continue that carrier. Closed, merged, or unknown-state carriers hold instead of silently opening duplicate work.
 - `APPLICATION_ONLY`: repository rules require provider assignment and no application has been sent yet.
 - `WAIT_ASSIGNMENT`: the application exists but assignment has not arrived.
@@ -15,6 +15,8 @@ It exists to stop a finished implementation from dying in a local session and to
 - `HOLD_ASSIGNMENT_UNKNOWN` / `HOLD_APPLICATION_UNKNOWN`: refresh provider evidence.
 - `HOLD_STALE_OBSERVATION`: refresh all evidence before acting.
 - `HANDOFF_REQUIRED`: tested bytes need a worker with a real publication path, or the missing path must be established first.
+
+A content-write path means either `create_file`/`update_file`, or the complete `create_blob` → `create_tree` → `create_commit` → `update_ref` chain. Branch creation plus PR creation alone is not enough to claim tested bytes can be published.
 
 All output receipts pin `target_base_branch` exactly. The gate does **not** silently replace a required `develop` target with `main` merely because `main` is conventional.
 
