@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import hashlib
+import json
 import unittest
 from unittest.mock import patch
 
@@ -133,6 +135,13 @@ def native_request(*, assigned=False):
     }
 
 
+def rehash_activation(receipt):
+    body = dict(receipt)
+    body.pop("activation_receipt_sha256", None)
+    raw = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    receipt["activation_receipt_sha256"] = hashlib.sha256(raw.encode()).hexdigest()
+
+
 class ActivationGateTests(unittest.TestCase):
     def compile(self, payload):
         with (
@@ -142,10 +151,18 @@ class ActivationGateTests(unittest.TestCase):
         ):
             return compile_activation(payload)
 
+    def verify(self, receipt):
+        with (
+            patch("concierge.grantfox_activation_gate.verify_queue_receipt", return_value=True),
+            patch("concierge.grantfox_activation_gate.verify_source_readiness_receipt", return_value=True),
+            patch("concierge.grantfox_activation_gate.verify_continuity_receipt", return_value=True),
+        ):
+            return verify_activation_receipt(receipt)
+
     def test_discovered_aligned_can_apply(self):
         receipt = self.compile(request())
         self.assertEqual(receipt["disposition"], "APPLY_ELIGIBLE")
-        self.assertTrue(verify_activation_receipt(receipt))
+        self.assertTrue(self.verify(receipt))
         self.assertEqual(receipt["authority"], AUTHORITY)
 
     def test_native_discovered_receipts_compose_without_mocked_verifiers(self):
@@ -161,6 +178,31 @@ class ActivationGateTests(unittest.TestCase):
         self.assertEqual(receipt["disposition"], "IMPLEMENT_ASSIGNED_SCOPE")
         self.assertEqual(receipt["inputs"]["queue_disposition"], "IMPLEMENTATION_ELIGIBLE")
         self.assertEqual(receipt["inputs"]["continuity_state"], "ASSIGNED")
+        self.assertEqual(receipt["evidence"]["queue_receipt"], payload["queue_receipt"])
+        self.assertEqual(receipt["evidence"]["source_receipt"], payload["source_receipt"])
+        self.assertEqual(
+            receipt["evidence"]["continuity_receipt"],
+            payload["continuity_receipt"],
+        )
+        self.assertTrue(verify_activation_receipt(receipt))
+
+    def test_native_rehashed_semantic_forgery_is_rejected(self):
+        receipt = compile_activation(native_request())
+        self.assertEqual(receipt["disposition"], "APPLY_ELIGIBLE")
+        forged = deepcopy(receipt)
+        forged["disposition"] = "IMPLEMENT_ASSIGNED_SCOPE"
+        forged["advisory_next_action"] = "IMPLEMENT_ONLY_THE_ASSIGNED_PINNED_SCOPE"
+        forged["inputs"]["queue_disposition"] = "IMPLEMENTATION_ELIGIBLE"
+        forged["inputs"]["continuity_state"] = "ASSIGNED"
+        rehash_activation(forged)
+        self.assertFalse(verify_activation_receipt(forged))
+
+    def test_rehashed_unknown_semantic_field_is_rejected(self):
+        receipt = compile_activation(native_request())
+        forged = deepcopy(receipt)
+        forged["implementation_authorized"] = True
+        rehash_activation(forged)
+        self.assertFalse(verify_activation_receipt(forged))
 
     def test_source_drift_requires_replan_before_apply(self):
         receipt = self.compile(request(source_disposition="SOURCE_DRIFT_REPLAN"))
@@ -264,7 +306,17 @@ class ActivationGateTests(unittest.TestCase):
     def test_receipt_digest_detects_tamper(self):
         receipt = self.compile(request())
         receipt["disposition"] = "IMPLEMENT_ASSIGNED_SCOPE"
-        self.assertFalse(verify_activation_receipt(receipt))
+        self.assertFalse(self.verify(receipt))
+
+    def test_rehashed_forgery_cannot_override_evidence_state_machine(self):
+        receipt = self.compile(request())
+        forged = deepcopy(receipt)
+        forged["disposition"] = "IMPLEMENT_ASSIGNED_SCOPE"
+        forged["advisory_next_action"] = "IMPLEMENT_ONLY_THE_ASSIGNED_PINNED_SCOPE"
+        forged["inputs"]["queue_disposition"] = "IMPLEMENTATION_ELIGIBLE"
+        forged["inputs"]["continuity_state"] = "ASSIGNED"
+        rehash_activation(forged)
+        self.assertFalse(self.verify(forged))
 
 
 class ActivationGateProductionIntegrationTests(unittest.TestCase):

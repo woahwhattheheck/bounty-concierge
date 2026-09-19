@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,20 @@ AUTHORITY = {
     "adjudication_authority": False,
     "payment_or_wallet_authority": False,
 }
+_RECEIPT_FIELDS = {
+    "schema",
+    "disposition",
+    "advisory_next_action",
+    "reason_codes",
+    "identity",
+    "anchors",
+    "inputs",
+    "evidence",
+    "authority",
+    "activation_receipt_sha256",
+}
+_EVIDENCE_FIELDS = {"queue_receipt", "source_receipt", "continuity_receipt"}
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
 class GrantFoxActivationInputError(ValueError):
@@ -168,20 +183,48 @@ def compile_activation(request: dict[str, Any]) -> dict[str, Any]:
             "continuity_disposition": cdisp,
             "continuity_state": state,
         },
+        "evidence": {
+            "queue_receipt": queue,
+            "source_receipt": source,
+            "continuity_receipt": continuity,
+        },
         "authority": AUTHORITY,
     }
     return {**body, "activation_receipt_sha256": _sha(body)}
 
 
 def verify_activation_receipt(receipt: dict[str, Any]) -> bool:
-    if type(receipt) is not dict or receipt.get("schema") != SCHEMA or receipt.get("authority") != AUTHORITY:
+    """Verify native evidence and recompile the complete activation semantics."""
+    if type(receipt) is not dict or set(receipt) != _RECEIPT_FIELDS:
         return False
+    if receipt.get("schema") != SCHEMA or receipt.get("authority") != AUTHORITY:
+        return False
+
     digest = receipt.get("activation_receipt_sha256")
-    if type(digest) is not str or len(digest) != 64:
+    if type(digest) is not str or _SHA256.fullmatch(digest) is None:
         return False
-    body = dict(receipt)
-    body.pop("activation_receipt_sha256", None)
-    return _sha(body) == digest
+
+    evidence = receipt.get("evidence")
+    if type(evidence) is not dict or set(evidence) != _EVIDENCE_FIELDS:
+        return False
+    queue = evidence.get("queue_receipt")
+    source = evidence.get("source_receipt")
+    continuity = evidence.get("continuity_receipt")
+    if type(queue) is not dict or type(source) is not dict or type(continuity) is not dict:
+        return False
+
+    try:
+        expected = compile_activation(
+            {
+                "schema": SCHEMA,
+                "queue_receipt": queue,
+                "source_receipt": source,
+                "continuity_receipt": continuity,
+            }
+        )
+    except (GrantFoxActivationInputError, KeyError, TypeError, ValueError):
+        return False
+    return expected == receipt
 
 
 def format_summary(receipt: dict[str, Any]) -> str:
