@@ -1,0 +1,96 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-yieldvault-frontend-257-R-ZZ-SOL-DELTA",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Delta",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "YieldVault-Org/YieldVault-Frontend",
+    "default_branch": "main",
+    "head_sha": "f0ce8b799ded8f8e4cc158069d1940b1f822eb17",
+    "issue_number": 257,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 1,
+    "issue_linked_pr_count": 0,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/YieldVault-Org/repo/YieldVault-Frontend/issue/257",
+    "public_assignment_state": "Unassigned",
+    "application_route_visible": true,
+    "one_application_per_user": true,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false,
+    "application_attempt": {
+      "status": "not_started",
+      "submitted_verified": false
+    }
+  },
+  "evidence": {
+    "prior_numeric_patch_commit": "70fe9c94477ae0c0754b36f4ab9fbfd1d681c6ff",
+    "amount_input_blob": "b9e8e006923ae8408df78d716339e34576d0b501",
+    "amount_input_test_blob": "ebdc1b3a26844e60fa46e897efb8670f34b52b61",
+    "format_blob": "372d6f8e3e016776eb041acd5f136f7a1793f525",
+    "format_test_blob": "e40849b721d6620f881735bdc3879ce7ab8a7d08",
+    "validate_blob": "849c864013419820d60c3cf25d57e98068a1a5fb",
+    "validate_test_blob": "a4020a2d5c9440bd2d08cd74ce22d2499bcb8a0e",
+    "shares_blob": "b5f0dfe0ce4e352d402b4781a08a9255a97f995f",
+    "shares_test_blob": "28270bebfbbce5fc7101e9a50e4ece909a0f1ca7",
+    "deposit_form_blob": "e52209803f083e95d3ea38394bdd644f2024b39a",
+    "withdraw_form_blob": "807745121848993fc5f253cb76d2e79b39ad8b3b",
+    "deposit_wizard_blob": "ea4344e711caf8cc4a1e7e232dd747c4cdb52602",
+    "withdraw_wizard_blob": "f1525ebcb3ec85c905567fe437317efa2fd71180",
+    "vault_service_blob": "aaacb749ee2533caa52aec984dec60b758d60622",
+    "wallet_service_blob": "e8aa9d5f64493082f058d2efd1138f1c8f6e8bb8",
+    "wallet_hook_blob": "fa12517b66be1b3b95539aa94695a99fd174db6d",
+    "i18n_blob": "834f3bb05b65d334ca33a51127a5f0b003a228cb",
+    "mock_data_blob": "8c61ddb294eee4b84495f9b39605c29040967179",
+    "ci_blob": "e0de7e895eadefcae74e0601edbd35341cb1f1bd",
+    "package_blob": "c30544e7574b0476e6da97928b1c23118fb85d32",
+    "current_state": {
+      "supported_product_locale": "en-US",
+      "amount_input_locale_hardcoded_en_us": true,
+      "comma_is_unconditionally_grouping": true,
+      "fractional_precision_guard": false,
+      "form_submit_uses_binary_number": true,
+      "wizard_submit_uses_binary_number": true,
+      "wizard_bypasses_amount_input": true,
+      "display_default_decimals": 2,
+      "per_asset_precision_metadata_present": false,
+      "balances_are_javascript_numbers": true,
+      "vault_transaction_service_is_mock": true,
+      "wallet_submission_is_mock_summary_only": true,
+      "dedicated_fee_source_path_found": false
+    }
+  },
+  "post_assignment": {
+    "required": [
+      "explicit locale grammar",
+      "locale-independent canonical decimal string",
+      "explicit per-asset precision or token metadata source",
+      "exact minor-unit or equivalent non-binary transaction amount",
+      "exact balance comparison",
+      "unified form and wizard parser",
+      "display formatting separated from serialization",
+      "mock service exact amount contract",
+      "locale matrix tests",
+      "round-trip property tests",
+      "minimum-unit and exact-balance boundary tests",
+      "N and N+1 precision tests",
+      "malformed grouping rejection",
+      "display-review-service reconciliation proof",
+      "npm test and npm run build"
+    ],
+    "financial_fixture_policy": "mocked/local/testnet only"
+  },
+  "fence": {
+    "implementation_requires_provider_or_maintainer_assignment": true,
+    "upstream_source_mutated": false,
+    "funded_wallet_or_mainnet_use": false
+  }
+}
