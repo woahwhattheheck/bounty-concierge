@@ -1,0 +1,94 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-credence-frontend-1045/R-api-drift-source-contract",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Forge",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "CredenceOrg/Credence-Frontend",
+    "issue_number": 1045,
+    "issue_state": "open",
+    "github_assignee": null,
+    "visible_issue_comments": 1,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    },
+    "head_sha": "430e4439c8f6434e624c4c0919a04cb8a3a0f38c"
+  },
+  "blobs": {
+    "openapi": "989e7a9a0f723018c570a364589aadd14538e545",
+    "package_json": "f519ccf6ee22a3cca38c1448f7d0c9504c89329a",
+    "package_lock": "e804259b0e828624bc9897dc5bd9685f6e4da3bd",
+    "generated_ts": "5544568bb8d984e398bbf3343a7814272c1421ad",
+    "api_types": "1e7f07b2209dd2639b7ee46d989e26ab5d006e47",
+    "use_trust_score": "2ec37836607076549e3f4e58e42e9025bc6852b1",
+    "use_transactions": "0648c8e2047da71ffedec3c8be4f1a699c6b785e",
+    "bond_page": "48c06e35af768c37e95c23fbbfbc3530bec9524c",
+    "trust_page": "40dea2bc70812beb8ddc9e421e1793b89bd5229f",
+    "ci": "38ac98215d7512a63a49ea416f6e7539ef69401f"
+  },
+  "codegen": {
+    "command": "openapi-typescript openapi.yaml -o src/api/generated.ts",
+    "dev_dependency_range": "^6.7.6",
+    "lockfile_present": true,
+    "generated_file_committed": true,
+    "runtime_regeneration_executed_by_this_audit": false,
+    "runtime_regeneration_note": "worker execution sandbox had no external DNS; no clean-regeneration result is claimed"
+  },
+  "openapi": {
+    "paths": [
+      {
+        "method": "GET",
+        "path": "/trust-score/{address}",
+        "operation_id": "getTrustScore"
+      },
+      {
+        "method": "GET",
+        "path": "/transactions",
+        "operation_id": "listTransactions"
+      },
+      {
+        "method": "PATCH",
+        "path": "/settings",
+        "operation_id": "updateSettings"
+      }
+    ],
+    "bond_schema_present": true,
+    "bond_operation_present": false
+  },
+  "consumers": {
+    "transactions": "operation-typed via ApiResponse<operations['listTransactions']>",
+    "trust_score": "schema-typed via apiFetch<TrustScore>; residual operation-typing gap",
+    "bond": "documented mock/in-memory; no authoritative OpenAPI operation"
+  },
+  "ci": {
+    "active_quality_gate": "echo-only stub",
+    "generated_drift_check": false,
+    "build_gate": false,
+    "contract_test_gate": false
+  },
+  "runtime_contract": {
+    "api_fetch_generic_is_runtime_validator": false,
+    "malformed_2xx_payload_rejection_present": false,
+    "recommendation": "operation endpoint wrappers plus runtime decoder/validator and typed ApiContractError"
+  },
+  "historical_merged_prs": [
+    {
+      "number": 478,
+      "purpose": "initial OpenAPI codegen/types pipeline"
+    },
+    {
+      "number": 1021,
+      "purpose": "operation-type /transactions consumer"
+    }
+  ],
+  "disposition": "READY_FOR_ASSIGNMENT_WITH_ONE_CONTRACT_DEPENDENCY",
+  "dependency": "authoritative Bond operation absent from checked-in OpenAPI; do not invent one",
+  "authority": {
+    "upstream_source_mutated": false,
+    "provider_application_submitted": false,
+    "provider_assignment_claimed": false,
+    "reward_or_payment_claimed": false
+  }
+}
