@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "generated_for": "source-readiness only",
+  "owner": "ZZ-Sol-Cinder-47 / GPT-5.6 Sol",
+  "captured_date": "2026-09-19",
+  "concierge_base": "f6421f5e0a52638b802265ec89320d91a590f7e5",
+  "issues": [
+    {
+      "repo": "TrustLayer-Org/TrustLayer-Backend",
+      "issue": 3,
+      "upstream_main": "6ba347951ab6e99e46c4983b2e15f370f214e15f",
+      "github_state": "open",
+      "assignee": null,
+      "linked_development_pr": false,
+      "grantfox_application": "not_claimed_submitted",
+      "implementation": "not_started_assignment_gated",
+      "key_paths": [
+        "src/signals/validate.js",
+        "src/signals/constants.js",
+        "src/signals/router.js",
+        "src/signals/repository.js",
+        "src/app.js",
+        "src/signals/validate.test.js",
+        "src/signals/router.test.js"
+      ]
+    },
+    {
+      "repo": "TrustLayer-Org/TrustLayer-Frontend",
+      "issue": 6,
+      "upstream_main": "9015d666984f1ae29657b6dfe2de3495c646b325",
+      "github_state": "open",
+      "assignee": null,
+      "linked_development_pr": false,
+      "grantfox_application": "not_claimed_submitted",
+      "implementation": "not_started_assignment_gated",
+      "key_paths": [
+        "src/lib/trust.js",
+        "src/components/ScoreCard.js",
+        "src/components/ScoreLegend.js",
+        "src/components/NextTierHint.js",
+        "src/components/ScoreMeter.js",
+        "src/components/TrustBadge.js",
+        ".github/workflows/ci.yml"
+      ],
+      "dependency": "authoritative cross-system tier policy source not present on audited frontend/backend main"
+    }
+  ]
+}
