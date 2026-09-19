@@ -1,0 +1,99 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-nexoraorg-chenaikit-303-R-LANTERN",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-17-Lantern",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "nexoraorg/chenaikit",
+    "default_branch": "main",
+    "head_sha": "2653a3f1d670828068c3c3692d2c7834d2e8bf15",
+    "issue_number": 303,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 1,
+    "open_issue_linked_pr_found": false,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/nexoraorg/repo/chenaikit/issue/303",
+    "assignment_state": "unassigned",
+    "apply_visible": true,
+    "applications_visible": 1,
+    "one_application_per_user": true,
+    "issue_requires_assignment_before_pr": true,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "source": {
+    "app_blob": "1717213a3a144150cfb91f5da5f639b53bcb7b5c",
+    "backend_package_blob": "eeef2b3912c9fefc18fb8baa16349266be265b90",
+    "app_error_blob": "e845339e81f6d39b9f7250e02cee63df1340a32b",
+    "error_handler_blob": "cf73f7ed6bc4f0980d5598296aa07b16718170ba",
+    "integration_test_blob": "8fd7bd442ab4831ede4c12a49377b8549c9672fe",
+    "backend_readme_blob": "996e7ebd117050a4b669aaeb1fcd3a8ab8a22b4b",
+    "backend_ci_blob": "9232e4c9e3a24c81ac87c0109f999bbf065ab972",
+    "tsconfig_blob": "a7381e28d9986d768446368ba347cad9dd220b3d",
+    "prisma_schema_blob": "b8ba449bafb3df80950fc787bd913171a3d1afec"
+  },
+  "current_surface": {
+    "public_mutating_routes": [
+      "POST /api/records"
+    ],
+    "current_inline_validation": true,
+    "centralized_validation_middleware_found": false,
+    "current_inline_error_code": "Validation Error",
+    "documented_error_code": "validation_error",
+    "typed_validation_error_exists": true,
+    "invalid_name_value_checked_before_prisma": true
+  },
+  "implementation_contract": {
+    "reuse_existing_error_architecture": true,
+    "dependency_addition_required": false,
+    "dependency_rule": "add only if the real route matrix justifies it",
+    "normalized_request_locations": [
+      "body",
+      "query",
+      "params"
+    ],
+    "migrate_real_route_first": "POST /api/records",
+    "malformed_json_must_remain_400": true,
+    "unknown_field_policy_must_be_explicit": true,
+    "side_effect_proof": [
+      "invalid => handler not called",
+      "invalid => prisma.apiRecord.create not called",
+      "valid => handler and persistence exactly once"
+    ]
+  },
+  "hostile_tests": [
+    "missing/null/wrong-type name",
+    "whitespace name",
+    "missing/null/wrong-type value",
+    "NaN/Infinity schema unit guard",
+    "malformed JSON 400",
+    "zero Prisma calls on invalid",
+    "zero handler calls on invalid",
+    "valid trimmed persistence",
+    "structured field detail",
+    "unknown-field compatibility",
+    "requestId preservation",
+    "existing error/Prisma tests"
+  ],
+  "disposition": {
+    "fleet_route": "APPLY_THEN_WAIT_FOR_ASSIGNMENT",
+    "implementation_started": false,
+    "implementation_assignment_gated": true
+  },
+  "authority": {
+    "advisory_only": true,
+    "provider_application_authority": false,
+    "provider_assignment_authority": false,
+    "upstream_implementation_authority": false,
+    "submission_authority": false,
+    "payment_or_wallet_authority": false
+  }
+}
