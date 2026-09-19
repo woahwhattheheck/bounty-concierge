@@ -95,6 +95,20 @@ positive landed evidence. Source problems take precedence over dependency state;
 issue closure alone cannot launder an unimplemented prerequisite into a green
 signal.
 
+## Consumption-time freshness
+
+A source-readiness receipt is not treated as perpetually fresh merely because its
+own historical verification still succeeds. At every dependency evaluation, the
+gate re-ages both the embedded repository snapshot and the embedded provider/queue
+observation against that evidence's original freshness ceiling. If either has
+expired, the result is `HOLD` with
+`REFRESH_SOURCE_READINESS_BEFORE_DEPENDENCY_CLEARANCE`.
+
+This prevents a newly refreshed prerequisite observation from laundering an old
+source/provider baseline into `DEPENDENCIES_CLEAR`. A fresh `LANDED` dependency
+therefore remains insufficient when the source evidence it is meant to unblock is
+stale.
+
 ## Tamper evidence
 
 The receipt embeds the complete source receipt, normalized dependency evidence,
