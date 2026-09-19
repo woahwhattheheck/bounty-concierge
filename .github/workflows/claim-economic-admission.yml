@@ -7,13 +7,16 @@ on:
       - "concierge/_claim_economic_admission_impl.py"
       - "concierge/_claim_economic_generation.py"
       - "concierge/entrypoint.py"
+      - "concierge/paid_work_dollar_floor.py"
       - "concierge/paid_work_effort_value_gate.py"
       - "concierge/fleet_economic_admission.py"
       - "concierge/_fleet_economic_admission_v1.py"
       - "tests/test_claim_economic_admission.py"
       - "tests/test_claim_entrypoint_preflight.py"
       - "tests/test_claim_economic_generation.py"
+      - "tests/test_paid_work_dollar_floor.py"
       - "tests/test_paid_work_effort_value_gate.py"
+      - "policies/paid_work_dollar_floor_v1.json"
       - "policies/paid_work_effort_value_v1.json"
       - "docs/CLAIM_ECONOMIC_ADMISSION.md"
       - "docs/CLAIM_ECONOMIC_GENERATION.md"
@@ -26,13 +29,16 @@ on:
       - "concierge/_claim_economic_admission_impl.py"
       - "concierge/_claim_economic_generation.py"
       - "concierge/entrypoint.py"
+      - "concierge/paid_work_dollar_floor.py"
       - "concierge/paid_work_effort_value_gate.py"
       - "concierge/fleet_economic_admission.py"
       - "concierge/_fleet_economic_admission_v1.py"
       - "tests/test_claim_economic_admission.py"
       - "tests/test_claim_entrypoint_preflight.py"
       - "tests/test_claim_economic_generation.py"
+      - "tests/test_paid_work_dollar_floor.py"
       - "tests/test_paid_work_effort_value_gate.py"
+      - "policies/paid_work_dollar_floor_v1.json"
       - "policies/paid_work_effort_value_v1.json"
       - "docs/CLAIM_ECONOMIC_ADMISSION.md"
       - "docs/CLAIM_ECONOMIC_GENERATION.md"
@@ -84,6 +90,9 @@ jobs:
           concierge/claim_economic_admission.py
           concierge/_claim_economic_admission_impl.py
           concierge/_claim_economic_generation.py
+          concierge/paid_work_dollar_floor.py
+          concierge/paid_work_effort_value_gate.py
+          concierge/fleet_economic_admission.py
           concierge/entrypoint.py
           tests/test_claim_economic_admission.py
           tests/test_claim_entrypoint_preflight.py
@@ -93,6 +102,7 @@ jobs:
           python -m pytest -q
           tests/test_claim_economic_admission.py
           tests/test_claim_entrypoint_preflight.py
+          tests/test_paid_work_dollar_floor.py
           tests/test_paid_work_effort_value_gate.py
           tests/test_claim_economic_generation.py
       - name: Optimized hostile tests
@@ -100,5 +110,6 @@ jobs:
           python -O -m pytest -q
           tests/test_claim_economic_admission.py
           tests/test_claim_entrypoint_preflight.py
+          tests/test_paid_work_dollar_floor.py
           tests/test_paid_work_effort_value_gate.py
           tests/test_claim_economic_generation.py
