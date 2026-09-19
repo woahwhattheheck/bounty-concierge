@@ -1,0 +1,110 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-chenaikit-323-R-LANTERN",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-17-Lantern",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "nexoraorg/chenaikit",
+    "default_branch": "main",
+    "head_sha": "2653a3f1d670828068c3c3692d2c7834d2e8bf15",
+    "issue_number": 323,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 3,
+    "open_issue_linked_pr_found": false,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/nexoraorg/repo/chenaikit/issue/323",
+    "assignment_state": "unassigned",
+    "apply_visible": true,
+    "issue_requires_assignment_before_pr": true,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "source": {
+    "backend_workflow_blob": "9232e4c9e3a24c81ac87c0109f999bbf065ab972",
+    "contracts_workflow_blob": "c2408222213394473efa49b8641ff97b13757e9b",
+    "workflow_readme_blob": "cee36b57bbf57ef1d297d51c8049be0b42cee42e",
+    "pnpm_lock_blob": "03a746d4c094ab6f3870a73ab841db22dd7a371d",
+    "pnpm_workspace_blob": "b6d7bb8a6dd1629990b79856f71ea0e51a2e6259",
+    "root_package_blob": "20b3e38c57bdb61777854f9e35be022f68027f48",
+    "cargo_lock_blob": "d08acefa7cb9b507d48aa226e1e8df0b1cd0bb82",
+    "cargo_workspace_blob": "5d8560b66e2ee204a5e50947fb8d6f602512696e",
+    "rust_toolchain_file_present": false
+  },
+  "current_cache": {
+    "pnpm": {
+      "present": true,
+      "mechanism": "actions/setup-node@v4 cache: pnpm",
+      "node": "22",
+      "pnpm": "9.15.9",
+      "install": "pnpm install --no-frozen-lockfile",
+      "node_modules_cached": false
+    },
+    "rust": {
+      "present": true,
+      "mechanism": "actions/cache@v4",
+      "paths": [
+        "~/.cargo/registry",
+        "~/.cargo/git",
+        "contracts/target"
+      ],
+      "key": "cargo-${runner.os}-${hashFiles('contracts/**/Cargo.toml')}",
+      "restore_prefix": "cargo-${runner.os}-",
+      "cargo_lock_in_key": false,
+      "exact_toolchain_in_key": false,
+      "wasm_target_in_key": false,
+      "build_outputs_cached": true,
+      "toolchain_selector": "stable"
+    }
+  },
+  "implementation_contract": {
+    "pnpm": "reuse setup-node store cache; make dependency-path and invalidation contract explicit",
+    "cargo_download_cache": [
+      "~/.cargo/registry",
+      "~/.cargo/git"
+    ],
+    "cargo_required_key_inputs": [
+      "OS",
+      "contracts/Cargo.lock",
+      "Cargo manifests",
+      "exact/pinned Rust identity",
+      "wasm32 target/components"
+    ],
+    "target_cache_default": "drop unless measured benefit justifies stronger compiler/target/profile/source key",
+    "credentials_cached": false,
+    "clean_miss_must_build": true
+  },
+  "proof_required": [
+    "pnpm miss",
+    "pnpm hit",
+    "pnpm lockfile invalidation",
+    "cargo miss",
+    "cargo hit",
+    "Cargo.lock invalidation",
+    "Rust toolchain invalidation",
+    "target/compiler invalidation",
+    "credential-path exclusion",
+    "docs parity"
+  ],
+  "disposition": {
+    "fleet_route": "APPLY_WITH_HARDENING_PLAN_THEN_WAIT_ASSIGNMENT",
+    "implementation_started": false,
+    "implementation_assignment_gated": true,
+    "reason": "both requested caches already exist; remaining work is source-specific correctness/invalidation hardening"
+  },
+  "authority": {
+    "advisory_only": true,
+    "provider_application_authority": false,
+    "provider_assignment_authority": false,
+    "upstream_implementation_authority": false,
+    "submission_authority": false,
+    "payment_or_wallet_authority": false
+  }
+}
