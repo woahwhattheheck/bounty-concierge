@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import hashlib
+import json
 import unittest
 from unittest.mock import patch
 
@@ -10,6 +12,9 @@ from concierge.grantfox_activation_gate import (
     compile_activation,
     verify_activation_receipt,
 )
+from concierge.grantfox_application_continuity import compile_continuity
+from concierge.grantfox_queue_gate import compile_grantfox_queue_gate
+from concierge.grantfox_source_readiness import compile_grantfox_source_readiness
 
 
 def request(queue_disposition="APPLY_ELIGIBLE", source_disposition="SOURCE_ALIGNED",
@@ -55,19 +60,101 @@ def request(queue_disposition="APPLY_ELIGIBLE", source_disposition="SOURCE_ALIGN
     }
 
 
+def _sha_json(value):
+    return hashlib.sha256(
+        json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    ).hexdigest()
+
+
+def native_request(*, assigned=False):
+    queue = compile_grantfox_queue_gate({
+        "schema": "grantfox-queue-gate/v1",
+        "listing_url": "https://contribute.grantfox.xyz/org/QuickLendX/repo/quicklendx-frontend/issue/16",
+        "canonical_issue_url": "https://github.com/QuickLendX/quicklendx-frontend/issues/16",
+        "issue_state": "open",
+        "actor_login": "woahwhattheheck",
+        "assigned_to": "woahwhattheheck" if assigned else None,
+        "actor_applied": assigned,
+        "application_count": 1 if assigned else 0,
+        "application_pressure_threshold": 3,
+        "linked_pr_urls": [],
+        "labels": ["Maybe Rewarded", "GrantFox OSS"],
+        "observed_at": "2026-09-19T22:00:00Z",
+        "evaluated_at": "2026-09-19T22:00:10Z",
+        "max_snapshot_age_seconds": 900,
+    })
+    source = compile_grantfox_source_readiness({
+        "schema": "grantfox-source-readiness/v1",
+        "queue_receipt": queue,
+        "repository_snapshot": {
+            "repository_full_name": "QuickLendX/quicklendx-frontend",
+            "default_branch": "main",
+            "commit_sha": "1" * 40,
+            "observed_at": "2026-09-19T22:00:15Z",
+        },
+        "expectations": [{
+            "kind": "path",
+            "value": "src/app/page.tsx",
+            "matches": [{"path": "src/app/page.tsx", "blob_sha": "2" * 40}],
+        }],
+        "replacements": [],
+        "evaluated_at": "2026-09-19T22:00:20Z",
+        "max_snapshot_age_seconds": 900,
+    })
+    if assigned:
+        events = [
+            {
+                "event_id": "e1",
+                "kind": "APPLICATION_RECEIPT",
+                "observed_at": "2026-09-19T22:00:30Z",
+                "receipt_url": "https://github.com/QuickLendX/quicklendx-frontend/issues/16#issuecomment-1001",
+            },
+            {
+                "event_id": "e2",
+                "kind": "ASSIGNMENT_RECEIPT",
+                "observed_at": "2026-09-19T22:00:40Z",
+                "receipt_url": "https://github.com/QuickLendX/quicklendx-frontend/issues/16#issuecomment-1002",
+                "assigned_to": "woahwhattheheck",
+            },
+        ]
+    else:
+        events = [{
+            "event_id": "e1",
+            "kind": "SNAPSHOT",
+            "observed_at": "2026-09-19T22:00:30Z",
+            "issue_state": "open",
+            "actor_applied": False,
+            "assigned_to": None,
+            "linked_pr_urls": [],
+        }]
+    continuity = compile_continuity({
+        "schema": "grantfox-application-continuity/v1",
+        "actor_login": "woahwhattheheck",
+        "queue_receipt": queue,
+        "events": events,
+    })
+    return {
+        "schema": "grantfox-activation-gate/v1",
+        "queue_receipt": queue,
+        "source_receipt": source,
+        "continuity_receipt": continuity,
+    }
+
+
 class ActivationGateTests(unittest.TestCase):
     def compile(self, payload):
         with (
             patch("concierge.grantfox_activation_gate.verify_queue_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_source_readiness_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_continuity_receipt", return_value=True),
+            patch("concierge.grantfox_activation_gate._queue_semantically_valid", return_value=True),
+            patch("concierge.grantfox_activation_gate._continuity_semantically_valid", return_value=True),
         ):
             return compile_activation(payload)
 
     def test_discovered_aligned_can_apply(self):
         receipt = self.compile(request())
         self.assertEqual(receipt["disposition"], "APPLY_ELIGIBLE")
-        self.assertTrue(verify_activation_receipt(receipt))
         self.assertEqual(receipt["authority"], AUTHORITY)
 
     def test_source_drift_requires_replan_before_apply(self):
@@ -176,73 +263,50 @@ class ActivationGateTests(unittest.TestCase):
 
 
 class ActivationGateProductionIntegrationTests(unittest.TestCase):
-    def test_real_receipt_compilers_unlock_only_assigned_aligned_scope(self):
-        from concierge.grantfox_application_continuity import compile_continuity
-        from concierge.grantfox_queue_gate import compile_grantfox_queue_gate
-        from concierge.grantfox_source_readiness import compile_grantfox_source_readiness
-
-        queue = compile_grantfox_queue_gate({
-            "schema": "grantfox-queue-gate/v1",
-            "listing_url": "https://contribute.grantfox.xyz/org/QuickLendX/repo/quicklendx-frontend/issue/16",
-            "canonical_issue_url": "https://github.com/QuickLendX/quicklendx-frontend/issues/16",
-            "issue_state": "open",
-            "actor_login": "woahwhattheheck",
-            "assigned_to": "woahwhattheheck",
-            "actor_applied": True,
-            "application_count": 1,
-            "application_pressure_threshold": 3,
-            "linked_pr_urls": [],
-            "labels": ["GrantFox OSS"],
-            "observed_at": "2026-09-19T21:00:00Z",
-            "evaluated_at": "2026-09-19T21:01:00Z",
-            "max_snapshot_age_seconds": 900,
-        })
-        source = compile_grantfox_source_readiness({
-            "schema": "grantfox-source-readiness/v1",
-            "queue_receipt": queue,
-            "repository_snapshot": {
-                "repository_full_name": "QuickLendX/quicklendx-frontend",
-                "default_branch": "main",
-                "commit_sha": "1" * 40,
-                "observed_at": "2026-09-19T21:00:30Z",
-            },
-            "expectations": [{
-                "kind": "path",
-                "value": "README.md",
-                "matches": [{"path": "README.md", "blob_sha": "2" * 40}],
-            }],
-            "replacements": [],
-            "evaluated_at": "2026-09-19T21:01:00Z",
-            "max_snapshot_age_seconds": 900,
-        })
-        continuity = compile_continuity({
-            "schema": "grantfox-application-continuity/v1",
-            "queue_receipt": queue,
-            "actor_login": "woahwhattheheck",
-            "events": [
-                {
-                    "event_id": "application",
-                    "kind": "APPLICATION_RECEIPT",
-                    "observed_at": "2026-09-19T21:00:10Z",
-                    "receipt_url": "https://github.com/QuickLendX/quicklendx-frontend/issues/16#issuecomment-101",
-                },
-                {
-                    "event_id": "assignment",
-                    "kind": "ASSIGNMENT_RECEIPT",
-                    "observed_at": "2026-09-19T21:00:20Z",
-                    "receipt_url": "https://github.com/QuickLendX/quicklendx-frontend/issues/16#issuecomment-102",
-                    "assigned_to": "woahwhattheheck",
-                },
-            ],
-        })
-        receipt = compile_activation({
-            "schema": "grantfox-activation-gate/v1",
-            "queue_receipt": queue,
-            "source_receipt": source,
-            "continuity_receipt": continuity,
-        })
-        self.assertEqual(receipt["disposition"], "IMPLEMENT_ASSIGNED_SCOPE")
+    def test_real_discovered_receipts_compose_and_verify(self):
+        receipt = compile_activation(native_request())
+        self.assertEqual(receipt["disposition"], "APPLY_ELIGIBLE")
+        self.assertEqual(receipt["identity"]["actor_login"], "woahwhattheheck")
         self.assertTrue(verify_activation_receipt(receipt))
+
+    def test_real_assigned_receipts_unlock_only_assigned_aligned_scope(self):
+        receipt = compile_activation(native_request(assigned=True))
+        self.assertEqual(receipt["disposition"], "IMPLEMENT_ASSIGNED_SCOPE")
+        self.assertEqual(receipt["inputs"]["queue_disposition"], "IMPLEMENTATION_ELIGIBLE")
+        self.assertEqual(receipt["inputs"]["continuity_state"], "ASSIGNED")
+        self.assertTrue(verify_activation_receipt(receipt))
+
+    def test_rehashed_derived_implementation_forgery_is_rejected(self):
+        receipt = compile_activation(native_request())
+        self.assertEqual(receipt["disposition"], "APPLY_ELIGIBLE")
+        self.assertTrue(verify_activation_receipt(receipt))
+
+        forged = deepcopy(receipt)
+        forged["disposition"] = "IMPLEMENT_ASSIGNED_SCOPE"
+        forged["advisory_next_action"] = "IMPLEMENT_ONLY_THE_ASSIGNED_PINNED_SCOPE"
+        forged["inputs"]["queue_disposition"] = "IMPLEMENTATION_ELIGIBLE"
+        forged["inputs"]["continuity_state"] = "ASSIGNED"
+        body = deepcopy(forged)
+        body.pop("activation_receipt_sha256")
+        forged["activation_receipt_sha256"] = _sha_json(body)
+
+        self.assertFalse(verify_activation_receipt(forged))
+
+    def test_rehashed_forged_continuity_state_is_rejected_before_activation(self):
+        payload = native_request()
+        forged = deepcopy(payload["continuity_receipt"])
+        forged["state"] = "ASSIGNED"
+        forged["advisory_next_action"] = "IMPLEMENT_ASSIGNED_SCOPE"
+        body = deepcopy(forged)
+        body.pop("receipt_sha256")
+        forged["receipt_sha256"] = _sha_json(body)
+        payload["continuity_receipt"] = forged
+
+        with self.assertRaisesRegex(
+            GrantFoxActivationInputError,
+            "continuity_receipt does not verify",
+        ):
+            compile_activation(payload)
 
 
 if __name__ == "__main__":
