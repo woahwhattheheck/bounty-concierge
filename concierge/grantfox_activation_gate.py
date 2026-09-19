@@ -10,7 +10,10 @@ from pathlib import Path
 from typing import Any
 
 from .grantfox_application_continuity import verify_continuity_receipt
-from .grantfox_dependency_fulfillment import verify_dependency_fulfillment_receipt
+from .grantfox_dependency_fulfillment import (
+    compile_grantfox_dependency_fulfillment,
+    verify_dependency_fulfillment_receipt,
+)
 from .grantfox_dependency_readiness import verify_dependency_readiness_receipt
 from .grantfox_queue_gate import verify_receipt as verify_queue_receipt
 from .grantfox_source_readiness import verify_source_readiness_receipt
@@ -88,7 +91,7 @@ def compile_activation(request: dict[str, Any]) -> dict[str, Any]:
     queue = _obj(r.get("queue_receipt"), "queue_receipt")
     source = _obj(r.get("source_receipt"), "source_receipt")
     dependency = _obj(r.get("dependency_receipt"), "dependency_receipt")
-    fulfillment = _obj(r.get("fulfillment_receipt"), "fulfillment_receipt")
+    fulfillment_raw = r.get("fulfillment_receipt")
     continuity = _obj(r.get("continuity_receipt"), "continuity_receipt")
 
     if not verify_queue_receipt(queue, semantic=True):
@@ -97,6 +100,35 @@ def compile_activation(request: dict[str, Any]) -> dict[str, Any]:
         raise GrantFoxActivationInputError("source_receipt does not verify")
     if not verify_dependency_readiness_receipt(dependency):
         raise GrantFoxActivationInputError("dependency_receipt does not verify")
+
+    if fulfillment_raw is None:
+        dependency_evidence = _obj(
+            dependency.get("evidence"), "dependency_receipt.evidence"
+        )
+        dependencies = dependency_evidence.get("dependencies")
+        if dependencies != []:
+            raise GrantFoxActivationInputError(
+                "fulfillment_receipt is required when prerequisites are declared"
+            )
+        try:
+            fulfillment = compile_grantfox_dependency_fulfillment(
+                {
+                    "schema": "grantfox-dependency-fulfillment/v1",
+                    "dependency_receipt": dependency,
+                    "landings": [],
+                    "evaluated_at": dependency_evidence.get("evaluated_at"),
+                    "max_snapshot_age_seconds": dependency_evidence.get(
+                        "max_snapshot_age_seconds"
+                    ),
+                }
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise GrantFoxActivationInputError(
+                "zero-prerequisite fulfillment could not be reconstructed"
+            ) from exc
+    else:
+        fulfillment = _obj(fulfillment_raw, "fulfillment_receipt")
+
     if not verify_dependency_fulfillment_receipt(fulfillment):
         raise GrantFoxActivationInputError("fulfillment_receipt does not verify")
     if not verify_continuity_receipt(continuity, queue):
