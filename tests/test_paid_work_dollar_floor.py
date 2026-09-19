@@ -217,6 +217,23 @@ class PaidWorkDollarFloorTests(unittest.TestCase):
         ):
             compile_paid_work_dollar_floor(payload)
 
+    def test_source_owned_policy_cannot_be_weakened(self):
+        payload = request()
+        payload["policy"]["active_floor"] = "49"
+        with self.assertRaisesRegex(
+            DollarFloorInputError, "source-owned"
+        ):
+            compile_paid_work_dollar_floor(payload)
+
+    def test_evidence_permalink_fragment_is_allowed(self):
+        payout = evidence(amount="50")
+        payout["evidence_url"] = (
+            "https://github.com/example/repo/issues/1#issuecomment-123"
+        )
+        result = compile_paid_work_dollar_floor(request(payout))
+        self.assertEqual(result["decision"], "ACTIVE_REVIEW")
+        self.assertTrue(verify_receipt(result))
+
     def test_receipt_is_deterministic_and_tamper_evident(self):
         first = compile_paid_work_dollar_floor(request())
         second = compile_paid_work_dollar_floor(
@@ -227,6 +244,21 @@ class PaidWorkDollarFloorTests(unittest.TestCase):
 
         changed = deepcopy(first)
         changed["decision"] = "PILE_SAVE_UP"
+        self.assertFalse(verify_receipt(changed))
+
+        changed = deepcopy(first)
+        changed["decision"] = "PILE_SAVE_UP"
+        body = dict(changed)
+        body.pop("receipt_sha256")
+        changed["receipt_sha256"] = hashlib.sha256(
+            json.dumps(
+                body,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest()
         self.assertFalse(verify_receipt(changed))
 
         changed = deepcopy(first)
@@ -251,6 +283,27 @@ class PaidWorkDollarFloorTests(unittest.TestCase):
             ).read_text(encoding="utf-8")
         )
         self.assertEqual(checked, POLICY)
+
+    def test_cli_rejects_json_float_amount(self):
+        payload = request()
+        payload["candidate"]["payout_evidence"]["amount"] = 50.0
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "request.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "concierge.paid_work_dollar_floor",
+                    str(path),
+                    "--json",
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("floating-point", proc.stderr)
 
     def test_cli_round_trip(self):
         payload = request()
