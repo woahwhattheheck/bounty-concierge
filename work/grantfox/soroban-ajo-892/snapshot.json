@@ -1,0 +1,59 @@
+{
+  "schema": "grantfox-source-baseline/v1",
+  "identity": {
+    "owner": "Ajo-contrib",
+    "repo": "soroban-ajo",
+    "issue_number": 892
+  },
+  "upstream": {
+    "ref": "master",
+    "sha": "1b87ea7344ae3d871e54abff05eabe5113bd2956"
+  },
+  "github": {
+    "state": "OPEN",
+    "assignees": [],
+    "comments": 0,
+    "labels": ["enhancement", "medium", "contracts", "Maybe Rewarded", "GrantFox OSS", "Third Campaign"]
+  },
+  "grantfox": {
+    "observed_date": "2026-09-19",
+    "assignment": "Unassigned",
+    "apply_available": true,
+    "applications_per_user": 1
+  },
+  "blobs": {
+    "contract": "ffc61c59ac9324b3b1ececd131afb64eb8da7184",
+    "storage": "2434706525a71819787ea17f4421ff64102b3505",
+    "storage_migrations_doc": "bbafee579dac853a7962984079adc3cb1b74bedd",
+    "deployment_doc": "4f4b565c4fe1c016b3885abc069799cffa318c5c",
+    "dependency_policy": "f43248387eb1962b2e554186ceae5ee9a5d43400",
+    "upgrade_migration_tests": "74b295303ab9f6f3c2091c849018a4aca33c87fc",
+    "events": "53c44d71b49865e76d87d8aa3bb525c2a9273420",
+    "errors": "ec414e7aab46bccbc8ba855499875231998cebc0",
+    "cargo": "7e22d95b03fa35e31ae3377d1e6f2c6f20fe829f"
+  },
+  "findings": [
+    "upgrade authenticates admin and gates on caller-supplied schema_version equal to current Wasm schema",
+    "upgrade does not bind target Wasm hash to a supported schema",
+    "no previous Wasm history or rollback entrypoint is present",
+    "no contract upgrade or rollback audit event was found",
+    "storage migration policy defines forward vN to vN+1 only",
+    "deployment runbook claims previous-Wasm rollback and omits required schema_version",
+    "dependency policy warns contract Wasm cannot be quietly reverted",
+    "existing migration test covers incompatible declared schema rejection, not successful rollback"
+  ],
+  "recommended_policy": {
+    "same_schema_revert": "ALLOW_ONLY_WITH_EXACT_REVIEWED_ARTIFACT_AND_COMPATIBILITY_EVIDENCE",
+    "cross_schema_revert": "FORWARD_ONLY_UNLESS_REVERSE_MIGRATION_EXISTS",
+    "true_n_minus_1": "REQUIRES_REVERSE_DATA_MIGRATION_PLUS_AUDITABLE_TARGET_IDENTITY"
+  },
+  "recommended_checks": [
+    "cargo test --locked",
+    "populated state incompatible-upgrade atomicity",
+    "same-schema forward-and-revert readability if supported",
+    "cross-schema replay rejection",
+    "deployment CLI schema argument parity",
+    "upgrade/rollback audit receipt semantics"
+  ],
+  "disposition": "WAIT_FOR_PROVIDER_ASSIGNMENT_SOURCE_CONTRADICTION_CONFIRMED"
+}
