@@ -1,12 +1,10 @@
 import copy
-import importlib.util
 import json
 from pathlib import Path
 import tempfile
 import unittest
 
-SPEC = importlib.util.spec_from_file_location('gate','/tmp/bounty_cash_admission.py')
-gate = importlib.util.module_from_spec(SPEC); SPEC.loader.exec_module(gate)
+from concierge import bounty_cash_admission as gate
 AS_OF='2026-09-19T23:00:00Z'; OBS='2026-09-19T22:30:00Z'; ISSUE='https://github.com/acme/widget/issues/42'
 
 def ev(amount='50', currency='USD', *, scope='ISSUE', authority='FIRST_PARTY', kind='EXPLICIT_AMOUNT', guaranteed=True, at=OBS, source=ISSUE, target=ISSUE):
