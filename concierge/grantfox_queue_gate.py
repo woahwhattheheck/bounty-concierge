@@ -35,6 +35,41 @@ _GITHUB_PR_PATH_RE = re.compile(
     r"^/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/pull/([1-9][0-9]*)/?$"
 )
 _MAX_URL_CHARS = 2048
+_AUTHORITY = {
+    "advisory_only": True,
+    "provider_application_authority": False,
+    "implementation_write_authority": False,
+    "submission_authority": False,
+    "payment_or_wallet_authority": False,
+}
+_OBSERVATION_FIELDS = {
+    "listing_url",
+    "canonical_issue_url",
+    "issue_state",
+    "actor_login",
+    "assigned_to",
+    "actor_applied",
+    "application_count",
+    "application_pressure_threshold",
+    "linked_pr_urls",
+    "labels",
+    "observed_at",
+    "evaluated_at",
+    "max_snapshot_age_seconds",
+}
+_REQUEST_FIELDS = {"schema"} | _OBSERVATION_FIELDS
+_RECEIPT_FIELDS = {
+    "schema",
+    "disposition",
+    "advisory_next_action",
+    "reason_codes",
+    "identity",
+    "provider_snapshot",
+    "reward",
+    "evidence",
+    "authority",
+    "receipt_sha256",
+}
 
 
 def _sha256_json(value: Any) -> str:
@@ -174,6 +209,11 @@ def compile_grantfox_queue_gate(request: dict[str, Any]) -> dict[str, Any]:
     request = _require_object(request, "request")
     if request.get("schema") != _SCHEMA:
         raise GrantFoxQueueInputError(f"schema must equal {_SCHEMA}")
+    unknown_request = set(request) - _REQUEST_FIELDS
+    if unknown_request:
+        raise GrantFoxQueueInputError(
+            f"request contains unsupported fields: {sorted(unknown_request)}"
+        )
 
     listing_url = _require_string(request.get("listing_url"), "listing_url")
     canonical_issue_url = _require_string(
@@ -308,38 +348,52 @@ def compile_grantfox_queue_gate(request: dict[str, Any]) -> dict[str, Any]:
                 "only; they are not an award, fixed amount, or payment receipt."
             ),
         },
-        "authority": {
-            "advisory_only": True,
-            "provider_application_authority": False,
-            "implementation_write_authority": False,
-            "submission_authority": False,
-            "payment_or_wallet_authority": False,
+        "evidence": {
+            "observation": {
+                "listing_url": listing_url,
+                "canonical_issue_url": canonical_issue_url,
+                "issue_state": issue_state,
+                "actor_login": actor_login,
+                "assigned_to": assigned_to,
+                "actor_applied": actor_applied,
+                "application_count": application_count,
+                "application_pressure_threshold": threshold,
+                "linked_pr_urls": list(linked_pr_urls),
+                "labels": labels,
+                "observed_at": request["observed_at"],
+                "evaluated_at": request["evaluated_at"],
+                "max_snapshot_age_seconds": max_age_seconds,
+            },
         },
+        "authority": dict(_AUTHORITY),
     }
     return {**body, "receipt_sha256": _sha256_json(body)}
 
 
 def verify_receipt(receipt: dict[str, Any]) -> bool:
-    """Verify deterministic receipt integrity and the advisory authority ceiling."""
-    if type(receipt) is not dict:
+    """Recompile a receipt from its retained provider observation and compare exactly."""
+    if type(receipt) is not dict or set(receipt) != _RECEIPT_FIELDS:
+        return False
+    if receipt.get("schema") != _SCHEMA or receipt.get("authority") != _AUTHORITY:
         return False
     digest = receipt.get("receipt_sha256")
     if type(digest) is not str or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
         return False
-    body = dict(receipt)
-    body.pop("receipt_sha256", None)
-    authority = body.get("authority")
-    if type(authority) is not dict:
+
+    evidence = receipt.get("evidence")
+    if type(evidence) is not dict or set(evidence) != {"observation"}:
         return False
-    if authority != {
-        "advisory_only": True,
-        "provider_application_authority": False,
-        "implementation_write_authority": False,
-        "submission_authority": False,
-        "payment_or_wallet_authority": False,
-    }:
+    observation = evidence.get("observation")
+    if type(observation) is not dict or set(observation) != _OBSERVATION_FIELDS:
         return False
-    return _sha256_json(body) == digest
+
+    try:
+        expected = compile_grantfox_queue_gate(
+            {"schema": _SCHEMA, **observation}
+        )
+    except (GrantFoxQueueInputError, KeyError, TypeError, ValueError):
+        return False
+    return expected == receipt
 
 
 def format_summary(receipt: dict[str, Any]) -> str:

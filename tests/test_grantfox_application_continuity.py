@@ -12,6 +12,7 @@ from concierge.grantfox_application_continuity import (
     compile_continuity,
     verify_continuity_receipt,
 )
+from concierge.grantfox_queue_gate import compile_grantfox_queue_gate
 
 
 def sha(value):
@@ -20,32 +21,34 @@ def sha(value):
     ).hexdigest()
 
 
-def queue_receipt(**identity_overrides):
-    identity = {
-        "owner": "gryd-lock",
-        "repo": "grydlock-testkit",
-        "issue_number": 33,
-        "listing_url": "https://contribute.grantfox.xyz/org/Gryd-lock/repo/grydlock-testkit/issue/33",
-        "canonical_issue_url": "https://github.com/Gryd-lock/grydlock-testkit/issues/33",
-    }
-    identity.update(identity_overrides)
-    body = {
+def queue_receipt(**overrides):
+    payload = {
         "schema": "grantfox-queue-gate/v1",
-        "disposition": "APPLY_ELIGIBLE",
-        "advisory_next_action": "APPLY_THROUGH_PROVIDER_ROUTE",
-        "reason_codes": [],
-        "identity": identity,
-        "provider_snapshot": {},
-        "reward": {},
-        "authority": {
-            "advisory_only": True,
-            "provider_application_authority": False,
-            "implementation_write_authority": False,
-            "submission_authority": False,
-            "payment_or_wallet_authority": False,
-        },
+        "listing_url": (
+            "https://contribute.grantfox.xyz/org/Gryd-lock/"
+            "repo/grydlock-testkit/issue/33"
+        ),
+        "canonical_issue_url": "https://github.com/Gryd-lock/grydlock-testkit/issues/33",
+        "issue_state": "open",
+        "actor_login": "woahwhattheheck",
+        "assigned_to": None,
+        "actor_applied": False,
+        "application_count": 1,
+        "application_pressure_threshold": 3,
+        "linked_pr_urls": [],
+        "labels": ["GrantFox OSS"],
+        "observed_at": "2026-09-19T20:58:00Z",
+        "evaluated_at": "2026-09-19T20:59:00Z",
+        "max_snapshot_age_seconds": 900,
     }
-    return {**body, "receipt_sha256": sha(body)}
+    payload.update(overrides)
+    return compile_grantfox_queue_gate(payload)
+
+
+def rehash(receipt):
+    body = dict(receipt)
+    body.pop("receipt_sha256", None)
+    receipt["receipt_sha256"] = sha(body)
 
 
 def ev(kind, n, **extra):
@@ -270,20 +273,27 @@ class GrantFoxContinuityTests(unittest.TestCase):
 
     def test_queue_actor_mismatch_is_rejected_when_observed(self):
         q = queue_receipt()
-        q["provider_snapshot"] = {"actor_login": "someone-else"}
-        body = dict(q); body.pop("receipt_sha256")
-        q["receipt_sha256"] = sha(body)
-        with self.assertRaisesRegex(GrantFoxContinuityInputError, "differs from queue receipt actor"):
+        q["provider_snapshot"]["actor_login"] = "someone-else"
+        rehash(q)
+        with self.assertRaisesRegex(
+            GrantFoxContinuityInputError, "queue_receipt digest does not verify"
+        ):
             compile_continuity(request([
                 ev("APPLICATION_RECEIPT", 1, receipt_url=APPLICATION)
             ], queue_receipt=q))
 
     def test_noncanonical_github_owner_segment_is_rejected(self):
-        q = queue_receipt(canonical_issue_url="https://github.com/Gryd-lock@alias/grydlock-testkit/issues/33")
-        body = dict(q); body.pop("receipt_sha256")
-        q["receipt_sha256"] = sha(body)
-        with self.assertRaises(GrantFoxContinuityInputError):
-            compile_continuity(request([ev("APPLICATION_RECEIPT", 1, receipt_url=APPLICATION)], queue_receipt=q))
+        q = queue_receipt()
+        q["identity"]["canonical_issue_url"] = (
+            "https://github.com/Gryd-lock@alias/grydlock-testkit/issues/33"
+        )
+        rehash(q)
+        with self.assertRaisesRegex(
+            GrantFoxContinuityInputError, "queue_receipt digest does not verify"
+        ):
+            compile_continuity(request([
+                ev("APPLICATION_RECEIPT", 1, receipt_url=APPLICATION)
+            ], queue_receipt=q))
 
 
     def test_queue_receipt_tamper_is_rejected(self):
@@ -295,14 +305,18 @@ class GrantFoxContinuityTests(unittest.TestCase):
             ], queue_receipt=q))
 
     def test_queue_identity_alias_is_rejected(self):
-        q = queue_receipt(canonical_issue_url="https://github.com/Gryd-lock/grydlock-testkit/issues/34")
-        body = dict(q)
-        body.pop("receipt_sha256")
-        q["receipt_sha256"] = sha(body)
-        with self.assertRaisesRegex(GrantFoxContinuityInputError, "different issue"):
+        q = queue_receipt()
+        q["identity"]["canonical_issue_url"] = (
+            "https://github.com/Gryd-lock/grydlock-testkit/issues/34"
+        )
+        rehash(q)
+        with self.assertRaisesRegex(
+            GrantFoxContinuityInputError, "queue_receipt digest does not verify"
+        ):
             compile_continuity(request([
                 ev("APPLICATION_RECEIPT", 1, receipt_url=APPLICATION)
             ], queue_receipt=q))
+
 
     def test_receipt_is_deterministic_and_tamper_evident(self):
         payload = request([ev("APPLICATION_RECEIPT", 1, receipt_url=APPLICATION)])
@@ -310,9 +324,31 @@ class GrantFoxContinuityTests(unittest.TestCase):
         second = compile_continuity(payload)
         self.assertEqual(first, second)
         self.assertTrue(verify_continuity_receipt(first))
+        self.assertEqual(first["evidence"]["queue_receipt"], payload["queue_receipt"])
+        self.assertEqual(first["evidence"]["events"], payload["events"])
         changed = deepcopy(first)
         changed["state"] = "PAID"
         self.assertFalse(verify_continuity_receipt(changed))
+
+    def test_rehashed_assignment_promotion_cannot_override_retained_events(self):
+        payload = request([ev("APPLICATION_RECEIPT", 1, receipt_url=APPLICATION)])
+        receipt = compile_continuity(payload)
+        self.assertEqual(receipt["state"], "APPLIED")
+        forged = deepcopy(receipt)
+        forged["state"] = "ASSIGNED"
+        forged["advisory_next_action"] = "IMPLEMENT_ASSIGNED_SCOPE"
+        forged["lifecycle"]["assigned"] = True
+        rehash(forged)
+        self.assertFalse(verify_continuity_receipt(forged))
+
+    def test_rehashed_unknown_receipt_field_is_rejected(self):
+        receipt = compile_continuity(
+            request([ev("APPLICATION_RECEIPT", 1, receipt_url=APPLICATION)])
+        )
+        forged = deepcopy(receipt)
+        forged["implementation_authorized"] = True
+        rehash(forged)
+        self.assertFalse(verify_continuity_receipt(forged))
 
     def test_cli_hold_exit_code_and_json_roundtrip(self):
         payload = request([

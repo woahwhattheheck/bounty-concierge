@@ -66,5 +66,18 @@ Exit code `2` means durable evidence conflicts and must be reconciled. Exit code
 `0` means the receipt is internally consistent; the output still carries no
 provider mutation authority.
 
-Every result is canonical-JSON SHA-256 bound and can be verified with
-`verify_continuity_receipt`.
+Every result retains a producer-evidence envelope containing the exact verified
+queue receipt, configured actor, and input event sequence. Verification does not
+trust the continuity receipt's SHA-256 alone: `verify_continuity_receipt()`
+re-runs the queue verifier, replays the lifecycle compiler from that retained
+evidence, and requires exact equality with the supplied receipt.
+
+This closes summary-rehash promotion: changing an `APPLIED` or `DISCOVERED`
+receipt to `ASSIGNED`, even with a correctly recomputed outer digest, fails
+unless the retained producer evidence itself compiles to that state. Receipts
+from the former self-hash-only format intentionally fail the repaired verifier
+and must be regenerated.
+
+The retained evidence is still an advisory record, not a provider signature.
+External assignment, adjudication, and payment authenticity must continue to
+come from the provider/GitHub/receipt sources represented by the evidence.

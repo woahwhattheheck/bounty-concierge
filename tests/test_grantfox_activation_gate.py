@@ -12,9 +12,15 @@ from concierge.grantfox_activation_gate import (
     compile_activation,
     verify_activation_receipt,
 )
-from concierge.grantfox_application_continuity import compile_continuity
+from concierge.grantfox_application_continuity import (
+    compile_continuity,
+    verify_continuity_receipt,
+)
 from concierge.grantfox_dependency_readiness import compile_grantfox_dependency_readiness
-from concierge.grantfox_queue_gate import compile_grantfox_queue_gate
+from concierge.grantfox_queue_gate import (
+    compile_grantfox_queue_gate,
+    verify_receipt as verify_queue_receipt,
+)
 from concierge.grantfox_source_readiness import compile_grantfox_source_readiness
 
 
@@ -157,6 +163,13 @@ def native_request(*, assigned=False):
     }
 
 
+def rehash_native(receipt):
+    body = dict(receipt)
+    body.pop("receipt_sha256", None)
+    raw = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    receipt["receipt_sha256"] = hashlib.sha256(raw.encode()).hexdigest()
+
+
 def rehash_activation(receipt):
     body = dict(receipt)
     body.pop("activation_receipt_sha256", None)
@@ -224,6 +237,36 @@ class ActivationGateTests(unittest.TestCase):
         forged["inputs"]["continuity_state"] = "ASSIGNED"
         rehash_activation(forged)
         self.assertFalse(verify_activation_receipt(forged))
+
+    def test_rehashed_native_queue_and_continuity_forgery_is_rejected(self):
+        payload = native_request()
+        queue = deepcopy(payload["queue_receipt"])
+        queue["disposition"] = "IMPLEMENTATION_ELIGIBLE"
+        queue["advisory_next_action"] = "IMPLEMENT_ASSIGNED_SCOPE"
+        queue["provider_snapshot"]["assigned_to"] = "woahwhattheheck"
+        queue["provider_snapshot"]["actor_applied"] = True
+        rehash_native(queue)
+        self.assertFalse(verify_queue_receipt(queue))
+
+        continuity = deepcopy(payload["continuity_receipt"])
+        continuity["state"] = "ASSIGNED"
+        continuity["advisory_next_action"] = "IMPLEMENT_ASSIGNED_SCOPE"
+        continuity["lifecycle"]["applied"] = True
+        continuity["lifecycle"]["assigned"] = True
+        rehash_native(continuity)
+        self.assertFalse(verify_continuity_receipt(continuity))
+
+        forged_payload = {
+            "schema": payload["schema"],
+            "queue_receipt": queue,
+            "source_receipt": payload["source_receipt"],
+            "dependency_receipt": payload["dependency_receipt"],
+            "continuity_receipt": continuity,
+        }
+        with self.assertRaisesRegex(
+            GrantFoxActivationInputError, "queue_receipt does not verify"
+        ):
+            compile_activation(forged_payload)
 
     def test_rehashed_unknown_semantic_field_is_rejected(self):
         receipt = compile_activation(native_request())

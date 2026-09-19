@@ -1,4 +1,5 @@
 from copy import deepcopy
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -11,6 +12,13 @@ from concierge.grantfox_queue_gate import (
     compile_grantfox_queue_gate,
     verify_receipt,
 )
+
+
+def rehash(receipt):
+    body = dict(receipt)
+    body.pop("receipt_sha256", None)
+    raw = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    receipt["receipt_sha256"] = hashlib.sha256(raw.encode()).hexdigest()
 
 
 def snapshot(**overrides):
@@ -154,9 +162,28 @@ class GrantFoxQueueGateTests(unittest.TestCase):
         second = compile_grantfox_queue_gate(snapshot())
         self.assertEqual(first, second)
         self.assertTrue(verify_receipt(first))
+        self.assertEqual(first["evidence"]["observation"], snapshot())
         changed = deepcopy(first)
         changed["provider_snapshot"]["application_count"] = 99
         self.assertFalse(verify_receipt(changed))
+
+    def test_rehashed_assignment_promotion_cannot_override_retained_observation(self):
+        receipt = compile_grantfox_queue_gate(snapshot())
+        self.assertEqual(receipt["disposition"], "APPLY_ELIGIBLE")
+        forged = deepcopy(receipt)
+        forged["disposition"] = "IMPLEMENTATION_ELIGIBLE"
+        forged["advisory_next_action"] = "IMPLEMENT_ASSIGNED_SCOPE"
+        forged["provider_snapshot"]["assigned_to"] = "woahwhattheheck"
+        forged["provider_snapshot"]["actor_applied"] = True
+        rehash(forged)
+        self.assertFalse(verify_receipt(forged))
+
+    def test_rehashed_unknown_receipt_field_is_rejected(self):
+        receipt = compile_grantfox_queue_gate(snapshot())
+        forged = deepcopy(receipt)
+        forged["implementation_authorized"] = True
+        rehash(forged)
+        self.assertFalse(verify_receipt(forged))
 
     def test_cli_round_trip_and_hold_exit_code(self):
         payload = snapshot(

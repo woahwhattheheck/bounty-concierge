@@ -75,26 +75,39 @@ Lifecycle states `SUBMITTED`, `APPROVED`, `PAYMENT_SENT`, `PAID`, and
 
 ## Verifiable evidence envelope
 
-An activation receipt retains the complete native queue, source-readiness, and
-continuity receipts under `evidence`. Verification does not trust the outer
-activation SHA-256 by itself. `verify_activation_receipt()`:
+An activation receipt retains the complete native queue, source-readiness,
+dependency-readiness, and continuity receipts under `evidence`. Verification
+does not trust the outer activation SHA-256 by itself.
+`verify_activation_receipt()`:
 
 1. requires the exact activation receipt and evidence field sets;
-2. re-runs all three native receipt verifiers;
-3. re-checks issue, actor, and queue-anchor equality through
+2. re-runs all four native receipt verifiers;
+3. re-checks issue, actor, queue, source, and dependency anchor equality through
    `compile_activation()`;
 4. recomputes the activation state machine from the retained native evidence; and
 5. requires exact equality with the supplied activation receipt, including its
    digest.
 
-Therefore, changing a non-implementation receipt to
-`IMPLEMENT_ASSIGNED_SCOPE` and recomputing only
-`activation_receipt_sha256` still fails verification. Extra semantic fields
-also fail closed.
+The queue and continuity trust roots are reconstructive as well. The queue
+receipt retains the producer observation from which its disposition and provider
+snapshot are derived. The continuity receipt retains the verified queue receipt,
+configured actor, and producer event sequence. Their native verifiers replay
+their compilers and require exact receipt equality instead of accepting a
+self-hash.
 
-Receipts created by the earlier self-hash-only implementation do not contain the
-native evidence envelope. They intentionally fail the repaired verifier and
-must be regenerated from the original native receipts.
+Therefore, changing a non-implementation activation receipt, queue disposition,
+provider-snapshot summary, or continuity lifecycle summary to implementation
+state and recomputing the affected SHA-256 values still fails when the retained
+producer evidence says otherwise. The hostile integration test performs exactly
+that native queue + continuity rehash promotion and requires rejection.
+
+Receipts created by the earlier self-hash-only queue, continuity, or activation
+formats intentionally fail the repaired verifiers and must be regenerated from
+their original producer evidence.
+
+These are semantic and integrity checks over retained advisory evidence, not
+digital signatures from GrantFox or GitHub. They do not independently
+authenticate an external assignment, award, adjudication, or payment.
 
 ## CLI
 

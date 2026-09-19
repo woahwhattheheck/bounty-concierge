@@ -36,6 +36,22 @@ GFOX = re.compile(rf"^/org/({SEG})/repo/({SEG})/issue/([1-9][0-9]*)/?$")
 COMMENT = re.compile(r"^issuecomment-([1-9][0-9]*)$")
 CURRENCY = re.compile(r"^[A-Z][A-Z0-9]{2,7}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_REQUEST_FIELDS = {"schema", "actor_login", "queue_receipt", "events"}
+_RECEIPT_FIELDS = {
+    "schema",
+    "disposition",
+    "state",
+    "advisory_next_action",
+    "reason_codes",
+    "identity",
+    "queue_anchor",
+    "lifecycle",
+    "events",
+    "evidence",
+    "authority",
+    "receipt_sha256",
+}
+_EVIDENCE_FIELDS = {"queue_receipt", "actor_login", "events"}
 
 
 class GrantFoxContinuityInputError(ValueError):
@@ -164,6 +180,11 @@ def compile_continuity(request: dict[str, Any]) -> dict[str, Any]:
     r = _obj(request, "request")
     if r.get("schema") != SCHEMA:
         raise GrantFoxContinuityInputError(f"schema must equal {SCHEMA}")
+    unknown_request = set(r) - _REQUEST_FIELDS
+    if unknown_request:
+        raise GrantFoxContinuityInputError(
+            f"request contains unsupported fields: {sorted(unknown_request)}"
+        )
     ident, issue, queue_digest = _queue_anchor(r.get("queue_receipt"))
     actor = _login(r.get("actor_login"), "actor_login")
     provider_snapshot = _obj(r["queue_receipt"].get("provider_snapshot"), "queue_receipt.provider_snapshot")
@@ -332,20 +353,47 @@ def compile_continuity(request: dict[str, Any]) -> dict[str, Any]:
         "queue_anchor": {"schema": QUEUE_SCHEMA, "receipt_sha256": queue_digest},
         "lifecycle": {"applied": applied, "assigned": assigned, "submission_pr_url": pr_url, "adjudication": adjudication, "approved_amount": approved[0] if approved else None, "approved_currency": approved[1] if approved else None, "payment_sent": payment_sent, "payment_received": payment_received},
         "events": normalized,
+        "evidence": {
+            "queue_receipt": r["queue_receipt"],
+            "actor_login": actor,
+            "events": [dict(event) for event in events],
+        },
         "authority": AUTHORITY,
     }
     return {**body, "receipt_sha256": _hash(body)}
 
 
 def verify_continuity_receipt(receipt: dict[str, Any]) -> bool:
-    if type(receipt) is not dict or receipt.get("schema") != SCHEMA or receipt.get("authority") != AUTHORITY:
+    """Recompile lifecycle semantics from retained queue, actor, and event evidence."""
+    if type(receipt) is not dict or set(receipt) != _RECEIPT_FIELDS:
+        return False
+    if receipt.get("schema") != SCHEMA or receipt.get("authority") != AUTHORITY:
         return False
     digest = receipt.get("receipt_sha256")
     if type(digest) is not str or not SHA256.fullmatch(digest):
         return False
-    body = dict(receipt)
-    body.pop("receipt_sha256", None)
-    return _hash(body) == digest
+
+    evidence = receipt.get("evidence")
+    if type(evidence) is not dict or set(evidence) != _EVIDENCE_FIELDS:
+        return False
+    queue = evidence.get("queue_receipt")
+    actor = evidence.get("actor_login")
+    events = evidence.get("events")
+    if type(queue) is not dict or type(actor) is not str or type(events) is not list:
+        return False
+
+    try:
+        expected = compile_continuity(
+            {
+                "schema": SCHEMA,
+                "queue_receipt": queue,
+                "actor_login": actor,
+                "events": events,
+            }
+        )
+    except (GrantFoxContinuityInputError, KeyError, TypeError, ValueError):
+        return False
+    return expected == receipt
 
 
 def format_summary(receipt: dict[str, Any]) -> str:
