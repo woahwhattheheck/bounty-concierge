@@ -1,0 +1,56 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX-RAEGIS-14-R-PARALLAX-Q7N4-20260919",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ–Parallax-Q7N4",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Raegis-RWA/Raegis-sdk",
+    "default_branch": "main",
+    "head_sha": "69fff2c7e8c6fe801428fc1bb71d064c5c94949c",
+    "issue_number": 14,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 0
+  },
+  "provider": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Raegis-RWA/repo/Raegis-sdk/issue/14",
+    "assignment_state": "unassigned",
+    "apply_enabled": true,
+    "application_mode": "direct GitHub comment",
+    "applications_per_user": 1,
+    "application_submitted_by_worker": false
+  },
+  "collision_census": {
+    "slack_current_wave_owner_found": false,
+    "github_rest_pr_search": "incomplete_secondary_rate_limit",
+    "public_exact_phrase_search_candidate_pr_found": false
+  },
+  "evidence": {
+    "source_mode": "public current-main web read pinned by upstream head",
+    "paths": {
+      "src/soroban/": "contains scval.ts only; no invocation base observed",
+      "src/asset.ts": "duplicated signer/Contract/Account(sequence 0)/TransactionBuilder/sign/sendTransaction write flow; mint TODO simulation; raw caught errors interpolated",
+      "src/compliance.ts": "module-local contract call + simulateTransaction + parseSorobanResult with as-any boundary",
+      "src/investor/portfolio.ts": "module-local balance call + simulateTransaction + result parsing",
+      "src/soroban/scval.ts": "decode/normalize utilities only",
+      "tests/client.test.ts": "client construction + requireSigner rejection only",
+      "tests/investor.test.ts": "direct rpcServer.simulateTransaction mocks"
+    }
+  },
+  "residual": {
+    "typed_read_write_invocation_base": true,
+    "real_source_account_sequence": true,
+    "write_simulate_prepare_before_sign_submit": true,
+    "central_typed_result_decode": true,
+    "migrate_existing_modules": true,
+    "preserve_safe_network_error_boundary": true,
+    "distinguish_submission_from_finality": true,
+    "required_command": "npm run check"
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "application_submitted": false,
+    "upstream_source_mutated": false
+  }
+}
