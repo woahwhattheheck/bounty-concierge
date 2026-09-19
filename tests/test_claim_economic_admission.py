@@ -66,10 +66,14 @@ def _request(
             "work_id": work_id,
             "canonical_source_url": source,
             "advertised_payout": {
+                "state": "VERIFIED",
+                "evidence_url": "https://github.com/acme/widget/issues/42",
+                "observed_at": "2026-09-17T19:30:00Z",
+                "amount_semantics": "FIXED",
                 "amount": amount,
                 "currency": currency,
                 "unit_type": unit_type,
-                "observed_at": "2026-09-17T19:30:00Z",
+                "authority": "FIRST_PARTY",
             },
             "estimated_engineering_hours": "1",
             "model_tool_cost": {
