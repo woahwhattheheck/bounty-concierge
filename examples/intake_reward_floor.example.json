@@ -1,0 +1,43 @@
+{
+  "schema": "intake-reward-floor/v1",
+  "as_of": "2026-09-19T23:31:00Z",
+  "policy": {
+    "schema": "intake-reward-floor-policy/v1",
+    "active_floor_usd": "50",
+    "pile_floor_usd": "10"
+  },
+  "candidates": [
+    {
+      "work_id": "sample-active-250",
+      "canonical_source_url": "https://github.com/example/paid/issues/1",
+      "reward_state": "KNOWN_USD",
+      "reward_usd": "250",
+      "reward_evidence_url": "https://github.com/example/paid/issues/1",
+      "observed_at": "2026-09-19T23:30:00Z"
+    },
+    {
+      "work_id": "sample-pile-25",
+      "canonical_source_url": "https://github.com/example/paid/issues/2",
+      "reward_state": "KNOWN_USD",
+      "reward_usd": "25",
+      "reward_evidence_url": "https://github.com/example/paid/issues/2",
+      "observed_at": "2026-09-19T23:30:00Z"
+    },
+    {
+      "work_id": "sample-ignore-1",
+      "canonical_source_url": "https://github.com/example/paid/issues/3",
+      "reward_state": "KNOWN_USD",
+      "reward_usd": "1",
+      "reward_evidence_url": "https://github.com/example/paid/issues/3",
+      "observed_at": "2026-09-19T23:30:00Z"
+    },
+    {
+      "work_id": "sample-hold-unpriced",
+      "canonical_source_url": "https://github.com/example/paid/issues/4",
+      "reward_state": "UNKNOWN",
+      "reward_evidence_url": "https://github.com/example/paid/issues/4",
+      "observed_at": "2026-09-19T23:30:00Z",
+      "native_reward_note": "Maybe Rewarded; no exact amount published"
+    }
+  ]
+}
