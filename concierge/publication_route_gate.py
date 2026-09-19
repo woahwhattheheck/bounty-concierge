@@ -262,7 +262,7 @@ def compile_publication_route(request: dict[str, Any]) -> dict[str, Any]:
         disposition = "HOLD_EXISTING_PR_STATE_UNKNOWN"
         next_action = "REFRESH_EXISTING_PR_STATE"
         reasons.append("EXISTING_PR_STATE_UNKNOWN")
-    elif existing_pr is not None:
+    elif existing_pr is not None and existing_pr_state in {"closed", "merged"}:
         disposition = "HOLD_EXISTING_PR_NOT_OPEN"
         next_action = "REFRESH_ISSUE_AND_PUBLICATION_ROUTE_BEFORE_NEW_WORK"
         reasons.append("EXISTING_PR_NOT_OPEN")
