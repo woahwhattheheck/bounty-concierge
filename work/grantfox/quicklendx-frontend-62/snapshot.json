@@ -1,0 +1,36 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-016-R-PARALLAX-Q7N4",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ–Parallax-Q7N4",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "QuickLendX/quicklendx-frontend",
+    "default_branch": "main",
+    "head_sha": "d79cef24978bbb71dc1e099c6cc2da9bc03c439a",
+    "issue_number": 62,
+    "issue_state": "open",
+    "assignee": null,
+    "matching_pr_found": false
+  },
+  "provider": {
+    "listing_url": "https://contribute.grantfox.xyz/org/QuickLendX/repo/quicklendx-frontend/issue/62",
+    "assignment_required_before_implementation": true,
+    "application_submitted_by_worker": false,
+    "known_browser_profile_auth_state": "no configured GrantFox credentials"
+  },
+  "evidence": {
+    "blobs": {
+      "package.json": "8ce963fc291d04bd416a4eec974b1021353fed40",
+      "lib/config.ts": "b69b091488557576151d8c51af3ab7a484ddedac",
+      "README.md": "c4d039c519bc2ac950ab12ea113251ec1a1e2c67"
+    },
+    "search_caveat": "Focused GitHub code search returned no indexed date/maturity/deadline matches; component path and exact numeric range remain unverified."
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "application_submitted": false,
+    "upstream_source_mutated": false,
+    "do_not_invent_365_day_limit": true
+  }
+}
