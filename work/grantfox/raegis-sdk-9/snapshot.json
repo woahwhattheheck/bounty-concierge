@@ -1,0 +1,73 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-RAEGIS-009-R-KAPPA",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Solstice-Kappa",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Raegis-RWA/Raegis-sdk",
+    "default_branch": "main",
+    "head_sha": "69fff2c7e8c6fe801428fc1bb71d064c5c94949c",
+    "issue_number": 9,
+    "issue_state": "open",
+    "assignee": null
+  },
+  "provider": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Raegis-RWA/repo/Raegis-sdk/issue/9",
+    "comment_count": 0,
+    "apply_available": true,
+    "one_application_per_user": true,
+    "assigned_to": null,
+    "assignment_required_before_implementation": true,
+    "application_submitted_by_worker": false,
+    "known_browser_profile_auth_state": "no authenticated GrantFox/GitHub session; redundant attempt intentionally not launched"
+  },
+  "evidence": {
+    "blobs": {
+      "src/soroban/scval.ts": "2d7faa9c31dbbf5960aa93c59f7d6127091e44eb",
+      "src/asset.ts": "0b5922dc115fbdc30ccb66b411e4b6a6b07b9187",
+      "src/compliance.ts": "04e0be7d0b562ca2172fb07d6f9fa1890952e6be",
+      "src/role.ts": "0239d03b21535147697fa73bd54763597c23bb8a",
+      "src/client.ts": "bf959efc3e790a4f1139f1d3f5ef62cacaaea42e",
+      "tests/network-failures.test.ts": "f04545519cc06c43f9c52caf6f6d75e95c1c0929",
+      "tests/role.test.ts": "cfe06e18ceb2b834df45d1a5516d751bb43dc4fa",
+      "package.json": "03b1908c19af0e259596dbd86684e6d79deb434e"
+    },
+    "residuals": [
+      "no reusable transaction simulation/readiness result layer on main",
+      "mint path signs/submits before the TODO'd simulation preflight exists",
+      "mint_asset local capability does not verify issuer/admin authorization",
+      "network failures are typed but simulation semantic outcomes are not"
+    ]
+  },
+  "live_dependencies": {
+    "upstream_pr_142": {
+      "state": "open",
+      "head_sha": "39b6de5d76f88a4bb61eea7033542a023a3116ca",
+      "purpose": "fix simulation request shape and add shared buildSimulationTransaction helper",
+      "required_coordination": "refresh before implementation and reuse helper if merged; do not create duplicate transaction builder"
+    },
+    "issue_51": {
+      "live_swarm_owner_present": true,
+      "relationship": "#9 owns shared simulation/readiness substrate; #51 should consume it",
+      "claimed_by_this_worker": false
+    }
+  },
+  "residual": {
+    "typed_readiness_states": [
+      "success_or_ready",
+      "warning",
+      "failed",
+      "blocked_or_unauthorized",
+      "unknown"
+    ],
+    "must_be_read_only": true,
+    "signing_or_submission_forbidden": true,
+    "required_command": "npm run verify"
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "application_submitted": false,
+    "upstream_source_mutated": false
+  }
+}
