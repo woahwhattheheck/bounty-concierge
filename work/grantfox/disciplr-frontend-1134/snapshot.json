@@ -1,0 +1,43 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-015-R-PARALLAX-Q7N4",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ–Parallax-Q7N4",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Disciplr-Org/Disciplr-Frontend",
+    "default_branch": "main",
+    "head_sha": "acf5405c198147d67a65f3c884f73ba439427c55",
+    "issue_number": 1134,
+    "issue_state": "open",
+    "assignee": null
+  },
+  "provider": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Disciplr-Org/repo/Disciplr-Frontend/issue/1134",
+    "assignment_required_before_implementation": true,
+    "application_submitted_by_worker": false,
+    "browser_run_id": "015b4772-9421-416f-a689-b4dafd886f49",
+    "browser_result": "no configured GrantFox credentials",
+    "github_issue_comment_result": "403 Resource not accessible by integration"
+  },
+  "evidence": {
+    "blobs": {
+      "src/utils/networkMismatch.ts": "a9877858a6fed8697060fabd81421616045c4aec",
+      "src/utils/horizon.ts": "92c75ac43486c05ebb1cfb90d567f02418a45fba",
+      "src/utils/explorer.ts": "2574fd1d342a1229452cb638b2a38fc2f0bb9cbf",
+      "src/pages/CreateVault.tsx": "3d107ff73adfa5c1a02c7194d6711106a1261c96",
+      "src/pages/ValidationDetail.tsx": "fdace95a44b3620b250c854f6ac8dab3980cfd53",
+      "package.json": "54dd13f179bf41ea87897891af4a49fcead3a3da"
+    },
+    "residuals": [
+      "no centralized coherent runtime configuration health object",
+      "unknown/missing network fallbacks can resolve to TESTNET",
+      "signing gates are not uniformly bound to runtime configuration health"
+    ]
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "application_submitted": false,
+    "upstream_source_mutated": false
+  }
+}
