@@ -142,6 +142,44 @@ class GrantFoxDependencyFulfillmentIntegrationTests(unittest.TestCase):
         )
         self.assertTrue(verify_dependency_fulfillment_receipt(fulfilled))
 
+    def test_real_v1_rejects_unrelated_same_repo_landing_identity(self):
+        upstream = dependency_receipt()
+        bad_pr = landing(27, "b" * 40, 999)
+        with self.assertRaisesRegex(
+            Exception,
+            "merged PR must equal upstream completion.merged_pr_url",
+        ):
+            compile_grantfox_dependency_fulfillment(
+                {
+                    "schema": "grantfox-dependency-fulfillment/v1",
+                    "dependency_receipt": upstream,
+                    "landings": [
+                        bad_pr,
+                        landing(4, "c" * 40, 104),
+                    ],
+                    "evaluated_at": "2026-09-19T22:03:00Z",
+                    "max_snapshot_age_seconds": 900,
+                }
+            )
+
+        bad_sha = landing(27, "d" * 40, 127)
+        with self.assertRaisesRegex(
+            Exception,
+            "must equal upstream completion.merge_commit_sha",
+        ):
+            compile_grantfox_dependency_fulfillment(
+                {
+                    "schema": "grantfox-dependency-fulfillment/v1",
+                    "dependency_receipt": upstream,
+                    "landings": [
+                        bad_sha,
+                        landing(4, "c" * 40, 104),
+                    ],
+                    "evaluated_at": "2026-09-19T22:03:00Z",
+                    "max_snapshot_age_seconds": 900,
+                }
+            )
+
     def test_real_v1_clear_receipt_without_ancestry_evidence_still_waits(self):
         waiting = compile_grantfox_dependency_fulfillment(
             {
