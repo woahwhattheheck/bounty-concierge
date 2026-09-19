@@ -121,6 +121,29 @@ def landing(number, sha, pr):
 
 
 class GrantFoxDependencyFulfillmentIntegrationTests(unittest.TestCase):
+    def test_real_zero_prerequisite_receipt_fulfills_without_landings(self):
+        readiness = compile_grantfox_dependency_readiness(
+            {
+                "schema": "grantfox-dependency-readiness/v1",
+                "source_receipt": source_receipt(),
+                "dependencies": [],
+                "evaluated_at": "2026-09-19T22:02:00Z",
+                "max_snapshot_age_seconds": 900,
+            }
+        )
+        self.assertEqual(readiness["dependency_disposition"], "DEPENDENCIES_CLEAR")
+        fulfilled = compile_grantfox_dependency_fulfillment(
+            {
+                "schema": "grantfox-dependency-fulfillment/v1",
+                "dependency_receipt": readiness,
+                "landings": [],
+                "evaluated_at": "2026-09-19T22:03:00Z",
+                "max_snapshot_age_seconds": 900,
+            }
+        )
+        self.assertEqual(fulfilled["fulfillment_disposition"], "DEPENDENCIES_FULFILLED")
+        self.assertTrue(verify_dependency_fulfillment_receipt(fulfilled))
+
     def test_real_v1_receipt_hands_off_to_default_branch_fulfillment(self):
         upstream = dependency_receipt()
         self.assertEqual(upstream["dependency_disposition"], "DEPENDENCIES_CLEAR")
