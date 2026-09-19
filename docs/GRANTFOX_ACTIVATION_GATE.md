@@ -65,6 +65,27 @@ A digest swap, actor swap, or issue swap is an input error rather than a HOLD.
 Lifecycle states `SUBMITTED`, `APPROVED`, `PAYMENT_SENT`, `PAID`, and
 `REJECTED` can never produce implementation activation.
 
+## Receipt verification
+
+The activation receipt retains the complete verified queue, source-readiness, and
+continuity receipts under `evidence`. Verification is semantic, not merely a
+self-hash check:
+
+1. the activation receipt's canonical SHA-256 must match its bytes;
+2. the queue receipt is reconstructed through the real queue compiler and must
+   exactly match the retained queue evidence;
+3. source readiness is reverified through its native semantic verifier;
+4. continuity is reconstructed from the retained queue + event ledger through
+   the real continuity compiler and must exactly match the retained continuity
+   evidence;
+5. the activation decision is recompiled from those three receipts and the full
+   expected receipt must equal the supplied receipt.
+
+Therefore a caller cannot turn an `APPLY_ELIGIBLE` or `WAIT_ASSIGNMENT`
+receipt into `IMPLEMENT_ASSIGNED_SCOPE` by editing derived fields and
+recomputing SHA-256. A rehashed forged queue/continuity state also fails the
+semantic producer-to-consumer replay.
+
 ## CLI
 
 ```bash
@@ -89,6 +110,9 @@ Every output fixes all mutation authorities to false:
 }
 ```
 
-The activation receipt is canonical-JSON SHA-256 bound. Its digest proves only
-the deterministic composition result; it is not provider authority and it does
-not turn a possible/discretionary reward into an award or payment.
+The activation receipt is canonical-JSON SHA-256 bound **and** semantically
+recompiled from its retained native evidence during verification. The digest is
+tamper evidence, not authority; even a correctly rehashed forged decision is
+rejected when it disagrees with the authenticated queue/source/continuity
+semantics. Nothing in the receipt turns a possible/discretionary reward into an
+award or payment.
