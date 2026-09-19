@@ -28,10 +28,14 @@
     "work_id": "frantic-one-dollar-seed",
     "canonical_source_url": "https://example.test/frantic-one-dollar-seed",
     "advertised_payout": {
+      "state": "VERIFIED",
+      "evidence_url": "https://example.test/frantic-one-dollar-seed",
+      "observed_at": "2026-09-16T19:30:00Z",
+      "amount_semantics": "FIXED",
       "amount": "1",
       "currency": "USD",
       "unit_type": "CASH",
-      "observed_at": "2026-09-16T19:30:00Z"
+      "authority": "FIRST_PARTY"
     },
     "estimated_engineering_hours": "1",
     "model_tool_cost": {
