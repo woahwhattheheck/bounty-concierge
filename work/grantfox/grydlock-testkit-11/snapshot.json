@@ -1,0 +1,68 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-gryd-lock-grydlock-testkit-11-R",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Delta",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Gryd-lock/grydlock-testkit",
+    "default_branch": "main",
+    "head_sha": "7064404d6e7c44df1f980d532d23901651d79426",
+    "issue_number": 11,
+    "issue_state": "open",
+    "assignee": null,
+    "linked_development_on_issue_page": false
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Gryd-lock/repo/grydlock-testkit/issue/11",
+    "assignment_state": "unassigned",
+    "apply_enabled": true,
+    "application_mode": "direct GitHub comment",
+    "applications_per_user": 1,
+    "existing_comment_count": 1,
+    "application_submitted_by_worker": false,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "blobs": {
+      "transactions/README.md": "e052e5a5d4f5ef8934dc74df7199b28c89987df1",
+      "transactions/index.json": "a07a007e9a9e8f418d918044578a792014472a2b",
+      "destinations.json": "c8f918089f700982d7347cc1d8af8d8677fd5774",
+      "scripts/validate-fixtures.mjs": "90ea1abb6136d939aa4d1e0ac422b23f74fa6362",
+      "package.json": "7d674c82cfca132d720a02dbc56d45df3979e950"
+    },
+    "present_transaction_fixtures": [
+      "payment.xdr",
+      "path_payment.xdr",
+      "change_trust.xdr",
+      "fee_bump_payment.xdr"
+    ],
+    "requested_missing_fixtures": [
+      "change_trust_then_payment.xdr",
+      "multi_payment.xdr"
+    ],
+    "stale_scope_corrections": [
+      "README already supports ordered multi-operation envelopes",
+      "transactions/index.json already provides machine-readable envelope and operation metadata",
+      "current scripts tree has no XDR generation script"
+    ]
+  },
+  "residual": {
+    "generate_two_offline_unsigned_testnet_multi_operation_xdrs": true,
+    "extend_existing_index_contract": true,
+    "extend_existing_readme_format": true,
+    "require_declared_destination_references": true,
+    "add_decode_and_operation_semantic_assertions": true,
+    "required_commands": [
+      "npm test",
+      "npm run validate"
+    ]
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "upstream_source_mutated": false,
+    "application_submitted": false
+  }
+}
