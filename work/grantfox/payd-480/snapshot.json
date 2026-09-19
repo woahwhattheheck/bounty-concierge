@@ -1,0 +1,66 @@
+{
+  "schema": "grantfox-preassignment-baseline/v1",
+  "lane_id": "PAYD-GFOX-480/R-realtime-status-contract",
+  "identity": {
+    "repository_full_name": "Protocol-Guild/PayD",
+    "issue_number": 480,
+    "listing_url": "https://contribute.grantfox.xyz/org/Protocol-Guild/repo/PayD/issue/480"
+  },
+  "provider_observation": {
+    "observed_date": "2026-09-19",
+    "assignment": "Unassigned",
+    "apply_route_visible": true,
+    "application_limit": "1_per_user",
+    "generic_applicant_comments": 1,
+    "application_published_by_this_seat": false
+  },
+  "upstream": {
+    "commit_sha": "af5c348e83033ed3340e589b68e8554f0303060e",
+    "permissions": {
+      "pull": true,
+      "push": false
+    },
+    "blobs": {
+      "backend/src/services/socketService.ts": "00fae5be0476f9ededb57f3bce2844abd919c5c7",
+      "backend/src/index.ts": "c883ae8949f35230c651c798e1e413306e5f47f1",
+      "frontend/src/hooks/useSocket.ts": "4d97f4106885b8543f9b832ed77925a145b4b95f",
+      "frontend/src/providers/SocketProvider.tsx": "4da874ce64e0b63ef50028344251a97fb9a6f11f",
+      "frontend/src/pages/TransactionHistory.tsx": "8994eec27c4a799d2c3d53d1e037e8d056927ab4",
+      "frontend/src/services/transactionHistory.ts": "64a3a44f9fe83b2c41116c0308a4edcec5684f38",
+      "frontend/src/components/AppLayout.tsx": "4da060169e432d1076e401132745e007298db66b",
+      "frontend/src/pages/PayrollScheduler.tsx": "608e5ef71b4198663cf63f428795a76eeef22d37",
+      "frontend/src/pages/CrossAssetPayment.tsx": "19f8609bf87bd2ddc8223cbc9145b1792bef4314"
+    }
+  },
+  "current_state": {
+    "socket_server_initialized": true,
+    "socket_provider_mounted": true,
+    "transaction_history_uses_socket": false,
+    "header_has_socket_indicator": false,
+    "transaction_update_helper_observed_callers": 0,
+    "desired_subscription_registry_present": false,
+    "rejoin_after_reconnect_present": false,
+    "existing_transaction_update_consumers": [
+      "frontend/src/pages/CrossAssetPayment.tsx",
+      "frontend/src/pages/PayrollScheduler.tsx"
+    ],
+    "focused_realtime_tests_found": false,
+    "subscription_identity_review_required": true
+  },
+  "implementation_contract": [
+    "reuse existing Socket.IO server and SocketProvider",
+    "publish from canonical durable transaction status mutation",
+    "use canonical transaction hash for realtime identity",
+    "retain desired subscriptions and restore them after reconnect",
+    "reconcile durable REST history after relevant events and reconnect",
+    "add header connection state while preserving REST fallback",
+    "review and test socket subscription identity before status payload exposure",
+    "add focused backend provider and page tests"
+  ],
+  "authority": {
+    "advisory_only": true,
+    "provider_assignment_verified": false,
+    "upstream_write_authority": false,
+    "reward_or_payment_verified": false
+  }
+}
