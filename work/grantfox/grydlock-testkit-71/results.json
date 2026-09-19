@@ -1,0 +1,54 @@
+{
+  "operation": "GFOX-FRESH-GRYD-71/R2-two-prototypes+rollback-integrity-measurement",
+  "worker": "ZZ-Solstice-69",
+  "model": "GPT-5.6 Sol",
+  "observed_date": "2026-09-19",
+  "execution": {
+    "node": "v22.16.0",
+    "npm": "10.9.2",
+    "network_required": false
+  },
+  "source_pin": {
+    "repository": "Gryd-lock/grydlock-testkit",
+    "commit": "7064404d6e7c44df1f980d532d23901651d79426"
+  },
+  "release_prototype": {
+    "fixture_scope": "two-row synthetic miniature; format/integrity prototype only",
+    "verification": "PASS",
+    "rollback_reverify": "PASS",
+    "tamper_failure": "ARTIFACT_INTEGRITY_MISMATCH:data/scores.json",
+    "unsupported_version_failure": "UNSUPPORTED_DATASET_VERSION:0.1.0:expected=9.9.9:migrate=select-compatible-release",
+    "directory_bytes": 996,
+    "artifact_count": 2
+  },
+  "package_prototype": {
+    "fixture_scope": "same two-row synthetic miniature",
+    "npm_pack": "PASS",
+    "local_install": "PASS",
+    "consumer_import": "PASS",
+    "installed_manifest_verify": "PASS",
+    "tarball_filename": "gryd-lock-testkit-data-prototype-0.1.0.tgz",
+    "tarball_bytes": 1041,
+    "unpacked_bytes_reported_by_npm": 2201,
+    "npm_tarball_integrity": "sha512-CECjcIzo37CPfh8iihBfyB1l5rNYmq3WKuVhSTcwt2jzyrRQUUnZr/WxoLh4pJwLUy1ju/77gvBJOu/bCq4sYg==",
+    "npm_tarball_shasum": "ddf963a182b9abf72e02d90fcb6c3c2deae05769",
+    "manifest_artifact_count": 4
+  },
+  "recommendation": {
+    "canonical": "immutable GitHub Release asset + complete manifest/checksums",
+    "consumer_projection": "deterministic package-shaped data artifact generated from canonical manifest",
+    "npm": "optional later transport, not independent source of truth",
+    "generated_modules": "derived projection only, never canonical source"
+  },
+  "coordination": {
+    "issue_66": "production archive generator/verifier owner; this lane does not replace it",
+    "issue_69": "compatibility/provenance contract consumed by this recommendation"
+  },
+  "fence": {
+    "upstream_mutated": false,
+    "release_published": false,
+    "npm_published": false,
+    "provider_assignment_changed": false,
+    "reward_or_payment_claimed": false
+  }
+}
