@@ -1,0 +1,73 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-088/R-path-payment-source-architecture",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Forge",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "StarsForges/StarForge",
+    "issue_number": 76,
+    "issue_state": "open",
+    "github_assignee": null,
+    "default_branch": "master",
+    "head_sha": "c2311c6cfbe25ab841ad6a18be60df0fe4f2fe61",
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    },
+    "matching_open_pr": false
+  },
+  "blobs": {
+    "cargo": "e2bd210dd1e5e4f4ff8170d3e9dd25cd73944d53",
+    "main_cli": "349e092c89432709304100a98448dfd862e01480",
+    "commands_mod": "e0a1165d3307473c96d1a4870894a151bdd4fe67",
+    "tx_cli": "68c524e483b897c74c510fda15bf9b3aa34af327",
+    "horizon": "bba08a81073a48d8bbb4d49e6d6dfccabdc8d252",
+    "config": "9756f4a5cf47f13026de79becf010b19dd577a21",
+    "exact_token_amount": "c9ac77037ef882a4a9080761fbb4ac18bb7abd3f",
+    "sep31_domain": "b0c540b819d010127ad1be7766abdb5431b88e3e",
+    "confirmation": "83429c4870ad0af495b44db119ccc05d23dfa353",
+    "signer_rotation_xdr": "4db85c7dbfd177d4cf370784238ac2cddffca43c",
+    "signer_rotation_store": "348d74a9e5c79c4e750519dbc617fd4f970d57d6",
+    "ceremony": "db45c00a927519f587f5e6e8825a3231c158c516",
+    "hardware_wallet": "8a78006e1ec05cc98c1ff1e11af7353b1dd499f2"
+  },
+  "source_findings": [
+    "Horizon transport has bounded timeouts and retries but no strict-send/strict-receive path implementation was found",
+    "current payment and batch transaction builders encode mock strings as base64 instead of real Stellar XDR",
+    "current generic payment signer is mock and includes a secret-key prefix in the constructed string",
+    "current tx send amount and XLM balance safety checks use f64",
+    "real Stellar XDR, signature payload, Ed25519 and Ledger signing primitives already exist in signer_rotation/xdr.rs",
+    "private atomic 0600 file writes already exist in signer_rotation/store.rs",
+    "confirmation/budget UX is reusable but a refreshed quote or rebuilt body must invalidate prior confirmation",
+    "current retry scaffolding can rebuild sequence/fee and must not silently mutate a confirmed path-payment transaction",
+    "Trezor is not a proven signing capability through the current generic hardware abstraction"
+  ],
+  "architecture": {
+    "exact_amount": "7-decimal checked integer Amount7; no f64",
+    "route_ranking": "lexicographic exact amount + policy penalty + hop count + stable path key",
+    "slippage": "strict-send dest_min floor; strict-receive send_max ceil; checked integer basis points",
+    "freshness": "local quote TTL plus immutable quote/policy/network digests; refresh requires reconfirmation",
+    "xdr": "real stellar-xdr strict-send/strict-receive operation construction",
+    "signing": "software plus proven hardware capability; verify body unchanged after signing",
+    "offline": "versioned private atomic unsigned bundle with quote/plan/body digests and no secrets",
+    "submission": "no body-mutating automatic retry after confirmation",
+    "cli": [
+      "paths",
+      "quote",
+      "send-strict",
+      "receive-strict",
+      "inspect",
+      "watch"
+    ],
+    "ci": "deterministic mocks/fixtures; no mandatory live Horizon"
+  },
+  "disposition": "READY_FOR_ASSIGNMENT_WITH_REAL_XDR_EXTRACTION_AS_FIRST_CLASS_DEPENDENCY",
+  "authority": {
+    "upstream_source_mutated": false,
+    "provider_application_submitted": false,
+    "provider_assignment_claimed": false,
+    "live_payment_executed": false,
+    "reward_or_payment_claimed": false
+  }
+}
