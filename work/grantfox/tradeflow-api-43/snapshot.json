@@ -1,0 +1,88 @@
+{
+  "schema": "grantfox-source-baseline/v1",
+  "target": {
+    "repository": "BETAIL-BOYS/TradeFlow-API",
+    "issue": 43,
+    "title": "chore: Implement a graceful shutdown sequence for the Node server",
+    "source_branch": "main",
+    "source_sha": "666b47088ae51cf0b0e657a8d56872b40fd327c7"
+  },
+  "census": {
+    "issue_state": "open",
+    "github_assignees": 0,
+    "issue_comments": 2,
+    "open_prs_matching_issue_number": 0,
+    "grantfox_assignment": "unassigned",
+    "grantfox_apply_enabled": true,
+    "grantfox_application_mode": "direct_github_comment",
+    "grantfox_applications_per_user": 1,
+    "grantfox_visible_applicants": 2,
+    "slack_exact_repo_issue_hits_before_take": 0,
+    "upstream_pull": true,
+    "upstream_push": false,
+    "reward_amount_verified": false
+  },
+  "source_evidence": [
+    {
+      "path": "src/main.ts",
+      "blob": "87169f559892fb7b8227b14664e85792085983f4",
+      "finding": "production Nest bootstrap has no SIGTERM/SIGINT path; owns HTTP bootstrap plus standalone rate-limit Redis reference and drops IndexerJob instance"
+    },
+    {
+      "path": "src/jobs/indexer.ts",
+      "blob": "d095cefbb4a873a5507efdbaffaff7f928a0fc27",
+      "finding": "cron task handle and simulated in-flight timeout are not retained; no stop/shutdown contract exists"
+    },
+    {
+      "path": "config/redis.js",
+      "blob": "2aeccd07a5fe209ed1f45ac3ea2613a89bc05403",
+      "finding": "standalone ioredis client for rate limiting is outside Nest lifecycle and uses reconnect strategy"
+    },
+    {
+      "path": "src/common/redis/redis.service.ts",
+      "blob": "ed6c0709ac9634cb216627277a642f5b48d3d1b3",
+      "finding": "Nest-owned publisher/subscriber clients disconnect through onModuleDestroy"
+    },
+    {
+      "path": "src/prisma/prisma.service.ts",
+      "blob": "bb6565f3785cfbfae4c4da9be9a4cad166f1e981",
+      "finding": "Prisma disconnects through onModuleDestroy, requiring Nest teardown rather than process.exit immediately after raw server close"
+    },
+    {
+      "path": "src/app.module.ts",
+      "blob": "22d79d76e63ea72629f2381c3255790f64f70a39",
+      "finding": "RedisModule and PrismaModule are part of the production Nest application lifecycle"
+    },
+    {
+      "path": "src/trade/trade.gateway.ts",
+      "blob": "d4e2f6431159f490de812ef636ab8f53b9c45dc6",
+      "finding": "Nest WebSocket gateway subscribes through Nest-owned RedisService; application close is the natural teardown boundary"
+    },
+    {
+      "path": "package.json",
+      "blob": "9ead7ac4633b2fa0c08f21adfeb483fe16e25f68",
+      "finding": "start:prod targets dist/main; Jest/Supertest exist; advertised test:e2e config path is absent on pinned main"
+    },
+    {
+      "path": "src/pools/pools.controller.int.spec.ts",
+      "blob": "2418a40b6140778b7fd85dc140301c09a2924502",
+      "finding": "existing colocated integration tests demonstrate Nest app lifecycle/testing seam with app.close()"
+    },
+    {
+      "path": "scripts/server.js",
+      "blob": "9b8883a97b2251c6e369c9923297d62d2af00d51",
+      "finding": "legacy standalone WebSocket server already uses SIGTERM but exits immediately after wss.close(); it is not the production Nest start target and should not be copied"
+    }
+  ],
+  "disposition": {
+    "source_gap_confirmed": true,
+    "bare_server_close_process_exit_insufficient": true,
+    "nest_owned_cleanup_required": true,
+    "standalone_redis_cleanup_required": true,
+    "indexer_shutdown_contract_required": true,
+    "implementation_ready_after_assignment_recensus": true,
+    "upstream_source_mutation_performed": false,
+    "provider_application_performed": false,
+    "implementation_fenced_pending_assignment": true
+  }
+}
