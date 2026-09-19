@@ -1,0 +1,52 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-so4-532-R-KEYSTONE-S7M2",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Keystone-S7M2",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "SO4-Markets/contracts",
+    "issue_number": 532,
+    "default_branch": "main",
+    "head_sha": "446a694b38651b91760b827cd9fa4da3362b3b12",
+    "source_blob": "c0df1824dd5a95bb32cb24449ff9962b8307aa86",
+    "matching_pr_found": false,
+    "push_authority": false
+  },
+  "assignment": {
+    "github_grantfox_bot_assignee": "Naajih09",
+    "grantfox_page_state": "unassigned",
+    "conflict": true,
+    "application_started": false
+  },
+  "dependency_529": {
+    "state": "closed",
+    "merged_pr": 669,
+    "merge_sha": "8c6d6749bfdab9b86a47de45f8ddc1879d8e2531",
+    "recorded_tests": {
+      "passed": 528,
+      "failed": 37,
+      "ignored": 5
+    },
+    "compile_blocker_resolved": true
+  },
+  "evidence": {
+    "initialize_present": false,
+    "instance_bound_data_store": false,
+    "instance_bound_role_store": false,
+    "caller_supplied_data_store": true,
+    "caller_supplied_role_store_on_sensitive_paths": true,
+    "source_tests_hostile_swap_infrastructure": false
+  },
+  "disposition": {
+    "fleet_route": "HOLD_ASSIGNMENT_CONFLICT",
+    "next_action": "RECONCILE_PROVIDER_ASSIGNMENT_THEN_IMPLEMENT_TRUSTED_INFRASTRUCTURE_BINDING",
+    "implementation_started": false
+  },
+  "authority": {
+    "advisory_only": true,
+    "provider_assignment_authority": false,
+    "upstream_implementation_authority": false,
+    "deploy_or_funds_authority": false
+  }
+}
