@@ -21,6 +21,12 @@ The compiler consumes:
 2. one or more same-repository prerequisite issue observations;
 3. a receipt evaluation timestamp and freshness window.
 
+Verification of the embedded source receipt is necessary but not sufficient: the
+dependency gate also re-evaluates the source repository observation and embedded
+provider/queue observation against **this dependency evaluation instant**, using
+their original freshness ceilings. A historically valid SOURCE_ALIGNED receipt
+cannot remain green indefinitely while only prerequisite observations are refreshed.
+
 ```json
 {
   "schema": "grantfox-dependency-readiness/v1",
@@ -68,8 +74,12 @@ silently trusting a URL string.
 
 All prerequisite observations are fresh and closed, every closed prerequisite has
 positive `LANDED` evidence bound to a same-repository merged PR + exact merge
-commit, and the embedded source receipt is `SOURCE_ALIGNED`. Merely closing an
-issue as not planned, duplicate, stale, or unresolved can never clear the gate.
+commit, the embedded source receipt is `SOURCE_ALIGNED`, and both the source
+repository snapshot and its embedded provider/queue snapshot remain within their
+own freshness windows at the dependency gate's current `evaluated_at`. Merely
+closing an issue as not planned, duplicate, stale, or unresolved can never clear
+the gate, and refreshing only dependency observations cannot launder an old
+source/provider baseline into a clear result.
 
 Advisory next action:
 `CONTINUE_WITH_PROVIDER_AND_ASSIGNMENT_GATES`.
@@ -89,11 +99,13 @@ on the blockers instead of duplicating downstream work.
 
 ### `HOLD`
 
-The guard holds when the source receipt is not `SOURCE_ALIGNED`, any prerequisite
-observation or completion observation is stale, or a closed prerequisite lacks
-positive landed evidence. Source problems take precedence over dependency state;
-issue closure alone cannot launder an unimplemented prerequisite into a green
-signal.
+The guard holds when the source receipt is not `SOURCE_ALIGNED`, when its source
+repository or provider/queue observation has aged past the original freshness
+ceiling at dependency-consumption time, when any prerequisite observation or
+completion observation is stale, or when a closed prerequisite lacks positive
+landed evidence. Source problems take precedence over dependency state; neither
+issue closure nor a freshly re-read dependency can launder stale source/provider
+evidence into a green signal.
 
 ## Tamper evidence
 
@@ -132,7 +144,6 @@ Every receipt hard-codes:
 Dependency clearance says only that declared prerequisite issue observations are
 closed and fresh. It never assigns a bounty, proves a reward, authorizes a
 provider application, or authorizes source/payment mutation.
-
 
 ## Zero-prerequisite issues
 
