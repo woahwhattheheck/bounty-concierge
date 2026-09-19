@@ -28,10 +28,14 @@
     "work_id": "rustchain-25-rtc-seed",
     "canonical_source_url": "https://example.test/rustchain-25-rtc-seed",
     "advertised_payout": {
+      "state": "VERIFIED",
+      "evidence_url": "https://example.test/rustchain-25-rtc-seed",
+      "observed_at": "2026-09-16T19:30:00Z",
+      "amount_semantics": "FIXED",
       "amount": "25",
       "currency": "RTC",
       "unit_type": "NONCASH",
-      "observed_at": "2026-09-16T19:30:00Z"
+      "authority": "FIRST_PARTY"
     },
     "estimated_engineering_hours": "1",
     "model_tool_cost": {
