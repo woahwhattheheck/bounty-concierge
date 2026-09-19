@@ -64,7 +64,7 @@ REAL_POLICY = {
         "max_batch_items": 200,
         "currencies": {
             "USD": {
-                "min_single_reward": "100",
+                "min_single_reward": "50",
                 "min_batch_reward": "500",
                 "min_reward_per_agent_hour": "100",
             }
@@ -93,10 +93,14 @@ def real_gate_request():
             "work_id": "work-17",
             "canonical_source_url": "https://github.com/acme/widgets/issues/17",
             "advertised_payout": {
+                "state": "VERIFIED",
+                "evidence_url": "https://github.com/acme/widgets/issues/17",
+                "observed_at": "2026-09-16T19:30:00Z",
+                "amount_semantics": "FIXED",
                 "amount": "300",
                 "currency": "USD",
                 "unit_type": "CASH",
-                "observed_at": "2026-09-16T19:30:00Z",
+                "authority": "FIRST_PARTY",
             },
             "estimated_engineering_hours": "1",
             "model_tool_cost": {"state": "KNOWN", "amount": "10", "currency": "USD"},
