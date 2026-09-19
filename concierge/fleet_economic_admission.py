@@ -189,6 +189,11 @@ def compile_fleet_economic_admission(request: dict[str, Any]) -> dict[str, Any]:
     body.pop("receipt_sha256", None)
     authority = dict(body.get("authority", {}))
     authority["canonical_source_identity_rechecked"] = True
+    authority["swarm_bounty_dispatch_authority"] = False
+    authority["swarm_bounty_dispatch_rule"] = (
+        "generic native-currency economics is analytics only; "
+        "new swarm bounty admission requires paid_work_dollar_floor ACTIVE ancestry"
+    )
     authority["canonical_source_identity_rule"] = (
         "bounded_https_no_whitespace_backslash_userinfo_query_fragment_or_port;"
         "github_issue_owner_repo_casefold_plus_positive_number;"
@@ -208,6 +213,8 @@ def verify_receipt(receipt: dict[str, Any]) -> bool:
     if (
         type(authority) is not dict
         or authority.get("canonical_source_identity_rechecked") is not True
+        or authority.get("swarm_bounty_dispatch_authority") is not False
+        or type(authority.get("swarm_bounty_dispatch_rule")) is not str
         or type(source_digest) is not str
         or _HEX_SHA256_RE.fullmatch(source_digest) is None
     ):
