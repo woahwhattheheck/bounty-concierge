@@ -151,7 +151,9 @@ def _amount(value: Any, field: str) -> Tuple[str, Decimal]:
     return normalized or "0", parsed
 
 
-def _normalize_availability(value: Any, *, as_of: datetime) -> Dict[str, Any]:
+def _normalize_availability(
+    value: Any, *, as_of: datetime, canonical_source_url: str
+) -> Dict[str, Any]:
     row = _exact_object(
         value,
         required={"state", "observed_at", "source_url"},
@@ -164,12 +166,20 @@ def _normalize_availability(value: Any, *, as_of: datetime) -> Dict[str, Any]:
     observed_at, age_seconds, fresh = _age(
         row["observed_at"], as_of=as_of, field="candidate.availability.observed_at"
     )
+    source_url = _https_url(
+        row["source_url"], "candidate.availability.source_url"
+    )
+    if source_url != canonical_source_url:
+        raise _error(
+            "AVAILABILITY_TARGET_MISMATCH",
+            "candidate.availability.source_url must match candidate canonical source",
+        )
     return {
         "state": state,
         "observed_at": observed_at,
         "age_seconds": age_seconds,
         "fresh": fresh,
-        "source_url": _https_url(row["source_url"], "candidate.availability.source_url"),
+        "source_url": source_url,
     }
 
 
@@ -275,7 +285,11 @@ def compile_bounty_cash_admission(request: Dict[str, Any]) -> Dict[str, Any]:
     )
     work_id = _identifier(candidate["work_id"], "candidate.work_id")
     canonical_source_url = _https_url(candidate["canonical_source_url"], "candidate.canonical_source_url")
-    availability = _normalize_availability(candidate["availability"], as_of=as_of)
+    availability = _normalize_availability(
+        candidate["availability"],
+        as_of=as_of,
+        canonical_source_url=canonical_source_url,
+    )
     raw_evidence = candidate["reward_evidence"]
     if type(raw_evidence) is not list or not 1 <= len(raw_evidence) <= 32:
         raise _error("INVALID_REWARD_EVIDENCE", "reward_evidence must contain 1..32 rows")
