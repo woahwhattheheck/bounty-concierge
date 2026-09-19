@@ -101,6 +101,27 @@ def _sha(value: Any, field: str) -> str:
     return value
 
 
+def _timestamp(value: Any, field: str) -> datetime:
+    raw = _string(value, field, max_chars=64)
+    if not raw.endswith("Z"):
+        raise BountyEconomicsInputError(f"{field} must be UTC RFC3339 ending in Z")
+    try:
+        parsed = datetime.fromisoformat(raw[:-1] + "+00:00")
+    except ValueError as exc:
+        raise BountyEconomicsInputError(f"{field} must be valid RFC3339") from exc
+    if parsed.utcoffset() is None or parsed.utcoffset().total_seconds() != 0:
+        raise BountyEconomicsInputError(f"{field} must be UTC")
+    return parsed.astimezone(timezone.utc)
+
+
+def _max_age(value: Any) -> int:
+    if type(value) is not int or not 1 <= value <= 604_800:
+        raise BountyEconomicsInputError(
+            "max_snapshot_age_seconds must be an integer between 1 and 604800"
+        )
+    return value
+
+
 def _normalize_reward(value: Any) -> dict[str, Any]:
     reward = _object(
         value,
@@ -114,6 +135,7 @@ def _normalize_reward(value: Any) -> dict[str, Any]:
             "max_usd_cents",
             "native_currency",
             "native_amount",
+            "observed_at",
         },
     )
     kind = _string(reward["kind"], "reward.kind", max_chars=32).upper()
@@ -145,6 +167,8 @@ def _normalize_reward(value: Any) -> dict[str, Any]:
         allow_none=True,
         max_chars=128,
     )
+    observed_at = _string(reward["observed_at"], "reward.observed_at", max_chars=64)
+    _timestamp(observed_at, "reward.observed_at")
 
     if kind == "FIXED":
         if min_cents is None or max_cents is None or min_cents != max_cents:
@@ -183,6 +207,7 @@ def _normalize_reward(value: Any) -> dict[str, Any]:
         "max_usd_cents": max_cents,
         "native_currency": native_currency,
         "native_amount": native_amount,
+        "observed_at": observed_at,
     }
 
 
@@ -198,7 +223,14 @@ def compile_economics_gate(request: dict[str, Any]) -> dict[str, Any]:
     request = _object(
         request,
         "request",
-        {"schema", "opportunity_id", "program", "reward"},
+        {
+            "schema",
+            "opportunity_id",
+            "program",
+            "reward",
+            "evaluated_at",
+            "max_snapshot_age_seconds",
+        },
     )
     if request["schema"] != SCHEMA:
         raise BountyEconomicsInputError(f"schema must equal {SCHEMA}")
@@ -208,11 +240,23 @@ def compile_economics_gate(request: dict[str, Any]) -> dict[str, Any]:
     )
     program = _string(request["program"], "program", max_chars=256)
     reward = _normalize_reward(request["reward"])
+    evaluated_raw = _string(request["evaluated_at"], "evaluated_at", max_chars=64)
+    evaluated_at = _timestamp(evaluated_raw, "evaluated_at")
+    observed_at = _timestamp(reward["observed_at"], "reward.observed_at")
+    if evaluated_at < observed_at:
+        raise BountyEconomicsInputError(
+            "evaluated_at must not precede reward.observed_at"
+        )
+    max_snapshot_age_seconds = _max_age(request["max_snapshot_age_seconds"])
+    snapshot_age_seconds = int((evaluated_at - observed_at).total_seconds())
 
     reasons: list[str] = []
     routing_channel: str | None = None
 
-    if not reward["usd_basis_verified"]:
+    if snapshot_age_seconds > max_snapshot_age_seconds:
+        disposition = "HOLD_STALE_ECONOMICS"
+        reasons.append("ECONOMICS_SNAPSHOT_STALE")
+    elif not reward["usd_basis_verified"]:
         if reward["kind"] == "TOKEN_ONLY":
             disposition = "HOLD_TOKEN_ONLY"
             reasons.append("NO_VERIFIED_USD_CASH_BASIS")
@@ -246,6 +290,7 @@ def compile_economics_gate(request: dict[str, Any]) -> dict[str, Any]:
         "HOLD_UNPRICED": ["VERIFY_ECONOMICS_ONLY"],
         "HOLD_UNVERIFIED_CASH": ["VERIFY_ECONOMICS_ONLY"],
         "HOLD_RANGE_CROSSES_BUCKET": ["VERIFY_ECONOMICS_ONLY"],
+        "HOLD_STALE_ECONOMICS": ["VERIFY_ECONOMICS_ONLY"],
     }[disposition]
 
     body = {
@@ -263,7 +308,12 @@ def compile_economics_gate(request: dict[str, Any]) -> dict[str, Any]:
             "active_floor_usd_cents": ACTIVE_FLOOR_USD_CENTS,
             "pile_floor_usd_cents": PILE_FLOOR_USD_CENTS,
         },
-        "evidence": {"reward": reward},
+        "evidence": {
+            "reward": reward,
+            "evaluated_at": evaluated_raw,
+            "max_snapshot_age_seconds": max_snapshot_age_seconds,
+            "snapshot_age_seconds": snapshot_age_seconds,
+        },
         "authority": dict(AUTHORITY),
     }
     return {**body, "economics_receipt_sha256": _sha256(body)}
@@ -281,12 +331,23 @@ def verify_economics_receipt(receipt: dict[str, Any]) -> bool:
         identity = _object(
             receipt.get("identity"), "identity", {"opportunity_id", "program"}
         )
-        evidence = _object(receipt.get("evidence"), "evidence", {"reward"})
+        evidence = _object(
+            receipt.get("evidence"),
+            "evidence",
+            {
+                "reward",
+                "evaluated_at",
+                "max_snapshot_age_seconds",
+                "snapshot_age_seconds",
+            },
+        )
         reconstructed = {
             "schema": SCHEMA,
             "opportunity_id": identity["opportunity_id"],
             "program": identity["program"],
             "reward": evidence["reward"],
+            "evaluated_at": evidence["evaluated_at"],
+            "max_snapshot_age_seconds": evidence["max_snapshot_age_seconds"],
         }
         expected = compile_economics_gate(reconstructed)
     except (BountyEconomicsInputError, KeyError, TypeError, ValueError):
