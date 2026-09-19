@@ -1,0 +1,73 @@
+{
+  "schema": "grantfox-preassignment-baseline/v1",
+  "lane_id": "ZZLK-GFOX-002/R-stale-saga-recovery-contract",
+  "identity": {
+    "repository_full_name": "Ajo-contrib/soroban-ajo",
+    "issue_number": 905,
+    "github_issue_url": "https://github.com/Ajo-contrib/soroban-ajo/issues/905",
+    "listing_url": "https://contribute.grantfox.xyz/org/Ajo-contrib/repo/soroban-ajo/issue/905"
+  },
+  "observed_at": "2026-09-19",
+  "provider_observation": {
+    "assignment": "Unassigned",
+    "apply_route_visible": true,
+    "application_limit": "1_per_user",
+    "application_method": "Direct GitHub comment",
+    "existing_issue_comments": 2,
+    "explicit_reward_amount_verified": false,
+    "labels": [
+      "medium",
+      "backend",
+      "Maybe Rewarded",
+      "GrantFox OSS",
+      "correctness",
+      "Third Campaign"
+    ],
+    "application_published_by_this_seat": false
+  },
+  "upstream": {
+    "default_branch": "master",
+    "commit_sha": "1b87ea7344ae3d871e54abff05eabe5113bd2956",
+    "permissions": {
+      "pull": true,
+      "push": false
+    },
+    "blobs": {
+      "backend/src/sagas/sagaRecovery.ts": "461046e06a66a1531d3df870b0cbfafe73ca458b",
+      "backend/src/sagas/sagaOrchestrator.ts": "1944ca341fef9a1e7775c64204bfae88962b49e7",
+      "backend/src/sagas/sagaMonitor.ts": "d432f4c3efc58877725bda143e73f3fdf27aea33",
+      "backend/src/sagas/__tests__/sagaRecovery.test.ts": "032a998d714dacf689b34b45fa8c523504dc5eb3",
+      "backend/src/sagas/__tests__/sagaMonitor.test.ts": "768e5c5dc46e077fd9ed07d1334ec534cbcfa06c",
+      "backend/prisma/schema.prisma": "a8da55bbd0adaf04f767cd1ab923b186a1e2f84d",
+      "backend/package.json": "817d678882942193301248e5dac6b6fddabb82e8"
+    }
+  },
+  "current_state": {
+    "monitor_stale_threshold_present": true,
+    "monitor_stale_threshold_ms": 300000,
+    "recovery_filters_by_heartbeat": false,
+    "recovery_has_claim_or_lease": false,
+    "per_execute_retry_limit": 5,
+    "durable_recovery_attempt_limit": false,
+    "last_heartbeat_persisted": true,
+    "last_heartbeat_indexed": true,
+    "recovery_tests_cover_fresh_vs_stale": false,
+    "monitor_tests_cover_fresh_vs_stale": true
+  },
+  "implementation_contract": [
+    "share one configurable stale/fresh policy between monitor and recovery",
+    "exclude fresh live sagas from default startup recovery",
+    "atomically claim stale saga so concurrent recoverers cannot both execute",
+    "persist recovery exhaustion across process restarts",
+    "escalate exhausted recovery to needs_reconciliation with explicit reason",
+    "preserve irreversible unknown-outcome reconciliation semantics",
+    "apply lease/exhaustion rules to compensating state",
+    "add deterministic clock and concurrent-recoverer tests"
+  ],
+  "authority": {
+    "advisory_only": true,
+    "provider_assignment_verified": false,
+    "upstream_write_authority": false,
+    "reward_or_payment_verified": false
+  }
+}
