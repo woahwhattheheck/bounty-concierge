@@ -192,6 +192,7 @@ class ActivationGateTests(unittest.TestCase):
             patch("concierge.grantfox_activation_gate.verify_queue_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_source_readiness_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_dependency_readiness_receipt", return_value=True),
+            patch("concierge.grantfox_activation_gate.verify_dependency_fulfillment_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_continuity_receipt", return_value=True),
         ):
             return compile_activation(payload)
@@ -201,6 +202,7 @@ class ActivationGateTests(unittest.TestCase):
             patch("concierge.grantfox_activation_gate.verify_queue_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_source_readiness_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_dependency_readiness_receipt", return_value=True),
+            patch("concierge.grantfox_activation_gate.verify_dependency_fulfillment_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_continuity_receipt", return_value=True),
         ):
             return verify_activation_receipt(receipt)
@@ -229,6 +231,10 @@ class ActivationGateTests(unittest.TestCase):
         self.assertEqual(
             receipt["evidence"]["dependency_receipt"],
             payload["dependency_receipt"],
+        )
+        self.assertEqual(
+            receipt["evidence"]["fulfillment_receipt"],
+            payload["fulfillment_receipt"],
         )
         self.assertEqual(
             receipt["evidence"]["continuity_receipt"],
@@ -375,6 +381,7 @@ class ActivationGateTests(unittest.TestCase):
             patch("concierge.grantfox_activation_gate.verify_queue_receipt", return_value=False),
             patch("concierge.grantfox_activation_gate.verify_source_readiness_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_dependency_readiness_receipt", return_value=True),
+            patch("concierge.grantfox_activation_gate.verify_dependency_fulfillment_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_continuity_receipt", return_value=True),
         ):
             with self.assertRaisesRegex(GrantFoxActivationInputError, "queue_receipt does not verify"):
