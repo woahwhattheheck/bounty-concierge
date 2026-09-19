@@ -220,6 +220,7 @@ class FleetEconomicAdmissionTests(unittest.TestCase):
         self.assertNotIn("winner", receipt)
         self.assertFalse(receipt["authority"]["fx_conversion"])
         self.assertFalse(receipt["authority"]["dispatch_authority"])
+        self.assertFalse(receipt["authority"]["swarm_bounty_dispatch_authority"])
 
     def test_receipt_digest_is_deterministic_and_tamper_evident(self):
         payload = request(candidate("a", "200", "0.5"))
