@@ -17,17 +17,20 @@ def _make_loader():
     import types
     from pathlib import Path
 
-    # Pins are Git blob identities, including Git's length/type framing. The
-    # three valuation files and retained claim implementation are unchanged.
+    # Pins are Git blob identities, including Git's length/type framing.
+    # The live claim generation now retains the source-owned dollar-floor
+    # ancestor in addition to fleet economics, effort/value, and claim binding.
     sources = (
         ("concierge._fleet_economic_admission_v1", "_fleet_economic_admission_v1.py",
          "48365b3e5726d1899a087d09e126a34206750eb0"),
         ("concierge.fleet_economic_admission", "fleet_economic_admission.py",
-         "b85d8b78a664315e3fa6dfc9b57d3506b840fd5d"),
+         "ca811aa321bd1e7963a8e5c879f5a1563e6b3a15"),
+        ("concierge.paid_work_dollar_floor", "paid_work_dollar_floor.py",
+         "c38b24c622d23c2fbb4229c45216072f7bc0e95b"),
         ("concierge.paid_work_effort_value_gate", "paid_work_effort_value_gate.py",
-         "420321dee0b0c32bb26f19eb3e4bc85214a005cc"),
+         "dd9d706026174658a5b7f2140a69926fac552fb8"),
         ("concierge._claim_economic_admission_impl", "_claim_economic_admission_impl.py",
-         "635fe007a06327211d2129832f3ba768c1600fe0"),
+         "557ba2ebd44a5c91c1674a4f545e4fde7aab0e2c"),
     )
     directory = Path(__file__).resolve().parent
     module_type = types.ModuleType
