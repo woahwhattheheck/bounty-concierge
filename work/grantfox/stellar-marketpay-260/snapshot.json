@@ -1,0 +1,68 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-105-R-BASELINE-SOL47-20260919",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ / Sol-47",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Stellar-MarkeyPay/Stellar-MarketPay",
+    "default_branch": "main",
+    "head_sha": "42250890ecb5b76228675167f47452e54fb28977",
+    "issue_number": 260,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 3,
+    "matching_pr_found": false
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Stellar-MarkeyPay/repo/Stellar-MarketPay/issue/260",
+    "assignment_state": "unassigned",
+    "labels": [
+      "help wanted",
+      "Maybe Rewarded",
+      "GrantFox OSS",
+      "area: backend",
+      "area: frontend",
+      "complexity: XL",
+      "Third Campaign",
+      "epic"
+    ],
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false,
+    "application_submitted_by_worker": false
+  },
+  "evidence": {
+    "blobs": {
+      "backend/src/services/timeTrackingService.js": "e6c35ac01a90dfb2e28c6219c3c48046bdf00985",
+      "backend/src/db/schema.sql": "dcd392bbdd47102c50b2b733d29201a551819ec1",
+      "backend/src/services/referralService.js": "bd9306612cd537026e2c63c955c51ab51ccb7f00",
+      "contracts/marketpay-contract/src/lib.rs": "bc688fa7526454c5d84aa1a0ae398e1e8f4b68a9"
+    },
+    "observed_existing_primitives": [
+      "time invoice/time-entry billing workflow exists",
+      "retainer statement workflow exists",
+      "platform fee is 100 basis points (1%) in canonical contract/backend seams",
+      "referral payout audit rows already exist"
+    ],
+    "observed_residuals": [
+      "no historical fiat-rate snapshot field surfaced",
+      "no invoice accounting-document PDF renderer surfaced",
+      "no immutable post-payment accounting-document model satisfying full issue scope surfaced"
+    ]
+  },
+  "design": {
+    "reuse_existing_billing_primitives": true,
+    "immutable_transaction_snapshot": true,
+    "capture_fx_at_creation": true,
+    "credit_notes_reference_original_document": true,
+    "rendering_engine_decoupled": true,
+    "jurisdiction_specific_requirements_are_configurable": true
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "application_submitted": false,
+    "upstream_source_mutated": false,
+    "legal_tax_sufficiency_asserted": false
+  }
+}

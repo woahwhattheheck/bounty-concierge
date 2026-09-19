@@ -1,0 +1,62 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-104-R-BASELINE-SOL47-20260919",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ / Sol-47",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Bonizozo/stellar-tipjar-backend",
+    "default_branch": "main",
+    "head_sha": "a9f477c45a3b6bb835c8b75286b7ec723da82795",
+    "issue_number": 385,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 3,
+    "matching_pr_found": false
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Bonizozo/repo/stellar-tipjar-backend/issue/385",
+    "assignment_state": "unassigned",
+    "labels": [
+      "Maybe Rewarded",
+      "GrantFox OSS",
+      "difficulty: very hard",
+      "security",
+      "Third Campaign"
+    ],
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false,
+    "application_submitted_by_worker": false,
+    "application_attempt_run_id": "f31d8f0b-2863-4933-9f33-b8e1a6f099cc"
+  },
+  "evidence": {
+    "blobs": {
+      "src/moderation/ai_detector.rs": "42fe33189d21a226ea507635c78f6efc2c9201b6",
+      "src/moderation/mod.rs": "f757d415e89dc04d94ef655c83952a45ba6d1347",
+      "src/models/tip.rs": "272a8c227ca22bed32769d463b47e5ff3dafcd83",
+      "src/controllers/tip_controller.rs": "1b81ae732d80183127dbd872d9492b8d9ccc875c",
+      "src/middleware/rate_limiter.rs": "ca4a0442b39ab062648c7f2ec0adbae4497f11c9",
+      "src/middleware/timeout.rs": "a5ca7373b8f51a1c2f4df070b41589696868ed79"
+    },
+    "observed_controls": {
+      "rest_message_max_chars": 280,
+      "anthropic_max_output_tokens": 512,
+      "local_write_rate_per_second": 2,
+      "local_write_burst": 5,
+      "outer_request_timeout_seconds": 30
+    },
+    "observed_residuals": [
+      "untrusted content shares the user prompt with moderation policy inside hand-built content tags",
+      "no explicit AiDetector dependency timeout",
+      "no service-level input cap independent of REST DTO validation",
+      "no direct hostile-input AI-path test seam surfaced"
+    ],
+    "stale_thread_correction": "Current REST RecordTipRequest.message is capped at 280 characters."
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "application_submitted": false,
+    "upstream_source_mutated": false
+  }
+}
