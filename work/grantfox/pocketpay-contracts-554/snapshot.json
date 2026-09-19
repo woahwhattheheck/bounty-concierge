@@ -1,0 +1,43 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX-PKT-554-STALE-SCOPE-PARALLAX-Q7N4-20260919",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ–Parallax-Q7N4",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Axionvera/pocketpay-contracts",
+    "default_branch": "main",
+    "head_sha": "7988c6efec9a73162ed7d2fffb3b8b6ebd5a7b67",
+    "issue_number": 554,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 0,
+    "matching_pr_found": false
+  },
+  "disposition": "STALE_SCOPE",
+  "evidence": {
+    "blobs": {
+      "contracts/savings_vault/src/test/token_backed_withdrawals.rs": "7711a379cdfa9e9d23a178489acb3faf1ec3da34",
+      "contracts/savings_vault/src/test/withdraw_lock.rs": "f9e6a84c8693516a3fe02bf8156e99debe66b1b5",
+      "contracts/savings_vault/src/test/unauthorized_access.rs": "8467681fe4721b8986e435bce8cfc66939f1b02c",
+      "contracts/savings_vault/src/test/token_transfer_rollback.rs": "1d907d6e7f4f18e5794b4868e668a89c84af6fb9",
+      "docs/authorisation-rules.md": "919aaf1a8f902f9e1f4d65f14159cbee44decd56",
+      "docs/failure-mode-catalogue.md": "b6d6da00d734c2fd3ed88a4a6de3b3488d149c79"
+    },
+    "post_issue_hardening_commit": "5265b0a8cab969a35baad77863322a221fdc6f9d",
+    "acceptance_coverage": [
+      "early withdrawal",
+      "unauthorized withdrawal",
+      "insufficient balance",
+      "failed-operation state invariance",
+      "successful withdrawal",
+      "documentation"
+    ]
+  },
+  "residual_doc_drift": "Failure-mode catalogue still marks some SAC-transfer failure cases Not tested despite current rollback coverage.",
+  "fence": {
+    "fresh_implementation_without_maintainer_clarification": false,
+    "application_submitted": false,
+    "upstream_source_mutated": false
+  }
+}
