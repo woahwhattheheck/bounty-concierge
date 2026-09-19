@@ -13,6 +13,7 @@ from concierge.grantfox_activation_gate import (
     verify_activation_receipt,
 )
 from concierge.grantfox_application_continuity import compile_continuity
+from concierge.grantfox_dependency_fulfillment import compile_grantfox_dependency_fulfillment
 from concierge.grantfox_dependency_readiness import compile_grantfox_dependency_readiness
 from concierge.grantfox_queue_gate import compile_grantfox_queue_gate
 from concierge.grantfox_source_readiness import compile_grantfox_source_readiness
@@ -20,6 +21,7 @@ from concierge.grantfox_source_readiness import compile_grantfox_source_readines
 
 def request(queue_disposition="APPLY_ELIGIBLE", source_disposition="SOURCE_ALIGNED",
             dependency_disposition="DEPENDENCIES_CLEAR",
+            fulfillment_disposition="DEPENDENCIES_FULFILLED",
             continuity_state="DISCOVERED", continuity_disposition="CONTINUE"):
     queue = {
         "schema": "grantfox-queue-gate/v1",
@@ -52,6 +54,17 @@ def request(queue_disposition="APPLY_ELIGIBLE", source_disposition="SOURCE_ALIGN
         },
         "source_receipt": deepcopy(source),
     }
+    fulfillment = {
+        "schema": "grantfox-dependency-fulfillment-receipt/v1",
+        "fulfillment_disposition": fulfillment_disposition,
+        "fulfillment_receipt_sha256": "e" * 64,
+        "identity": {
+            "owner": "quicklendx",
+            "repo": "quicklendx-frontend",
+            "issue_number": 16,
+        },
+        "dependency_receipt": deepcopy(dependency),
+    }
     continuity = {
         "schema": "grantfox-application-continuity/v1",
         "disposition": continuity_disposition,
@@ -70,6 +83,7 @@ def request(queue_disposition="APPLY_ELIGIBLE", source_disposition="SOURCE_ALIGN
         "queue_receipt": queue,
         "source_receipt": source,
         "dependency_receipt": dependency,
+        "fulfillment_receipt": fulfillment,
         "continuity_receipt": continuity,
     }
 
@@ -116,6 +130,13 @@ def native_request(*, assigned=False):
         "evaluated_at": "2026-09-19T22:00:25Z",
         "max_snapshot_age_seconds": 900,
     })
+    fulfillment = compile_grantfox_dependency_fulfillment({
+        "schema": "grantfox-dependency-fulfillment/v1",
+        "dependency_receipt": dependency,
+        "landings": [],
+        "evaluated_at": "2026-09-19T22:00:26Z",
+        "max_snapshot_age_seconds": 900,
+    })
     if assigned:
         events = [
             {
@@ -153,6 +174,7 @@ def native_request(*, assigned=False):
         "queue_receipt": queue,
         "source_receipt": source,
         "dependency_receipt": dependency,
+        "fulfillment_receipt": fulfillment,
         "continuity_receipt": continuity,
     }
 
@@ -170,6 +192,7 @@ class ActivationGateTests(unittest.TestCase):
             patch("concierge.grantfox_activation_gate.verify_queue_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_source_readiness_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_dependency_readiness_receipt", return_value=True),
+            patch("concierge.grantfox_activation_gate.verify_dependency_fulfillment_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_continuity_receipt", return_value=True),
         ):
             return compile_activation(payload)
@@ -179,6 +202,7 @@ class ActivationGateTests(unittest.TestCase):
             patch("concierge.grantfox_activation_gate.verify_queue_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_source_readiness_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_dependency_readiness_receipt", return_value=True),
+            patch("concierge.grantfox_activation_gate.verify_dependency_fulfillment_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_continuity_receipt", return_value=True),
         ):
             return verify_activation_receipt(receipt)
@@ -262,6 +286,26 @@ class ActivationGateTests(unittest.TestCase):
         self.assertEqual(receipt["disposition"], "HOLD_DEPENDENCIES")
         self.assertIn("DEPENDENCY_READINESS_HOLD", receipt["reason_codes"])
 
+    def test_assigned_waits_for_missing_landing_fulfillment(self):
+        receipt = self.compile(request(
+            queue_disposition="IMPLEMENTATION_ELIGIBLE",
+            dependency_disposition="DEPENDENCIES_CLEAR",
+            fulfillment_disposition="FULFILLMENT_WAIT",
+            continuity_state="ASSIGNED",
+        ))
+        self.assertEqual(receipt["disposition"], "WAIT_DEPENDENCIES")
+        self.assertIn("PREREQUISITE_LANDING_EVIDENCE_MISSING", receipt["reason_codes"])
+
+    def test_assigned_holds_on_fulfillment_hold(self):
+        receipt = self.compile(request(
+            queue_disposition="IMPLEMENTATION_ELIGIBLE",
+            dependency_disposition="DEPENDENCIES_CLEAR",
+            fulfillment_disposition="HOLD",
+            continuity_state="ASSIGNED",
+        ))
+        self.assertEqual(receipt["disposition"], "HOLD_DEPENDENCIES")
+        self.assertIn("DEPENDENCY_FULFILLMENT_HOLD", receipt["reason_codes"])
+
     def test_assigned_but_source_drift_refuses_implementation(self):
         receipt = self.compile(request(
             queue_disposition="IMPLEMENTATION_ELIGIBLE",
@@ -341,6 +385,18 @@ class ActivationGateTests(unittest.TestCase):
         with self.assertRaisesRegex(GrantFoxActivationInputError, "different source receipt"):
             self.compile(payload)
 
+    def test_fulfillment_dependency_swap_fails_closed(self):
+        payload = request()
+        payload["fulfillment_receipt"]["dependency_receipt"]["dependency_receipt_sha256"] = "f" * 64
+        with self.assertRaisesRegex(GrantFoxActivationInputError, "different dependency receipt"):
+            self.compile(payload)
+
+    def test_fulfillment_issue_swap_fails_closed(self):
+        payload = request()
+        payload["fulfillment_receipt"]["identity"]["issue_number"] = 99
+        with self.assertRaisesRegex(GrantFoxActivationInputError, "different issues"):
+            self.compile(payload)
+
     def test_continuity_queue_digest_swap_fails_closed(self):
         payload = request()
         payload["continuity_receipt"]["queue_anchor"]["receipt_sha256"] = "d" * 64
@@ -353,6 +409,7 @@ class ActivationGateTests(unittest.TestCase):
             patch("concierge.grantfox_activation_gate.verify_queue_receipt", return_value=False),
             patch("concierge.grantfox_activation_gate.verify_source_readiness_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_dependency_readiness_receipt", return_value=True),
+            patch("concierge.grantfox_activation_gate.verify_dependency_fulfillment_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_continuity_receipt", return_value=True),
         ):
             with self.assertRaisesRegex(GrantFoxActivationInputError, "queue_receipt does not verify"):
@@ -364,9 +421,22 @@ class ActivationGateTests(unittest.TestCase):
             patch("concierge.grantfox_activation_gate.verify_queue_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_source_readiness_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_dependency_readiness_receipt", return_value=False),
+            patch("concierge.grantfox_activation_gate.verify_dependency_fulfillment_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_continuity_receipt", return_value=True),
         ):
             with self.assertRaisesRegex(GrantFoxActivationInputError, "dependency_receipt does not verify"):
+                compile_activation(payload)
+
+    def test_unverified_fulfillment_is_rejected(self):
+        payload = request()
+        with (
+            patch("concierge.grantfox_activation_gate.verify_queue_receipt", return_value=True),
+            patch("concierge.grantfox_activation_gate.verify_source_readiness_receipt", return_value=True),
+            patch("concierge.grantfox_activation_gate.verify_dependency_readiness_receipt", return_value=True),
+            patch("concierge.grantfox_activation_gate.verify_dependency_fulfillment_receipt", return_value=False),
+            patch("concierge.grantfox_activation_gate.verify_continuity_receipt", return_value=True),
+        ):
+            with self.assertRaisesRegex(GrantFoxActivationInputError, "fulfillment_receipt does not verify"):
                 compile_activation(payload)
 
     def test_receipt_digest_detects_tamper(self):
@@ -433,6 +503,13 @@ class ActivationGateProductionIntegrationTests(unittest.TestCase):
             "evaluated_at": "2026-09-19T21:01:00Z",
             "max_snapshot_age_seconds": 900,
         })
+        fulfillment = compile_grantfox_dependency_fulfillment({
+            "schema": "grantfox-dependency-fulfillment/v1",
+            "dependency_receipt": dependency,
+            "landings": [],
+            "evaluated_at": "2026-09-19T21:01:00Z",
+            "max_snapshot_age_seconds": 900,
+        })
         continuity = compile_continuity({
             "schema": "grantfox-application-continuity/v1",
             "queue_receipt": queue,
@@ -458,8 +535,10 @@ class ActivationGateProductionIntegrationTests(unittest.TestCase):
             "queue_receipt": queue,
             "source_receipt": source,
             "dependency_receipt": dependency,
+            "fulfillment_receipt": fulfillment,
             "continuity_receipt": continuity,
         })
+        self.assertEqual(fulfillment["fulfillment_disposition"], "DEPENDENCIES_FULFILLED")
         self.assertEqual(receipt["disposition"], "IMPLEMENT_ASSIGNED_SCOPE")
         self.assertTrue(verify_activation_receipt(receipt))
 
