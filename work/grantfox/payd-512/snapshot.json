@@ -1,0 +1,65 @@
+{
+  "schema": "grantfox-preassignment-baseline/v1",
+  "lane_id": "PAYD-GFOX-512/R-vesting-events",
+  "identity": {
+    "repository_full_name": "Protocol-Guild/PayD",
+    "issue_number": 512,
+    "listing_url": "https://contribute.grantfox.xyz/org/Protocol-Guild/repo/PayD/issue/512"
+  },
+  "provider_observation": {
+    "observed_date": "2026-09-19",
+    "assignment": "Unassigned",
+    "apply_route_visible": true,
+    "application_limit": "1_per_user",
+    "generic_applicant_comments": 1,
+    "application_published_by_this_seat": false
+  },
+  "upstream": {
+    "commit_sha": "af5c348e83033ed3340e589b68e8554f0303060e",
+    "blobs": {
+      "contracts/vesting_escrow/src/lib.rs": "4e3af21f2bb04c56f8133d43564cd9a5efa382d9",
+      "contracts/vesting_escrow/src/test.rs": "4cbcf07ae552b0abaa3e80c64b2679c4135906b1",
+      "contracts/bulk_payment/src/lib.rs": "84eb1a15b6814b47564a595d2db2b8ec8dd812d2",
+      "backend/src/services/contractEventIndexerService.ts": "0bf566fc31c6001650fc79b5a441af491e18068b",
+      "backend/src/services/contractEventIndexer.ts": "7e66c7469afb9a2cf6d294c3e5d28dfba33d17db",
+      "backend/src/__tests__/contractIntegration.test.ts": "f0683f519edb9f25f65be8b4d243b1001d202dd4",
+      "frontend/src/services/transactionHistory.ts": "64a3a44f9fe83b2c41116c0308a4edcec5684f38",
+      "docs/VESTING_UPGRADES.md": "85380d3089b450e175b1763837c5bcffd0cd1591"
+    }
+  },
+  "source_corrections": {
+    "contract_already_has_upgrade_events": true,
+    "grant_initialize_event_present": false,
+    "grant_claim_event_present": false,
+    "grant_clawback_event_present": false,
+    "grant_cancel_operation_present": false,
+    "schedule_id_present": false,
+    "single_vesting_config_per_contract_instance": true,
+    "storage_layout_compatibility_required": true,
+    "indexer_already_includes_vesting_contract": true,
+    "real_contract_topics_use_snake_case": true,
+    "integration_fixture_uses_camel_case_mock_event_types": true
+  },
+  "current_grant_transitions": [
+    "initialize",
+    "positive_claim",
+    "zero_claim_noop",
+    "clawback_revoke_future_vesting"
+  ],
+  "implementation_contract": [
+    "preserve DataKey and VestingConfig storage layout",
+    "emit grant lifecycle events only on real successful transitions",
+    "do not emit claimed event for zero-claim no-op",
+    "keep existing upgrade events unchanged",
+    "verify actual Soroban topic and data encoding in contract tests",
+    "reuse generic contract event indexer without vesting-specific branch",
+    "obtain maintainer clarification for schedule_id requirement",
+    "obtain maintainer clarification for VestingCancelled because no grant-cancel transition exists"
+  ],
+  "authority": {
+    "advisory_only": true,
+    "provider_assignment_verified": false,
+    "upstream_write_authority": false,
+    "reward_or_payment_verified": false
+  }
+}
