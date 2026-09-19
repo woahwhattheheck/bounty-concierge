@@ -1,0 +1,45 @@
+{
+  "schema": "grantfox-source-readiness-snapshot/v1",
+  "captured_at": "2026-09-19T22:48:00Z",
+  "identity": {
+    "repository_full_name": "Ajo-contrib/soroban-ajo",
+    "issue_number": 912,
+    "issue_url": "https://github.com/Ajo-contrib/soroban-ajo/issues/912"
+  },
+  "source": {
+    "default_branch": "master",
+    "commit_sha": "1b87ea7344ae3d871e54abff05eabe5113bd2956",
+    "blobs": {
+      "backend/src/services/blockchainListener.ts": "a7031bc65307f7c912a753ed13940718346562a3",
+      "backend/src/services/eventProcessor.ts": "d06c2ff4f8a990ec3590b6f9c20302730d2f8ab8",
+      "backend/tests/unit/blockchainListener.test.ts": "48d65ccfd63a4260eeef15ab2ddede8f31aab1f4",
+      "backend/prisma/schema.prisma": "a8da55bbd0adaf04f767cd1ab923b186a1e2f84d"
+    }
+  },
+  "github": {
+    "issue_state": "open",
+    "assignees": [],
+    "comments": 1,
+    "pr_carriers_found": 0
+  },
+  "provider": {
+    "assignment_state": "Unassigned",
+    "apply_route_visible": true,
+    "reward_amount_verified": false
+  },
+  "findings": {
+    "backfill_failure_scope": "whole loop aborts on one processEvent rejection",
+    "live_processing": "per-message async processEvent calls are not serialized",
+    "checkpoint": "singleton row advanced inside each successful event transaction",
+    "checkpoint_can_outrun_failed_earlier_event": true,
+    "dead_letter_or_quarantine_model_found": false,
+    "poison_event_runbook_found": false
+  },
+  "authority": {
+    "pre_assignment_only": true,
+    "implementation": false,
+    "provider_application": false,
+    "submission": false,
+    "payment_or_wallet": false
+  }
+}
