@@ -65,28 +65,26 @@ A digest swap, actor swap, or issue swap is an input error rather than a HOLD.
 Lifecycle states `SUBMITTED`, `APPROVED`, `PAYMENT_SENT`, `PAID`, and
 `REJECTED` can never produce implementation activation.
 
-## Verifiable evidence envelope
+## Receipt verification
 
-An activation receipt retains the complete native queue, source-readiness, and
-continuity receipts under `evidence`. Verification does not trust the outer
-activation SHA-256 by itself. `verify_activation_receipt()`:
+The activation receipt retains the complete verified queue, source-readiness, and
+continuity receipts under `evidence`. Verification is semantic, not merely a
+self-hash check:
 
-1. requires the exact activation receipt and evidence field sets;
-2. re-runs all three native receipt verifiers;
-3. re-checks issue, actor, and queue-anchor equality through
-   `compile_activation()`;
-4. recomputes the activation state machine from the retained native evidence; and
-5. requires exact equality with the supplied activation receipt, including its
-   digest.
+1. the activation receipt's canonical SHA-256 must match its bytes;
+2. the queue receipt is reconstructed through the real queue compiler and must
+   exactly match the retained queue evidence;
+3. source readiness is reverified through its native semantic verifier;
+4. continuity is reconstructed from the retained queue + event ledger through
+   the real continuity compiler and must exactly match the retained continuity
+   evidence;
+5. the activation decision is recompiled from those three receipts and the full
+   expected receipt must equal the supplied receipt.
 
-Therefore, changing a non-implementation receipt to
-`IMPLEMENT_ASSIGNED_SCOPE` and recomputing only
-`activation_receipt_sha256` still fails verification. Extra semantic fields
-also fail closed.
-
-Receipts created by the earlier self-hash-only implementation do not contain the
-native evidence envelope. They intentionally fail the repaired verifier and
-must be regenerated from the original native receipts.
+Therefore a caller cannot turn an `APPLY_ELIGIBLE` or `WAIT_ASSIGNMENT`
+receipt into `IMPLEMENT_ASSIGNED_SCOPE` by editing derived fields and
+recomputing SHA-256. A rehashed forged queue/continuity state also fails the
+semantic producer-to-consumer replay.
 
 ## CLI
 
@@ -112,7 +110,9 @@ Every output fixes all mutation authorities to false:
 }
 ```
 
-The activation receipt is canonical-JSON SHA-256 bound, but verification also
-replays the native verifiers and activation state machine from the retained
-evidence. The digest remains tamper evidence only; it is not provider authority
-and it does not turn a possible/discretionary reward into an award or payment.
+The activation receipt is canonical-JSON SHA-256 bound **and** semantically
+recompiled from its retained native evidence during verification. The digest is
+tamper evidence, not authority; even a correctly rehashed forged decision is
+rejected when it disagrees with the authenticated queue/source/continuity
+semantics. Nothing in the receipt turns a possible/discretionary reward into an
+award or payment.
