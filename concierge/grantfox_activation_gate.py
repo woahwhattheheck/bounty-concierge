@@ -5,12 +5,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import re
 from pathlib import Path
 from typing import Any
 
-from .grantfox_application_continuity import verify_continuity_receipt
-from .grantfox_queue_gate import verify_receipt as verify_queue_receipt
+from .grantfox_application_continuity import compile_continuity, verify_continuity_receipt
+from .grantfox_queue_gate import compile_grantfox_queue_gate, verify_receipt as verify_queue_receipt
 from .grantfox_source_readiness import verify_source_readiness_receipt
 
 SCHEMA = "grantfox-activation-gate/v1"
@@ -22,20 +21,6 @@ AUTHORITY = {
     "adjudication_authority": False,
     "payment_or_wallet_authority": False,
 }
-_RECEIPT_FIELDS = {
-    "schema",
-    "disposition",
-    "advisory_next_action",
-    "reason_codes",
-    "identity",
-    "anchors",
-    "inputs",
-    "evidence",
-    "authority",
-    "activation_receipt_sha256",
-}
-_EVIDENCE_FIELDS = {"queue_receipt", "source_receipt", "continuity_receipt"}
-_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
 class GrantFoxActivationInputError(ValueError):
@@ -72,6 +57,55 @@ def _identity(receipt: dict[str, Any], name: str, *, actor: bool) -> tuple[str, 
     return owner, repo, number, login
 
 
+def _queue_semantically_valid(receipt: dict[str, Any]) -> bool:
+    if not verify_queue_receipt(receipt):
+        return False
+    try:
+        identity = _obj(receipt.get("identity"), "queue_receipt.identity")
+        snapshot = _obj(receipt.get("provider_snapshot"), "queue_receipt.provider_snapshot")
+        expected = compile_grantfox_queue_gate({
+            "schema": receipt.get("schema"),
+            "listing_url": identity.get("listing_url"),
+            "canonical_issue_url": identity.get("canonical_issue_url"),
+            "issue_state": snapshot.get("issue_state"),
+            "actor_login": snapshot.get("actor_login"),
+            "assigned_to": snapshot.get("assigned_to"),
+            "actor_applied": snapshot.get("actor_applied"),
+            "application_count": snapshot.get("application_count"),
+            "application_pressure_threshold": snapshot.get("application_pressure_threshold"),
+            "linked_pr_urls": snapshot.get("linked_pr_urls"),
+            "labels": snapshot.get("labels"),
+            "observed_at": snapshot.get("observed_at"),
+            "evaluated_at": snapshot.get("evaluated_at"),
+            "max_snapshot_age_seconds": snapshot.get("max_snapshot_age_seconds"),
+        })
+    except (KeyError, TypeError, ValueError):
+        return False
+    return expected == receipt
+
+
+def _continuity_semantically_valid(
+    queue_receipt: dict[str, Any],
+    receipt: dict[str, Any],
+) -> bool:
+    if not verify_continuity_receipt(receipt):
+        return False
+    try:
+        identity = _obj(receipt.get("identity"), "continuity_receipt.identity")
+        events = receipt.get("events")
+        if type(events) is not list:
+            return False
+        expected = compile_continuity({
+            "schema": receipt.get("schema"),
+            "actor_login": identity.get("actor_login"),
+            "queue_receipt": queue_receipt,
+            "events": events,
+        })
+    except (KeyError, TypeError, ValueError):
+        return False
+    return expected == receipt
+
+
 def compile_activation(request: dict[str, Any]) -> dict[str, Any]:
     r = _obj(request, "request")
     if r.get("schema") != SCHEMA:
@@ -81,11 +115,11 @@ def compile_activation(request: dict[str, Any]) -> dict[str, Any]:
     source = _obj(r.get("source_receipt"), "source_receipt")
     continuity = _obj(r.get("continuity_receipt"), "continuity_receipt")
 
-    if not verify_queue_receipt(queue):
+    if not _queue_semantically_valid(queue):
         raise GrantFoxActivationInputError("queue_receipt does not verify")
     if not verify_source_readiness_receipt(source):
         raise GrantFoxActivationInputError("source_receipt does not verify")
-    if not verify_continuity_receipt(continuity):
+    if not _continuity_semantically_valid(queue, continuity):
         raise GrantFoxActivationInputError("continuity_receipt does not verify")
 
     qid = _identity(queue, "queue_receipt", actor=False)
@@ -194,35 +228,26 @@ def compile_activation(request: dict[str, Any]) -> dict[str, Any]:
 
 
 def verify_activation_receipt(receipt: dict[str, Any]) -> bool:
-    """Verify native evidence and recompile the complete activation semantics."""
-    if type(receipt) is not dict or set(receipt) != _RECEIPT_FIELDS:
+    if type(receipt) is not dict or receipt.get("schema") != SCHEMA or receipt.get("authority") != AUTHORITY:
         return False
-    if receipt.get("schema") != SCHEMA or receipt.get("authority") != AUTHORITY:
-        return False
-
     digest = receipt.get("activation_receipt_sha256")
-    if type(digest) is not str or _SHA256.fullmatch(digest) is None:
+    if type(digest) is not str or len(digest) != 64:
         return False
-
+    body = dict(receipt)
+    body.pop("activation_receipt_sha256", None)
+    if _sha(body) != digest:
+        return False
     evidence = receipt.get("evidence")
-    if type(evidence) is not dict or set(evidence) != _EVIDENCE_FIELDS:
+    if type(evidence) is not dict:
         return False
-    queue = evidence.get("queue_receipt")
-    source = evidence.get("source_receipt")
-    continuity = evidence.get("continuity_receipt")
-    if type(queue) is not dict or type(source) is not dict or type(continuity) is not dict:
-        return False
-
     try:
-        expected = compile_activation(
-            {
-                "schema": SCHEMA,
-                "queue_receipt": queue,
-                "source_receipt": source,
-                "continuity_receipt": continuity,
-            }
-        )
-    except (GrantFoxActivationInputError, KeyError, TypeError, ValueError):
+        expected = compile_activation({
+            "schema": SCHEMA,
+            "queue_receipt": evidence.get("queue_receipt"),
+            "source_receipt": evidence.get("source_receipt"),
+            "continuity_receipt": evidence.get("continuity_receipt"),
+        })
+    except (KeyError, TypeError, ValueError):
         return False
     return expected == receipt
 
