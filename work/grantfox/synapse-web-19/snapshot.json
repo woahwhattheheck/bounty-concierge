@@ -1,0 +1,85 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-synapse-web-19-R-test-ci-map",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Bounty-Ranger",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Synapse-bridgez/synapse-web",
+    "default_branch": "main",
+    "head_sha": "48cdca3264161daeb735383b7bd01f14474bcd1f",
+    "issue_number": 19,
+    "issue_state": "open",
+    "github_assignee": null,
+    "github_comment_count": 1,
+    "connector_permissions": {
+      "pull": true,
+      "push": false,
+      "admin": false
+    },
+    "focused_open_implementation_pr_found": false
+  },
+  "provider": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Synapse-bridgez/repo/synapse-web/issue/19",
+    "live_provider_assignment_verified": false,
+    "application_submitted_by_worker": false,
+    "note": "Public GrantFox listing was not independently readable through this seat's public web index; do not infer assignment from GitHub alone."
+  },
+  "source": {
+    "package.json": "2e5980a5cafe0308c18453f758376af814f8c0ee",
+    ".github/workflows/ci.yml": "0e566fbd3b098a4138758a66c2780a85650e31f7",
+    "vitest.config.ts": "f0a0462dbbad80f7b638534b19136ac718b5ea1c",
+    "lib/utils.test.ts": "33e2a95e5c55cf9afde17a787893ed074481af44",
+    "lib/soroban/args.test.ts": "09497cb9a3c677a275af35d3569a2d5177b7e193",
+    "lib/soroban/transactionMerge.test.ts": "1fab546c22eca6f09b2d472518425cd933603caf",
+    "lib/wallet/storage.test.ts": "7ac08c404e54cd2e3da2680f171a23f9271c997d",
+    "components/ui/Badge.test.tsx": "9f94d8214673aec83cb7fe2adbd62c537033f5f1",
+    "components/transactions/TxDetailModal.tsx": "7d2715f49e5266bda8ce5a380eb4faa1731a8f17",
+    "components/transactions/TransactionsTab.tsx": "98b0aff454fc549e36771e296c6512c1cb1f5b76",
+    "lib/soroban/contract.ts": "647ff977cf31b3bf82183e7bb0915f615c6324d5",
+    "lib/wallet/WalletProvider.tsx": "c2d3adab7fcf79e9e87cc20df0707ebd7519db02"
+  },
+  "current_surface": {
+    "vitest_present": true,
+    "react_testing_library_present": true,
+    "npm_test_present": true,
+    "ci_runs_unit_tests": true,
+    "existing_test_files": 5,
+    "playwright_present": false,
+    "test_e2e_script_present": false,
+    "coverage_threshold_present": false,
+    "error_tracking_sdk_present": false,
+    "modal_state_machine_fully_enforced": false
+  },
+  "residual": {
+    "preserve_existing_unit_suite": true,
+    "component_integration_tests": true,
+    "mocked_wallet_rpc_playwright": true,
+    "pr_e2e_ci": true,
+    "lib_coverage_gate": true,
+    "rpc_signing_error_telemetry": true,
+    "branch_required_check_requires_maintainer_policy_action": true,
+    "testnet_or_mocked_fixtures_only": true
+  },
+  "evidence": {
+    "fresh_runtime_tests_claimed": false,
+    "historical_pr79_claim": "31 tests across 5 files; author-reported in closed PR #79",
+    "current_source_readback": true,
+    "focused_open_pr_queries": [
+      "#19",
+      "playwright",
+      "e2e",
+      "sentry",
+      "error tracking",
+      "coverage",
+      "TxDetailModal"
+    ]
+  },
+  "authority": {
+    "advisory_only": true,
+    "provider_application_authority": false,
+    "upstream_implementation_authority": false,
+    "wallet_or_payment_authority": false,
+    "reward_or_award_claim": false
+  }
+}
