@@ -89,6 +89,11 @@ def stellarstream_drift_request():
             "value": "contracts/Contract-V1/src/types.rs",
             "matches": [],
         },
+        {
+            "kind": "path",
+            "value": "contracts/Contract-V1/src/lib.rs",
+            "matches": [match("contracts/Contract-V1/src/lib.rs")],
+        },
         {"kind": "symbol", "value": "UserProfile", "matches": []},
         {"kind": "symbol", "value": "outgoing_streams", "matches": []},
         {"kind": "symbol", "value": "incoming_streams", "matches": []},
@@ -295,6 +300,111 @@ class GrantFoxSourceReadinessTests(unittest.TestCase):
         with self.assertRaisesRegex(
             GrantFoxSourceReadinessInputError,
             "existing expectation",
+        ):
+            compile_grantfox_source_readiness(payload)
+
+    def test_replacement_target_must_be_a_declared_present_expectation(self):
+        payload = request(
+            expectations=[
+                {"kind": "path", "value": "src/old.rs", "matches": []},
+            ],
+            replacements=[
+                {
+                    "for_kind": "path",
+                    "for_value": "src/old.rs",
+                    "replacement_kind": "path",
+                    "replacement_value": "src/new.rs",
+                    "evidence": [match("src/new.rs")],
+                }
+            ],
+        )
+        with self.assertRaisesRegex(
+            GrantFoxSourceReadinessInputError,
+            "replacement target must be a declared expectation",
+        ):
+            compile_grantfox_source_readiness(payload)
+
+    def test_path_replacement_rejects_unrelated_declared_evidence(self):
+        payload = request(
+            expectations=[
+                {"kind": "path", "value": "src/old.rs", "matches": []},
+                {
+                    "kind": "path",
+                    "value": "src/new.rs",
+                    "matches": [match("src/new.rs")],
+                },
+                {
+                    "kind": "path",
+                    "value": "src/unrelated.rs",
+                    "matches": [match("src/unrelated.rs", STORAGE_BLOB)],
+                },
+            ],
+            replacements=[
+                {
+                    "for_kind": "path",
+                    "for_value": "src/old.rs",
+                    "replacement_kind": "path",
+                    "replacement_value": "src/new.rs",
+                    "evidence": [match("src/unrelated.rs", STORAGE_BLOB)],
+                }
+            ],
+        )
+        with self.assertRaisesRegex(
+            GrantFoxSourceReadinessInputError,
+            "evidence must match the declared replacement target evidence",
+        ):
+            compile_grantfox_source_readiness(payload)
+
+    def test_symbol_replacement_rejects_unrelated_declared_evidence(self):
+        payload = request(
+            expectations=[
+                {"kind": "symbol", "value": "OldSymbol", "matches": []},
+                {
+                    "kind": "symbol",
+                    "value": "NewSymbol",
+                    "matches": [match("src/new.rs")],
+                },
+                {
+                    "kind": "symbol",
+                    "value": "OtherSymbol",
+                    "matches": [match("src/other.rs", STORAGE_BLOB)],
+                },
+            ],
+            replacements=[
+                {
+                    "for_kind": "symbol",
+                    "for_value": "OldSymbol",
+                    "replacement_kind": "symbol",
+                    "replacement_value": "NewSymbol",
+                    "evidence": [match("src/other.rs", STORAGE_BLOB)],
+                }
+            ],
+        )
+        with self.assertRaisesRegex(
+            GrantFoxSourceReadinessInputError,
+            "evidence must match the declared replacement target evidence",
+        ):
+            compile_grantfox_source_readiness(payload)
+
+    def test_replacement_target_declared_but_missing_fails_closed(self):
+        payload = request(
+            expectations=[
+                {"kind": "symbol", "value": "OldSymbol", "matches": []},
+                {"kind": "symbol", "value": "NewSymbol", "matches": []},
+            ],
+            replacements=[
+                {
+                    "for_kind": "symbol",
+                    "for_value": "OldSymbol",
+                    "replacement_kind": "symbol",
+                    "replacement_value": "NewSymbol",
+                    "evidence": [match("src/new.rs")],
+                }
+            ],
+        )
+        with self.assertRaisesRegex(
+            GrantFoxSourceReadinessInputError,
+            "replacement target expectation must be present",
         ):
             compile_grantfox_source_readiness(payload)
 
