@@ -236,3 +236,21 @@ This gate never provides:
 - noncash valuation authority.
 
 Those actions require their own evidence and control planes.
+
+
+## Mandatory dollar-floor ancestry
+
+For new swarm bounty work, this gate now constructs and semantically verifies a
+`paid-work-dollar-floor/v2` receipt from the candidate's payout evidence before
+gross fleet economics can run. Only `ACTIVE_REVIEW` ancestry can reach the
+downstream economic calculation. `PILE_SAVE_UP` and
+`PRUNE_BELOW_FLOOR` become terminal economic skips; unverified, ceiling,
+cross-boundary range, noncash, and non-USD dollar-floor states remain value
+holds.
+
+When a verified RANGE is wholly above the active threshold, downstream
+profitability uses its guaranteed minimum, never its maximum. The complete
+dollar-floor receipt is embedded in the effort/value receipt and reverified by
+`verify_receipt()`; claim admission's deterministic request replay therefore
+inherits the same source-owned floor automatically.
+
