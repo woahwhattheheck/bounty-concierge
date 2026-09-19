@@ -43,8 +43,9 @@ _ALLOWED_PRIMITIVES = frozenset(
         "merge_pull_request",
     }
 )
-_MIN_DIRECT = frozenset({"create_branch", "create_pull_request"})
-_MIN_FORK = frozenset({"create_branch", "create_pull_request"})
+_MIN_BRANCH_PR = frozenset({"create_branch", "create_pull_request"})
+_CONTENTS_WRITE = frozenset({"create_file", "update_file"})
+_GIT_OBJECT_WRITE = frozenset({"create_blob", "create_tree", "create_commit", "update_ref"})
 _READY = frozenset({"DIRECT_BRANCH_PR", "OWNED_FORK_PR", "REUSE_EXISTING_PR"})
 
 
@@ -160,6 +161,11 @@ def _primitives(value: Any) -> list[str]:
         seen.add(primitive)
         result.append(primitive)
     return sorted(result)
+
+
+def _has_content_write_path(primitives: frozenset[str]) -> bool:
+    """Return whether observed primitives can publish tested bytes to a branch."""
+    return bool(_CONTENTS_WRITE & primitives) or _GIT_OBJECT_WRITE <= primitives
 
 
 def compile_publication_route(request: dict[str, Any]) -> dict[str, Any]:
@@ -285,7 +291,11 @@ def compile_publication_route(request: dict[str, Any]) -> dict[str, Any]:
             disposition = "HOLD_APPLICATION_UNKNOWN"
             next_action = "REFRESH_PROVIDER_APPLICATION_STATE"
             reasons.append("APPLICATION_STATE_UNKNOWN")
-    elif integration_access == "write" and _MIN_DIRECT <= primitive_set:
+    elif (
+        integration_access == "write"
+        and _MIN_BRANCH_PR <= primitive_set
+        and _has_content_write_path(primitive_set)
+    ):
         disposition = "DIRECT_BRANCH_PR"
         next_action = "PUBLISH_BRANCH_AND_PR_TO_BOUND_BASE"
         reasons.append("UPSTREAM_WRITE_OBSERVED")
@@ -293,7 +303,8 @@ def compile_publication_route(request: dict[str, Any]) -> dict[str, Any]:
         installed_fork is not None
         and fork_actor_owned is True
         and fork_push_access is True
-        and _MIN_FORK <= primitive_set
+        and _MIN_BRANCH_PR <= primitive_set
+        and _has_content_write_path(primitive_set)
     ):
         disposition = "OWNED_FORK_PR"
         next_action = "PUBLISH_TO_INSTALLED_FORK_THEN_OPEN_UPSTREAM_PR"
@@ -317,7 +328,7 @@ def compile_publication_route(request: dict[str, Any]) -> dict[str, Any]:
             reasons.append("INSTALLED_FORK_NOT_ACTOR_OWNED")
         elif fork_push_access is not True:
             reasons.append("INSTALLED_FORK_PUSH_NOT_OBSERVED")
-        if not _MIN_FORK <= primitive_set:
+        if not _MIN_BRANCH_PR <= primitive_set or not _has_content_write_path(primitive_set):
             reasons.append("PUBLICATION_PRIMITIVES_INSUFFICIENT")
         reasons = list(dict.fromkeys(reasons))
 
