@@ -1,0 +1,87 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-arbitra-3-R-ZZ-SOL-DELTA",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Delta",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Arbitra-Lab/Arbitra",
+    "default_branch": "main",
+    "head_sha": "b98c3f7eb6ee283c97ef7bfd8917280a8197b698",
+    "issue_number": 3,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 1,
+    "open_pr_count": 0,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Arbitra-Lab/repo/Arbitra/issue/3",
+    "public_assignment_state": "Unassigned",
+    "application_route_visible": true,
+    "one_application_per_user": true,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false,
+    "application_attempt": {
+      "status": "not_started",
+      "submitted_verified": false
+    }
+  },
+  "evidence": {
+    "frontend_package_blob": "827361835145b256b32bab942a3f321583d931ba",
+    "eslint_config_blob": "d6d1738de67ec12cd1cae1bbef0525681e0f82c7",
+    "root_precommit_blob": "c37466e2b308ae097b510ac4f3c8b983ae0dbab7",
+    "root_package_blob": "632c4289e94bf68d4481bc2185f31d7ce3358723",
+    "frontend_ci_blob": "98ba9e380a8c112cd11b424d479ab9144653da0b",
+    "check_all_blob": "abdf538be41432a870128ebde5c778a36b1eaec0",
+    "versions": {
+      "next": "16.2.6",
+      "react": "19.2.3",
+      "react_dom": "19.2.3",
+      "eslint": "^9.0.0",
+      "eslint_config_next": "16.1.3",
+      "eslint_eslintrc": "2.1.4"
+    },
+    "current_state": {
+      "eslint_flat_config": "empty_array",
+      "lint_script": "echo_noop",
+      "lint_fix_script": "echo_noop",
+      "ci_run_eslint_step": "calls_noop_lint_script",
+      "root_precommit": "npx lint-staged",
+      "root_js_ts_lint_staged": "prettier_only",
+      "frontend_local_lint_staged": "eslint_fix_then_prettier_declared",
+      "acceptance_paths_present": [
+        "frontend/app/admin",
+        "frontend/app/user",
+        "frontend/components",
+        "frontend/components/blockchain",
+        "frontend/components/stellar"
+      ]
+    }
+  },
+  "post_assignment": {
+    "required": [
+      "supported ESLint 9 flat config",
+      "Next/React/TypeScript rules",
+      "real lint and lint:fix scripts",
+      "admin/user/components coverage",
+      "narrow blockchain-specific rules",
+      "root pre-commit ESLint enforcement",
+      "CI lint fail/pass proof",
+      "tests and production build"
+    ],
+    "anti_false_green": [
+      "do not use echo/no-op lint scripts",
+      "do not treat next build as lint",
+      "prove root staged-file hook invokes ESLint"
+    ]
+  },
+  "fence": {
+    "implementation_requires_provider_or_maintainer_assignment": true,
+    "upstream_source_mutated": false
+  }
+}
