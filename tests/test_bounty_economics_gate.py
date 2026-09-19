@@ -36,7 +36,10 @@ def request(
             "max_usd_cents": max_cents,
             "native_currency": native_currency,
             "native_amount": native_amount,
+            "observed_at": "2026-09-19T23:00:00Z",
         },
+        "evaluated_at": "2026-09-19T23:05:00Z",
+        "max_snapshot_age_seconds": 900,
     }
 
 
@@ -107,6 +110,21 @@ def test_token_units_do_not_become_usd_by_inference():
     assert receipt["disposition"] == "HOLD_TOKEN_ONLY"
     assert receipt["reason_codes"] == ["NO_VERIFIED_USD_CASH_BASIS"]
     assert receipt["evidence"]["reward"]["native_amount"] == "500"
+
+
+def test_stale_economics_snapshot_holds_even_large_verified_cash():
+    payload = request(min_cents=100_000, max_cents=100_000)
+    payload["reward"]["observed_at"] = "2026-09-18T23:00:00Z"
+    receipt = compile_economics_gate(payload)
+    assert receipt["disposition"] == "HOLD_STALE_ECONOMICS"
+    assert receipt["reason_codes"] == ["ECONOMICS_SNAPSHOT_STALE"]
+
+
+def test_future_economics_snapshot_is_rejected():
+    payload = request()
+    payload["reward"]["observed_at"] = "2026-09-20T00:00:00Z"
+    with pytest.raises(BountyEconomicsInputError, match="must not precede"):
+        compile_economics_gate(payload)
 
 
 def test_unverified_large_cash_amount_is_hold_not_active():
