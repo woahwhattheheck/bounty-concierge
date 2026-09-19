@@ -1,0 +1,81 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-ajo-938-R-zod-strictness",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Bounty-Ranger",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Ajo-contrib/soroban-ajo",
+    "default_branch": "master",
+    "head_sha": "1b87ea7344ae3d871e54abff05eabe5113bd2956",
+    "issue_number": 938,
+    "issue_state": "open",
+    "github_assignee": null,
+    "issue_comment_count": 1,
+    "focused_open_implementation_pr_found": false,
+    "connector_permissions": {
+      "pull": true,
+      "push": false,
+      "admin": false
+    }
+  },
+  "zod": {
+    "package_range": "^3.22.4",
+    "backend_z_object_files_found": 25,
+    "strict_call_occurrences": 0,
+    "strict_object_occurrences": 0,
+    "passthrough_occurrences": 0,
+    "explicit_strip_occurrences": 0,
+    "default_unknown_key_policy": "strip",
+    "desired_security_request_policy": "reject unexpected keys explicitly"
+  },
+  "source": {
+    "backend/package.json": "817d678882942193301248e5dac6b6fddabb82e8",
+    "backend/src/utils/validationUtils.ts": "24cfd353fc3e578e86fe26addcde8e0a1df009a3",
+    "backend/src/utils/zodHelpers.ts": "03bc2111acdd56267792a0e0c43f50f135710fa4",
+    "backend/src/middleware/validateRequest.ts": "c9a48f32c3fdb335c8f24ee5c5f90565901969a4",
+    "backend/src/middleware/validationMiddleware.ts": "ba62b5b1ed6ccc19103482ba5205ddda90d741d9",
+    "backend/src/utils/validationChain.ts": "b71c4a3dbef99c176fc4c74aafa38fe852e775be",
+    "backend/src/schemas/auth.schema.ts": "7c5b0576e0c35f6036786d86b7d3687beccaad40",
+    "backend/src/routes/auth.ts": "057894815d4d2d945298892aa6fef481c9090aa9",
+    "backend/src/validators/groups.ts": "d61c83e74100337121170d755268253801c2fba5",
+    "backend/src/routes/groups.ts": "0ec238de367579af2cd53771e66f4014069d7ed6",
+    "backend/src/types/multisig.ts": "d57e75e2280ed710d36d1af6eab5988648e09bd9",
+    "backend/src/routes/multisig.ts": "8c45bea07b8987c3726894fc758bdefc4b523b7c",
+    "backend/src/routes/jobs.ts": "343db64012fd14ce022d584e36ede5c5ab8d248b",
+    "backend/src/index.ts": "1d1a94f0e3ae09de6de3e19701835f337516e897",
+    "backend/src/routes/notifications.ts": "970e8057b06a2f3beff19835061e73f0a7bb3b62",
+    "backend/src/controllers/dataExportController.ts": "86891370a7feb7da863ab0b441b80905189960b4",
+    "backend/src/routes/calendar.ts": "ac6ffc863bb8519eb92dd014bfcdeb84db75efe4",
+    "backend/src/routes/e2e.ts": "1ae863d227c2da3413f4b318e171c089c19d4d29",
+    "backend/src/schemas/goal.schema.ts": "60a0796ba0b336fd65452fcd5f162fce14cdd805",
+    "backend/src/routes/goals.ts": "afb32665f3f1cefca8f5cecd52d07b1ee4d74bb1",
+    "backend/src/controllers/goalsController.ts": "6a14ac7bbba2cdd354e50e0f6874929d2e90b95a",
+    "backend/src/services/goalsService.ts": "5f69781c1b80cf8a0662da9e5540007ba29f63cb"
+  },
+  "findings": {
+    "unknown_keys_are_silently_stripped_today": true,
+    "unrecognized_keys_error_keys_not_explicitly_formatted": true,
+    "validation_utils_old_named_type_reference_present": false,
+    "duplicate_group_schema_stacks": true,
+    "actual_group_ingress_uses_validators_groups": true,
+    "goal_zod_schemas_wired_to_routes": false,
+    "goals_router_currently_mounted": false,
+    "jobs_router_currently_mounted": true,
+    "jobs_router_app_level_auth_wrapper_observed": false,
+    "jobs_route_contains_state_changing_admin_payout_actions": true,
+    "blanket_strict_all_z_objects_is_safe": false
+  },
+  "authority": {
+    "advisory_only": true,
+    "upstream_implementation_authority": false,
+    "provider_application_authority": false,
+    "wallet_or_payment_authority": false,
+    "reward_or_award_claim": false
+  },
+  "runtime": {
+    "fresh_upstream_test_run_claimed": false,
+    "local_zod_package_available": false,
+    "spec_reference": "https://v3.zod.dev/?id=objects"
+  }
+}
