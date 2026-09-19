@@ -1,4 +1,5 @@
 from copy import deepcopy
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -157,6 +158,29 @@ class GrantFoxQueueGateTests(unittest.TestCase):
         changed = deepcopy(first)
         changed["provider_snapshot"]["application_count"] = 99
         self.assertFalse(verify_receipt(changed))
+
+    def test_rehashed_semantic_forgery_is_rejected(self):
+        forged = compile_grantfox_queue_gate(snapshot())
+        forged["provider_snapshot"]["assigned_to"] = "woahwhattheheck"
+        forged["provider_snapshot"]["actor_applied"] = True
+        forged["disposition"] = "IMPLEMENTATION_ELIGIBLE"
+        forged["advisory_next_action"] = "IMPLEMENT_ASSIGNED_SCOPE"
+        body = dict(forged)
+        body.pop("receipt_sha256")
+        forged["receipt_sha256"] = hashlib.sha256(
+            json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        ).hexdigest()
+        self.assertFalse(verify_receipt(forged))
+
+    def test_rehashed_unknown_semantic_field_is_rejected(self):
+        forged = compile_grantfox_queue_gate(snapshot())
+        forged["provider_snapshot"]["assignment_receipt_url"] = "https://example.invalid/fake"
+        body = dict(forged)
+        body.pop("receipt_sha256")
+        forged["receipt_sha256"] = hashlib.sha256(
+            json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        ).hexdigest()
+        self.assertFalse(verify_receipt(forged))
 
     def test_cli_round_trip_and_hold_exit_code(self):
         payload = snapshot(

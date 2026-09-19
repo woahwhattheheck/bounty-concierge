@@ -320,26 +320,45 @@ def compile_grantfox_queue_gate(request: dict[str, Any]) -> dict[str, Any]:
 
 
 def verify_receipt(receipt: dict[str, Any]) -> bool:
-    """Verify deterministic receipt integrity and the advisory authority ceiling."""
-    if type(receipt) is not dict:
-        return False
-    digest = receipt.get("receipt_sha256")
-    if type(digest) is not str or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
-        return False
-    body = dict(receipt)
-    body.pop("receipt_sha256", None)
-    authority = body.get("authority")
-    if type(authority) is not dict:
-        return False
-    if authority != {
-        "advisory_only": True,
-        "provider_application_authority": False,
-        "implementation_write_authority": False,
-        "submission_authority": False,
-        "payment_or_wallet_authority": False,
+    """Replay the retained provider observation; reject self-hashed semantic forgeries."""
+    if type(receipt) is not dict or set(receipt) != {
+        "schema", "disposition", "advisory_next_action", "reason_codes", "identity",
+        "provider_snapshot", "reward", "authority", "receipt_sha256",
     }:
         return False
-    return _sha256_json(body) == digest
+    identity = receipt.get("identity")
+    snapshot = receipt.get("provider_snapshot")
+    if type(identity) is not dict or set(identity) != {
+        "owner", "repo", "issue_number", "listing_url", "canonical_issue_url",
+    }:
+        return False
+    if type(snapshot) is not dict or set(snapshot) != {
+        "issue_state", "assigned_to", "actor_login", "actor_applied",
+        "application_count", "application_pressure_threshold", "linked_pr_urls",
+        "labels", "observed_at", "evaluated_at", "snapshot_age_seconds",
+        "max_snapshot_age_seconds",
+    }:
+        return False
+    try:
+        rebuilt = compile_grantfox_queue_gate({
+            "schema": receipt["schema"],
+            "listing_url": identity["listing_url"],
+            "canonical_issue_url": identity["canonical_issue_url"],
+            "actor_login": snapshot["actor_login"],
+            "assigned_to": snapshot["assigned_to"],
+            "actor_applied": snapshot["actor_applied"],
+            "issue_state": snapshot["issue_state"],
+            "application_count": snapshot["application_count"],
+            "application_pressure_threshold": snapshot["application_pressure_threshold"],
+            "linked_pr_urls": snapshot["linked_pr_urls"],
+            "labels": snapshot["labels"],
+            "observed_at": snapshot["observed_at"],
+            "evaluated_at": snapshot["evaluated_at"],
+            "max_snapshot_age_seconds": snapshot["max_snapshot_age_seconds"],
+        })
+    except (KeyError, GrantFoxQueueInputError):
+        return False
+    return rebuilt == receipt
 
 
 def format_summary(receipt: dict[str, Any]) -> str:
