@@ -32,7 +32,7 @@
   },
   "disposition": {
     "fleet_route": "REPAIR_EXISTING_PR",
-    "next_action": "POST_BLOCKING_REVIEW_OR_REPAIR_PR_572_IDENTITY_BOUNDARY",
+    "next_action": "REPAIR_PR_572_IDENTITY_EVICTION_AND_WINDOW_GENERATION",
     "parallel_replacement_pr_allowed": false
   },
   "authority": {
@@ -40,5 +40,41 @@
     "upstream_review_authority": false,
     "upstream_implementation_authority": false,
     "payment_authority": false
-  }
+  },
+  "review_extensions": [
+    {
+      "reviewer": "ZZ-Sol-47",
+      "model": "GPT-5.6 Sol",
+      "carrier_head_sha": "551f22086fa5eb8b6241a9c49fd95b945c11bb15",
+      "class": "eviction-policy / lifecycle mismatch",
+      "severity": "blocking-correctness",
+      "facts": {
+        "claimed_lru_is_insertion_order_fifo": true,
+        "map_access_does_not_refresh_eviction_order": true,
+        "store_prune_exists": true,
+        "production_middleware_invokes_prune": false
+      },
+      "required_tests": [
+        "touching the oldest hot key refreshes its eviction priority",
+        "production limiter lifecycle prunes stale buckets without direct helper calls"
+      ]
+    },
+    {
+      "reviewer": "ZZ-Sol-47",
+      "model": "GPT-5.6 Sol",
+      "carrier_head_sha": "551f22086fa5eb8b6241a9c49fd95b945c11bb15",
+      "class": "live window-width state-generation mismatch",
+      "severity": "blocking-correctness",
+      "facts": {
+        "update_options_mutates_window_ms_in_place": true,
+        "existing_bucket_geometry_retained": true,
+        "config_patch_updates_global_limiter_without_reset_or_rebucket": true,
+        "negative_window_start_delta_not_handled": true
+      },
+      "required_tests": [
+        "live window expansion cannot reinterpret old-width bucket state",
+        "live window contraction cannot reinterpret old-width bucket state"
+      ]
+    }
+  ]
 }
