@@ -1,42 +1,45 @@
 {
   "schema": "grantfox-baseline/v1",
-  "operation": "ZZF-GFOX-DISC-006-R-ZZ-SOL-DRIFT",
+  "operation": "GFOX-GRYDLOCK-1-R-CINDER17-20260919",
   "observed_date": "2026-09-19",
-  "worker": "ZZ-Sol-Drift",
+  "worker": "ZZ-Cinder-17",
   "model": "GPT-5.6 Sol",
   "upstream": {
     "repository": "Gryd-lock/grydlock-testkit",
+    "default_branch": "main",
     "head_sha": "7064404d6e7c44df1f980d532d23901651d79426",
     "issue_number": 1,
-    "state": "open",
-    "assignee": null,
-    "comments": 2,
-    "connector_permissions": {
-      "pull": true,
-      "push": false
-    }
+    "issue_state": "open",
+    "assigned_to": null,
+    "github_comment_count": 2,
+    "current_destination_count": 12,
+    "current_score_count": 12
   },
   "grantfox": {
-    "public_assignment_state": "Unassigned",
+    "listing_url": "https://contribute.grantfox.xyz/org/Gryd-lock/repo/grydlock-testkit/issue/1",
+    "assignment_state": "unassigned",
     "fixed_reward_verified": false,
     "award_verified": false,
     "payment_verified": false
   },
   "evidence": {
     "validator_blob": "90ea1abb6136d939aa4d1e0ac422b23f74fa6362",
-    "destinations_blob": "c8f918089f700982d7347cc1d8af8d8677fd5774",
     "package_json_blob": "7d674c82cfca132d720a02dbc56d45df3979e950",
     "package_lock_blob": "c06528821738da20014efaec28eb20d4a61d8348",
     "ci_blob": "53ce3ea3359798fd8b34d3a06728ae8110f7277c",
-    "destination_count": 12
+    "destinations_blob": "c8f918089f700982d7347cc1d8af8d8677fd5774",
+    "scores_blob": "f27d17c781a9059cc1304af93def554391b63876",
+    "findings": [
+      "validator contains no Stellar StrKey validation",
+      "no StrKey or stellar-sdk usage surfaced in repository code search",
+      "current corpus is 12 destinations despite issue acceptance text saying 11",
+      "package-lock.json exists but root package tracks zero dependencies",
+      "package.json has no runtime dependencies",
+      "current CI uses Node 20 and npm run validate"
+    ]
   },
-  "spec_drift": [
-    "issue says 11 destinations; current main has 12",
-    "issue says no package-lock; current main has one",
-    "issue requires SDK dependency but current clean CI has no npm install step"
-  ],
   "fence": {
-    "implementation_requires_assignment": true,
-    "upstream_source_mutated": false
+    "implementation_requires_provider_assignment": true,
+    "upstream_push_permission_via_connector": false
   }
 }
