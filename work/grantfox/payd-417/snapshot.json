@@ -1,0 +1,68 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-payd-417/R-source-provider-baseline",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Kestrel-V41",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Protocol-Guild/PayD",
+    "default_branch": "main",
+    "head_sha": "af5c348e83033ed3340e589b68e8554f0303060e",
+    "issue_number": 417,
+    "issue_state": "open",
+    "assigned_to": null,
+    "applicant_comment_count": 2,
+    "provider_assignment": "unassigned"
+  },
+  "targets": {
+    "EmployeeList.tsx": {
+      "blob": "735d5561e062187ad0121fc76f08817275fd88c0",
+      "inputs": 6,
+      "selects": 1,
+      "labels": 0,
+      "htmlFor": 0,
+      "placeholder_attributes": 5,
+      "clickable_sort_headers": 5
+    },
+    "RevenueSplitDashboard.tsx": {
+      "blob": "0ad565378fa66837d9d889a9c759d853e283243a",
+      "inputs": 2,
+      "labels": 0,
+      "htmlFor": 0,
+      "placeholder_attributes": 2
+    },
+    "AdminPanel.tsx": {
+      "blob": "f006db147bc281b66ac6bc7993a6430830cd9220",
+      "inputs": 14,
+      "labels": 14,
+      "htmlFor": 0,
+      "aria_labels": 0
+    },
+    "UpgradeConfirmModal.tsx": {
+      "blob": "ae1a22ac7716b9789ce80ff3e97bd0616b72af37",
+      "role_dialog": 0,
+      "aria_modal": 0,
+      "keydown_handlers": 0,
+      "aria_live": 0,
+      "clickable_divs": 2
+    }
+  },
+  "overlap": {
+    "open_pr": 611,
+    "state": "open",
+    "animated_modal_blob": "16bba4549d5275de5b7fdad68c68e9dc87789d2e",
+    "pr_upgrade_modal_blob": "db30ed09c33e9e7888016b436d505085fd2bd85c",
+    "modal_focus_escape_overlap": true,
+    "form_label_overlap": false
+  },
+  "disposition": {
+    "implementation_started": false,
+    "next_action": "WAIT_FOR_ASSIGNMENT_AND_REUSE_OPEN_MODAL_CARRIER",
+    "reason": "GrantFox unassigned; PR #611 overlaps modal focus/escape scope"
+  },
+  "reward": {
+    "fixed_amount_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  }
+}
