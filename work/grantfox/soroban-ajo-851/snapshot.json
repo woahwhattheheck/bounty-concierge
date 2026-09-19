@@ -1,0 +1,40 @@
+{
+  "schema": "grantfox-source-baseline/v1",
+  "identity": {
+    "owner": "Ajo-contrib",
+    "repo": "soroban-ajo",
+    "issue_number": 851
+  },
+  "upstream": {
+    "ref": "master",
+    "sha": "1b87ea7344ae3d871e54abff05eabe5113bd2956"
+  },
+  "github": {
+    "state": "OPEN",
+    "assignees": [],
+    "issue_comments": 0,
+    "open_pr_carriers": 0
+  },
+  "grantfox": {
+    "assignment": "Unassigned",
+    "comments": 0,
+    "apply_route": true
+  },
+  "blobs": {
+    "insurance": "cf1864c1243047d07a2e66952b936dc1bbac2677",
+    "types": "207c38fb98769d166f1a93f22f05240241345faa",
+    "storage": "2434706525a71819787ea17f4421ff64102b3505",
+    "security_tests": "ad7883958c16774a3db50baeeaef7840c2f307a5",
+    "security_audit_tests": "9033f536ece503e2620ecb890624d69e3bec459a"
+  },
+  "findings": [
+    "file_claim stores Pending amount but reserves only claim count",
+    "approved=true rechecks solvency and pays directly; no live Approved transition found",
+    "solvency scan charges Paid claims by filing created_at rather than settlement time",
+    "aged Pending claims can be paid after they fall outside the created_at window",
+    "last_epoch_reset and epoch_claimed_amount exist but are unused by the solvency path",
+    "high-fraud auto-reject bypasses the normal pending-count decrement path"
+  ],
+  "required_invariant": "active-epoch settled payouts plus live reserved liabilities must never exceed the epoch claimable budget",
+  "disposition": "APPLY_FOR_ASSIGNMENT"
+}
