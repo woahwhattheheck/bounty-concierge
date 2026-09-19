@@ -1,0 +1,103 @@
+{
+  "schema": "grantfox-source-baseline/v1",
+  "target": {
+    "repository": "Creditra/Creditra-Backend",
+    "issue": 300,
+    "title": "[GrantFox][High] Enforce a complete credit-line authorization matrix",
+    "source_branch": "main",
+    "source_sha": "70189f4a6e52f53c764123df760c2a1de39876ce"
+  },
+  "census": {
+    "issue_state": "open",
+    "github_assignees": 0,
+    "issue_comments": 5,
+    "open_prs_matching_issue_number": 0,
+    "grantfox_assignment": "unassigned",
+    "grantfox_apply_enabled": true,
+    "grantfox_application_mode": "direct_github_comment",
+    "grantfox_applications_per_user": 1,
+    "grantfox_visible_applicants": 5,
+    "slack_exact_repo_issue_hits_before_take": 0,
+    "upstream_pull": true,
+    "upstream_push": false,
+    "reward_amount_verified": false
+  },
+  "mutation_inventory": [
+    {"method":"POST","path":"/api/credit/lines","current_auth":"none"},
+    {"method":"PUT","path":"/api/credit/lines/:id","current_auth":"none"},
+    {"method":"DELETE","path":"/api/credit/lines/:id","current_auth":"none"},
+    {"method":"POST","path":"/api/credit/lines/:id/draw","current_auth":"none"},
+    {"method":"POST","path":"/api/credit/lines/:id/repay","current_auth":"none"},
+    {"method":"POST","path":"/api/credit/lines/:id/suspend","current_auth":"X-Admin-Api-Key"},
+    {"method":"POST","path":"/api/credit/lines/:id/close","current_auth":"X-Admin-Api-Key"}
+  ],
+  "source_evidence": [
+    {
+      "path": "src/routes/credit.ts",
+      "blob": "8bff0b996b0fee21ae65d7ceee4b9296dcf921a3",
+      "finding": "five of seven credit-line mutations have no auth middleware; suspend/close alone use adminAuth"
+    },
+    {
+      "path": "src/index.ts",
+      "blob": "09eb326a96de5d571c66ab9d439404361c3bc980",
+      "finding": "credit router is globally wrapped only by rate limiting; no global authentication layer protects missing mutation rules"
+    },
+    {
+      "path": "src/middleware/adminAuth.ts",
+      "blob": "c94f02a84250313319cd4c0e0847a9e81bb60d65",
+      "finding": "single global admin secret is validated but no actor, role or tenant principal is attached to request"
+    },
+    {
+      "path": "src/middleware/auth.ts",
+      "blob": "922ea281bf33595861d0a1d7bf399e45337fce3c",
+      "finding": "generic API-key middleware validates membership in a key set but attaches no identity/role/tenant principal"
+    },
+    {
+      "path": "src/middleware/tenantRateLimit.ts",
+      "blob": "66deec2c2c52ee6aa81419d6c632eebede393f78",
+      "finding": "rate-limit tenant defaults to caller-controlled x-tenant-id and must not be reused as authorization identity"
+    },
+    {
+      "path": "src/services/creditService.ts",
+      "blob": "8b356d98517eca194cfa0077d01f05006ab3d185",
+      "finding": "HTTP draw/repay submission audit identity comes from caller-supplied walletAddress; no authenticated principal is passed"
+    },
+    {
+      "path": "src/services/CreditLineService.ts",
+      "blob": "84bd11fd2b448040b30b0b0425d2db05e68d8418",
+      "finding": "CRUD has no audit principal; draw compares a supplied borrowerId to line owner, while repay ignores its walletAddress parameter"
+    },
+    {
+      "path": "src/services/auditLedger.ts",
+      "blob": "c87b7e58eff8e0fffcf64d0c420837078f282597",
+      "finding": "ledger already requires actor and tenant fields, providing a sink once trusted principal identity exists"
+    },
+    {
+      "path": "src/__test__/creditRoute.test.ts",
+      "blob": "99680bec97cec5fbf1334436fa0dc3214e17f3be",
+      "finding": "route suite mocks adminAuth and defaults it to allow; it cannot prove the real shared matrix"
+    },
+    {
+      "path": "src/__tests__/credit.test.ts",
+      "blob": "ebe963fb8df0b61a8500ea067493676b43870226",
+      "finding": "real middleware integration covers suspend/close only; no authorization tests exist for the five unauthenticated mutations"
+    },
+    {
+      "path": "docs/SECURITY.md",
+      "blob": "c2be34bed37a32e9fa3b3e7c22ca9ee1465375c0",
+      "finding": "security model explicitly says no JWT/cookie auth ships and documents only integration-api-key and admin roles"
+    }
+  ],
+  "disposition": {
+    "source_gap_confirmed": true,
+    "authenticated_borrower_lender_principal_missing": true,
+    "unauthenticated_credit_mutations": 5,
+    "admin_only_credit_mutations": 2,
+    "caller_controlled_audit_actor_present": true,
+    "route_inventory_test_required": true,
+    "implementation_ready_after_assignment_and_identity_policy_confirmation": true,
+    "upstream_source_mutation_performed": false,
+    "provider_application_performed": false,
+    "implementation_fenced_pending_assignment": true
+  }
+}
