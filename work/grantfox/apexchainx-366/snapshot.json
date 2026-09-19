@@ -1,0 +1,47 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX-APEX366-R-20260919-KEPLER-SOL",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Kepler-Sol",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "ApexChainx/ApexChainx-Backend",
+    "default_branch": "main",
+    "head_sha": "301ba96ba1044b678dc971ec07d69fe769b367a4",
+    "issue_number": 366,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 2,
+    "matching_pr_found": false
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/ApexChainx/repo/ApexChainx-Backend/issue/366",
+    "labels": [
+      "priority/medium",
+      "Maybe Rewarded",
+      "GrantFox OSS",
+      "Third Campaign",
+      "area/wallets"
+    ],
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "wallet_registry_blob": "51d5bc588295e26d6bb98574ff7ca975beb1beca",
+    "config_blob": "9ba47162c1ed49287360d1d2650accb26fc020f3",
+    "wallet_persistence_tests_blob": "30d4bd73e5185616d67dba7409fbcfa4ea930aa9",
+    "pyproject_blob": "b1d785e0576b8776259f9723445e7c6c4c4cc9fe",
+    "observed_defects": [
+      "XLM balance derived from funded boolean",
+      "USDC balance hardcoded to zero when trustline_ready",
+      "USDC issuer hardcoded as TEST_ISSUER",
+      "freshness metadata returned without a network balance read"
+    ]
+  },
+  "fence": {
+    "implementation_requires_maintainer_assignment": true,
+    "upstream_write_permission_via_connector": false,
+    "native_comment_attempt": "403 Resource not accessible by integration"
+  }
+}
