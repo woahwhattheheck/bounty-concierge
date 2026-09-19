@@ -1,0 +1,94 @@
+{
+  "schema": "grantfox-hosted-observation/v1",
+  "operation": "GFOX3-20260919-chenaikit-323/R-hosted-observation",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Alder-74",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "nexoraorg/chenaikit",
+    "pinned_main": "2653a3f1d670828068c3c3692d2c7834d2e8bf15",
+    "backend_workflow_blob": "9232e4c9e3a24c81ac87c0109f999bbf065ab972",
+    "contracts_workflow_blob": "c2408222213394473efa49b8641ff97b13757e9b"
+  },
+  "backend_observation": {
+    "run_id": 35115123373,
+    "workflow_sequence": 392,
+    "commit": "2653a3f1d670828068c3c3692d2c7834d2e8bf15",
+    "run_duration_seconds": 26,
+    "jobs": [
+      {
+        "name": "Lint, typecheck, test, build",
+        "job_id": 104858473993,
+        "duration_seconds": 22,
+        "pnpm_cache_status": "miss",
+        "setup_node_message": "pnpm cache is not found",
+        "install_reported_seconds": 8.3,
+        "pnpm_version": "9.15.9",
+        "project_node_version": "22.23.2",
+        "conclusion": "failure",
+        "failure_stage": "Lint"
+      },
+      {
+        "name": "Shared packages build",
+        "job_id": 104858474388,
+        "duration_seconds": 22,
+        "pnpm_cache_status": "miss",
+        "setup_node_message": "pnpm cache is not found",
+        "install_reported_seconds": 7,
+        "pnpm_version": "9.15.9",
+        "project_node_version": "22.23.2",
+        "conclusion": "success"
+      }
+    ],
+    "proves_clean_miss_acceptance": false,
+    "warm_comparator_claimed": false
+  },
+  "cargo_observation": {
+    "latest_relevant_main_run_id": 35109371797,
+    "workflow_sequence": 30,
+    "commit": "cd4d5ab15f5a3d6da65bdce70d5b84ab0c1c0e1b",
+    "total_duration_seconds": 63,
+    "job_id": 104838766926,
+    "job_duration_seconds": 58,
+    "exact_key": "cargo-Linux-e02edc50ccf9a27d9f771a6a297fa194b767c4f541c40fec36341ab14943718c",
+    "cache_status": "miss",
+    "conclusion": "failure",
+    "failure_stage": "Clippy",
+    "standalone_dependency_install_duration_available": false,
+    "proves_clean_miss_acceptance": false
+  },
+  "fallback_restore_evidence": [
+    {
+      "run_id": 33362300082,
+      "job_id": 99395875530,
+      "requested_key": "cargo-Linux-c4248faf11996cce9ecb0671a74f8dda770d6de2f01a6cfedc27ecced4e29254",
+      "restored_key": "cargo-Linux-0586edde93bffb421fcb02feebeef9216fbf7a991dd7fe76dfb23c3414fc17c4",
+      "restored_bytes": 596649882,
+      "exact_key_match": false
+    },
+    {
+      "run_id": 33362276058,
+      "job_id": 99395798738,
+      "requested_key": "cargo-Linux-c4248faf11996cce9ecb0671a74f8dda770d6de2f01a6cfedc27ecced4e29254",
+      "restored_key": "cargo-Linux-0586edde93bffb421fcb02feebeef9216fbf7a991dd7fe76dfb23c3414fc17c4",
+      "restored_bytes": 596649882,
+      "exact_key_match": false
+    }
+  ],
+  "finding": "OS-only Cargo restore prefix demonstrably restores a ~569 MB older cache under a different exact key while contracts/target is in the cached payload.",
+  "acceptance": {
+    "pnpm_cold_miss_observed": true,
+    "pnpm_clean_miss_green": false,
+    "pnpm_warm_hit_observed_on_same_revision": false,
+    "cargo_cold_miss_observed": true,
+    "cargo_clean_miss_green": false,
+    "cargo_cross_exact_key_restore_observed": true,
+    "controlled_invalidation_proof_complete": false
+  },
+  "authority": {
+    "upstream_mutation": false,
+    "provider_application": false,
+    "provider_assignment": false,
+    "payment_or_wallet": false
+  }
+}
