@@ -1,0 +1,73 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX-QUASAR-A3/R-signing-context-trust-boundary",
+  "worker": "ZZ-Solstice-69",
+  "model": "GPT-5.6 Sol",
+  "observed_date": "2026-09-19",
+  "upstream": {
+    "repository": "CalloraOrg/Callora-Frontend",
+    "head_sha": "cbf382eadb26d863a82694ae36cc85ced20b4d51",
+    "issue_number": 986,
+    "issue_state": "open",
+    "assignee": null,
+    "issue_comment_count": 5,
+    "open_issue986_prs_observed": 0,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "source_evidence": {
+    "package_blob": "f9ad9483b2c75cfaedb6e34f72b97e2bf7fd798b",
+    "app_blob": "d3917c3dd750ac37fbe95d5aaac09c96360ee2f0",
+    "account_context_blob": "3e039c68ad8077022397641345736c749e1f697c",
+    "account_store_blob": "bbc95a1f7cbcf3ef1489e3fd1962f606025ca6f0",
+    "constants_blob": "c65c8fe731e034a59bd4a52cd2c0a5abf02e2fc4",
+    "deposit_preview_blob": "1eaca83c8d7ae9343e70de4ba55b80081d05cbe8",
+    "deposit_preview_test_blob": "90e2033fc0c389e6a19a06e8e92e2c5e3d514b5a",
+    "stellar_wallet_dependency_present": false,
+    "real_sign_call_present": false,
+    "real_submit_call_present": false,
+    "deposit_hash_is_mock": true,
+    "current_account_model_is_stellar_public_key": false,
+    "canonical_network_passphrase_modeled": false
+  },
+  "adjacent_dependency": {
+    "issue_number": 979,
+    "title": "[GrantFox][High] Implement a deterministic wallet transaction state machine",
+    "state_observed": "open",
+    "assignee_observed": null,
+    "pr_census": "UNKNOWN_SECONDARY_RATE_LIMIT",
+    "github_error": "HTTP 403 secondary rate limit during follow-up PR census"
+  },
+  "disposition": {
+    "implementation_ready": false,
+    "reason": "No real wallet/signing/submission boundary exists on current main; expected wallet account/network/destination authority is undefined.",
+    "maintainer_decisions_required": [
+      "canonical wallet/provider",
+      "expected Stellar source-account authority mapping",
+      "supported network identity/passphrase set",
+      "real transaction builder/deposit destination",
+      "scope relationship to issue 979"
+    ]
+  },
+  "required_contract": {
+    "immutable_signing_intent": true,
+    "final_wallet_snapshot_recheck": true,
+    "fail_closed_on_account_or_network_mismatch": true,
+    "switch_invalidates_old_intent": true,
+    "fresh_confirmation_after_switch": true,
+    "zero_sign_and_submit_on_failure": true,
+    "summary_derived_from_signable_transaction": true,
+    "stale_attempt_completion_ignored": true
+  },
+  "fence": {
+    "upstream_source_mutated": false,
+    "wallet_action_performed": false,
+    "transaction_signed": false,
+    "transaction_submitted": false,
+    "provider_application_submitted": false,
+    "assignment_claimed": false,
+    "reward_or_payment_claimed": false
+  }
+}
