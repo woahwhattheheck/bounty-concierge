@@ -73,12 +73,18 @@ def compile_activation(request: dict[str, Any]) -> dict[str, Any]:
     if not verify_continuity_receipt(continuity):
         raise GrantFoxActivationInputError("continuity_receipt does not verify")
 
-    qid = _identity(queue, "queue_receipt", actor=True)
+    qid = _identity(queue, "queue_receipt", actor=False)
     sid = _identity(source, "source_receipt", actor=False)
     cid = _identity(continuity, "continuity_receipt", actor=True)
     if qid[:3] != sid[:3] or qid[:3] != cid[:3]:
         raise GrantFoxActivationInputError("receipts identify different issues")
-    if qid[3] != cid[3]:
+
+    provider_snapshot = _obj(queue.get("provider_snapshot"), "queue_receipt.provider_snapshot")
+    queue_actor = _text(
+        provider_snapshot.get("actor_login"),
+        "queue_receipt.provider_snapshot.actor_login",
+    ).casefold()
+    if queue_actor != cid[3]:
         raise GrantFoxActivationInputError("queue and continuity actors differ")
 
     queue_digest = _text(queue.get("receipt_sha256"), "queue_receipt.receipt_sha256")
@@ -149,7 +155,7 @@ def compile_activation(request: dict[str, Any]) -> dict[str, Any]:
             "owner": qid[0],
             "repo": qid[1],
             "issue_number": qid[2],
-            "actor_login": qid[3],
+            "actor_login": queue_actor,
         },
         "anchors": {
             "queue_receipt_sha256": queue_digest,
