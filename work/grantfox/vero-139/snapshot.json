@@ -1,0 +1,58 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-vero-139/R-storage-compat-census",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Rook-73",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Vero-protocol/vero-core-contracts",
+    "default_branch": "main",
+    "head_sha": "bad5c54092afdf3285bd60998341a1c27ec0eab6",
+    "issue_number": 139,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 2,
+    "matching_pr_found": false,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Vero-protocol/repo/vero-core-contracts/issue/139",
+    "assignment": "unassigned",
+    "labels": [
+      "good first issue",
+      "Maybe Rewarded",
+      "GrantFox OSS",
+      "Third Campaign"
+    ],
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "storage_layout_blob": "625e0003644f2057d0fb8b608c43df6a2aa4ea3a",
+    "voting_blob": "9ac20f707ef387d4f1a4334a3dd1d43bb90c95dc",
+    "storage_blob": "a6d2685cbc4b83e2407bc68a48826a2d25383b92",
+    "task_blob": "74d72365c5655ac73fca7815a57a78de3af72891",
+    "types_blob": "fdeccc20980bd625b959aef7c21ed8f717afe9b5",
+    "migrate_blob": "2b6229548d5cbfc8ccab95915e2629fa85cb03aa",
+    "observations": [
+      "AllVotes is defined in canonical DataKey",
+      "inspected vote/storage/task/migration paths do not read or write AllVotes",
+      "votes are tracked with Voted(task_id, guardian) and TaskVoters(task_id)",
+      "purge removes Voted and TaskVoters records rather than a global vote index",
+      "Soroban contracttype unit/tuple enums encode variant names as Symbols rather than ordinal positions"
+    ]
+  },
+  "recommendation": {
+    "preferred": "remove_dead_variant_after_latest-head-and-history-check",
+    "add_encoding_regression": true,
+    "do_not_invent_global_vote_index_without_consumer": true
+  },
+  "fence": {
+    "implementation_requires_provider_or_maintainer_assignment": true,
+    "upstream_mutated": false
+  }
+}
