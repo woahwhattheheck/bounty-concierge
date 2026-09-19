@@ -77,6 +77,12 @@ def dependency(number=27, state="open", **overrides):
         "state": state,
         "observed_at": "2026-09-19T22:01:00Z",
         "basis": "Issue #33 explicitly says to build on describe-transactions tooling.",
+        "completion": {
+            "status": "UNKNOWN" if state == "open" else "LANDED",
+            "merged_pr_url": None if state == "open" else "https://github.com/Gryd-lock/grydlock-testkit/pull/44",
+            "merge_commit_sha": None if state == "open" else "b" * 40,
+            "observed_at": "2026-09-19T22:01:10Z",
+        },
     }
     item.update(overrides)
     return item
@@ -128,6 +134,62 @@ class GrantFoxDependencyReadinessTests(unittest.TestCase):
         )
         self.assertEqual(receipt["dependency_disposition"], "HOLD")
         self.assertIn("SOURCE_NOT_ALIGNED", receipt["reason_codes"])
+
+    def test_closed_without_landed_completion_holds(self):
+        for completion_status in ("NOT_LANDED", "UNKNOWN"):
+            item = dependency(state="closed")
+            item["completion"] = {
+                "status": completion_status,
+                "merged_pr_url": None,
+                "merge_commit_sha": None,
+                "observed_at": "2026-09-19T22:01:10Z",
+            }
+            receipt = compile_grantfox_dependency_readiness(request(dependencies=[item]))
+            with self.subTest(completion_status=completion_status):
+                self.assertEqual(receipt["dependency_disposition"], "HOLD")
+                self.assertIn(
+                    "PREREQUISITE_CLOSED_WITHOUT_LANDED_EVIDENCE",
+                    receipt["reason_codes"],
+                )
+                self.assertEqual(
+                    receipt["advisory_next_action"],
+                    "PROVE_PREREQUISITE_CAPABILITY_LANDED",
+                )
+
+    def test_landed_completion_requires_same_repo_canonical_pr_and_merge_sha(self):
+        item = dependency(state="closed")
+        item["completion"]["merged_pr_url"] = "https://github.com/Other/repo/pull/44"
+        with self.assertRaisesRegex(
+            GrantFoxDependencyReadinessInputError, "must reference a PR"
+        ):
+            compile_grantfox_dependency_readiness(request(dependencies=[item]))
+
+        item = dependency(state="closed")
+        item["completion"]["merge_commit_sha"] = "ABC"
+        with self.assertRaisesRegex(
+            GrantFoxDependencyReadinessInputError, "40 lowercase hex"
+        ):
+            compile_grantfox_dependency_readiness(request(dependencies=[item]))
+
+    def test_non_landed_completion_cannot_smuggle_merge_evidence(self):
+        item = dependency(state="closed")
+        item["completion"] = {
+            "status": "NOT_LANDED",
+            "merged_pr_url": "https://github.com/Gryd-lock/grydlock-testkit/pull/44",
+            "merge_commit_sha": "b" * 40,
+            "observed_at": "2026-09-19T22:01:10Z",
+        }
+        with self.assertRaisesRegex(
+            GrantFoxDependencyReadinessInputError, "must not claim merge evidence"
+        ):
+            compile_grantfox_dependency_readiness(request(dependencies=[item]))
+
+    def test_stale_completion_snapshot_holds(self):
+        item = dependency(state="closed")
+        item["completion"]["observed_at"] = "2026-09-19T21:00:00Z"
+        receipt = compile_grantfox_dependency_readiness(request(dependencies=[item]))
+        self.assertEqual(receipt["dependency_disposition"], "HOLD")
+        self.assertIn("DEPENDENCY_SNAPSHOT_STALE", receipt["reason_codes"])
 
     def test_stale_dependency_snapshot_holds(self):
         receipt = compile_grantfox_dependency_readiness(
