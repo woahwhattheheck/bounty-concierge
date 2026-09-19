@@ -1,0 +1,40 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "ZZ-SOL-DRIFT-BONI385-R",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Drift",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Bonizozo/stellar-tipjar-backend",
+    "head_sha": "a9f477c45a3b6bb835c8b75286b7ec723da82795",
+    "issue_number": 385,
+    "state": "open",
+    "assignee": null,
+    "comments": 3,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "public_assignment_state": "Unassigned",
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "ai_detector_blob": "42fe33189d21a226ea507635c78f6efc2c9201b6",
+    "moderation_blob": "f757d415e89dc04d94ef655c83952a45ba6d1347",
+    "cargo_blob": "329b08ace3c74db2cd4376f9f34931d85d3e3716",
+    "prompt_injection_live": true,
+    "current_message_max_chars": 280,
+    "output_max_tokens": 512,
+    "write_rate_default_per_second": 2,
+    "write_rate_default_burst": 5,
+    "handoff_unbounded_input_finding_stale": true
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "upstream_source_mutated": false
+  }
+}
