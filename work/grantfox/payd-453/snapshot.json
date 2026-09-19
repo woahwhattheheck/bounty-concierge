@@ -1,0 +1,52 @@
+{
+  "schema": "grantfox-source-baseline/v1",
+  "identity": {
+    "owner": "Protocol-Guild",
+    "repo": "PayD",
+    "issue_number": 453
+  },
+  "upstream": {
+    "ref": "main",
+    "sha": "af5c348e83033ed3340e589b68e8554f0303060e",
+    "connector_pull": true,
+    "connector_push": false
+  },
+  "provider_observation": {
+    "observed_at": "2026-09-19T18:44:04-04:00",
+    "assignment": "unassigned",
+    "application_route": "direct_github_comment",
+    "applications_observed": 2,
+    "applications_per_user": 1,
+    "fleet_receipt": "https://tokenjunkielabs.slack.com/archives/C0BVANHNB26/p1789857844181929"
+  },
+  "carrier_census": {
+    "open_pr_match_for_issue": false
+  },
+  "source_blobs": {
+    "bulk_payment_lib": "84eb1a15b6814b47564a595d2db2b8ec8dd812d2",
+    "bulk_payment_tests": "7940c3c7bca049d2571c87ddbde892fc34b7c111",
+    "bulk_payment_cargo": "419d7e39b09fe79b047c3fd1e6af73110f0cd63f",
+    "cross_asset_payment_lib": "c5715147e06fbdfdab70115d68e7a8e259f34791",
+    "cross_asset_payment_tests": "e4f28753bde783f3d22b5d942af81ee67e91a28a",
+    "cross_asset_payment_cargo": "183ce6e0d748917f8fdde206b5d8cd906da1686b"
+  },
+  "findings": [
+    "bulk_payment retains sender in BatchRecord but indexes only global BatchCount and Batch(id)",
+    "cross_asset_payment retains sender in PaymentRecord but indexes only global PaymentCount and Payment(id)",
+    "global-count scans would be O(global history) and read unrelated senders",
+    "one unbounded Vec per sender would violate the issue's storage/read-limit constraint",
+    "bounded per-sender ordinal-to-global-id indexing gives O(limit) listing independent of global history",
+    "cross_asset_payment records use persistent storage with PAYMENT_TTL_LEDGERS=518400, so index retention must be defined consistently",
+    "a forward-only new index does not automatically enumerate records created before contract upgrade",
+    "backend ContractEventIndexer is separate event indexing and does not satisfy contract-state enumeration"
+  ],
+  "proposed_contract": {
+    "index_shape": "sender-local count plus sender ordinal to existing global ID",
+    "read_shape": "bounded list IDs by sender/start/limit",
+    "complexity": "O(limit) reads with a fixed contract cap",
+    "preserve_existing_global_ids": true,
+    "return_full_records": false
+  },
+  "disposition": "SOURCE_CONFIRMED_READY_FOR_ASSIGNMENT",
+  "upstream_implementation_authorized": false
+}
