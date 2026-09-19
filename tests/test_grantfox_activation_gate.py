@@ -204,6 +204,36 @@ class ActivationGateTests(unittest.TestCase):
         rehash_activation(forged)
         self.assertFalse(verify_activation_receipt(forged))
 
+    def test_rehashed_native_queue_forgery_is_rejected_before_activation(self):
+        payload = native_request()
+        forged_queue = deepcopy(payload["queue_receipt"])
+        forged_queue["provider_snapshot"]["assigned_to"] = "woahwhattheheck"
+        forged_queue["provider_snapshot"]["actor_applied"] = True
+        forged_queue["disposition"] = "IMPLEMENTATION_ELIGIBLE"
+        forged_queue["advisory_next_action"] = "IMPLEMENT_ASSIGNED_SCOPE"
+        body = dict(forged_queue)
+        body.pop("receipt_sha256")
+        forged_queue["receipt_sha256"] = hashlib.sha256(
+            json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        ).hexdigest()
+        payload["queue_receipt"] = forged_queue
+        with self.assertRaisesRegex(GrantFoxActivationInputError, "queue_receipt does not verify"):
+            compile_activation(payload)
+
+    def test_rehashed_native_continuity_forgery_is_rejected_before_activation(self):
+        payload = native_request()
+        forged = deepcopy(payload["continuity_receipt"])
+        forged["state"] = "ASSIGNED"
+        forged["disposition"] = "CONTINUE"
+        body = dict(forged)
+        body.pop("receipt_sha256")
+        forged["receipt_sha256"] = hashlib.sha256(
+            json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        ).hexdigest()
+        payload["continuity_receipt"] = forged
+        with self.assertRaisesRegex(GrantFoxActivationInputError, "continuity_receipt does not verify"):
+            compile_activation(payload)
+
     def test_source_drift_requires_replan_before_apply(self):
         receipt = self.compile(request(source_disposition="SOURCE_DRIFT_REPLAN"))
         self.assertEqual(receipt["disposition"], "REPLAN_BEFORE_APPLY")
