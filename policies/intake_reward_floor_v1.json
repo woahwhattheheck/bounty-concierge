@@ -1,0 +1,5 @@
+{
+  "schema": "intake-reward-floor-policy/v1",
+  "active_floor_usd": "50",
+  "pile_floor_usd": "10"
+}
