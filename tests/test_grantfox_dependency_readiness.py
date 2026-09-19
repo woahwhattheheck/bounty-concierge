@@ -207,6 +207,34 @@ class GrantFoxDependencyReadinessTests(unittest.TestCase):
             "DEPENDENCY_SNAPSHOT_STALE", receipt["reason_codes"]
         )
 
+    def test_fresh_landed_dependency_cannot_clear_stale_source_and_queue(self):
+        item = dependency(state="closed")
+        item["observed_at"] = "2026-09-19T23:29:00Z"
+        item["completion"]["observed_at"] = "2026-09-19T23:29:10Z"
+        receipt = compile_grantfox_dependency_readiness(
+            request(
+                dependencies=[item],
+                evaluated_at="2026-09-19T23:30:00Z",
+            )
+        )
+        self.assertEqual(receipt["dependency_disposition"], "HOLD")
+        self.assertEqual(
+            receipt["advisory_next_action"],
+            "REFRESH_SOURCE_READINESS_BEFORE_DEPENDENCY_CLEARANCE",
+        )
+        self.assertIn(
+            "SOURCE_SNAPSHOT_STALE_AT_DEPENDENCY_EVALUATION",
+            receipt["reason_codes"],
+        )
+        self.assertIn(
+            "QUEUE_RECEIPT_STALE_AT_DEPENDENCY_EVALUATION",
+            receipt["reason_codes"],
+        )
+        freshness = receipt["evidence"]["source_freshness_at_evaluation"]
+        self.assertTrue(freshness["source_snapshot_stale"])
+        self.assertTrue(freshness["queue_snapshot_stale"])
+        self.assertTrue(verify_dependency_readiness_receipt(receipt))
+
     def test_cross_repo_dependency_is_rejected(self):
         with self.assertRaisesRegex(
             GrantFoxDependencyReadinessInputError,
