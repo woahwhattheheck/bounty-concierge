@@ -171,7 +171,38 @@ def _declared_dependencies(dependency_receipt: dict[str, Any]) -> list[dict[str,
             f"dependency_receipt.evidence.dependencies[{index}].state",
             max_chars=16,
         ).casefold()
-        result.append({"issue_number": number, "state": state})
+        completion = _require_object(
+            item.get("completion"),
+            f"dependency_receipt.evidence.dependencies[{index}].completion",
+        )
+        completion_status = _require_string(
+            completion.get("status"),
+            f"dependency_receipt.evidence.dependencies[{index}].completion.status",
+            max_chars=24,
+        ).upper()
+        merged_pr_url = completion.get("merged_pr_url")
+        merge_commit_sha = completion.get("merge_commit_sha")
+        if completion_status == "LANDED":
+            merged_pr_url = _require_string(
+                merged_pr_url,
+                f"dependency_receipt.evidence.dependencies[{index}].completion.merged_pr_url",
+                max_chars=512,
+            )
+            merge_commit_sha = _require_sha(
+                merge_commit_sha,
+                f"dependency_receipt.evidence.dependencies[{index}].completion.merge_commit_sha",
+            )
+        result.append(
+            {
+                "issue_number": number,
+                "state": state,
+                "completion": {
+                    "status": completion_status,
+                    "merged_pr_url": merged_pr_url,
+                    "merge_commit_sha": merge_commit_sha,
+                },
+            }
+        )
     return result
 
 
@@ -180,7 +211,7 @@ def _normalize_landings(
     *,
     owner: str,
     repo: str,
-    dependency_numbers: set[int],
+    dependencies_by_issue: dict[int, dict[str, Any]],
     evaluated_at: datetime,
     max_age: int,
 ) -> tuple[list[dict[str, Any]], bool]:
@@ -230,9 +261,15 @@ def _normalize_landings(
             )
 
         number = _require_positive_int(item.get("issue_number"), f"{field}.issue_number")
-        if number not in dependency_numbers:
+        if number not in dependencies_by_issue:
             raise GrantFoxDependencyFulfillmentInputError(
                 f"{field} references undeclared prerequisite issue #{number}"
+            )
+        upstream = dependencies_by_issue[number]
+        completion = upstream["completion"]
+        if completion["status"] != "LANDED":
+            raise GrantFoxDependencyFulfillmentInputError(
+                f"{field} requires upstream completion.status LANDED"
             )
         if number in seen:
             raise GrantFoxDependencyFulfillmentInputError(
@@ -282,6 +319,18 @@ def _normalize_landings(
             raise GrantFoxDependencyFulfillmentInputError(
                 f"{field}.evidence_url must equal {expected_url}"
             )
+
+        upstream_sha = completion["merge_commit_sha"]
+        if landed_sha != upstream_sha:
+            raise GrantFoxDependencyFulfillmentInputError(
+                f"{field}.landed_commit_sha must equal upstream completion.merge_commit_sha"
+            )
+        if kind == "merged_pull_request":
+            upstream_pr_url = completion["merged_pr_url"]
+            if expected_url.casefold() != upstream_pr_url.casefold():
+                raise GrantFoxDependencyFulfillmentInputError(
+                    f"{field} merged PR must equal upstream completion.merged_pr_url"
+                )
 
         observed_raw = _require_string(
             item.get("observed_at"), f"{field}.observed_at", max_chars=64
@@ -333,6 +382,9 @@ def compile_grantfox_dependency_fulfillment(request: dict[str, Any]) -> dict[str
     owner, repo, issue_number = _identity(dependency_receipt)
     dependencies = _declared_dependencies(dependency_receipt)
     dependency_numbers = {item["issue_number"] for item in dependencies}
+    dependencies_by_issue = {
+        item["issue_number"]: item for item in dependencies
+    }
 
     evaluated_raw = _require_string(
         request.get("evaluated_at"), "evaluated_at", max_chars=64
@@ -346,7 +398,7 @@ def compile_grantfox_dependency_fulfillment(request: dict[str, Any]) -> dict[str
         request.get("landings", []),
         owner=owner,
         repo=repo,
-        dependency_numbers=dependency_numbers,
+        dependencies_by_issue=dependencies_by_issue,
         evaluated_at=evaluated_at,
         max_age=max_age,
     )
