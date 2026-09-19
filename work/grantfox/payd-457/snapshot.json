@@ -1,0 +1,58 @@
+{
+  "schema": "grantfox-source-baseline/v1",
+  "target": {
+    "repository": "Protocol-Guild/PayD",
+    "issue": 457,
+    "title": "withdrawal.ts swallows all backend errors and silently falls back to fabricated mock data",
+    "source_branch": "main",
+    "source_sha": "af5c348e83033ed3340e589b68e8554f0303060e"
+  },
+  "census": {
+    "issue_state": "open",
+    "github_assignees": 0,
+    "issue_comments": 2,
+    "grantfox_assignment": "unassigned",
+    "grantfox_apply_enabled": true,
+    "grantfox_application_mode": "direct_github_comment",
+    "grantfox_applications_per_user": 1,
+    "slack_exact_repo_issue_hits_before_take": 0,
+    "upstream_pull": true,
+    "upstream_push": false,
+    "reward_amount_verified": false
+  },
+  "source_evidence": [
+    {
+      "path": "frontend/src/services/withdrawal.ts",
+      "blob": "633d2dcfff23edffa900d4501d387999817b6906",
+      "finding": "all four service methods catch backend failures and substitute mock anchors, transaction data, status, or cancellation success"
+    },
+    {
+      "path": "frontend/src/hooks/useWithdrawal.ts",
+      "blob": "09dd0fc3b2be90f3bdc8ffab8556d940325dd7ea",
+      "finding": "hook already owns visible error state for anchor load, initiation, polling, and cancellation failures"
+    },
+    {
+      "path": "frontend/src/components/WithdrawalFlow.tsx",
+      "blob": "a19daaa65386dd90f265226db1a5d335faa3c11b",
+      "finding": "post-await success callback uses stale state.step closure and can run after failed initiation"
+    },
+    {
+      "path": "frontend/src/pages/EmployeePortal.tsx",
+      "blob": "28075699ed06b95627f63336a3de32bc22f73189",
+      "finding": "withdrawal success callback refreshes portal data, so false-success invocation currently triggers success-side behavior"
+    },
+    {
+      "path": "frontend/package.json",
+      "blob": "33e58d67eca11b200b6988835b1f8450f179d2c2",
+      "finding": "Vitest dependency exists but frontend scripts expose build/lint and Playwright E2E only; no unit-test script is wired"
+    }
+  ],
+  "disposition": {
+    "source_gap_confirmed": true,
+    "additional_false_success_callback_seam_confirmed": true,
+    "implementation_ready_after_assignment_recensus": true,
+    "upstream_source_mutation_performed": false,
+    "provider_application_performed": false,
+    "implementation_fenced_pending_assignment": true
+  }
+}
