@@ -1,0 +1,63 @@
+{
+  "schema": "grantfox-source-residual/v1",
+  "upstream": {
+    "repository": "Axionvera/pocketpay-mobile",
+    "issue_number": 322,
+    "issue_title": "Add mobile transaction status refresh action",
+    "state": "open",
+    "comments": 0,
+    "assignees": [],
+    "labels": [
+      "Maybe Rewarded",
+      "GrantFox OSS",
+      "Official Campaign | FWC26"
+    ],
+    "matching_open_prs": [],
+    "canonical_main": "c3a24abacb45030eb4fef41aabc46b312aaf54a3",
+    "permissions_observed": {
+      "pull": true,
+      "push": false,
+      "admin": false,
+      "maintain": false,
+      "triage": false
+    }
+  },
+  "source_blobs": {
+    "src/store/walletStore.ts": "6ee485a9c9d2ffe3bb80b1e70c4bf720fcfbec81",
+    "app/transaction/[id].tsx": "99113180ff6069476d518d9a8f67bce9eda3c5f2",
+    "src/services/stellar.ts": "3cbe4124bbefb3f7a6539fdaef2502f84921715f",
+    "src/features/transactions/helpers.ts": "67a53fad9ce9712dc4fa83b510f99855513c5944",
+    "src/features/transactions/types.ts": "467e0d842302f627b73e61a82c7e0b7948157efa",
+    "src/components/PendingTransactionQueue.tsx": "5832221364ce3bfc73be5f13d8f1805f43c06cb4",
+    "src/components/TransactionListItem.tsx": "6672b248a4c96b3460b4aefd1c821f5bbd082b4f",
+    "app/(tabs)/history.tsx": "052c0da3373ea7d7d91ddcaf19c3cee34de44cc4",
+    "src/utils/paymentErrors.ts": "e2ea5ba2748db82af1b19bb9be6d800fbd0b36e8"
+  },
+  "prior_lineage": {
+    "optimistic_pending_commit": "d9ce9057b16077b079a1b0b1b2f1cc49c5e36a1b",
+    "pending_queue_commit": "06809d1f92834434e3a06c5f43f731214ec6b444"
+  },
+  "disposition": "SOURCE_REAL_PARTIALLY_IMPLEMENTED",
+  "residuals": [
+    "detail/shared status resolver ignores local status:'pending' while History list honors it",
+    "optimistic record id is transaction hash but detail network fallback is operation-id lookup",
+    "no typed transaction-by-hash status probe",
+    "404/network uncertainty must preserve pending rather than imply failure",
+    "direct detail refresh must reconcile one hash without resubmission or duplicate rows"
+  ],
+  "implementation_invariants": [
+    "single canonical status authority across History and Detail",
+    "transaction hash status uses Horizon transaction endpoint, not operation endpoint",
+    "only definitive ledger evidence transitions pending to confirmed or failed",
+    "not-found and transport errors preserve nonterminal status",
+    "hash-keyed reconciliation is idempotent and stale-response safe",
+    "refresh never retries/submits the payment",
+    "reuse existing PendingTransactionQueue"
+  ],
+  "authority": {
+    "provider_application": false,
+    "provider_assignment": false,
+    "upstream_write": false,
+    "reward_or_payment": false
+  }
+}
