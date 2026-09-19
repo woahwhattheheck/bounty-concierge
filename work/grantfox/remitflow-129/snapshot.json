@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "work_order": "GFOX3-20260919-remitflow-remitflow-backend-129",
+  "upstream": {
+    "repo": "RemitFlow/RemitFlow-Backend",
+    "issue": 129,
+    "issue_state": "open",
+    "github_assigned": false,
+    "audited_main": "b0a004ab8aa00b1e6f262aa84ea2b0ec0a622e1b",
+    "permissions": {
+      "pull": true,
+      "push": false,
+      "maintain": false,
+      "admin": false
+    },
+    "open_pr_issue_search_count": 0,
+    "applicant_comment_count": 3
+  },
+  "source_blobs": {
+    "src/services/rateService.js": "95c7112e9f88a003c5d34ade0cb02f05b8cd4da0",
+    "src/services/quoteService.js": "3cba17a0cbad99a0128c6130383702f949baa0d6",
+    "src/services/transferService.js": "1517f6254bf18cf1be4e7d52cf369e637d8ffb0f",
+    "src/store/index.js": "0024fac7dfbefe34054b9ad0f3ce4a8164828ee7",
+    "src/config/index.js": "41f9a7137046d1b8482d5261d727dcfa267ddc12",
+    ".github/workflows/ci.yml": "bbe235fe408cfb2e297e61d702faf3e1f3e593e4",
+    "README.md": "479141426185157e257a4e225044cc45df63b803"
+  },
+  "current_truth": {
+    "provider_abstraction": false,
+    "data_cache": false,
+    "http_cache_control_only": true,
+    "freshness_metadata": false,
+    "quote_identity_or_version": false,
+    "transfer_binds_prior_quote": false,
+    "transfer_persists_numeric_rate": true,
+    "existing_idempotency_replay_preserves_original_transfer": true,
+    "store_process_local": true
+  },
+  "assignment_gate": true,
+  "implementation_authority": false,
+  "provider_assignment_claimed": false,
+  "payment_or_fx_action_performed": false
+}
