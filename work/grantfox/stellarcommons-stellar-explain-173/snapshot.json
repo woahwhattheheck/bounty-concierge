@@ -1,0 +1,87 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-stellar-explain-173-R-ZZ-SOL-DELTA",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Delta",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "StellarCommons/Stellar-Explain",
+    "default_branch": "main",
+    "head_sha": "5c1e18d1ed6e28734e8305a134c67613ed5d8e8c",
+    "issue_number": 173,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 1,
+    "issue_linked_pr_count": 0,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/StellarCommons/repo/Stellar-Explain/issue/173",
+    "public_assignment_state": "Unassigned",
+    "application_route_visible": true,
+    "one_application_per_user": true,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false,
+    "application_attempt": {
+      "status": "not_started",
+      "submitted_verified": false
+    }
+  },
+  "evidence": {
+    "core_account_model_blob": "b1205ddbce7be9d3342e4bf4ecbdf25f03cabd4a",
+    "horizon_service_blob": "6f9fd1c08ffb3afcc6b3328dcf02c44923f2b2ee",
+    "account_explainer_blob": "f97b3ac3e24e3e2bc39aac6afed96346ad2a47d0",
+    "account_route_blob": "657c0f11b256c40db5240c3b58006cc653ec349c",
+    "horizon_test_blob": "dd83f562d2b84d9766bddab9af35329b342999ea",
+    "account_integration_fixture_blob": "1d7d0f3ad8f3dfb5ae0f8766955aaabbe06864cf",
+    "ui_types_blob": "796ce67c1db1e49faf0224146a20c979dcd3c131",
+    "account_result_blob": "cc6cd202de571cdd62e8b56e6fffa765a256a33f",
+    "ui_package_blob": "4f73d504bd22fe6b34bb15fb1112813ce6f0decf",
+    "current_data_flow": {
+      "horizon_balances_deserialized": true,
+      "domain_account_balances_retained": true,
+      "trustline_limit_retained": false,
+      "explanation_balances_exposed": false,
+      "route_balances_exposed": false,
+      "ui_balances_typed": false,
+      "asset_list_component_present": false,
+      "account_balances_component_present": false,
+      "account_asset_ui_test_present": false
+    },
+    "existing_domain_balance_fields": [
+      "asset_type",
+      "asset_code",
+      "asset_issuer",
+      "balance",
+      "is_authorized"
+    ],
+    "missing_transport_field": "limit"
+  },
+  "post_assignment": {
+    "required": [
+      "retain Horizon trustline limit",
+      "reuse existing domain balance pipeline",
+      "normalize full account balance output",
+      "XLM first with XLM/native/unlimited presentation",
+      "extend HTTP/OpenAPI response and integration fixture",
+      "mirror balances in TypeScript",
+      "add AssetList against current AccountResult tree",
+      "collapsed non-native list",
+      "zero-balance styling",
+      "issuer copy feedback",
+      "empty and XLM-only safety",
+      "backend mapping and frontend render tests",
+      "Rust checks/tests and UI lint/build"
+    ],
+    "financial_fixture_policy": "deterministic mocked/local/testnet data only"
+  },
+  "fence": {
+    "implementation_requires_provider_or_maintainer_assignment": true,
+    "upstream_source_mutated": false,
+    "funded_wallet_or_mainnet_use": false
+  }
+}
