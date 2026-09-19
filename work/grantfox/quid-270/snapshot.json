@@ -1,0 +1,64 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-QUID-270-R-KAPPA",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Solstice-Kappa",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Quid-proquo/Quid",
+    "default_branch": "main",
+    "head_sha": "bd6b3b0571b10cc5f9a720e0ae37ee0542a2df82",
+    "issue_number": 270,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 0,
+    "matching_open_pr_found": false
+  },
+  "provider": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Quid-proquo/repo/Quid/issue/270",
+    "apply_available": true,
+    "assigned_to": null,
+    "assignment_required_before_implementation": true,
+    "application_submitted_by_worker": false,
+    "known_browser_profile_auth_state": "no authenticated GrantFox/GitHub session; redundant attempt intentionally not launched"
+  },
+  "evidence": {
+    "blobs": {
+      "backend/prisma/schema.prisma": "f7580cafaba8a11c5a85569af680367d8fb5070b",
+      "backend/src/missions/missions.service.ts": "ce63f0a157b4b5a462e2943539d722ceac708295",
+      "backend/src/missions/missions.controller.ts": "eb52f40dc5801a75e0977e5a724fc49d1814a439",
+      "backend/src/missions/missions.service.spec.ts": "7d8dbcefa350992626582cee8c5de2e0f38a9450",
+      "backend/package.json": "4e2635d43699318b0c79ffb7abf6aea6795c2685",
+      "backend/README.md": "fae70c9c56c938db164fcd71f9ada5ee813126d3"
+    },
+    "migration_directories": [
+      "20260101000000_init",
+      "20260324000000_add_mission_draft_model",
+      "20260728000000_add_submission_rejection_reason"
+    ],
+    "residuals": [
+      "Mission model lacks onChainId",
+      "no unique on-chain mission correlation key exists",
+      "no onChainId migration exists",
+      "mission service has no chain-ID lookup helper",
+      "backend README explicitly lists persisting onChainId as missing MVP work"
+    ]
+  },
+  "residual": {
+    "proposed_schema_shape": "onChainId String? @unique @map(\"on_chain_id\")",
+    "destructive_backfill_forbidden": true,
+    "public_route_required": false,
+    "downstream_publish_or_indexer_implementation": false,
+    "required_commands": [
+      "npm run prisma:generate",
+      "npm test",
+      "npm run build",
+      "npm run lint"
+    ]
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "application_submitted": false,
+    "upstream_source_mutated": false
+  }
+}
