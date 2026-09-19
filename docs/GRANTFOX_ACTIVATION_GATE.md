@@ -1,12 +1,13 @@
 # GrantFox activation gate
 
-`concierge.grantfox_activation_gate` composes the four independent GrantFox
-control receipts that workers otherwise have to interpret separately:
+`concierge.grantfox_activation_gate` composes five GrantFox control layers that
+workers otherwise have to interpret separately:
 
 1. `grantfox-queue-gate/v1` — current provider queue/application state.
 2. the verified GrantFox source-readiness receipt — pinned repository/source state.
 3. `grantfox-dependency-readiness-receipt/v1` — explicit prerequisite issue readiness, including an explicit zero-dependency receipt.
-4. `grantfox-application-continuity/v1` — monotonic durable lifecycle evidence.
+4. `grantfox-dependency-fulfillment-receipt/v1` — evidence that every declared prerequisite capability landed on default-branch ancestry.
+5. `grantfox-application-continuity/v1` — monotonic durable lifecycle evidence.
 
 The gate is intentionally advisory-only. It performs no provider application,
 assignment, GitHub write, submission, adjudication, sponsor contact, payment, or
@@ -34,14 +35,15 @@ The activation gate fails closed across those seams.
   "queue_receipt": {"...": "verified grantfox-queue-gate/v1 receipt"},
   "source_receipt": {"...": "verified GrantFox source-readiness receipt"},
   "dependency_receipt": {"...": "verified GrantFox dependency-readiness receipt"},
+  "fulfillment_receipt": {"...": "verified GrantFox dependency-fulfillment receipt"},
   "continuity_receipt": {"...": "verified grantfox-application-continuity/v1 receipt"}
 }
 ```
 
 The queue receipt must pass semantic replay from its embedded provider snapshot;
-the source and dependency receipts must pass their native verifiers; and the
-continuity receipt must replay successfully against the exact supplied queue
-receipt. The gate then binds:
+the source, dependency, and fulfillment receipts must pass their native
+verifiers; and the continuity receipt must replay successfully against the exact
+supplied queue receipt. The gate then binds:
 
 - case-insensitive owner/repository + exact issue number;
 - exact actor between queue and continuity;
@@ -49,6 +51,8 @@ receipt. The gate then binds:
   receipt;
 - the dependency receipt's embedded source receipt byte-for-byte to the supplied
   source receipt;
+- the fulfillment receipt's embedded dependency receipt byte-for-byte to the
+  supplied dependency receipt;
 - the continuity receipt's queue anchor SHA-256 to that same queue receipt.
 
 A digest swap, actor swap, or issue swap is an input error rather than a HOLD.
@@ -65,8 +69,9 @@ A digest swap, actor swap, or issue swap is an input error rather than a HOLD.
   verified prerequisite issues remain open.
 - **`IMPLEMENT_ASSIGNED_SCOPE`** — the only implementation activation. It
   requires queue=`IMPLEMENTATION_ELIGIBLE`, continuity=`ASSIGNED`,
-  continuity disposition not held, same actor/issue/queue/source anchors,
-  source=`SOURCE_ALIGNED`, and dependency=`DEPENDENCIES_CLEAR`.
+  continuity disposition not held, same actor/issue/queue/source/dependency
+  anchors, source=`SOURCE_ALIGNED`, dependency=`DEPENDENCIES_CLEAR`, and
+  fulfillment=`DEPENDENCIES_FULFILLED`.
 - **`HOLD_SOURCE`** — source is `HOLD`, or an assigned scope has source drift.
 - **`HOLD_DEPENDENCIES`** — dependency evidence is itself stale or held and
   must be refreshed or reconciled.
@@ -78,16 +83,18 @@ Lifecycle states `SUBMITTED`, `APPROVED`, `PAYMENT_SENT`, `PAID`, and
 
 ## Verifiable evidence envelope
 
-An activation receipt retains the complete native queue, source-readiness, and
-continuity receipts under `evidence`. Verification does not trust the outer
+An activation receipt retains the complete native queue, source-readiness,
+dependency-readiness, dependency-fulfillment, and continuity receipts under
+`evidence`. Verification does not trust the outer
 activation SHA-256 by itself. `verify_activation_receipt()`:
 
 1. requires the exact activation receipt and evidence field sets;
 2. semantically recompiles the queue receipt from its retained provider
    snapshot instead of trusting a rehashed queue body;
-3. re-runs source/dependency verification and contextually recompiles continuity
-   from its normalized events against that exact queue receipt;
-4. re-checks issue, actor, queue, source, and dependency-anchor equality through
+3. re-runs source/dependency/fulfillment verification and contextually recompiles
+   continuity from its normalized events against that exact queue receipt;
+4. re-checks issue, actor, queue, source, dependency, and fulfillment-anchor
+   equality through
    `compile_activation()`;
 5. recomputes the activation state machine from the retained native evidence; and
 6. requires exact equality with the supplied activation receipt, including its
@@ -139,3 +146,19 @@ request carries a verified dependency-readiness receipt. Issues with no
 prerequisites use an explicit empty dependency list, which compiles to
 `DEPENDENCIES_CLEAR`. Assigned issues with verified open prerequisites compile
 to `WAIT_DEPENDENCIES` and cannot produce `IMPLEMENT_ASSIGNED_SCOPE`.
+
+
+## Fulfillment rule
+
+Closure-level dependency readiness is necessary but not sufficient when
+prerequisites exist. An assigned scope with declared prerequisites must carry a
+verified dependency-fulfillment receipt embedding the exact dependency receipt.
+`FULFILLMENT_WAIT` routes to `WAIT_DEPENDENCIES`; fulfillment `HOLD` routes
+to `HOLD_DEPENDENCIES`; only `DEPENDENCIES_FULFILLED` can reach
+`IMPLEMENT_ASSIGNED_SCOPE`.
+
+For backward compatibility, omission of the fulfillment input is accepted only
+when the already-verified dependency receipt explicitly declares
+`dependencies: []`. The compositor then constructs the canonical zero-landing
+fulfillment receipt and retains it in the activation evidence envelope. Absence
+never clears a non-empty prerequisite list.
