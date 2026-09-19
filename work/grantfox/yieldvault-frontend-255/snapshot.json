@@ -1,0 +1,115 @@
+{
+  "schema": "grantfox-source-baseline/v1",
+  "target": {
+    "repository": "YieldVault-Org/YieldVault-Frontend",
+    "issue": 255,
+    "title": "a11y(frontend): make deposit and withdrawal wizards keyboard-complete and screen-reader safe",
+    "source_branch": "main",
+    "source_sha": "f0ce8b799ded8f8e4cc158069d1940b1f822eb17"
+  },
+  "census": {
+    "issue_state": "open",
+    "github_assignees": 0,
+    "issue_comments": 1,
+    "open_prs_matching_issue_number": 0,
+    "grantfox_assignment": "unassigned",
+    "grantfox_apply_enabled": true,
+    "grantfox_application_mode": "direct_github_comment",
+    "grantfox_applications_per_user": 1,
+    "grantfox_visible_applicants": 1,
+    "slack_exact_repo_issue_hits_before_take": 0,
+    "upstream_pull": true,
+    "upstream_push": false,
+    "reward_amount_verified": false
+  },
+  "source_evidence": [
+    {
+      "path": "src/pages/VaultDetail.jsx",
+      "blob": "ee3756c2caeb716e5f345e88bb3e87ac0e89476f",
+      "finding": "production vault route renders DepositForm and WithdrawForm under Tabs, not the financial wizard components"
+    },
+    {
+      "path": "src/App.jsx",
+      "blob": "2ca3da9d10e505d2cdd0f7ec4fb3d9ba094f8de6",
+      "finding": "production route graph exposes /vault/:id and does not route WizardDemo"
+    },
+    {
+      "path": "src/components/DepositForm.tsx",
+      "blob": "e52209803f083e95d3ea38394bdd644f2024b39a",
+      "finding": "visible label exists, but validation/result text is not programmatically bound or live-announced"
+    },
+    {
+      "path": "src/components/WithdrawForm.tsx",
+      "blob": "807745121848993fc5f253cb76d2e79b39ad8b3b",
+      "finding": "visible label exists, but validation/result text is not programmatically bound or live-announced"
+    },
+    {
+      "path": "src/components/AmountInput.tsx",
+      "blob": "b9e8e006923ae8408df78d716339e34576d0b501",
+      "finding": "shared input exposes id but no aria-invalid/description/error contract"
+    },
+    {
+      "path": "src/components/Tabs.tsx",
+      "blob": "1628dc5a57db2fc73bd2b5c895fea9959224ae80",
+      "finding": "role tab semantics are partial: no roving tabindex, arrow/Home/End model, aria-controls, or matching production tabpanel association"
+    },
+    {
+      "path": "src/components/FormWizard.jsx",
+      "blob": "e30ad6e145cbdfbee5c49c3d0efd0733b6ee4bc3",
+      "finding": "reusable wizard has tab/progress roles but no focus transition/error focus/live announcement contract; step tab divs lack keyboard tab behavior"
+    },
+    {
+      "path": "src/components/DepositWizard.jsx",
+      "blob": "ea4344e711caf8cc4a1e7e232dd747c4cdb52602",
+      "finding": "currently unrouted financial wizard; duplicate useAppContext import binding is a source-level build/typecheck hazard"
+    },
+    {
+      "path": "src/components/WithdrawWizard.jsx",
+      "blob": "f1525ebcb3ec85c905567fe437317efa2fd71180",
+      "finding": "currently unrouted financial wizard; duplicate useAppContext import binding is a source-level build/typecheck hazard"
+    },
+    {
+      "path": "src/components/Modal.tsx",
+      "blob": "1d7715fd77686c4b9e9ad437a4110f3eea5bbab0",
+      "finding": "dialog roles/Escape exist but focus trap, initial focus, and focus restoration do not"
+    },
+    {
+      "path": "src/components/RouteAnnouncer.jsx",
+      "blob": "213181db304cdfb43d01a901d319ad8492b0ecd3",
+      "finding": "existing polite live-region pattern covers route changes only, not in-route financial flow state"
+    },
+    {
+      "path": "test/components/FormWizard.test.jsx",
+      "blob": "0d9971afe05f8b0b4759a82d7fac1715f84019c6",
+      "finding": "generic wizard tests cover steps and Enter but not focus, ARIA association, live announcements, tab keyboard pattern, or axe checks"
+    },
+    {
+      "path": "package.json",
+      "blob": "c30544e7574b0476e6da97928b1c23118fb85d32",
+      "finding": "Vitest/Testing Library exist but no axe-style or user-event dependency is present"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "blob": "e0de7e895eadefcae74e0601edbd35341cb1f1bd",
+      "finding": "CI runs npm test + npm run build only; no dedicated accessibility job"
+    },
+    {
+      "path": "tsconfig.json",
+      "blob": "f7a34217b54cf1d04f46806869b32551ea490af0",
+      "finding": "allowJs=true and src is included, making duplicate JS import bindings relevant to clean typecheck/build validation"
+    }
+  ],
+  "disposition": {
+    "issue_accessibility_gap_confirmed": true,
+    "production_uses_financial_wizards": false,
+    "production_uses_deposit_withdraw_forms": true,
+    "scope_clarification_required": true,
+    "duplicate_wizard_import_hazard_present": true,
+    "axe_dependency_present": false,
+    "upstream_workflow_run_for_pinned_commit_observed": false,
+    "implementation_ready_after_assignment_and_scope_confirmation": true,
+    "upstream_source_mutation_performed": false,
+    "provider_application_performed": false,
+    "funded_wallet_or_real_transaction_used": false
+  }
+}
