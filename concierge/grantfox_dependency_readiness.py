@@ -120,6 +120,74 @@ def _source_identity(source_receipt: dict[str, Any]) -> tuple[str, str, int]:
     return owner, repo, number
 
 
+def _source_freshness_at_evaluation(
+    source_receipt: dict[str, Any],
+    *,
+    evaluated_at: datetime,
+) -> dict[str, Any]:
+    """Re-evaluate embedded source/provider observation age at consumption time."""
+    source = _require_object(
+        source_receipt.get("repository_snapshot"),
+        "source_receipt.repository_snapshot",
+    )
+    source_observed_raw = _require_string(
+        source.get("observed_at"),
+        "source_receipt.repository_snapshot.observed_at",
+        max_chars=64,
+    )
+    source_observed = _parse_timestamp(
+        source_observed_raw,
+        "source_receipt.repository_snapshot.observed_at",
+    )
+    source_max_age = _require_bounded_age(
+        source.get("max_snapshot_age_seconds"),
+        "source_receipt.repository_snapshot.max_snapshot_age_seconds",
+    )
+    if evaluated_at < source_observed:
+        raise GrantFoxDependencyReadinessInputError(
+            "evaluated_at must not precede source_receipt repository observation"
+        )
+    source_age = int((evaluated_at - source_observed).total_seconds())
+
+    queue = _require_object(
+        source_receipt.get("queue_receipt"),
+        "source_receipt.queue_receipt",
+    )
+    provider = _require_object(
+        queue.get("provider_snapshot"),
+        "source_receipt.queue_receipt.provider_snapshot",
+    )
+    queue_observed_raw = _require_string(
+        provider.get("observed_at"),
+        "source_receipt.queue_receipt.provider_snapshot.observed_at",
+        max_chars=64,
+    )
+    queue_observed = _parse_timestamp(
+        queue_observed_raw,
+        "source_receipt.queue_receipt.provider_snapshot.observed_at",
+    )
+    queue_max_age = _require_bounded_age(
+        provider.get("max_snapshot_age_seconds"),
+        "source_receipt.queue_receipt.provider_snapshot.max_snapshot_age_seconds",
+    )
+    if evaluated_at < queue_observed:
+        raise GrantFoxDependencyReadinessInputError(
+            "evaluated_at must not precede source_receipt provider observation"
+        )
+    queue_age = int((evaluated_at - queue_observed).total_seconds())
+
+    return {
+        "source_observed_at": source_observed_raw,
+        "source_snapshot_age_seconds": source_age,
+        "source_max_snapshot_age_seconds": source_max_age,
+        "source_snapshot_stale": source_age > source_max_age,
+        "queue_observed_at": queue_observed_raw,
+        "queue_snapshot_age_seconds": queue_age,
+        "queue_max_snapshot_age_seconds": queue_max_age,
+        "queue_snapshot_stale": queue_age > queue_max_age,
+    }
+
+
 def _normalize_dependencies(
     value: Any,
     *,
@@ -313,6 +381,10 @@ def compile_grantfox_dependency_readiness(request: dict[str, Any]) -> dict[str, 
         request.get("max_snapshot_age_seconds", 900),
         "max_snapshot_age_seconds",
     )
+    source_freshness = _source_freshness_at_evaluation(
+        source_receipt,
+        evaluated_at=evaluated_at,
+    )
 
     dependencies, dependency_stale = _normalize_dependencies(
         request.get("dependencies"),
@@ -332,6 +404,10 @@ def compile_grantfox_dependency_readiness(request: dict[str, Any]) -> dict[str, 
     reasons: list[str] = []
     if source_disposition != "SOURCE_ALIGNED":
         reasons.append("SOURCE_NOT_ALIGNED")
+    if source_freshness["source_snapshot_stale"]:
+        reasons.append("SOURCE_SNAPSHOT_STALE_AT_DEPENDENCY_EVALUATION")
+    if source_freshness["queue_snapshot_stale"]:
+        reasons.append("QUEUE_RECEIPT_STALE_AT_DEPENDENCY_EVALUATION")
     if dependency_stale:
         reasons.append("DEPENDENCY_SNAPSHOT_STALE")
     if closed_without_landed:
@@ -342,6 +418,12 @@ def compile_grantfox_dependency_readiness(request: dict[str, Any]) -> dict[str, 
     if "SOURCE_NOT_ALIGNED" in reasons:
         disposition = "HOLD"
         next_action = "RESOLVE_SOURCE_READINESS_BEFORE_DEPENDENCY_CLEARANCE"
+    elif (
+        "SOURCE_SNAPSHOT_STALE_AT_DEPENDENCY_EVALUATION" in reasons
+        or "QUEUE_RECEIPT_STALE_AT_DEPENDENCY_EVALUATION" in reasons
+    ):
+        disposition = "HOLD"
+        next_action = "REFRESH_SOURCE_READINESS_BEFORE_DEPENDENCY_CLEARANCE"
     elif "DEPENDENCY_SNAPSHOT_STALE" in reasons:
         disposition = "HOLD"
         next_action = "REFRESH_PREREQUISITE_ISSUE_OBSERVATIONS"
@@ -388,6 +470,7 @@ def compile_grantfox_dependency_readiness(request: dict[str, Any]) -> dict[str, 
             "dependencies": dependencies,
             "evaluated_at": evaluated_raw,
             "max_snapshot_age_seconds": max_age,
+            "source_freshness_at_evaluation": source_freshness,
         },
         "authority": dict(_AUTHORITY),
     }
