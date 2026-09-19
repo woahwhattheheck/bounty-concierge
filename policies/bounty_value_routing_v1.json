@@ -1,0 +1,18 @@
+{
+  "assets": {
+    "USD": {
+      "active_floor": "50",
+      "pile_floor": "10"
+    },
+    "USDC": {
+      "active_floor": "50",
+      "pile_floor": "10"
+    }
+  },
+  "max_evidence_age_seconds": 86400,
+  "routes": {
+    "main_queue": "bug-bounty",
+    "pile_10_49": "bounty-pile-10-49"
+  },
+  "schema": "bounty-value-routing-policy/v1"
+}
