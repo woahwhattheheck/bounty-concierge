@@ -1,0 +1,73 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-STELLAR-KRAAL-FRONTEND-26-R-20260919-SOLSTICE",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Solstice",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Stellar-kraal/stellar-kraal-frontend",
+    "default_branch": "main",
+    "head_sha": "390605df2d60ee605bc366e10e79b460b6122a6a",
+    "tree_sha": "98a623d78760930287f628f511639268f29b05cb",
+    "issue_number": 26,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 1,
+    "open_pr_count": 0,
+    "matching_pr_found": false,
+    "connector_permissions": {
+      "pull": true,
+      "push": false,
+      "admin": false
+    }
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Stellar-kraal/repo/stellar-kraal-frontend/issue/26",
+    "assigned_to": "Unassigned",
+    "apply_control_visible": true,
+    "labels": [
+      "frontend",
+      "accessibility",
+      "Maybe Rewarded",
+      "GrantFox OSS",
+      "Third Campaign"
+    ],
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "file_count": 50,
+    "investor_page_blob": "47cce301706a565a7df60ef28a1e334306324639",
+    "farmer_page_blob": "38feec2977188abb66edf4efadcc98ff017dc3ba",
+    "animal_card_blob": "4e05a3e51d7eadd1e97d5b915673ba0047b5b375",
+    "mobile_wallet_modal_blob": "c265b380ad559eb5e37bc30f7460791ad3435b0c",
+    "marketplace_e2e_blob": "d0105b756be36192ba12b08ffb74fb07ac09af58",
+    "portfolio_e2e_blob": "f0ea5a5a0350035ced66734b945eab28b90bb076",
+    "mobile_wallet_e2e_blob": "135cdd8612ec71e683991c12ebb8ccd73a6b8846",
+    "e2e_workflow_blob": "750e769a5c36288c39221b11921467194faf8d65",
+    "package_json_blob": "71798fc65814b87d9a9d0bb22ff14e6a44258c21",
+    "observed_gaps": [
+      "Investor table th elements lack scope=col",
+      "Investor numeric cells have visible units but no explicit accessible-unit labels",
+      "Farmer registration overlay lacks dialog semantics, focus trap, Escape close, and opener focus restoration",
+      "MobileWalletModal has dialog semantics/Escape/initial focus but lacks a Tab focus trap and opener restoration",
+      "axe exists in Playwright but only one mobile-wallet dialog scenario is scanned",
+      "No transaction/history path exists in the pinned 50-file tree",
+      "docs/accessibility/audit-report.md is absent"
+    ],
+    "partial_satisfaction": [
+      "Investor loan status badges include visible status text in addition to color",
+      "AnimalCard verification badges include visible status text in addition to color",
+      "MobileWalletModal already uses role=dialog, aria-modal, aria-labelledby, Escape close, and initial focus",
+      "Playwright E2E runs in CI and @axe-core/playwright is installed"
+    ]
+  },
+  "fence": {
+    "implementation_requires_provider_or_maintainer_assignment": true,
+    "upstream_write_permission_via_connector": false,
+    "upstream_source_mutated": false,
+    "provider_assignment_mutated": false,
+    "reward_or_payment_claimed": false
+  }
+}
