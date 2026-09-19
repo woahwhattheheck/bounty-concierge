@@ -1,0 +1,41 @@
+{
+  "schema": "grantfox-candidate-baseline/v1",
+  "operation": "GFOX-DISCOVERY-PAYD-523-ZZ-SOLSTICE-20260919",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Solstice",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Protocol-Guild/PayD",
+    "default_branch": "main",
+    "head_sha": "af5c348e83033ed3340e589b68e8554f0303060e",
+    "issue_number": 523,
+    "issue_state": "open",
+    "assignee": null,
+    "matching_open_pr": false,
+    "controller_plural_blob": "ead7682b49e0c6ab98f91f9208f33c8c60f62db1",
+    "controller_singular_blob": "4f8a0852043f2f282ce7b3bae1f2fc0f44cbed06"
+  },
+  "pressure": {
+    "application_comment_count": 1,
+    "application_scope_matches_issue": false
+  },
+  "evidence": {
+    "canonical_route_uses": "ContractEventController",
+    "dedicated_test_uses": "ContractEventController",
+    "plural_known_consumers": [
+      "backend/src/__tests__/contractIntegration.test.ts"
+    ],
+    "singular_documented_as_canonical": true
+  },
+  "disposition": {
+    "candidate_status": "WORTH_APPLICATION_REVIEW",
+    "implementation_started": false,
+    "next_action": "REFRESH_PROVIDER_STATE_AND_APPLY_IF_STILL_ELIGIBLE"
+  },
+  "authority": {
+    "advisory_only": true,
+    "provider_application_authority": false,
+    "upstream_implementation_authority": false,
+    "payment_or_wallet_authority": false
+  }
+}
