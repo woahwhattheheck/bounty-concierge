@@ -1,0 +1,52 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX-RAEGIS-12-R-PARALLAX-Q7N4-20260919",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ–Parallax-Q7N4",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Raegis-RWA/Raegis-sdk",
+    "default_branch": "main",
+    "head_sha": "69fff2c7e8c6fe801428fc1bb71d064c5c94949c",
+    "issue_number": 12,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 0,
+    "matching_pr_found": false
+  },
+  "provider": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Raegis-RWA/repo/Raegis-sdk/issue/12",
+    "assignment_state": "unassigned",
+    "apply_enabled": true,
+    "application_mode": "direct GitHub comment",
+    "applications_per_user": 1,
+    "application_submitted_by_worker": false
+  },
+  "evidence": {
+    "blobs": {
+      "src/network/failures.ts": "872a5409d2f0c87657a6998a1303c659a0ca7380",
+      "src/diagnostics/network.ts": "a2955a554cb6fee7d2b7f6b5d3fdc730130edc7a",
+      "tests/network-failures.test.ts": "f04545519cc06c43f9c52caf6f6d75e95c1c0929",
+      "docs/network-failures.md": "22ba6fa5898c30c4d3e1698efcd12a2ea1a4f460",
+      "src/index.ts": "b498dcfb2008865b3a98ad0ceaa330ff7a89a547",
+      "README.md": "4d2bb5a126aebd7e55f5e8316d6a98becffccf7d",
+      "docs/role-aware-client-factory.md": "41afd00b7def758853628b0f2083edcac3ad9766"
+    },
+    "already_landed": [
+      "network failure classification replaces raw messages with fixed safe messages",
+      "serialisable network diagnostics omit raw provider material",
+      "network-failure tests include secret/token leakage assertions"
+    ],
+    "residuals": [
+      "no generic exported redaction primitive",
+      "no generic structured support/log redaction contract",
+      "raw NetworkFailure cause remains available for inspection",
+      "signer docs demonstrate inline Keypair.fromSecret placeholder patterns"
+    ]
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "application_submitted": false,
+    "upstream_source_mutated": false
+  }
+}
