@@ -1,11 +1,12 @@
 # GrantFox activation gate
 
-`concierge.grantfox_activation_gate` composes the three independent GrantFox
+`concierge.grantfox_activation_gate` composes the four independent GrantFox
 control receipts that workers otherwise have to interpret separately:
 
 1. `grantfox-queue-gate/v1` — current provider queue/application state.
 2. the verified GrantFox source-readiness receipt — pinned repository/source state.
-3. `grantfox-application-continuity/v1` — monotonic durable lifecycle evidence.
+3. `grantfox-dependency-readiness-receipt/v1` — explicit prerequisite issue readiness, including an explicit zero-dependency receipt.
+4. `grantfox-application-continuity/v1` — monotonic durable lifecycle evidence.
 
 The gate is intentionally advisory-only. It performs no provider application,
 assignment, GitHub write, submission, adjudication, sponsor contact, payment, or
@@ -14,7 +15,7 @@ wallet action.
 ## Why a compositor is necessary
 
 Each underlying receipt is useful on its own, but no one receipt proves that all
-three views agree. In a fast swarm, these are materially different facts:
+four views agree. In a fast swarm, these are materially different facts:
 
 - source code can be perfectly aligned while the actor is only **APPLIED**;
 - a fresh queue page can render implementation-eligible while durable lifecycle
@@ -32,16 +33,19 @@ The activation gate fails closed across those seams.
   "schema": "grantfox-activation-gate/v1",
   "queue_receipt": {"...": "verified grantfox-queue-gate/v1 receipt"},
   "source_receipt": {"...": "verified GrantFox source-readiness receipt"},
+  "dependency_receipt": {"...": "verified GrantFox dependency-readiness receipt"},
   "continuity_receipt": {"...": "verified grantfox-application-continuity/v1 receipt"}
 }
 ```
 
-All three receipts must verify using their native verifier. The gate then binds:
+All four receipts must verify using their native verifier. The gate then binds:
 
 - case-insensitive owner/repository + exact issue number;
 - exact actor between queue and continuity;
 - the source receipt's embedded queue receipt byte-for-byte to the supplied queue
   receipt;
+- the dependency receipt's embedded source receipt byte-for-byte to the supplied
+  source receipt;
 - the continuity receipt's queue anchor SHA-256 to that same queue receipt.
 
 A digest swap, actor swap, or issue swap is an input error rather than a HOLD.
@@ -54,11 +58,15 @@ A digest swap, actor swap, or issue swap is an input error rather than a HOLD.
   but source is `SOURCE_DRIFT_REPLAN`.
 - **`WAIT_ASSIGNMENT`** — durable continuity says `APPLIED`; do not duplicate
   the provider application.
+- **`WAIT_DEPENDENCIES`** — durable continuity says `ASSIGNED`, but one or more
+  verified prerequisite issues remain open.
 - **`IMPLEMENT_ASSIGNED_SCOPE`** — the only implementation activation. It
   requires queue=`IMPLEMENTATION_ELIGIBLE`, continuity=`ASSIGNED`,
-  continuity disposition not held, same actor/issue/queue anchor, and
-  source=`SOURCE_ALIGNED`.
+  continuity disposition not held, same actor/issue/queue/source anchors,
+  source=`SOURCE_ALIGNED`, and dependency=`DEPENDENCIES_CLEAR`.
 - **`HOLD_SOURCE`** — source is `HOLD`, or an assigned scope has source drift.
+- **`HOLD_DEPENDENCIES`** — dependency evidence is itself stale or held and
+  must be refreshed or reconciled.
 - **`HOLD_RECONCILE`** — contradictory lifecycle/provider receipts or a durable
   continuity reconciliation hold.
 
@@ -92,3 +100,12 @@ Every output fixes all mutation authorities to false:
 The activation receipt is canonical-JSON SHA-256 bound. Its digest proves only
 the deterministic composition result; it is not provider authority and it does
 not turn a possible/discretionary reward into an award or payment.
+
+
+## Dependency rule
+
+Activation never infers prerequisite clearance from absence. Every activation
+request carries a verified dependency-readiness receipt. Issues with no
+prerequisites use an explicit empty dependency list, which compiles to
+`DEPENDENCIES_CLEAR`. Assigned issues with verified open prerequisites compile
+to `WAIT_DEPENDENCIES` and cannot produce `IMPLEMENT_ASSIGNED_SCOPE`.
