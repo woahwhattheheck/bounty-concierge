@@ -1,0 +1,94 @@
+{
+  "schema": "grantfox-supply-hygiene/v1",
+  "upstream": {
+    "repository": "Stellar-Analysis/frontend",
+    "canonical_main": "482ee456369418ef82c4056718cb82d3468f762b",
+    "evidence_blobs": {
+      "README.md": "a7546f7a6f85709fccd21e136cd8b12bae820652",
+      "package.json": "2b1c6ac1f83096666c7fd6d5ba3fd22780e6b8eb"
+    },
+    "absent_on_main": [
+      "backend/Cargo.toml",
+      "backend/src/lib.rs",
+      "Cargo.toml"
+    ],
+    "historical_backend": {
+      "ancestor": "d8bae439cbaeb0f6b3a4fb36ffe212993c3af617",
+      "cargo_blob": "5f15f0b4c473a688ff5a42767c4ad9abdb477b8d",
+      "canonical_main_ahead_by": 41,
+      "observed_diff": "backend/** removed"
+    }
+  },
+  "backend_dependent_open_issues": [
+    319,
+    321,
+    323,
+    324,
+    327,
+    328,
+    329,
+    330,
+    331,
+    332,
+    333,
+    334,
+    335,
+    336,
+    337,
+    378,
+    379,
+    380,
+    382,
+    383
+  ],
+  "upstream_open_pr_carriers": {
+    "319": 392,
+    "337": 391,
+    "378": 386,
+    "379": 393,
+    "380": 394,
+    "382": 384,
+    "383": 387
+  },
+  "hold_no_carrier": [
+    321,
+    323,
+    324,
+    327,
+    328,
+    329,
+    330,
+    331,
+    332,
+    333,
+    334,
+    335,
+    336
+  ],
+  "contract_only_not_blocked": [
+    {
+      "issue": 342,
+      "carrier": null
+    },
+    {
+      "issue": 346,
+      "carrier": null
+    },
+    {
+      "issue": 381,
+      "carrier": 389
+    }
+  ],
+  "routing": {
+    "existing_upstream_carrier": "REVIEW_EXISTING_CARRIER_NO_DUPLICATE",
+    "backend_issue_without_carrier": "HOLD_CANONICAL_BACKEND_TARGET",
+    "contract_issue": "EVALUATE_NORMALLY_ON_CURRENT_SOURCE"
+  },
+  "authority": {
+    "reserves_implementation_custody": false,
+    "provider_application": false,
+    "provider_assignment": false,
+    "upstream_write": false,
+    "reward_or_payment": false
+  }
+}
