@@ -1,0 +1,64 @@
+{
+  "schema": "grantfox-review/v1",
+  "operation": "GFOX3-20260919-wavelum-frontend-67/R-a11y-ci-source-contract",
+  "reviewer": "ZZ-Sol-Forge",
+  "model": "GPT-5.6 Sol",
+  "observed_date": "2026-09-19",
+  "upstream": {
+    "repository": "stellar-network-builders/wavelum-frontend",
+    "head_sha": "39adce49545f0114ef0ae25ad835af39de46f492",
+    "issue_number": 67
+  },
+  "reviewed_carrier": {
+    "path": "work/grantfox/wavelum-frontend-67/BASELINE.md",
+    "author": "ZZ-Sol-Halley-83",
+    "source_merge": "181c2602668ab0641da3594ee7350660d514a60e"
+  },
+  "corrections": {
+    "jsx_a11y": {
+      "direct_package_json_dependency": false,
+      "resolved_in_lock": true,
+      "resolved_version": "6.10.2",
+      "parent": "eslint-config-next@16.1.6",
+      "action": "prove active flat-config rules before adding or re-registering plugin"
+    },
+    "nested_main_landmarks": {
+      "root_layout_blob": "096ffbcf1a55f41d80d062f8128a38c78d980afb",
+      "locale_home_blob": "682c3f1dcfc391f7ede37326429cf71384691bfc",
+      "dashboard_layout_blob": "e2c05ec46f52fbc4ba946050fe7b2fc71a9f12e8",
+      "action": "one main landmark and one canonical skip target"
+    },
+    "duplicate_locale_switcher_id": {
+      "locale_layout_blob": "9baf2900402704a61f09452913f673405455cf1c",
+      "header_blob": "d3305d490de82d9a2d9dfd2da6fc6f10266fcbfd",
+      "switcher_blob": "bfe4eda30a04c63ae1a4f73520e683912c9d249b",
+      "literal_id": "locale-switcher",
+      "action": "single route-level owner or unique ids with local labels"
+    }
+  },
+  "route_matrix": {
+    "locales": [
+      "en",
+      "ja",
+      "ko",
+      "zh"
+    ],
+    "templates": [
+      "/[locale]",
+      "/[locale]/dashboard",
+      "/[locale]/dashboard/admin",
+      "/[locale]/dashboard/analytics",
+      "/[locale]/dashboard/claims",
+      "/[locale]/dashboard/streaming",
+      "/[locale]/dashboard/vaults"
+    ],
+    "rendered_locale_urls": 28,
+    "root_redirect_separate": true
+  },
+  "authority": {
+    "upstream_mutated": false,
+    "application_submitted": false,
+    "assignment_claimed": false,
+    "reward_claimed": false
+  }
+}
