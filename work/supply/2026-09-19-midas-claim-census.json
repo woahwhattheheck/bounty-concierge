@@ -1,0 +1,146 @@
+{
+  "captured_at": "2026-09-19",
+  "owner": "ZZ-Solstice-Palisade / GPT-5.6 Sol",
+  "repository": "bujiproject-art/agentmidasopendevteam",
+  "interpretation": "Public-claim census only. Absence of a public open claim is not provider assignment or guaranteed availability.",
+  "current_open_issue_specific_bounty_map": {
+    "1": 8,
+    "2": 18,
+    "6": 14,
+    "7": 23,
+    "9": 17,
+    "10": 7,
+    "11": 6,
+    "13": 21,
+    "14": 3,
+    "17": 10,
+    "23": 1,
+    "24": 20,
+    "25": 25,
+    "27": 4,
+    "28": 16,
+    "29": 5,
+    "32": 19,
+    "35": 12,
+    "36": 13,
+    "37": 9,
+    "38": 24,
+    "39": 11,
+    "40": 15
+  },
+  "generic_open_inquiry_issue": 22,
+  "open_prs": [
+    {
+      "pr": 2,
+      "bounty": 23,
+      "title": "Bounty #23: FAQ Manager"
+    }
+  ],
+  "no_matching_open_public_claim_issue": [
+    {
+      "bounty": 3,
+      "usd": 300
+    },
+    {
+      "bounty": 4,
+      "usd": 250
+    },
+    {
+      "bounty": 5,
+      "usd": 200
+    },
+    {
+      "bounty": 8,
+      "usd": 300
+    },
+    {
+      "bounty": 12,
+      "usd": 500
+    },
+    {
+      "bounty": 15,
+      "usd": 400
+    },
+    {
+      "bounty": 16,
+      "usd": 300
+    },
+    {
+      "bounty": 18,
+      "usd": 500
+    },
+    {
+      "bounty": 19,
+      "usd": 400
+    },
+    {
+      "bounty": 20,
+      "usd": 250
+    },
+    {
+      "bounty": 21,
+      "usd": 300
+    },
+    {
+      "bounty": 22,
+      "usd": 350
+    },
+    {
+      "bounty": 26,
+      "usd": 200
+    },
+    {
+      "bounty": 30,
+      "usd": 400
+    },
+    {
+      "bounty": 31,
+      "usd": 350
+    },
+    {
+      "bounty": 33,
+      "usd": 400
+    },
+    {
+      "bounty": 34,
+      "usd": 500
+    },
+    {
+      "bounty": 41,
+      "usd": 300
+    }
+  ],
+  "source_scaffold_probe": {
+    "ref": "main",
+    "missing_404": [
+      "package.json",
+      ".env.example",
+      "app",
+      "src"
+    ],
+    "implication": "Public repository is not currently a runnable application scaffold for the advertised app bounties."
+  },
+  "sampled_comment_probe": {
+    "issue_22": {
+      "comments": 0
+    },
+    "issue_25": {
+      "comments": 0
+    },
+    "issue_3": {
+      "comments": 1,
+      "maintainer_reply": false,
+      "note": "Only a third-party AI-generated implementation suggestion was present in the sampled comment result."
+    },
+    "issue_1": {
+      "comments": 0
+    }
+  },
+  "classification": "PUBLIC_COLLISION_QUIET_SOURCE_GATED",
+  "next_required_gate": [
+    "maintainer/provider confirms bounty is currently available at advertised fixed amount",
+    "target application repository/scaffold and acceptance commands are supplied",
+    "signup/CLA/payout eligibility is satisfied",
+    "final claim+PR collision census immediately before implementation"
+  ]
+}
