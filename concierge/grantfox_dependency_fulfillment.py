@@ -143,9 +143,9 @@ def _declared_dependencies(dependency_receipt: dict[str, Any]) -> list[dict[str,
         dependency_receipt.get("evidence"), "dependency_receipt.evidence"
     )
     raw = evidence.get("dependencies")
-    if type(raw) is not list or not raw:
+    if type(raw) is not list:
         raise GrantFoxDependencyFulfillmentInputError(
-            "dependency_receipt.evidence.dependencies must be a non-empty list"
+            "dependency_receipt.evidence.dependencies must be a list"
         )
     if len(raw) > _MAX_DEPENDENCIES:
         raise GrantFoxDependencyFulfillmentInputError(
