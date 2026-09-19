@@ -1,4 +1,5 @@
 from copy import deepcopy
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -157,6 +158,24 @@ class GrantFoxQueueGateTests(unittest.TestCase):
         changed = deepcopy(first)
         changed["provider_snapshot"]["application_count"] = 99
         self.assertFalse(verify_receipt(changed))
+
+    def test_semantic_verifier_rejects_rehashed_queue_state_forgery(self):
+        receipt = compile_grantfox_queue_gate(snapshot())
+        self.assertTrue(verify_receipt(receipt, semantic=True))
+
+        forged = deepcopy(receipt)
+        forged["disposition"] = "IMPLEMENTATION_ELIGIBLE"
+        forged["advisory_next_action"] = "IMPLEMENT_ASSIGNED_SCOPE"
+        body = dict(forged)
+        body.pop("receipt_sha256", None)
+        forged["receipt_sha256"] = hashlib.sha256(
+            json.dumps(
+                body, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            ).encode("utf-8")
+        ).hexdigest()
+
+        self.assertTrue(verify_receipt(forged))
+        self.assertFalse(verify_receipt(forged, semantic=True))
 
     def test_cli_round_trip_and_hold_exit_code(self):
         payload = snapshot(

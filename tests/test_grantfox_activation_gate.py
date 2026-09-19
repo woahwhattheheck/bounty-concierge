@@ -369,6 +369,44 @@ class ActivationGateTests(unittest.TestCase):
             with self.assertRaisesRegex(GrantFoxActivationInputError, "dependency_receipt does not verify"):
                 compile_activation(payload)
 
+    def test_native_rehashed_queue_semantic_forgery_is_rejected(self):
+        payload = native_request()
+        forged = deepcopy(payload["queue_receipt"])
+        forged["disposition"] = "IMPLEMENTATION_ELIGIBLE"
+        forged["advisory_next_action"] = "IMPLEMENT_ASSIGNED_SCOPE"
+        body = dict(forged)
+        body.pop("receipt_sha256", None)
+        raw = json.dumps(
+            body, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        )
+        forged["receipt_sha256"] = hashlib.sha256(raw.encode()).hexdigest()
+        payload["queue_receipt"] = forged
+
+        with self.assertRaisesRegex(
+            GrantFoxActivationInputError, "queue_receipt does not verify semantically"
+        ):
+            compile_activation(payload)
+
+    def test_native_rehashed_continuity_semantic_forgery_is_rejected(self):
+        payload = native_request()
+        forged = deepcopy(payload["continuity_receipt"])
+        forged["state"] = "ASSIGNED"
+        forged["advisory_next_action"] = "IMPLEMENT_ASSIGNED_SCOPE"
+        forged["lifecycle"]["assigned"] = True
+        body = dict(forged)
+        body.pop("receipt_sha256", None)
+        raw = json.dumps(
+            body, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        )
+        forged["receipt_sha256"] = hashlib.sha256(raw.encode()).hexdigest()
+        payload["continuity_receipt"] = forged
+
+        with self.assertRaisesRegex(
+            GrantFoxActivationInputError,
+            "continuity_receipt does not verify against queue semantics",
+        ):
+            compile_activation(payload)
+
     def test_receipt_digest_detects_tamper(self):
         receipt = self.compile(request())
         receipt["disposition"] = "IMPLEMENT_ASSIGNED_SCOPE"
