@@ -1,0 +1,78 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-RAEGIS51/R-mint-readiness-baseline",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Solstice",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Raegis-RWA/Raegis-sdk",
+    "default_branch": "main",
+    "head_sha": "69fff2c7e8c6fe801428fc1bb71d064c5c94949c",
+    "issue_number": 51,
+    "issue_state": "open",
+    "issue_comments": 0,
+    "issue_assignees": [],
+    "labels": [
+      "GrantFox OSS",
+      "Maybe Rewarded",
+      "Official Campaign | FWC26",
+      "sdk",
+      "feature",
+      "expert",
+      "aegis",
+      "rwa",
+      "minting"
+    ],
+    "matching_open_prs_found": 0
+  },
+  "connector_observation": {
+    "repository_permissions": {
+      "pull": true,
+      "push": false,
+      "admin": false,
+      "maintain": false,
+      "triage": false
+    },
+    "collaborator_permission_probe": "403 Resource not accessible by integration",
+    "interpretation": "connector/install access evidence only; not a human-account permission claim"
+  },
+  "evidence": {
+    "asset_sha": "0b5922dc115fbdc30ccb66b411e4b6a6b07b9187",
+    "compliance_sha": "04e0be7d0b562ca2172fb07d6f9fa1890952e6be",
+    "role_sha": "0239d03b21535147697fa73bd54763597c23bb8a",
+    "client_sha": "bf959efc3e790a4f1139f1d3f5ef62cacaaea42e",
+    "network_failures_sha": "872a5409d2f0c87657a6998a1303c659a0ca7380",
+    "network_diagnostics_sha": "a2955a554cb6fee7d2b7f6b5d3fdc730130edc7a",
+    "role_docs_sha": "ce52da34b09eb8dc0387a8e9cef046b6b54dc112",
+    "role_tests_sha": "cfe06e18ceb2b834df45d1a5516d751bb43dc4fa",
+    "network_tests_sha": "f04545519cc06c43f9c52caf6f6d75e95c1c0929",
+    "testing_fixtures_sha": "08ca6680fc1eda2ff9663cb8d8637e0cee0b75ab",
+    "mock_client_sha": "0eed26507070cbf74a13889c80421e02645e6122",
+    "index_sha": "b498dcfb2008865b3a98ad0ceaa330ff7a89a547",
+    "mint_example_sha": "9a9f1fa1534346443cd72b269ee7bed513a308f2",
+    "package_sha": "03b1908c19af0e259596dbd86684e6d79deb434e",
+    "gap": "mint signs and submits without a composed readiness result; explicit TODO calls for simulation/preflight",
+    "issuer_authority": "current RoleModule only proves local signer context and explicitly says issuer/admin authorization is not verifiable",
+    "recipient_compliance": "ComplianceModule.checkWhitelist provides existing contract-backed whitelist read",
+    "network_boundary": "AegisClient.runNetworkOperation plus NetworkFailure taxonomy already provide typed RPC failure handling",
+    "disposition": "SOURCE_GAP_CONFIRMED_ASSIGNMENT_GATED"
+  },
+  "acceptance": {
+    "implementation_requires_assignment": true,
+    "readiness_must_be_read_only": true,
+    "blocked_states_must_prevent_signing": true,
+    "blocked_states_must_prevent_submission": true,
+    "issuer_unknown_must_not_be_reported_as_verified": true,
+    "asset_status_unknown_must_not_be_reported_as_verified": true,
+    "full_verification_command": "npm run verify"
+  },
+  "fence": {
+    "upstream_source_mutated": false,
+    "provider_application_performed": false,
+    "assignment_obtained": false,
+    "live_contract_exploit_performed": false,
+    "transaction_signed": false,
+    "transaction_submitted": false,
+    "reward_or_payment_verified": false
+  }
+}
