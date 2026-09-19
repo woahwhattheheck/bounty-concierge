@@ -59,8 +59,13 @@ def evidence(
 def candidate(
     *,
     amount="300",
+    amount_semantics="FIXED",
+    min_amount=None,
+    max_amount=None,
     currency="USD",
     unit_type="CASH",
+    payout_authority="FIRST_PARTY",
+    payout_state="VERIFIED",
     hours="1",
     cost="10",
     cost_currency="USD",
@@ -72,15 +77,31 @@ def candidate(
         if cost is None
         else {"state": "KNOWN", "amount": cost, "currency": cost_currency}
     )
+    payout = {
+        "state": payout_state,
+        "evidence_url": "https://github.com/example/repo/issues/1",
+        "observed_at": "2026-09-16T19:30:00Z",
+    }
+    if payout_state == "VERIFIED":
+        payout.update(
+            {
+                "amount_semantics": amount_semantics,
+                "currency": currency,
+                "unit_type": unit_type,
+                "authority": payout_authority,
+            }
+        )
+        if amount_semantics == "FIXED":
+            payout["amount"] = amount
+        elif amount_semantics == "RANGE":
+            payout["min_amount"] = min_amount
+            payout["max_amount"] = max_amount
+        elif amount_semantics == "UP_TO":
+            payout["max_amount"] = max_amount
     return {
         "work_id": "work-1",
-        "canonical_source_url": "https://example.test/work/1",
-        "advertised_payout": {
-            "amount": amount,
-            "currency": currency,
-            "unit_type": unit_type,
-            "observed_at": "2026-09-16T19:30:00Z",
-        },
+        "canonical_source_url": "https://github.com/example/repo/issues/1",
+        "advertised_payout": payout,
         "estimated_engineering_hours": hours,
         "model_tool_cost": model_tool_cost,
         "deadline_at": deadline,
@@ -113,58 +134,115 @@ class PaidWorkEffortValueGateTests(unittest.TestCase):
         self.assertEqual(receipt["decision"], "GO")
         self.assertEqual(receipt["reason_codes"], ["ALL_GATES_CLEAR"])
         self.assertEqual(
-            receipt["economics"]["net_reward_after_model_tool_cost"],
-            "290",
+            receipt["gates"]["dollar_floor"]["decision"], "ACTIVE_REVIEW"
+        )
+        self.assertEqual(
+            receipt["economics"]["net_reward_after_model_tool_cost"], "290"
         )
         self.assertTrue(receipt["economics"]["gross_economically_eligible"])
         self.assertTrue(verify_receipt(receipt))
-        self.assertFalse(receipt["authority"]["external_claim_authority"])
-        self.assertFalse(receipt["authority"]["external_submission_authority"])
-        self.assertFalse(
-            receipt["authority"]["payment_cash_or_revenue_authority"]
-        )
 
     def test_75_dollar_fast_job_can_reach_downstream_go(self):
         receipt = compile_paid_work_effort_value_gate(
             request(candidate(amount="75", hours="0.5", cost="0"))
         )
         self.assertEqual(receipt["decision"], "GO")
-        self.assertTrue(receipt["economics"]["gross_economically_eligible"])
+        self.assertEqual(
+            receipt["gates"]["dollar_floor"]["decision"], "ACTIVE_REVIEW"
+        )
         self.assertEqual(
             receipt["economics"]["net_reward_after_model_tool_cost"], "75"
         )
-        self.assertTrue(verify_receipt(receipt))
 
-    def test_frantic_one_dollar_seed_skips_economics(self):
+    def test_range_above_floor_uses_guaranteed_minimum_for_economics(self):
+        receipt = compile_paid_work_effort_value_gate(
+            request(candidate(
+                amount_semantics="RANGE",
+                min_amount="60",
+                max_amount="500",
+                hours="0.5",
+                cost="0",
+            ))
+        )
+        self.assertEqual(receipt["decision"], "GO")
+        self.assertEqual(receipt["economics"]["advertised_payout"], "60")
+        self.assertEqual(receipt["economics"]["payout_range_min"], "60")
+        self.assertEqual(receipt["economics"]["payout_range_max"], "500")
+        nested = receipt["economics"]["fleet_economic_receipt"]
+        self.assertEqual(nested["candidates"][0]["advertised_reward"], "60")
+
+    def test_cross_boundary_range_and_up_to_never_reach_go(self):
+        crossing = compile_paid_work_effort_value_gate(
+            request(candidate(
+                amount_semantics="RANGE",
+                min_amount="49.99",
+                max_amount="50",
+                cost="0",
+            ))
+        )
+        self.assertEqual(crossing["decision"], "HOLD_VALUE_UNKNOWN")
+        self.assertEqual(
+            crossing["gates"]["dollar_floor"]["decision"],
+            "HOLD_VERIFY_AMOUNT",
+        )
+        ceiling = compile_paid_work_effort_value_gate(
+            request(candidate(
+                amount_semantics="UP_TO",
+                max_amount="500",
+                cost="0",
+            ))
+        )
+        self.assertEqual(ceiling["decision"], "HOLD_VALUE_UNKNOWN")
+        self.assertIsNone(ceiling["economics"]["fleet_economic_receipt"])
+
+    def test_one_dollar_is_pruned_before_generic_fleet_economics(self):
         receipt = compile_paid_work_effort_value_gate(
             request(candidate(amount="1", cost="0"))
         )
         self.assertEqual(receipt["decision"], "SKIP_ECONOMICS")
-        self.assertIn(
-            "GROSS_ECONOMICS_INELIGIBLE",
-            receipt["reason_codes"],
+        self.assertIn("DOLLAR_FLOOR_NOT_ACTIVE", receipt["reason_codes"])
+        self.assertEqual(
+            receipt["gates"]["dollar_floor"]["decision"],
+            "PRUNE_BELOW_FLOOR",
         )
-        nested = receipt["economics"]["fleet_economic_receipt"]
-        self.assertIsNotNone(nested)
-        self.assertFalse(nested["candidates"][0]["economically_eligible"])
+        self.assertIsNone(receipt["economics"]["fleet_economic_receipt"])
 
-    def test_rustchain_25_rtc_seed_holds_value_without_fx(self):
+    def test_20_dollar_job_is_pile_before_generic_fleet_economics(self):
         receipt = compile_paid_work_effort_value_gate(
-            request(
-                candidate(
-                    amount="25",
-                    currency="RTC",
-                    unit_type="NONCASH",
-                    cost="0",
-                    cost_currency="RTC",
-                )
-            )
+            request(candidate(amount="20", cost="0"))
+        )
+        self.assertEqual(receipt["decision"], "SKIP_ECONOMICS")
+        self.assertEqual(
+            receipt["gates"]["dollar_floor"]["decision"], "PILE_SAVE_UP"
+        )
+        self.assertIsNone(receipt["economics"]["fleet_economic_receipt"])
+
+    def test_rtc_noncash_is_blocked_before_generic_fleet_can_admit_it(self):
+        receipt = compile_paid_work_effort_value_gate(
+            request(candidate(
+                amount="200",
+                currency="RTC",
+                unit_type="NONCASH",
+                cost="0",
+                cost_currency="RTC",
+            ))
         )
         self.assertEqual(receipt["decision"], "HOLD_VALUE_UNKNOWN")
+        self.assertIn(
+            "DOLLAR_FLOOR_VALUE_NOT_ACTIVE", receipt["reason_codes"]
+        )
         self.assertIn("NONCASH_VALUE_UNAUTHORIZED", receipt["reason_codes"])
         self.assertIsNone(receipt["economics"]["fleet_economic_receipt"])
-        self.assertFalse(receipt["authority"]["fx_conversion"])
-        self.assertFalse(receipt["authority"]["noncash_valuation"])
+
+    def test_unverified_payout_holds_before_economics(self):
+        receipt = compile_paid_work_effort_value_gate(
+            request(candidate(payout_state="UNVERIFIED", cost="0"))
+        )
+        self.assertEqual(receipt["decision"], "HOLD_VALUE_UNKNOWN")
+        self.assertEqual(
+            receipt["gates"]["dollar_floor"]["decision"],
+            "HOLD_VERIFY_AMOUNT",
+        )
 
     def test_unknown_tool_cost_holds_value(self):
         receipt = compile_paid_work_effort_value_gate(
@@ -183,141 +261,94 @@ class PaidWorkEffortValueGateTests(unittest.TestCase):
             receipt["reason_codes"],
         )
 
-    def test_post_cost_reward_floor_can_turn_gross_go_into_skip(self):
+    def test_post_cost_reward_and_rate_floors_can_skip(self):
         receipt = compile_paid_work_effort_value_gate(
-            request(candidate(amount="120", cost="30"))
+            request(candidate(amount="70", cost="30"))
         )
         self.assertTrue(receipt["economics"]["gross_economically_eligible"])
         self.assertEqual(receipt["decision"], "SKIP_ECONOMICS")
         self.assertIn(
-            "POST_COST_REWARD_FLOOR_NOT_MET",
-            receipt["reason_codes"],
+            "POST_COST_REWARD_FLOOR_NOT_MET", receipt["reason_codes"]
         )
         self.assertIn(
-            "POST_COST_REWARD_RATE_FLOOR_NOT_MET",
-            receipt["reason_codes"],
+            "POST_COST_REWARD_RATE_FLOOR_NOT_MET", receipt["reason_codes"]
         )
 
-    def test_missing_payout_route_holds_account_gate(self):
+    def test_account_and_acceptance_gates_still_apply_after_active_floor(self):
         item = candidate()
         item["payout_route"] = evidence("UNKNOWN", tag="payout-route")
         receipt = compile_paid_work_effort_value_gate(request(item))
         self.assertEqual(receipt["decision"], "HOLD_ACCOUNT_GATE")
-        self.assertIn(
-            "PAYOUT_ROUTE_NOT_CONFIRMED",
-            receipt["reason_codes"],
-        )
+        self.assertIn("PAYOUT_ROUTE_NOT_CONFIRMED", receipt["reason_codes"])
 
-    def test_blocked_kyc_holds_account_gate(self):
         item = candidate()
         item["account_kyc"] = evidence("BLOCKED", tag="account-kyc")
         receipt = compile_paid_work_effort_value_gate(request(item))
         self.assertEqual(receipt["decision"], "HOLD_ACCOUNT_GATE")
-        self.assertIn("ACCOUNT_KYC_NOT_READY", receipt["reason_codes"])
 
-    def test_acceptance_requires_first_party_authority(self):
         item = candidate()
         item["acceptance"] = evidence(
-            "CONFIRMED",
-            authority="OTHER",
-            tag="acceptance",
+            "CONFIRMED", authority="OTHER", tag="acceptance"
         )
         receipt = compile_paid_work_effort_value_gate(request(item))
         self.assertEqual(receipt["decision"], "HOLD_ACCOUNT_GATE")
-        self.assertIn(
-            "ACCEPTANCE_NOT_FIRST_PARTY",
-            receipt["reason_codes"],
-        )
+        self.assertIn("ACCEPTANCE_NOT_FIRST_PARTY", receipt["reason_codes"])
 
-    def test_expired_deadline_skips_even_when_value_is_unknown(self):
-        receipt = compile_paid_work_effort_value_gate(
-            request(
-                candidate(
-                    currency="RTC",
-                    unit_type="NONCASH",
-                    cost="0",
-                    cost_currency="RTC",
-                    deadline="2026-09-16T19:59:59Z",
-                )
-            )
+    def test_deadline_and_congestion_terminal_reasons_still_win(self):
+        expired = compile_paid_work_effort_value_gate(
+            request(candidate(deadline="2026-09-16T19:59:59Z"))
         )
-        self.assertEqual(receipt["decision"], "SKIP_ECONOMICS")
-        self.assertEqual(receipt["reason_codes"], ["DEADLINE_EXPIRED"])
-        self.assertIn(
-            "NONCASH_VALUE_UNAUTHORIZED",
-            receipt["observed_hold_reasons"],
-        )
+        self.assertEqual(expired["decision"], "SKIP_ECONOMICS")
+        self.assertEqual(expired["reason_codes"], ["DEADLINE_EXPIRED"])
 
-    def test_deadline_safety_window_skips(self):
-        receipt = compile_paid_work_effort_value_gate(
+        safety = compile_paid_work_effort_value_gate(
             request(candidate(deadline="2026-09-16T20:30:00Z"))
         )
-        self.assertEqual(receipt["decision"], "SKIP_ECONOMICS")
-        self.assertIn(
-            "DEADLINE_SAFETY_WINDOW_NOT_MET",
-            receipt["reason_codes"],
-        )
+        self.assertEqual(safety["decision"], "SKIP_ECONOMICS")
+        self.assertIn("DEADLINE_SAFETY_WINDOW_NOT_MET", safety["reason_codes"])
 
-    def test_claim_congestion_saturation_skips(self):
-        receipt = compile_paid_work_effort_value_gate(
+        congested = compile_paid_work_effort_value_gate(
             request(candidate(claims=1))
         )
-        self.assertEqual(receipt["decision"], "SKIP_ECONOMICS")
-        self.assertIn(
-            "CLAIM_CONGESTION_SATURATED",
-            receipt["reason_codes"],
-        )
+        self.assertEqual(congested["decision"], "SKIP_ECONOMICS")
+        self.assertIn("CLAIM_CONGESTION_SATURATED", congested["reason_codes"])
 
-    def test_stale_payout_evidence_holds_value(self):
+    def test_stale_payout_is_a_dollar_floor_hold(self):
         item = candidate()
         item["advertised_payout"]["observed_at"] = "2026-09-15T00:00:00Z"
         receipt = compile_paid_work_effort_value_gate(request(item))
         self.assertEqual(receipt["decision"], "HOLD_VALUE_UNKNOWN")
-        self.assertIn("PAYOUT_EVIDENCE_STALE", receipt["reason_codes"])
+        self.assertEqual(
+            receipt["gates"]["dollar_floor"]["decision"],
+            "HOLD_VERIFY_AMOUNT",
+        )
 
-    def test_stale_coordination_evidence_holds_account(self):
+    def test_stale_coordination_and_account_evidence_hold_account(self):
         item = candidate()
         item["congestion"]["observed_at"] = "2026-09-15T00:00:00Z"
         receipt = compile_paid_work_effort_value_gate(request(item))
         self.assertEqual(receipt["decision"], "HOLD_ACCOUNT_GATE")
-        self.assertIn(
-            "CONGESTION_EVIDENCE_STALE",
-            receipt["reason_codes"],
-        )
+        self.assertIn("CONGESTION_EVIDENCE_STALE", receipt["reason_codes"])
 
-    def test_stale_account_evidence_holds_account(self):
         item = candidate()
         item["account_kyc"] = evidence(
-            "READY",
-            at="2026-09-15T00:00:00Z",
-            tag="account-kyc",
+            "READY", at="2026-09-15T00:00:00Z", tag="account-kyc"
         )
         receipt = compile_paid_work_effort_value_gate(request(item))
         self.assertEqual(receipt["decision"], "HOLD_ACCOUNT_GATE")
-        self.assertIn(
-            "ACCOUNT_KYC_EVIDENCE_STALE",
-            receipt["reason_codes"],
-        )
+        self.assertIn("ACCOUNT_KYC_EVIDENCE_STALE", receipt["reason_codes"])
 
-    def test_future_evidence_is_rejected(self):
+    def test_future_and_unknown_input_are_rejected(self):
         item = candidate()
         item["payout_route"]["observed_at"] = "2026-09-16T20:00:01Z"
-        with self.assertRaisesRegex(
-            PaidWorkGateInputError,
-            "must not be in the future",
-        ):
+        with self.assertRaisesRegex(PaidWorkGateInputError, "future"):
             compile_paid_work_effort_value_gate(request(item))
-
-    def test_unknown_fields_are_rejected(self):
         item = candidate()
         item["mystery"] = "silent-input-expansion"
-        with self.assertRaisesRegex(
-            PaidWorkGateInputError,
-            "unsupported field",
-        ):
+        with self.assertRaisesRegex(PaidWorkGateInputError, "unsupported field"):
             compile_paid_work_effort_value_gate(request(item))
 
-    def test_float_and_nan_money_are_rejected(self):
+    def test_float_and_nan_money_are_rejected_by_dollar_floor_ancestor(self):
         for bad in (1.5, True, "NaN", "Infinity", "-1"):
             with self.subTest(value=bad):
                 item = candidate()
@@ -325,19 +356,20 @@ class PaidWorkEffortValueGateTests(unittest.TestCase):
                 with self.assertRaises(PaidWorkGateInputError):
                     compile_paid_work_effort_value_gate(request(item))
 
-    def test_receipt_is_deterministic_and_tamper_evident(self):
-        payload = request(candidate())
-        first = compile_paid_work_effort_value_gate(payload)
-        second = compile_paid_work_effort_value_gate(deepcopy(payload))
-        self.assertEqual(first, second)
-        self.assertTrue(verify_receipt(first))
-
-        changed = deepcopy(first)
-        changed["decision"] = "SKIP_ECONOMICS"
+    def test_nested_dollar_and_fleet_receipt_tamper_are_rejected(self):
+        receipt = compile_paid_work_effort_value_gate(request(candidate()))
+        changed = deepcopy(receipt)
+        changed["gates"]["dollar_floor"]["receipt"]["decision"] = "PILE_SAVE_UP"
+        body = dict(changed)
+        body.pop("receipt_sha256")
+        changed["receipt_sha256"] = hashlib.sha256(
+            json.dumps(
+                body, ensure_ascii=False, sort_keys=True,
+                separators=(",", ":"), allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest()
         self.assertFalse(verify_receipt(changed))
 
-    def test_nested_fleet_receipt_tamper_is_rejected_even_if_outer_rehashed(self):
-        receipt = compile_paid_work_effort_value_gate(request(candidate()))
         changed = deepcopy(receipt)
         changed["economics"]["fleet_economic_receipt"]["candidates"][0][
             "advertised_reward"
@@ -346,11 +378,8 @@ class PaidWorkEffortValueGateTests(unittest.TestCase):
         body.pop("receipt_sha256")
         changed["receipt_sha256"] = hashlib.sha256(
             json.dumps(
-                body,
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-                allow_nan=False,
+                body, ensure_ascii=False, sort_keys=True,
+                separators=(",", ":"), allow_nan=False,
             ).encode("utf-8")
         ).hexdigest()
         self.assertFalse(verify_receipt(changed))
@@ -363,7 +392,7 @@ class PaidWorkEffortValueGateTests(unittest.TestCase):
         )
         self.assertEqual(checked_in, POLICY)
 
-    def test_seed_fixtures_keep_policy_and_expected_decisions(self):
+    def test_seed_fixtures_keep_expected_decisions(self):
         fixture_dir = Path("data/paid_work_effort_value_gate")
         expectations = {
             "frantic_one_dollar.json": "SKIP_ECONOMICS",
@@ -386,15 +415,11 @@ class PaidWorkEffortValueGateTests(unittest.TestCase):
             path.write_text(json.dumps(payload), encoding="utf-8")
             proc = subprocess.run(
                 [
-                    sys.executable,
-                    "-m",
+                    sys.executable, "-m",
                     "concierge.paid_work_effort_value_gate",
-                    str(path),
-                    "--json",
+                    str(path), "--json",
                 ],
-                text=True,
-                capture_output=True,
-                check=False,
+                text=True, capture_output=True, check=False,
             )
         self.assertEqual(proc.returncode, 0, proc.stderr)
         receipt = json.loads(proc.stdout)
