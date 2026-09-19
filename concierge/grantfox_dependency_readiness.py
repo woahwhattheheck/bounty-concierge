@@ -153,6 +153,7 @@ def _normalize_dependencies(
             "state",
             "observed_at",
             "basis",
+            "completion",
         }
         if unknown:
             raise GrantFoxDependencyReadinessInputError(
@@ -211,6 +212,65 @@ def _normalize_dependencies(
         age = int((evaluated_at - observed_at).total_seconds())
         any_stale = any_stale or age > max_age
 
+        completion = _require_object(item.get("completion"), f"{field}.completion")
+        completion_unknown = set(completion) - {
+            "status", "merged_pr_url", "merge_commit_sha", "observed_at"
+        }
+        if completion_unknown:
+            raise GrantFoxDependencyReadinessInputError(
+                f"{field}.completion contains unsupported fields: {sorted(completion_unknown)}"
+            )
+        completion_status = _require_string(
+            completion.get("status"), f"{field}.completion.status", max_chars=24
+        ).upper()
+        if completion_status not in {"LANDED", "NOT_LANDED", "UNKNOWN"}:
+            raise GrantFoxDependencyReadinessInputError(
+                f"{field}.completion.status must be LANDED, NOT_LANDED, or UNKNOWN"
+            )
+        completion_observed_raw = _require_string(
+            completion.get("observed_at"), f"{field}.completion.observed_at", max_chars=64
+        )
+        completion_observed_at = _parse_timestamp(
+            completion_observed_raw, f"{field}.completion.observed_at"
+        )
+        if evaluated_at < completion_observed_at:
+            raise GrantFoxDependencyReadinessInputError(
+                f"{field}.completion.observed_at must not be after evaluated_at"
+            )
+        completion_age = int((evaluated_at - completion_observed_at).total_seconds())
+        any_stale = any_stale or completion_age > max_age
+
+        merged_pr_url = completion.get("merged_pr_url")
+        merge_commit_sha = completion.get("merge_commit_sha")
+        if completion_status == "LANDED":
+            merged_pr_url = _require_string(
+                merged_pr_url, f"{field}.completion.merged_pr_url", max_chars=512
+            )
+            expected_pr_prefix = (
+                "https://github.com/"
+                f"{quote(owner, safe='._-')}/{quote(repo, safe='._-')}/pull/"
+            )
+            if not merged_pr_url.casefold().startswith(expected_pr_prefix.casefold()):
+                raise GrantFoxDependencyReadinessInputError(
+                    f"{field}.completion.merged_pr_url must reference a PR in {expected_repo}"
+                )
+            pr_number = merged_pr_url[len(expected_pr_prefix):]
+            if not pr_number.isdigit() or int(pr_number) < 1 or str(int(pr_number)) != pr_number:
+                raise GrantFoxDependencyReadinessInputError(
+                    f"{field}.completion.merged_pr_url must be a canonical GitHub pull URL"
+                )
+            merge_commit_sha = _require_string(
+                merge_commit_sha, f"{field}.completion.merge_commit_sha", max_chars=40
+            )
+            if re.fullmatch(r"[0-9a-f]{40}", merge_commit_sha) is None:
+                raise GrantFoxDependencyReadinessInputError(
+                    f"{field}.completion.merge_commit_sha must be 40 lowercase hex characters"
+                )
+        elif merged_pr_url is not None or merge_commit_sha is not None:
+            raise GrantFoxDependencyReadinessInputError(
+                f"{field}.completion must not claim merge evidence unless status is LANDED"
+            )
+
         normalized.append(
             {
                 "repository_full_name": expected_repo,
@@ -220,6 +280,13 @@ def _normalize_dependencies(
                 "observed_at": observed_raw,
                 "snapshot_age_seconds": age,
                 "basis": basis,
+                "completion": {
+                    "status": completion_status,
+                    "merged_pr_url": merged_pr_url,
+                    "merge_commit_sha": merge_commit_sha,
+                    "observed_at": completion_observed_raw,
+                    "snapshot_age_seconds": completion_age,
+                },
             }
         )
     return normalized, any_stale
@@ -256,6 +323,10 @@ def compile_grantfox_dependency_readiness(request: dict[str, Any]) -> dict[str, 
         max_age=max_age,
     )
     open_dependencies = [item for item in dependencies if item["state"] == "open"]
+    closed_without_landed = [
+        item for item in dependencies
+        if item["state"] == "closed" and item["completion"]["status"] != "LANDED"
+    ]
     source_disposition = source_receipt.get("source_disposition")
 
     reasons: list[str] = []
@@ -263,6 +334,8 @@ def compile_grantfox_dependency_readiness(request: dict[str, Any]) -> dict[str, 
         reasons.append("SOURCE_NOT_ALIGNED")
     if dependency_stale:
         reasons.append("DEPENDENCY_SNAPSHOT_STALE")
+    if closed_without_landed:
+        reasons.append("PREREQUISITE_CLOSED_WITHOUT_LANDED_EVIDENCE")
     if open_dependencies:
         reasons.append("PREREQUISITE_ISSUES_OPEN")
 
@@ -272,6 +345,9 @@ def compile_grantfox_dependency_readiness(request: dict[str, Any]) -> dict[str, 
     elif "DEPENDENCY_SNAPSHOT_STALE" in reasons:
         disposition = "HOLD"
         next_action = "REFRESH_PREREQUISITE_ISSUE_OBSERVATIONS"
+    elif "PREREQUISITE_CLOSED_WITHOUT_LANDED_EVIDENCE" in reasons:
+        disposition = "HOLD"
+        next_action = "PROVE_PREREQUISITE_CAPABILITY_LANDED"
     elif open_dependencies:
         disposition = "DEPENDENCY_WAIT"
         next_action = (
@@ -298,6 +374,12 @@ def compile_grantfox_dependency_readiness(request: dict[str, Any]) -> dict[str, 
             "dependency_count": len(dependencies),
             "open_count": len(open_dependencies),
             "closed_count": len(dependencies) - len(open_dependencies),
+            "landed_count": sum(
+                1 for item in dependencies if item["completion"]["status"] == "LANDED"
+            ),
+            "closed_without_landed_issue_numbers": [
+                item["issue_number"] for item in closed_without_landed
+            ],
             "open_issue_numbers": [
                 item["issue_number"] for item in open_dependencies
             ],
@@ -341,6 +423,16 @@ def verify_dependency_readiness_receipt(receipt: dict[str, Any]) -> bool:
                     "state": item.get("state"),
                     "observed_at": item.get("observed_at"),
                     "basis": item.get("basis"),
+                    "completion": {
+                        "status": item.get("completion", {}).get("status")
+                        if type(item.get("completion")) is dict else None,
+                        "merged_pr_url": item.get("completion", {}).get("merged_pr_url")
+                        if type(item.get("completion")) is dict else None,
+                        "merge_commit_sha": item.get("completion", {}).get("merge_commit_sha")
+                        if type(item.get("completion")) is dict else None,
+                        "observed_at": item.get("completion", {}).get("observed_at")
+                        if type(item.get("completion")) is dict else None,
+                    },
                 }
                 for item in dependencies
             ],

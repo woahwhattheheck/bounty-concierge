@@ -34,7 +34,13 @@ The compiler consumes:
       "issue_url": "https://github.com/Gryd-lock/grydlock-testkit/issues/27",
       "state": "open",
       "observed_at": "2026-09-19T22:01:00Z",
-      "basis": "Issue #33 explicitly says to build on describe-transactions tooling."
+      "basis": "Issue #33 explicitly says to build on describe-transactions tooling.",
+      "completion": {
+        "status": "UNKNOWN",
+        "merged_pr_url": null,
+        "merge_commit_sha": null,
+        "observed_at": "2026-09-19T22:01:10Z"
+      }
     }
   ],
   "evaluated_at": "2026-09-19T22:02:00Z",
@@ -45,8 +51,12 @@ The compiler consumes:
 Every dependency must use the source receipt's owner/repository, exact canonical
 GitHub issue URL, a distinct positive issue number, `open` or `closed` state, a
 fresh observation time, and a non-empty `basis` explaining why it is a real
-prerequisite. Duplicate issues, self-dependencies, cross-repository aliases, and
-non-canonical URLs fail closed.
+prerequisite. It also carries an explicit `completion` observation. A closed issue
+is **not** completion evidence by itself: `LANDED` requires a same-repository
+canonical merged-PR URL, its exact 40-hex merge commit SHA, and a fresh observation.
+`NOT_LANDED` and `UNKNOWN` must carry no merge evidence. Duplicate issues,
+self-dependencies, cross-repository aliases, non-canonical URLs, and contradictory
+completion evidence fail closed.
 
 The same-repository restriction is intentional for v1. Cross-repository
 dependencies require a stronger identity and source-binding contract rather than
@@ -56,8 +66,10 @@ silently trusting a URL string.
 
 ### `DEPENDENCIES_CLEAR`
 
-All prerequisite observations are fresh and closed, and the embedded source
-receipt is `SOURCE_ALIGNED`.
+All prerequisite observations are fresh and closed, every closed prerequisite has
+positive `LANDED` evidence bound to a same-repository merged PR + exact merge
+commit, and the embedded source receipt is `SOURCE_ALIGNED`. Merely closing an
+issue as not planned, duplicate, stale, or unresolved can never clear the gate.
 
 Advisory next action:
 `CONTINUE_WITH_PROVIDER_AND_ASSIGNMENT_GATES`.
@@ -77,9 +89,10 @@ on the blockers instead of duplicating downstream work.
 
 ### `HOLD`
 
-The guard holds when the source receipt is not `SOURCE_ALIGNED` or any
-prerequisite observation is stale. Source problems take precedence over
-dependency state; closed prerequisites cannot launder a source HOLD into a green
+The guard holds when the source receipt is not `SOURCE_ALIGNED`, any prerequisite
+observation or completion observation is stale, or a closed prerequisite lacks
+positive landed evidence. Source problems take precedence over dependency state;
+issue closure alone cannot launder an unimplemented prerequisite into a green
 signal.
 
 ## Tamper evidence
