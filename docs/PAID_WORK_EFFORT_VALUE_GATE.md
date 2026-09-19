@@ -98,10 +98,14 @@ This is deliberately compatible with the fleet's separate Muse/single-writer coo
     "work_id": "paid-task-123",
     "canonical_source_url": "https://example.test/work/123",
     "advertised_payout": {
+      "state": "VERIFIED",
+      "evidence_url": "https://github.com/example/repo/issues/123",
+      "observed_at": "2026-09-16T19:30:00Z",
+      "amount_semantics": "FIXED",
       "amount": "300",
       "currency": "USD",
       "unit_type": "CASH",
-      "observed_at": "2026-09-16T19:30:00Z"
+      "authority": "FIRST_PARTY"
     },
     "estimated_engineering_hours": "1",
     "model_tool_cost": {
