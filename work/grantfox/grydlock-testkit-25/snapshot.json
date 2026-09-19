@@ -1,0 +1,54 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-gryd-lock-grydlock-testkit-25-R",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Delta",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Gryd-lock/grydlock-testkit",
+    "default_branch": "main",
+    "head_sha": "7064404d6e7c44df1f980d532d23901651d79426",
+    "issue_number": 25,
+    "issue_state": "open",
+    "assignee": null,
+    "linked_development_on_issue_page": false
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Gryd-lock/repo/grydlock-testkit/issue/25",
+    "assignment_state": "unassigned",
+    "apply_enabled": true,
+    "application_mode": "direct GitHub comment",
+    "applications_per_user": 1,
+    "existing_comment_count": 1,
+    "application_submitted_by_worker": false,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "blobs": {
+      ".github/workflows/ci.yml": "53ce3ea3359798fd8b34d3a06728ae8110f7277c",
+      "transactions/index.json": "a07a007e9a9e8f418d918044578a792014472a2b",
+      "package.json": "7d674c82cfca132d720a02dbc56d45df3979e950",
+      "transactions/payment.xdr": "0862f48fc1ed31a276de75c89ee162a00f056cce",
+      "transactions/path_payment.xdr": "cee944ec1e1ecf862366024daab3ca9584c89377",
+      "transactions/change_trust.xdr": "3ceaf64c0b088fd585dae2aac6260262e32091f3",
+      "transactions/fee_bump_payment.xdr": "0690ae0db3d8582988cf92ca70ba007430b4a9d1"
+    },
+    "observed_fixture_count": 4,
+    "generator_script_present": false,
+    "ci_regeneration_drift_gate_present": false
+  },
+  "residual": {
+    "single_authoritative_declarative_spec": true,
+    "byte_identical_clean_regeneration": true,
+    "fee_bump_included": true,
+    "ci_drift_gate": true,
+    "preserve_changelog_gate": true
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "upstream_source_mutated": false,
+    "application_submitted": false
+  }
+}
