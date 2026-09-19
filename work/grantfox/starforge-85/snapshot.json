@@ -1,0 +1,63 @@
+{
+  "schema": "grantfox-source-baseline/v1",
+  "identity": {
+    "owner": "StarsForges",
+    "repo": "StarForge",
+    "issue_number": 85,
+    "work_id": "GFOX2-20260919-082"
+  },
+  "upstream": {
+    "ref": "master",
+    "sha": "c2311c6cfbe25ab841ad6a18be60df0fe4f2fe61"
+  },
+  "github": {
+    "state": "OPEN",
+    "assignees": [],
+    "development_carrier": false,
+    "open_pr_85": false
+  },
+  "grantfox": {
+    "assignment": "Unassigned",
+    "comments": 2,
+    "apply_route": true
+  },
+  "connector": {
+    "upstream_permission": "pull"
+  },
+  "issue_minimum_production_loc": 1000,
+  "overlap": {
+    "pr": 114,
+    "closes_issue": 87,
+    "state": "open",
+    "mergeable": true,
+    "head": "7f86285384b5161a5fd6051e44ac6f4f1ed5929a",
+    "base": "c2311c6cfbe25ab841ad6a18be60df0fe4f2fe61",
+    "changed_files": 19,
+    "additions": 3939,
+    "scope": "privacy-safe JSON-RPC traffic recording/redaction and response replay; not ledger-state-backed local Soroban host execution"
+  },
+  "blobs": {
+    "cargo_toml": "e2bd210dd1e5e4f4ff8170d3e9dd25cd73944d53",
+    "main_rs": "349e092c89432709304100a98448dfd862e01480",
+    "lib_rs": "d05a42aa43f70b7e13af155752f937ae02f1f754",
+    "commands_mod": "e0a1165d3307473c96d1a4870894a151bdd4fe67",
+    "soroban_rs": "ebc77f8b572288c03db17c6ec222f58389267029",
+    "query_executor": "0443548f912e08d9c3121269acf87ead6353927e",
+    "query_output": "8db4de95a4250cabcffdbcae19f6404c59f1fb00",
+    "release_archive": "f7de862cc4c6c50f1c07da8f7028ec6979d5daf1",
+    "release_manifest": "672fe8cf3ce6fdf3b4bf0bb8375d48c979dce7f0",
+    "release_migrations": "47ace4e8a4a8b578a9df76c48d57cbf9e3c8055e",
+    "release_verify": "dcfb8567daa1a66e9d3b46a23e4196ad734e0222",
+    "signer_store": "348d74a9e5c79c4e750519dbc617fd4f970d57d6"
+  },
+  "findings": [
+    "PR #114 should be reused for privacy/redaction/response-replay primitives but does not satisfy ledger-state-backed offline execution",
+    "current src/utils/soroban.rs contains explicit mock/placeholder XDR paths and must not become snapshot truth",
+    "query executor already demonstrates canonical stellar-xdr LedgerKey encoding and an injectable RpcTransport boundary",
+    "release subsystem provides deterministic archive/checksum/versioned migration patterns but its fixed 0755 archive entry mode is not the snapshot security contract",
+    "signer-rotation/query output code already provides 0600/0700 private atomic persistence conventions",
+    "Cargo.toml has stellar-xdr and wasmi but no Soroban host implementation dependency; a compatible host/runtime dependency or equivalent real host integration is required for offline simulation semantics"
+  ],
+  "disposition": "APPLY_FOR_ASSIGNMENT",
+  "implementation_gate": "provider_or_maintainer_assignment_required"
+}
