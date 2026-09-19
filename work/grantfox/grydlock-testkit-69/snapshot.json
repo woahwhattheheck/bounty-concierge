@@ -1,0 +1,85 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX-FRESH-GRYD-69/R2-downstream-generated-module+consumer-pin-audit",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Solstice-69",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Gryd-lock/grydlock-testkit",
+    "head_sha": "7064404d6e7c44df1f980d532d23901651d79426",
+    "issue_number": 69,
+    "issue_state": "open",
+    "assignee": null,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "producer": {
+    "package_version": "0.1.0",
+    "destinations_blob": "c8f918089f700982d7347cc1d8af8d8677fd5774",
+    "scores_blob": "f27d17c781a9059cc1304af93def554391b63876",
+    "validator_blob": "90ea1abb6136d939aa4d1e0ac422b23f74fa6362",
+    "consumer_contract_workflow_blob": "05968b778c3ad91e096e4e954c79fa9178662092",
+    "consumer_contract_adapter_ref": "7e5b1b09860ce713abe507a59a3b7a226e09ebfb",
+    "current_required_destination_metadata": [
+      "risk_pattern",
+      "fixture_status"
+    ]
+  },
+  "direct_consumer": {
+    "repository": "Gryd-lock/grydlock-oracle-adapter",
+    "head_sha": "81b09e371694998d5c42e66be656aaaef409c176",
+    "sync_automation_commit": "480691fcc880806357a09543fc8b8f5ba1926b3b",
+    "sync_source": "https://raw.githubusercontent.com/Gryd-lock/grydlock-testkit/main",
+    "vendored_destinations_blob": "b37f01d6e90f63b3bdb7c5c1475c27785a1b05be",
+    "vendored_scores_blob": "f27d17c781a9059cc1304af93def554391b63876",
+    "schema_blob": "24ff153ac138e3836b886942677e41c6e2ab83a8",
+    "generated_sync_test_blob": "aff41d77d73dad6b287a18e50e974e1c3b8e615b",
+    "cross_repo_sync_blob": "d2ef84bb24ede952507acf5e1cb413ec1d8d0ec3",
+    "destinations_match_producer": false,
+    "scores_match_producer": true,
+    "runtime_preserves_unknown_destination_fields": false,
+    "generated_module_test_is_local_vendor_bound": true
+  },
+  "indirect_consumers": [
+    {
+      "repository": "Gryd-lock/grydlock-extension",
+      "head_sha": "4c3cc11c37288732b4d27d73ae473815f4fab40a"
+    },
+    {
+      "repository": "Gryd-lock/grydlock-research",
+      "head_sha": "24bab091f5ec9dc98af1a69bacaeb547b15d980b"
+    }
+  ],
+  "findings": {
+    "issue_manual_copy_premise_partially_stale": true,
+    "moving_main_used_as_sync_provenance": true,
+    "current_adapter_destination_vendor_is_stale": true,
+    "generated_modules_can_be_locally_green_while_vendor_is_stale": true,
+    "producer_contract_pin_lags_current_adapter_head": true,
+    "fixture_schema_not_covered_by_existing_cross_repo_sync": true
+  },
+  "recommended_protocol": {
+    "directional_compatibility": true,
+    "immutable_producer_identity": true,
+    "artifact_digests": true,
+    "consumer_revision_pins": true,
+    "capability_declarations": true,
+    "migration_guidance_on_unsupported": true,
+    "required_hostile_tests": [
+      "additive_field",
+      "removed_field",
+      "stale_generated_module",
+      "stale_vendor_vs_manifest",
+      "unsupported_schema_version"
+    ]
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "upstream_source_mutated": false,
+    "reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  }
+}
