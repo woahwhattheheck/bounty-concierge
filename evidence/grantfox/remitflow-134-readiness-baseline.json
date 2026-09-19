@@ -1,0 +1,58 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-remitflow-remitflow-backend-134/R-readiness-recovery-map",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Rook",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "RemitFlow/RemitFlow-Backend",
+    "default_branch": "main",
+    "head_sha": "b0a004ab8aa00b1e6f262aa84ea2b0ec0a622e1b",
+    "issue_number": 134,
+    "issue_state": "open",
+    "connector_pull": true,
+    "connector_push": false
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/RemitFlow/repo/RemitFlow-Backend/issue/134",
+    "public_assignment_state": "Unassigned",
+    "visible_comments": 0,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "health_routes_sha": "b60f184c3035a6d15e274ade6537ccefe59621d7",
+    "health_controller_sha": "0e41aa5f9de1c5cf2369bedf7d2d38e2865d630f",
+    "package_sha": "a1bf7b6726b103f58de2e8cf6f2bab71fca6883b",
+    "store_sha": "0024fac7dfbefe34054b9ad0f3ce4a8164828ee7",
+    "rates_config_sha": "52f235a875affcbf31a15ac19108d2a12c0e6bad",
+    "rate_service_sha": "95c7112e9f88a003c5d34ade0cb02f05b8cd4da0",
+    "stellar_service_sha": "e77cea9f8ff55a38de68ee55f4a5563a7c748321",
+    "app_config_sha": "41f9a7137046d1b8482d5261d727dcfa267ddc12",
+    "request_timeout_sha": "ad9b53a3bd9faf5980d588b37a2944400e5a3836",
+    "app_sha": "bd5b0652767bfb774ec992a331d8ec8826f27376",
+    "current_readiness": "unconditional_ready_store_ok",
+    "live_db_client_found": false,
+    "live_payment_provider_client_found": false,
+    "live_fx_provider_client_found": false,
+    "health_test_files_found": 0,
+    "disposition": "SCOPE_MISMATCH_CONFIRM_WITH_MAINTAINER_ASSIGNMENT_GATED"
+  },
+  "recommended_contract": {
+    "liveness_dependency_io": false,
+    "readiness_failure_status": 503,
+    "readiness_success_status": 200,
+    "per_check_deadline_required": true,
+    "cancellation_required": true,
+    "redacted_allowlisted_reason_codes": true,
+    "failure_latching": false,
+    "injected_failure_timeout_recovery_tests": true
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "upstream_source_mutated": false,
+    "provider_application_submitted": false,
+    "live_dependency_contacted": false
+  }
+}
