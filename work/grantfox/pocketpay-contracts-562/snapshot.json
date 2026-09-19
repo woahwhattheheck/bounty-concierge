@@ -1,0 +1,41 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-pocketpay-contracts-562/R-consumer-fixture-source-audit",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Halley-83",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Axionvera/pocketpay-contracts",
+    "default_branch": "main",
+    "head_sha": "7988c6efec9a73162ed7d2fffb3b8b6ebd5a7b67",
+    "issue_number": 562,
+    "issue_state": "open",
+    "github_assignee": null
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Axionvera/repo/pocketpay-contracts/issue/562",
+    "public_assignment_state": "Unassigned",
+    "application_route_visible": true,
+    "one_application_per_user": true,
+    "visible_comments": 2,
+    "fixed_reward_verified": false
+  },
+  "evidence": {
+    "test_helpers_blob": "d05a767400edc940f1e8ba2c622b8ea1bcffa438",
+    "event_compatibility_blob": "6f50b028159c57b9b57f2af5da40b60bd6d0d477",
+    "token_transfer_rollback_blob": "1d907d6e7f4f18e5794b4868e668a89c84af6fb9",
+    "test_mod_blob": "f69f4ff36f4608b2480b1280204f7e63039ab2dc",
+    "simulation_compatibility_blob": "ad5d5c97633977465d3deab7334a7dd8ea7a1aa6",
+    "repo_map_blob": "00970c7e1592de0d9ebc7b5c961237b6f902cbfc",
+    "consumer_fixtures_directory_found": false
+  },
+  "design": {
+    "disposition": "READY_FOR_ASSIGNMENT_NOT_IMPLEMENTATION",
+    "residual": "portable versioned SDK/mobile fixture corpus derived from canonical contract vectors",
+    "avoid": "duplicating existing Rust-only fixture helpers"
+  },
+  "fence": {
+    "implementation_requires_provider_or_maintainer_assignment": true,
+    "upstream_source_mutated": false
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "schema": "grantfox-stale-scope/v1",
+  "operation": "GFOX3-20260919-pocketpay-contracts/R-stale-scope-suppression",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Halley-83",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Axionvera/pocketpay-contracts",
+    "head_sha": "7988c6efec9a73162ed7d2fffb3b8b6ebd5a7b67"
+  },
+  "suppressions": [
+    {
+      "issue": 276,
+      "grantfox_public_assignment_state": "Unassigned",
+      "reason": "core token-backed deposit acceptance criteria already implemented",
+      "evidence_blobs": [
+        "8829b657f7b101c1e4ba8aaa423ba14cf5652b9e",
+        "f69f4ff36f4608b2480b1280204f7e63039ab2dc"
+      ]
+    },
+    {
+      "issue": 440,
+      "reason": "dedicated rollback suite and documentation already cover deposit, withdrawal, and matured-lock transfer atomicity",
+      "evidence_blobs": [
+        "1d907d6e7f4f18e5794b4868e668a89c84af6fb9",
+        "ad5d5c97633977465d3deab7334a7dd8ea7a1aa6"
+      ]
+    }
+  ],
+  "recommendation": "close or explicitly re-scope stale issues before contributor implementation"
+}
