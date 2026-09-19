@@ -41,6 +41,8 @@ class T(unittest.TestCase):
     def test_stale_future_and_target_binding(self):
         self.assertEqual(self.c([ev('100',at='2026-09-18T22:59:59Z')])['reason_codes'],['REWARD_EVIDENCE_STALE'])
         with self.assertRaisesRegex(gate.BountyCashAdmissionError,'future'): self.c([ev('100',at='2026-09-19T23:00:01Z')])
+        bad=req(); bad['candidate']['availability']['source_url']='https://github.com/acme/widget/issues/99'
+        with self.assertRaisesRegex(gate.BountyCashAdmissionError,'availability.source_url'): gate.compile_bounty_cash_admission(bad)
         with self.assertRaisesRegex(gate.BountyCashAdmissionError,'target_url'): self.c([ev('500',target='https://github.com/acme/widget/issues/99')])
     def test_schema_money_and_tamper_fail_closed(self):
         bad=req(); bad['candidate']['mystery']=True
