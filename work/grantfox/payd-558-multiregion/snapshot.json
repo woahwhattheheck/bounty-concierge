@@ -1,0 +1,61 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-PAYD-558/R-multiregion-terraform-source-audit",
+  "worker": "ZZ-Sol-Crux-83",
+  "model": "GPT-5.6 Sol",
+  "observed_date": "2026-09-19",
+  "upstream": {
+    "repository": "Protocol-Guild/PayD",
+    "head_sha": "af5c348e83033ed3340e589b68e8554f0303060e",
+    "issue_number": 558,
+    "issue_state": "open",
+    "assignee": null,
+    "public_dev_carrier": false,
+    "duplicate_history_issue": 335,
+    "duplicate_history_has_public_carrier": false
+  },
+  "grantfox": {
+    "public_assignment_state": "Unassigned",
+    "visible_comments": 0,
+    "application_route_visible": true,
+    "one_application_per_user": true,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "source_pins": {
+    "production_main": "0ff7b58bd87ace8dee4645eafdbd0249cc029f5a",
+    "production_variables": "ec1291fbcc2d9d97b701fd4ce13abaaafd143bfc",
+    "staging_main": "b9a7aa5c29837d548e9142d5b612561807950faf",
+    "staging_variables": "ec1291fbcc2d9d97b701fd4ce13abaaafd143bfc",
+    "vpc_module": "d16029b8fa5638c80ad1699609c4f9c2b5f72b6a",
+    "rds_module": "91f691dcfbb6de6edf34682c801abad88de4bbf1",
+    "redis_module": "dbf8b8edef591d33dc924004fe69c7e51a4e0f4c",
+    "ecs_module": "ff400b673c7a27f5911a6232aa23e54ab8b1776b",
+    "secrets_module": "f74129c7143cd7cf4304e6a769470680f5400bd1",
+    "terraform_workflow": "ab8964dcd01ec661f9b22e80e185168219d544c7",
+    "infrastructure_readme": "073de6cbea31c91c4e8da326de782740652a1c26"
+  },
+  "repair_gates": [
+    "aws_region is duplicated/ignored while provider remains hardcoded to us-east-1",
+    "VPC endpoint service names are hardcoded to us-east-1",
+    "production RDS and Redis ingress hardcode staging CIDR 10.0.0.0/16 instead of production 10.1.0.0/16",
+    "Terraform workflow is outside root .github/workflows and references matrix.environment without a visible matrix",
+    "regional ECS duplication would collide on account-global IAM role names"
+  ],
+  "current_gap": [
+    "no Route53 failover graph",
+    "RDS multi_az is intra-region and there is no cross-region replica",
+    "no secondary regional application stack",
+    "no documented promotion/write-fence/failback procedure",
+    "no controlled failover test measuring RPO/RTO"
+  ],
+  "disposition": "READY_FOR_ASSIGNMENT_WITH_REPAIR_GATES",
+  "fence": {
+    "aws_apply_performed": false,
+    "upstream_source_mutated": false,
+    "provider_application_submitted": false,
+    "production_credentials_mutated": false,
+    "funds_moved": false
+  }
+}
