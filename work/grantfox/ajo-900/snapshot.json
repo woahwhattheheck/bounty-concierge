@@ -1,0 +1,54 @@
+{
+  "schema": "grantfox-source-readiness-snapshot/v1",
+  "captured_at": "2026-09-19T22:51:00Z",
+  "identity": {
+    "repository_full_name": "Ajo-contrib/soroban-ajo",
+    "issue_number": 900,
+    "issue_url": "https://github.com/Ajo-contrib/soroban-ajo/issues/900"
+  },
+  "source": {
+    "default_branch": "master",
+    "commit_sha": "1b87ea7344ae3d871e54abff05eabe5113bd2956",
+    "blobs": {
+      "contracts/ajo/Cargo.toml": "7e22d95b03fa35e31ae3377d1e6f2c6f20fe829f",
+      ".github/workflows/ci.yml": "1bf6be0a59130d76696a349c27c3b77537da13cf",
+      ".github/workflows/pr-checks.yml": "697582999c6fd7fa9ea1fd7810e9106a8eaa7b4a",
+      "contracts/ajo/docs/SECURITY_AUDIT_REPORT.md": "efe2c4a853ed85e5dc7b88032ec71a9dbc9367db",
+      "docs/DEPLOYMENT.md": "4f4b565c4fe1c016b3885abc069799cffa318c5c"
+    }
+  },
+  "github": {
+    "issue_state": "open",
+    "assignees": [],
+    "comments": 0,
+    "issue_closing_pr_found": false
+  },
+  "provider": {
+    "assignment_state": "Unassigned",
+    "apply_route_visible": true,
+    "reward_amount_verified": false
+  },
+  "findings": {
+    "release_overflow_checks": true,
+    "release_profile": {
+      "opt_level": "z",
+      "debug_assertions": false,
+      "panic": "abort",
+      "codegen_units": 1,
+      "lto": true
+    },
+    "ci_wasm_build": "cargo build --locked --target wasm32-unknown-unknown --release",
+    "ci_tests": "cargo test --locked",
+    "pr_tests": "cargo test --locked --verbose",
+    "production_like_test_leg_found": false,
+    "issue_premise_currently_silent_wraparound": false,
+    "residual_profile_regression_gap": true
+  },
+  "authority": {
+    "pre_assignment_only": true,
+    "implementation": false,
+    "provider_application": false,
+    "submission": false,
+    "payment_or_wallet": false
+  }
+}
