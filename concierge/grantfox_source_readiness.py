@@ -230,6 +230,7 @@ def _normalize_replacements(
     value: Any,
     expectation_keys: set[tuple[str, str]],
     missing_keys: set[tuple[str, str]],
+    expectation_matches: dict[tuple[str, str], set[tuple[str, str]]],
 ) -> list[dict[str, Any]]:
     if type(value) is not list:
         raise GrantFoxSourceReadinessInputError("replacements must be a list")
@@ -315,11 +316,27 @@ def _normalize_replacements(
             _normalize_match(entry, f"{field}.evidence[{evidence_index}]")
             for evidence_index, entry in enumerate(evidence)
         ]
-        if len({(x["path"], x["blob_sha"]) for x in normalized_evidence}) != len(
-            normalized_evidence
-        ):
+        evidence_keys = {
+            (item["path"], item["blob_sha"]) for item in normalized_evidence
+        }
+        if len(evidence_keys) != len(normalized_evidence):
             raise GrantFoxSourceReadinessInputError(
                 f"{field}.evidence must not contain duplicates"
+            )
+
+        replacement_key = (replacement_kind, replacement_value)
+        target_matches = expectation_matches.get(replacement_key)
+        if target_matches is None:
+            raise GrantFoxSourceReadinessInputError(
+                f"{field} replacement target must be a declared expectation"
+            )
+        if not target_matches:
+            raise GrantFoxSourceReadinessInputError(
+                f"{field} replacement target expectation must be present"
+            )
+        if not evidence_keys.issubset(target_matches):
+            raise GrantFoxSourceReadinessInputError(
+                f"{field}.evidence must match the declared replacement target evidence"
             )
 
         normalized.append(
@@ -426,10 +443,19 @@ def compile_grantfox_source_readiness(request: dict[str, Any]) -> dict[str, Any]
 
     expectations = _normalize_expectations(request.get("expectations"))
     expectation_keys = {(item["kind"], item["value"]) for item in expectations}
+    expectation_matches = {
+        (item["kind"], item["value"]): {
+            (match["path"], match["blob_sha"]) for match in item["matches"]
+        }
+        for item in expectations
+    }
     missing = [item for item in expectations if not item["matches"]]
     missing_keys = {(item["kind"], item["value"]) for item in missing}
     replacements = _normalize_replacements(
-        request.get("replacements", []), expectation_keys, missing_keys
+        request.get("replacements", []),
+        expectation_keys,
+        missing_keys,
+        expectation_matches,
     )
     replacement_keys = {
         (item["for_kind"], item["for_value"]) for item in replacements
