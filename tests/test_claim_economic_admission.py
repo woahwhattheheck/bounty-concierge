@@ -279,9 +279,9 @@ def test_rehashed_forged_go_cannot_override_replayed_hold(tmp_path):
 
 
 def test_weak_caller_policy_cannot_mint_live_admission(tmp_path):
-    request = _request(amount="14", currency="RTC")
-    request["policy"]["fleet_economic_policy"]["currencies"]["RTC"]["min_single_reward"] = "1"
-    request["policy"]["fleet_economic_policy"]["currencies"]["RTC"]["min_reward_per_agent_hour"] = "1"
+    request = _request(amount="75", currency="USD")
+    request["policy"]["fleet_economic_policy"]["currencies"]["USD"]["min_single_reward"] = "1"
+    request["policy"]["fleet_economic_policy"]["currencies"]["USD"]["min_reward_per_agent_hour"] = "1"
     receipt = compile_paid_work_effort_value_gate(request)
     assert receipt["decision"] == "GO"
     with pytest.raises(gate.ClaimEconomicAdmissionError) as caught:
