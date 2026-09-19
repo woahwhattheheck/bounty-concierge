@@ -12,7 +12,10 @@ import re
 from typing import Any
 from urllib.parse import urlsplit
 
-from .grantfox_queue_gate import verify_receipt as verify_queue_receipt
+from .grantfox_queue_gate import (
+    compile_grantfox_queue_gate,
+    verify_receipt as verify_queue_receipt,
+)
 
 SCHEMA = "grantfox-application-continuity/v1"
 QUEUE_SCHEMA = "grantfox-queue-gate/v1"
@@ -337,15 +340,104 @@ def compile_continuity(request: dict[str, Any]) -> dict[str, Any]:
     return {**body, "receipt_sha256": _hash(body)}
 
 
+def _semantic_replay(receipt: dict[str, Any]) -> dict[str, Any]:
+    """Recompile retained events without pretending the queue anchor is recoverable.
+
+    Continuity v1 stores the queue digest rather than the complete queue receipt.
+    For semantic replay we therefore compile a deterministic, valid synthetic queue
+    envelope carrying only the continuity-owned identity + actor fields. The
+    resulting continuity receipt is then rebound to the retained queue digest
+    before exact comparison. Downstream consumers remain responsible for
+    verifying the real queue receipt and matching its digest to queue_anchor.
+    """
+    identity = _obj(receipt.get("identity"), "receipt.identity")
+    queue_anchor = _obj(receipt.get("queue_anchor"), "receipt.queue_anchor")
+    if set(queue_anchor) != {"schema", "receipt_sha256"}:
+        raise GrantFoxContinuityInputError("receipt.queue_anchor fields are invalid")
+    if queue_anchor.get("schema") != QUEUE_SCHEMA:
+        raise GrantFoxContinuityInputError("receipt.queue_anchor schema is invalid")
+    queue_digest = queue_anchor.get("receipt_sha256")
+    if type(queue_digest) is not str or not SHA256.fullmatch(queue_digest):
+        raise GrantFoxContinuityInputError("receipt.queue_anchor digest is invalid")
+
+    actor = _login(identity.get("actor_login"), "receipt.identity.actor_login")
+    listing_url = _text(identity.get("listing_url"), "receipt.identity.listing_url")
+    canonical_issue_url = _text(
+        identity.get("canonical_issue_url"), "receipt.identity.canonical_issue_url"
+    )
+    issue = _identity(
+        canonical_issue_url, "receipt.identity.canonical_issue_url", "issue"
+    )
+    listing_issue = _identity(
+        listing_url, "receipt.identity.listing_url", "gfox"
+    )
+    if listing_issue != issue:
+        raise GrantFoxContinuityInputError(
+            "receipt identity URLs identify different issues"
+        )
+    if (
+        identity.get("owner"),
+        identity.get("repo"),
+        identity.get("issue_number"),
+    ) != issue:
+        raise GrantFoxContinuityInputError(
+            "receipt identity fields do not match canonical issue URL"
+        )
+
+    # Use the public queue compiler rather than hand-minting a verifier fixture.
+    # These timestamps are intentionally identical: freshness is irrelevant to
+    # continuity event replay, and the real queue digest is restored below.
+    replay_queue = compile_grantfox_queue_gate(
+        {
+            "schema": QUEUE_SCHEMA,
+            "listing_url": listing_url,
+            "canonical_issue_url": canonical_issue_url,
+            "actor_login": actor,
+            "assigned_to": None,
+            "actor_applied": False,
+            "issue_state": "open",
+            "application_count": 0,
+            "linked_pr_urls": [],
+            "labels": [],
+            "observed_at": "2000-01-01T00:00:00Z",
+            "evaluated_at": "2000-01-01T00:00:00Z",
+            "max_snapshot_age_seconds": 900,
+        }
+    )
+    expected = compile_continuity(
+        {
+            "schema": SCHEMA,
+            "actor_login": actor,
+            "queue_receipt": replay_queue,
+            "events": receipt.get("events"),
+        }
+    )
+    expected["queue_anchor"]["receipt_sha256"] = queue_digest
+    body = dict(expected)
+    body.pop("receipt_sha256", None)
+    expected["receipt_sha256"] = _hash(body)
+    return expected
+
+
 def verify_continuity_receipt(receipt: dict[str, Any]) -> bool:
-    if type(receipt) is not dict or receipt.get("schema") != SCHEMA or receipt.get("authority") != AUTHORITY:
+    """Verify digest and replay the retained lifecycle semantics exactly."""
+    if (
+        type(receipt) is not dict
+        or receipt.get("schema") != SCHEMA
+        or receipt.get("authority") != AUTHORITY
+    ):
         return False
     digest = receipt.get("receipt_sha256")
     if type(digest) is not str or not SHA256.fullmatch(digest):
         return False
     body = dict(receipt)
     body.pop("receipt_sha256", None)
-    return _hash(body) == digest
+    if _hash(body) != digest:
+        return False
+    try:
+        return _semantic_replay(receipt) == receipt
+    except (GrantFoxContinuityInputError, KeyError, TypeError, ValueError):
+        return False
 
 
 def format_summary(receipt: dict[str, Any]) -> str:
