@@ -1,0 +1,64 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-remitwise-frontend-1627/R-idempotency-source-audit",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Crux-83",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Remitwise-Org/Remitwise-Frontend",
+    "default_branch": "main",
+    "head_sha": "9ec08b3cdda3b12ff5be1a8d57f5bf49352629ed",
+    "issue_number": 1627,
+    "issue_state": "open",
+    "assignee": null,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    },
+    "tree_entry_count": 1451,
+    "repo_roots": [
+      ".github",
+      ".vs",
+      ".vscode",
+      "README.md",
+      "docs",
+      "lib",
+      "meridian-api",
+      "meridian-contracts",
+      "meridian-web",
+      "package-lock.json",
+      "tests"
+    ]
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Remitwise-Org/repo/Remitwise-Frontend/issue/1627",
+    "public_assignment_state": "Unassigned",
+    "visible_application_comments": 2,
+    "linked_pr_found": false,
+    "application_route_visible": true,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "required_starting_paths": [
+      "lib/soroban/client.ts",
+      "services/transaction-builder.ts",
+      "services/transaction-builder-service.ts",
+      "useTransactionStatus.ts"
+    ],
+    "required_starting_paths_present": false,
+    "code_search_queries": [
+      "transaction-builder",
+      "useTransactionStatus",
+      "submitTransaction"
+    ],
+    "code_search_hits": 0,
+    "disposition": "HOLD_SOURCE_MISMATCH"
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "maintainer_path_clarification_required": true,
+    "upstream_source_mutated": false
+  }
+}
