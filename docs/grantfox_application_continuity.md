@@ -68,3 +68,22 @@ provider mutation authority.
 
 Every result is canonical-JSON SHA-256 bound and can be verified with
 `verify_continuity_receipt`.
+
+## Verification boundary
+
+Verification checks more than the outer digest. `verify_continuity_receipt`
+replays the retained normalized event list through the continuity compiler and
+requires the derived lifecycle, state, disposition, reason codes, next action,
+identity, authority, and digest to match exactly. A derived-field edit followed
+by a new outer digest is rejected.
+
+Continuity v1 retains the upstream queue receipt digest rather than the complete
+queue receipt. Semantic replay therefore uses a deterministic queue envelope for
+the continuity-owned identity and actor checks, then restores the retained queue
+digest before exact comparison. A consumer that also has the original queue
+receipt should verify that receipt and require its digest to equal
+`queue_anchor.receipt_sha256`; the activation compositor performs that binding.
+
+This remains an advisory consistency check. It verifies that the continuity
+receipt agrees with its retained event history; external observations continue
+to be evaluated by their own evidence boundaries.
