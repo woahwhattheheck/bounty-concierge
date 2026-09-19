@@ -1,0 +1,56 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-035-R-V41",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Kestrel-V41",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Flux-DeFi/LiquidFlow",
+    "default_branch": "main",
+    "head_sha": "c0cb1753a96ca900d3a3bb01791023da5a5148c1",
+    "issue_number": 182,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 2,
+    "matching_pr_found": true,
+    "matching_pr_url": "https://github.com/Flux-DeFi/LiquidFlow/pull/222",
+    "matching_pr_state": "open"
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Flux-DeFi/repo/LiquidFlow/issue/182",
+    "assignment_state": "unassigned",
+    "labels": [
+      "good first issue",
+      "frontend",
+      "Maybe Rewarded",
+      "GrantFox OSS",
+      "Official Campaign | FWC26"
+    ],
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "main_use_stream_data_blob": "e8c605486511c5381582272d2315ff2261f0fc3c",
+    "main_dashboard_blob": "9075c015b8f097e0cfa1b6ab31b2350b848c6f19",
+    "vitest_config_blob": "b79a955ef7c4c3e8aa5844ba19cb05d3ce0296f4",
+    "pr222_dashboard_blob": "696d0fc7118a48967f7f998312a401ab48934986",
+    "pr222_state_tests_blob": "627c2b8fd686cb6ecf024f5f87189dc98213a61c",
+    "pr222_use_stream_data_blob": "e8c605486511c5381582272d2315ff2261f0fc3c",
+    "pr222_review_count": 0,
+    "pr222_review_thread_count": 0,
+    "literal_acceptance_gap": "useStreamData/useUserStreams expose error but not an isError boolean"
+  },
+  "disposition": {
+    "fleet_route": "REUSE_EXISTING_PR",
+    "next_action": "REFRESH_AND_CONTINUE_EXISTING_PR",
+    "implementation_started": false,
+    "reason": "matching open upstream PR exists before provider assignment"
+  },
+  "authority": {
+    "advisory_only": true,
+    "provider_assignment_authority": false,
+    "upstream_implementation_authority": false,
+    "payment_or_wallet_authority": false
+  }
+}
