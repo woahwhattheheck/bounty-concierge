@@ -43,10 +43,11 @@ def _make_loader():
              | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
              | getattr(os, "O_NONBLOCK", 0))
     max_bytes = 256 * 1024
+    compare_ctime = os.name == "posix"
 
     def generation(st):
-        return (st.st_dev, st.st_ino, st.st_mode, st.st_size,
-                st.st_mtime_ns, st.st_ctime_ns)
+        identity = (st.st_dev, st.st_ino, st.st_mode, st.st_size, st.st_mtime_ns)
+        return identity + ((st.st_ctime_ns,) if compare_ctime else ())
 
     def source_bytes(filename, expected):
         path = directory / filename
