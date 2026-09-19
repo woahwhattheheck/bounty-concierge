@@ -1,0 +1,80 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-017-R-ZZ-SOL-DELTA",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Delta",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Bitcoindefi/v0-piggy-city",
+    "default_branch": "main",
+    "head_sha": "1846b4f204974654050beecf56a56391dc7ad138",
+    "issue_number": 15,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 2,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Bitcoindefi/repo/v0-piggy-city/issue/15",
+    "public_assignment_state": "Unassigned",
+    "application_route_visible": true,
+    "one_application_per_user": true,
+    "observed_application_comments": 2,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false,
+    "application_attempt": {
+      "status": "automation_pending",
+      "submitted_verified": false
+    }
+  },
+  "evidence": {
+    "readme_blob": "bc9ef39725e5acfeb108ec6a9538d8be0f3bda2c",
+    "web_index_blob": "2f7c9a63af5106f3e7e75c76aca9f8fa77284387",
+    "compiled_web_build_commit": "f3264aed5a076133b2d09f8a080960e219135bba",
+    "subpath_boot_fix_commit": "37e337c0302a985ba85224c9f5e72cb87243bb6a",
+    "web_artifact_sizes_from_shell": {
+      "index.pck": 4382168,
+      "index.wasm": 39509339
+    },
+    "project_godot_root_path": "not_found",
+    "export_presets_root_path": "not_found",
+    "headless_build_search": "not_found",
+    "blocking_dependency": {
+      "issue_number": 4,
+      "state": "open",
+      "assignee": null,
+      "comments": 0,
+      "open_pr_carrier_found": false,
+      "issue_explicitly_blocks_rest": true
+    }
+  },
+  "residual_scope": {
+    "existing_browser_bundle": true,
+    "reproducible_source_export_contract": false,
+    "tracked_web_export_preset": false,
+    "tracked_godot_project_at_root": false,
+    "readme_godot_export_docs": false,
+    "required_preservations": [
+      "/game/ base href behavior",
+      "visible loading/progress/failure states",
+      "single-threaded Web compatibility unless isolation headers are deliberately adopted"
+    ],
+    "post_assignment_checks": [
+      "clean-checkout headless Web export",
+      "HTTP browser smoke for index/JS/WASM/PCK",
+      "canvas/engine boot",
+      "fatal console failure absence",
+      "artifact size delta report",
+      "/game, /game/, /game/index.html routing"
+    ]
+  },
+  "fence": {
+    "implementation_requires_provider_or_maintainer_assignment": true,
+    "dependency_4_requires_clearance_or_maintainer_coordination": true,
+    "upstream_source_mutated": false
+  }
+}
