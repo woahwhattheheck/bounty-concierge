@@ -160,6 +160,13 @@ def test_exact_input_schema_rejects_hidden_fields():
         compile_economics_gate(payload)
 
 
+def test_lone_surrogate_in_source_ref_is_rejected_before_hashing():
+    payload = request()
+    payload["reward"]["source_ref"] = "bad\ud800source"
+    with pytest.raises(BountyEconomicsInputError, match="lone surrogates"):
+        compile_economics_gate(payload)
+
+
 def test_receipt_tamper_cannot_be_relabelled_active():
     receipt = compile_economics_gate(
         request(min_cents=2_000, max_cents=2_000)
