@@ -1,0 +1,56 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "ZZF-GFOX-DISC-007-R-ZZ-SOL-DRIFT",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Drift",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "StellarSend/contracts",
+    "default_branch": "main",
+    "head_sha": "d510c6e9af81df5ede14287d58ce7eca84ee6147",
+    "issue_number": 6,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 2,
+    "matching_invalid_path_pr_found": false,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/StellarSend/repo/contracts/issue/6",
+    "public_assignment_state": "Unassigned",
+    "application_route_visible": true,
+    "labels": [
+      "bug",
+      "contracts",
+      "testing",
+      "very hard",
+      "Maybe Rewarded",
+      "GrantFox OSS",
+      "Official Campaign | FWC26"
+    ],
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "lib_blob": "f502afc8441f21426931ceb22f754094a834071d",
+    "error_blob": "00db98c55436ff87efd5c9bc221029360d50c4c9",
+    "test_blob": "4c3bd7351b04a409591622c14cd393e9315c1778",
+    "cargo_blob": "43b5234ba7370095cbbd183da6345a649a8bef43",
+    "invalid_path_discriminant": 8,
+    "findings": [
+      "send_path_payment accepts Vec<Address> path with no bound",
+      "endpoint intermediate hops are not rejected",
+      "duplicate intermediate hops are not rejected",
+      "full_path is built but unused by current simulated swap",
+      "empty intermediate path is explicitly valid in issue clarification"
+    ]
+  },
+  "fence": {
+    "implementation_requires_provider_or_maintainer_assignment": true,
+    "upstream_source_mutated": false
+  }
+}
