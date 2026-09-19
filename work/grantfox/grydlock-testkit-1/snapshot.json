@@ -1,0 +1,42 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "ZZF-GFOX-DISC-006-R-ZZ-SOL-DRIFT",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Drift",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Gryd-lock/grydlock-testkit",
+    "head_sha": "7064404d6e7c44df1f980d532d23901651d79426",
+    "issue_number": 1,
+    "state": "open",
+    "assignee": null,
+    "comments": 2,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "public_assignment_state": "Unassigned",
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "validator_blob": "90ea1abb6136d939aa4d1e0ac422b23f74fa6362",
+    "destinations_blob": "c8f918089f700982d7347cc1d8af8d8677fd5774",
+    "package_json_blob": "7d674c82cfca132d720a02dbc56d45df3979e950",
+    "package_lock_blob": "c06528821738da20014efaec28eb20d4a61d8348",
+    "ci_blob": "53ce3ea3359798fd8b34d3a06728ae8110f7277c",
+    "destination_count": 12
+  },
+  "spec_drift": [
+    "issue says 11 destinations; current main has 12",
+    "issue says no package-lock; current main has one",
+    "issue requires SDK dependency but current clean CI has no npm install step"
+  ],
+  "fence": {
+    "implementation_requires_assignment": true,
+    "upstream_source_mutated": false
+  }
+}
