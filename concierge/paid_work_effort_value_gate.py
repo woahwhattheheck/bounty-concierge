@@ -20,6 +20,7 @@ import sys
 from typing import Any, Optional
 
 from concierge import fleet_economic_admission as fleet_economics
+from concierge import paid_work_dollar_floor as dollar_floor
 
 
 _REQUEST_SCHEMA = "paid-work-effort-value-gate/v1"
@@ -433,27 +434,58 @@ def compile_paid_work_effort_value_gate(request: dict[str, Any]) -> dict[str, An
     payout_raw = _object(
         candidate["advertised_payout"],
         "candidate.advertised_payout",
-        required=frozenset({"amount", "currency", "unit_type", "observed_at"}),
+        required=frozenset({"state", "evidence_url", "observed_at"}),
+        optional=frozenset(
+            {
+                "amount_semantics",
+                "amount",
+                "min_amount",
+                "max_amount",
+                "currency",
+                "unit_type",
+                "authority",
+            }
+        ),
     )
-    payout = _decimal(
-        payout_raw["amount"],
-        "candidate.advertised_payout.amount",
-        positive=True,
-    )
-    payout_currency = _currency(
-        payout_raw["currency"], "candidate.advertised_payout.currency"
-    )
-    unit_type = payout_raw["unit_type"]
-    if unit_type not in {"CASH", "NONCASH"}:
-        raise PaidWorkGateInputError(
-            "candidate.advertised_payout.unit_type must be CASH or NONCASH"
+    floor_request = {
+        "schema": "paid-work-dollar-floor/v2",
+        "evaluated_at": top["as_of"],
+        "candidate": {
+            "work_id": work_id,
+            "canonical_source_url": source_url,
+            "payout_evidence": payout_raw,
+        },
+    }
+    try:
+        dollar_floor_receipt = dollar_floor.compile_paid_work_dollar_floor(
+            floor_request
         )
-    payout_observed_at, payout_fresh, payout_age = _freshness(
-        payout_raw["observed_at"],
-        as_of=as_of,
-        max_age_seconds=evidence_max_age,
-        field="candidate.advertised_payout.observed_at",
-    )
+    except dollar_floor.DollarFloorInputError as exc:
+        raise PaidWorkGateInputError(
+            f"dollar-floor intake rejected candidate: {exc}"
+        ) from exc
+    if not dollar_floor.verify_receipt(dollar_floor_receipt):
+        raise PaidWorkGateInputError(
+            "dollar-floor intake receipt failed semantic verification"
+        )
+
+    floor_decision = dollar_floor_receipt["decision"]
+    floor_evidence = dollar_floor_receipt["payout_evidence"]
+    payout_currency = floor_evidence["currency"]
+    unit_type = floor_evidence["unit_type"]
+    guaranteed_amount = floor_evidence["guaranteed_amount"]
+    payout: Optional[Decimal] = None
+    if guaranteed_amount is not None:
+        guaranteed = _decimal(
+            guaranteed_amount,
+            "dollar_floor_receipt.payout_evidence.guaranteed_amount",
+            nonnegative=True,
+        )
+        if guaranteed > 0:
+            payout = guaranteed
+    payout_observed_at = floor_evidence["observed_at"]
+    payout_fresh = floor_evidence["fresh"]
+    payout_age = floor_evidence["age_seconds"]
 
     hours = _decimal(
         candidate["estimated_engineering_hours"],
@@ -555,13 +587,22 @@ def compile_paid_work_effort_value_gate(request: dict[str, Any]) -> dict[str, An
     elif active_claims >= policy["max_active_claims"]:
         skip_reasons.append("CLAIM_CONGESTION_SATURATED")
 
-    if not payout_fresh:
-        value_reasons.append("PAYOUT_EVIDENCE_STALE")
-    if unit_type != "CASH":
+    if floor_decision in {"PILE_SAVE_UP", "PRUNE_BELOW_FLOOR"}:
+        skip_reasons.append("DOLLAR_FLOOR_NOT_ACTIVE")
+    elif floor_decision != "ACTIVE_REVIEW":
+        value_reasons.append("DOLLAR_FLOOR_VALUE_NOT_ACTIVE")
+    if floor_decision == "ACTIVE_REVIEW" and payout is None:
+        raise PaidWorkGateInputError(
+            "active dollar-floor receipt must carry a positive guaranteed amount"
+        )
+    if unit_type not in {None, "CASH"}:
         value_reasons.append("NONCASH_VALUE_UNAUTHORIZED")
     if cost_state != "KNOWN":
         value_reasons.append("MODEL_TOOL_COST_UNKNOWN")
-    elif tool_cost_currency != payout_currency:
+    elif (
+        payout_currency is not None
+        and tool_cost_currency != payout_currency
+    ):
         value_reasons.append("MODEL_TOOL_COST_CURRENCY_MISMATCH_NO_FX")
 
     if acceptance["state"] != "CONFIRMED":
@@ -590,7 +631,11 @@ def compile_paid_work_effort_value_gate(request: dict[str, Any]) -> dict[str, An
 
     # Never invent economics when the value domain is unknown. Deadline and
     # fresh congestion terminal reasons still win because they need no FX/value.
-    if not value_reasons:
+    if not value_reasons and floor_decision == "ACTIVE_REVIEW":
+        if payout is None or payout_currency is None:
+            raise PaidWorkGateInputError(
+                "active dollar-floor binding lost payout economics"
+            )
         gross_receipt = _compile_gross_economics(
             work_id=work_id,
             source_url=source_url,
@@ -658,7 +703,12 @@ def compile_paid_work_effort_value_gate(request: dict[str, Any]) -> dict[str, An
         "reason_codes": reason_codes,
         "observed_hold_reasons": observed_holds,
         "economics": {
-            "advertised_payout": _amount_text(payout),
+            "advertised_payout": (
+                _amount_text(payout) if payout is not None else None
+            ),
+            "payout_amount_semantics": floor_evidence["amount_semantics"],
+            "payout_range_min": floor_evidence["min_amount"],
+            "payout_range_max": floor_evidence["max_amount"],
             "currency": payout_currency,
             "unit_type": unit_type,
             "estimated_engineering_hours": _amount_text(hours),
@@ -681,6 +731,11 @@ def compile_paid_work_effort_value_gate(request: dict[str, Any]) -> dict[str, An
             "fleet_economic_receipt": gross_receipt,
         },
         "gates": {
+            "dollar_floor": {
+                "decision": floor_decision,
+                "receipt_sha256": dollar_floor_receipt["receipt_sha256"],
+                "receipt": dollar_floor_receipt,
+            },
             "payout_value": {
                 "observed_at": payout_observed_at,
                 "age_seconds": payout_age,
@@ -747,6 +802,21 @@ def verify_receipt(receipt: dict[str, Any]) -> bool:
         return False
     nested = economics.get("fleet_economic_receipt")
     if nested is not None and not fleet_economics.verify_receipt(nested):
+        return False
+    gates = receipt.get("gates")
+    if type(gates) is not dict:
+        return False
+    dollar_gate = gates.get("dollar_floor")
+    if type(dollar_gate) is not dict:
+        return False
+    dollar_receipt = dollar_gate.get("receipt")
+    if (
+        type(dollar_receipt) is not dict
+        or not dollar_floor.verify_receipt(dollar_receipt)
+        or dollar_gate.get("receipt_sha256")
+        != dollar_receipt.get("receipt_sha256")
+        or dollar_gate.get("decision") != dollar_receipt.get("decision")
+    ):
         return False
     return True
 
