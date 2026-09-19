@@ -1,0 +1,47 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-046-R-KEYSTONE-S7M2",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Keystone-S7M2",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Stellar-MarkeyPay/Stellar-MarketPay",
+    "default_branch": "main",
+    "head_sha": "42250890ecb5b76228675167f47452e54fb28977",
+    "issue_number": 204,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 1,
+    "matching_pr_found": false,
+    "repository_push_authority": false
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Stellar-MarkeyPay/repo/Stellar-MarketPay/issue/204",
+    "assignment_state": "unassigned",
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "component_blob": "e66304a26bcd73f4ea1b0340d5f0f130427cf6ee",
+    "snapshot_test_blob": "7f00d05356b9c8d3ae654b12a4c923c938421684",
+    "frontend_package_blob": "d0c3aab27aaed193b063cf52595bbc68cc054861",
+    "selected_tier_initialization": "BOOST_TIERS[0]",
+    "unchosen_tier_state_present": false,
+    "initial_confirm_disabled": false,
+    "issue_requires_initial_confirm_disabled": true,
+    "scope_mismatch": "The issue requires disabled confirmation before tier selection, but current source preselects tier 0 and never represents an unchosen state."
+  },
+  "disposition": {
+    "fleet_route": "NEEDS_SCOPE_CLARIFICATION",
+    "next_action": "CONFIRM_MINIMAL_PRODUCT_CHANGE_SCOPE_BEFORE_TEST_PR",
+    "implementation_started": false,
+    "parallel_test_only_implementation_allowed": false
+  },
+  "authority": {
+    "advisory_only": true,
+    "provider_assignment_authority": false,
+    "upstream_implementation_authority": false,
+    "payment_or_wallet_authority": false
+  }
+}

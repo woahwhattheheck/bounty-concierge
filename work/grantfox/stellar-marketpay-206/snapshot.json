@@ -1,0 +1,47 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-043-R-KEYSTONE-S7M2",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Keystone-S7M2",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Stellar-MarkeyPay/Stellar-MarketPay",
+    "default_branch": "main",
+    "head_sha": "42250890ecb5b76228675167f47452e54fb28977",
+    "issue_number": 206,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 1,
+    "matching_pr_found": false,
+    "repository_push_authority": false
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Stellar-MarkeyPay/repo/Stellar-MarketPay/issue/206",
+    "assignment_state": "unassigned",
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "component_blob": "4f5c62dcb540db8839a4f997a20926bd3fcf85f3",
+    "portfolio_item_limit": 10,
+    "incomplete_item_validation_present": true,
+    "portfolio_url_shape_validation_present": false,
+    "skill_enter_add_behavior_present": true,
+    "skill_remove_behavior_present": true,
+    "issue_requires_invalid_url_validation": true,
+    "scope_mismatch": "The issue requires invalid portfolio URL coverage, but current source only rejects empty item fields and has no URL-format or scheme validation."
+  },
+  "disposition": {
+    "fleet_route": "NEEDS_SCOPE_CLARIFICATION",
+    "next_action": "DEFINE_URL_CONTRACT_AND_CONFIRM_MINIMAL_PRODUCT_CHANGE_SCOPE",
+    "implementation_started": false,
+    "parallel_test_only_implementation_allowed": false
+  },
+  "authority": {
+    "advisory_only": true,
+    "provider_assignment_authority": false,
+    "upstream_implementation_authority": false,
+    "payment_or_wallet_authority": false
+  }
+}
