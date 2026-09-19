@@ -1,0 +1,137 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-carbonmint-carbonmint-backend-117-R-LANTERN",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-17-Lantern",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "CarbonMint/CarbonMint-Backend",
+    "default_branch": "main",
+    "head_sha": "d71a9852fd349a59b8746b9bd80c88867ca2d0da",
+    "issue_number": 117,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 3,
+    "open_issue_linked_pr_found": false,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/CarbonMint/repo/CarbonMint-Backend/issue/117",
+    "assignment_state": "unassigned",
+    "apply_visible": true,
+    "applications_visible": 3,
+    "one_application_per_user": true,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "architecture": {
+    "persistence": "in-memory Map collections",
+    "database_present": false,
+    "existing_pagination": "offset/page",
+    "default_limit": 20,
+    "max_limit": 100,
+    "stable_sort_contract": false
+  },
+  "surfaces": {
+    "batches": {
+      "route_blob": "01d8933571d7115bec93bc9b84345af3faf0b98f",
+      "controller_blob": "cbc628243443e78c10323b5ea509aa91725cf116",
+      "service_blob": "292face5f29c8d974f857903a1310e5fbd814675",
+      "filters": [
+        "projectId",
+        "status",
+        "vintage"
+      ],
+      "pagination": "page/limit offset slice",
+      "order": "Map insertion order"
+    },
+    "projects": {
+      "route_blob": "7da88a9305d7c092e054017d358ef7c3d0d7f80e",
+      "controller_blob": "97f05a2a24db7748507f8e37ffbd19f360fa3c03",
+      "service_blob": "a977f3fb6df1525325b56b5b82c9bd49aada00db",
+      "list_pagination": false,
+      "top_sort": "minted DESC without explicit tie-break",
+      "stats_complexity": "full batch scan per project"
+    },
+    "certificates": {
+      "route_blob": "38046547c090dd6b3d1c5ab5784c98015dd3d232",
+      "controller_blob": "a8afb6117b8affb187dbabde141972ac04042a9f",
+      "service_blob": "83d1c1fb01fe2783ce463e633d165ed8334af203",
+      "filters": [
+        "user",
+        "projectId"
+      ],
+      "pagination": false,
+      "date_field": "retiredAt",
+      "integrity_verification_on_read": true
+    },
+    "registry": {
+      "route_blob": "68b470fd3bca4aa83bfd7ed192770faa4f356e28",
+      "controller_blob": "b0c8b2a326a4ebab6679ead41c4fad1fa7bea6f8",
+      "service_blob": "7553c8a153656f69b971dc41173dbbcefcaf31af",
+      "shape": "single aggregate snapshot",
+      "pagination_applicable": false
+    },
+    "audit_sibling": {
+      "service_blob": "c0fed958d3b9ba59a3527f5c348f8f6e49f7e329",
+      "merged_pr": 127,
+      "pagination": "newest-first offset/limit max 100"
+    }
+  },
+  "implementation_contract": {
+    "order": {
+      "batches": "createdAt DESC, id DESC",
+      "projects_collection": "createdAt DESC, id DESC",
+      "projects_ranked": "minted DESC, id ASC",
+      "certificates": "retiredAt DESC, id DESC"
+    },
+    "cursor_must_bind": [
+      "schema",
+      "resource",
+      "filter_digest",
+      "snapshot_fence",
+      "last_composite_key"
+    ],
+    "filters": [
+      "projectId",
+      "status",
+      "registry",
+      "from",
+      "to",
+      "vintage where applicable"
+    ],
+    "ranked_project_rule": "materialized snapshot or analytics revision fence; never mixed-version silent pagination",
+    "database_query_plan_required_now": false,
+    "source_compatible_plan_evidence": "selector/complexity counts + deterministic large-fixture benchmark"
+  },
+  "hostile_tests": [
+    "concurrent insert between pages",
+    "equal sort-key tie breaker",
+    "filter/cursor mismatch",
+    "oversized and malformed limits",
+    "date window validation",
+    "rank mutation between pages",
+    "certificate integrity preserved",
+    "large deterministic fixture latency and selector-plan counts",
+    "offset-instability regression reproduction",
+    "existing tests remain enabled"
+  ],
+  "disposition": {
+    "fleet_route": "APPLY_WITH_SOURCE_SPECIFIC_PLAN_THEN_WAIT_ASSIGNMENT",
+    "implementation_started": false,
+    "implementation_assignment_gated": true,
+    "reason": "current issue is unassigned; source research identifies a real gap and architecture-compatible plan"
+  },
+  "authority": {
+    "advisory_only": true,
+    "provider_application_authority": false,
+    "provider_assignment_authority": false,
+    "upstream_implementation_authority": false,
+    "submission_authority": false,
+    "payment_or_wallet_authority": false
+  }
+}
