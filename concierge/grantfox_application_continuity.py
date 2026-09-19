@@ -332,20 +332,39 @@ def compile_continuity(request: dict[str, Any]) -> dict[str, Any]:
         "queue_anchor": {"schema": QUEUE_SCHEMA, "receipt_sha256": queue_digest},
         "lifecycle": {"applied": applied, "assigned": assigned, "submission_pr_url": pr_url, "adjudication": adjudication, "approved_amount": approved[0] if approved else None, "approved_currency": approved[1] if approved else None, "payment_sent": payment_sent, "payment_received": payment_received},
         "events": normalized,
+        "evidence": {"queue_receipt": r["queue_receipt"]},
         "authority": AUTHORITY,
     }
     return {**body, "receipt_sha256": _hash(body)}
 
 
 def verify_continuity_receipt(receipt: dict[str, Any]) -> bool:
-    if type(receipt) is not dict or receipt.get("schema") != SCHEMA or receipt.get("authority") != AUTHORITY:
+    """Replay native queue evidence and lifecycle events; reject re-hashed forgeries."""
+    if type(receipt) is not dict or set(receipt) != {
+        "schema", "disposition", "state", "advisory_next_action", "reason_codes",
+        "identity", "queue_anchor", "lifecycle", "events", "evidence",
+        "authority", "receipt_sha256",
+    }:
         return False
-    digest = receipt.get("receipt_sha256")
-    if type(digest) is not str or not SHA256.fullmatch(digest):
+    if receipt.get("schema") != SCHEMA or receipt.get("authority") != AUTHORITY:
         return False
-    body = dict(receipt)
-    body.pop("receipt_sha256", None)
-    return _hash(body) == digest
+    identity = receipt.get("identity")
+    evidence = receipt.get("evidence")
+    if type(identity) is not dict or type(evidence) is not dict or set(evidence) != {"queue_receipt"}:
+        return False
+    queue = evidence.get("queue_receipt")
+    if not verify_queue_receipt(queue):
+        return False
+    try:
+        rebuilt = compile_continuity({
+            "schema": SCHEMA,
+            "actor_login": identity["actor_login"],
+            "queue_receipt": queue,
+            "events": receipt["events"],
+        })
+    except (KeyError, GrantFoxContinuityInputError):
+        return False
+    return rebuilt == receipt
 
 
 def format_summary(receipt: dict[str, Any]) -> str:
