@@ -1,0 +1,200 @@
+{
+  "schema": "grantfox-gryd48-expansion-plan/v1",
+  "lane_id": "GFOX-FRESH-GRYD-48",
+  "identity": {
+    "repository_full_name": "Gryd-lock/grydlock-testkit",
+    "issue_number": 48,
+    "issue_url": "https://github.com/Gryd-lock/grydlock-testkit/issues/48",
+    "listing_url": "https://contribute.grantfox.xyz/org/Gryd-lock/repo/grydlock-testkit/issue/48"
+  },
+  "provider_observation": {
+    "assignment": "Unassigned",
+    "application_route_visible": true,
+    "issue_state": "open",
+    "generic_issue_applicant_comments": 2,
+    "matching_pr_census_count": 0,
+    "reward_interpretation": "possible_discretionary_only"
+  },
+  "source": {
+    "commit_sha": "7064404d6e7c44df1f980d532d23901651d79426",
+    "permissions": {
+      "pull": true,
+      "push": false
+    },
+    "blobs": {
+      "destinations.json": "c8f918089f700982d7347cc1d8af8d8677fd5774",
+      "README.md": "f8fd8bdb89cca82a0ef42735e3daf3b1cacfa895",
+      "scores.json": "f27d17c781a9059cc1304af93def554391b63876",
+      "package.json": "7d674c82cfca132d720a02dbc56d45df3979e950"
+    }
+  },
+  "current": {
+    "total": 12,
+    "labels": {
+      "clean": 4,
+      "suspicious": 3,
+      "malicious": 5
+    },
+    "entity_subtypes": {
+      "classic_account": 11,
+      "muxed_account": 0,
+      "asset": 1,
+      "contract": 0,
+      "liquidity_pool": 0
+    },
+    "risk_patterns": {
+      "none": 4,
+      "pass-through": 2,
+      "scam-trustline": 1,
+      "sweep": 1,
+      "phishing-drainer": 1,
+      "rug-pull": 3
+    },
+    "fixture_status": "synthetic-only"
+  },
+  "phase1_target": {
+    "total": 120,
+    "interpretation": "stratified evaluation/stress corpus; not an observed real-world prevalence estimate",
+    "labels": {
+      "clean": 48,
+      "suspicious": 36,
+      "malicious": 36
+    },
+    "entity_label_matrix": {
+      "classic_account": {
+        "clean": 30,
+        "suspicious": 20,
+        "malicious": 18,
+        "total": 68
+      },
+      "muxed_account": {
+        "clean": 6,
+        "suspicious": 3,
+        "malicious": 3,
+        "total": 12
+      },
+      "asset": {
+        "clean": 6,
+        "suspicious": 4,
+        "malicious": 6,
+        "total": 16
+      },
+      "contract": {
+        "clean": 3,
+        "suspicious": 4,
+        "malicious": 5,
+        "total": 12
+      },
+      "liquidity_pool": {
+        "clean": 3,
+        "suspicious": 5,
+        "malicious": 4,
+        "total": 12
+      }
+    },
+    "risk_pattern_label_matrix": {
+      "none": {
+        "clean": 30,
+        "suspicious": 0,
+        "malicious": 0,
+        "total": 30
+      },
+      "adversarial-clean": {
+        "clean": 12,
+        "suspicious": 0,
+        "malicious": 0,
+        "total": 12
+      },
+      "cold-start": {
+        "clean": 6,
+        "suspicious": 6,
+        "malicious": 0,
+        "total": 12
+      },
+      "pass-through": {
+        "clean": 0,
+        "suspicious": 6,
+        "malicious": 3,
+        "total": 9
+      },
+      "sweep": {
+        "clean": 0,
+        "suspicious": 3,
+        "malicious": 6,
+        "total": 9
+      },
+      "phishing-drainer": {
+        "clean": 0,
+        "suspicious": 3,
+        "malicious": 6,
+        "total": 9
+      },
+      "rug-pull": {
+        "clean": 0,
+        "suspicious": 4,
+        "malicious": 7,
+        "total": 11
+      },
+      "scam-trustline": {
+        "clean": 0,
+        "suspicious": 5,
+        "malicious": 4,
+        "total": 9
+      },
+      "signer-takeover": {
+        "clean": 0,
+        "suspicious": 4,
+        "malicious": 4,
+        "total": 8
+      },
+      "memo-impersonation": {
+        "clean": 0,
+        "suspicious": 3,
+        "malicious": 3,
+        "total": 6
+      },
+      "sponsored-mule": {
+        "clean": 0,
+        "suspicious": 2,
+        "malicious": 3,
+        "total": 5
+      }
+    }
+  },
+  "transaction_only_coverage_issue_numbers": [
+    14,
+    20,
+    22
+  ],
+  "destination_coverage_issue_numbers": [
+    13,
+    15,
+    16,
+    17,
+    18,
+    19,
+    21,
+    23,
+    50
+  ],
+  "governance_and_reporting_issue_numbers": [
+    63,
+    73
+  ],
+  "canonical_tracker": {
+    "location": "Gryd-lock/grydlock-testkit#48",
+    "readme_role": "headline target + label split + link only"
+  },
+  "statistical_caveat": {
+    "research_documents_real_world_prevalence": false,
+    "worst_case_95pct_margin_overall_approx_percentage_points": 9,
+    "zero_false_positive_rule_of_three_upper_bound_with_48_clean_approx_percent": 6.25
+  },
+  "authority": {
+    "advisory_only": true,
+    "provider_application_authority": false,
+    "implementation_write_authority": false,
+    "submission_authority": false,
+    "award_or_payment_verified": false
+  }
+}
