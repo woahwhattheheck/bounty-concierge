@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-19",
+  "seat": "ZZ-Sol-Variegate",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Ajo-contrib/soroban-ajo",
+    "issue": 912,
+    "issue_title": "Dead-letter / poison-event handling",
+    "pinned_master": "1b87ea7344ae3d871e54abff05eabe5113bd2956",
+    "github_state": "OPEN",
+    "github_assignees": [],
+    "github_comment_count": 1,
+    "matching_pr_carriers": [],
+    "grantfox_state": "Unassigned",
+    "grantfox_action": "Apply to this issue"
+  },
+  "source_pins": {
+    "backend/src/services/blockchainListener.ts": "a7031bc65307f7c912a753ed13940718346562a3",
+    "backend/src/services/eventProcessor.ts": "d06c2ff4f8a990ec3590b6f9c20302730d2f8ab8",
+    "backend/tests/unit/blockchainListener.test.ts": "48d65ccfd63a4260eeef15ab2ddede8f31aab1f4",
+    "backend/prisma/schema.prisma": "a8da55bbd0adaf04f767cd1ab923b186a1e2f84d",
+    "backend/src/events/eventStore.ts": "87551db7cc2c2070b3481731b8892f3bbd0c91f5",
+    "backend/src/events/projections/index.ts": "2c21f829685dd7491ac814e4d4507cd3676b08e0",
+    "backend/src/events/README.md": "f3eae4a556a7fc1e4430340ec916115e01c72a11",
+    "backend/src/__tests__/unit/events/replayCorrectness.test.ts": "7b294a7b46db78a4d9a3f5ea428b17ccad7da2fc",
+    "backend/src/__tests__/unit/events/snapshotReplay.test.ts": "98970c8af54c47f9444c1992845292971df60b23",
+    "backend/docs/FRAUD_RUNBOOK.md": "66050549739c959481d7a119ebcc3b1ab635cd0b",
+    "backend/package.json": "817d678882942193301248e5dac6b6fddabb82e8"
+  },
+  "findings": [
+    {
+      "id": "A",
+      "severity": "high",
+      "surface": "backend/src/events/projections/index.ts",
+      "summary": "Literal projection replay is one Array.reduce with no per-event isolation; one throwing/corrupt event aborts the rebuild with no durable poison record or operator disposition.",
+      "production_scope": "Event-sourcing module README/ADR says the module is currently unused by production callers."
+    },
+    {
+      "id": "B",
+      "severity": "critical",
+      "surface": "backend/src/services/blockchainListener.ts",
+      "summary": "Live SSE callbacks launch processEvent promises without serialization; ordered checkpoint state is mutated by concurrently completing events."
+    },
+    {
+      "id": "C",
+      "severity": "critical",
+      "surface": "advanceCheckpoint",
+      "summary": "Checkpoint upsert is unconditional, so a slow earlier event can overwrite a later checkpoint and regress durable state."
+    },
+    {
+      "id": "D",
+      "severity": "critical",
+      "surface": "live good-bad-good",
+      "summary": "A later good event can commit a checkpoint beyond an earlier poison event; restart backfill then starts after the unresolved ledger and may skip the poison permanently."
+    },
+    {
+      "id": "E",
+      "severity": "high",
+      "surface": "backfill resume",
+      "summary": "Backfill resumes from lastProcessedLedger + 1, so a poison event after a successful sibling in the same ledger can be skipped by ledger-only restart semantics."
+    },
+    {
+      "id": "F",
+      "severity": "medium",
+      "surface": "dedup recovery",
+      "summary": "A dedup P2002 returns before checkpoint advance; an already-processed event encountered behind a stale checkpoint does not repair the resume point."
+    },
+    {
+      "id": "G",
+      "severity": "high",
+      "surface": "ProcessedBlockchainEvent identity",
+      "summary": "Unique key contractId+txHash+eventType can collapse two distinct same-type events emitted by one transaction; canonical event id/paging token should participate in identity."
+    }
+  ],
+  "required_invariants": [
+    "No successful event may advance the durable checkpoint past an earlier unresolved event.",
+    "Checkpoint position must distinguish multiple events in the same ledger.",
+    "Checkpoint must never regress.",
+    "Poison-event disposition must be durable and explicit; skip must never be a silent log-and-continue.",
+    "A restart must surface the same unresolved poison until retry succeeds or an operator explicitly skips/quarantines it.",
+    "Distinct same-type events from one transaction must remain distinct."
+  ],
+  "recommended_scope": {
+    "active_listener": "Implement ordered processing/commit barrier, canonical event identity, durable dead-letter state, alerting and runbook.",
+    "offchain_event_module": "If maintainer confirms #912 also targets backend/src/events, replace bare reduce with event-level diagnostic/policy and poison tests; preserve ADR-011 truth that module is unused."
+  },
+  "hostile_tests": [
+    "good -> poison -> good across increasing ledgers",
+    "good -> poison -> good in one ledger",
+    "slow earlier success + fast later success",
+    "slow poison + fast later success",
+    "dedup replay behind stale checkpoint",
+    "two same-type events in one tx",
+    "restart with unresolved poison",
+    "explicit skip with actor/reason/timestamp",
+    "offchain valid -> malformed -> valid replay",
+    "snapshot-tail projection throw diagnostics"
+  ],
+  "assignment_gate": "DO_NOT_IMPLEMENT_UPSTREAM_UNTIL_ASSIGNED"
+}
