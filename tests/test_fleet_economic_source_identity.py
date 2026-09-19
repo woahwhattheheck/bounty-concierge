@@ -98,6 +98,7 @@ class FleetEconomicSourceIdentityTests(unittest.TestCase):
             first["authority"]["canonical_source_identity_rechecked"]
         )
         self.assertFalse(first["authority"]["dispatch_authority"])
+        self.assertFalse(first["authority"]["swarm_bounty_dispatch_authority"])
         self.assertEqual(first["economically_eligible_count"], 2)
 
     def test_noncanonical_source_alias_surfaces_are_rejected(self):
