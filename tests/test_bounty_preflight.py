@@ -533,3 +533,27 @@ def test_maintainer_pause_classifier_rejects_descriptive_and_negated_false_holds
 )
 def test_maintainer_pause_classifier_accepts_explicit_policy_and_wait_forms(text):
     assert bp._signals_maintainer_contribution_pause(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        'The phrase "we are not accepting new bounty attempts" is not policy.',
+        "The example says new submissions are paused for now.",
+        "> we are not accepting new bounty attempts\nThat quoted statement is obsolete.",
+    ],
+)
+def test_maintainer_pause_classifier_rejects_quoted_policy_meta_language(text):
+    assert not bp._signals_maintainer_contribution_pause(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "For now, we are not accepting new bounty attempts.",
+        "Currently, we are no longer accepting new contributions.",
+        "For now, new submissions are paused.",
+    ],
+)
+def test_maintainer_pause_classifier_accepts_temporal_policy_prefixes(text):
+    assert bp._signals_maintainer_contribution_pause(text)
