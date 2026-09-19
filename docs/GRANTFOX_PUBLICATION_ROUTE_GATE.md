@@ -7,8 +7,8 @@ It exists to stop a finished implementation from dying in a local session and to
 ## Dispositions
 
 - `DIRECT_BRANCH_PR`: upstream write access and the minimum branch/PR primitives were observed.
-- `OWNED_FORK_PR`: a writable installed fork and branch/PR primitives were observed.
-- `REUSE_EXISTING_PR`: an upstream PR already exists; refresh and continue that carrier.
+- `OWNED_FORK_PR`: a writable installed fork owned by the observed actor and branch/PR primitives were observed.
+- `REUSE_EXISTING_PR`: an upstream PR is observed **open**; refresh and continue that carrier. Closed, merged, or unknown-state carriers hold instead of silently opening duplicate work.
 - `APPLICATION_ONLY`: repository rules require provider assignment and no application has been sent yet.
 - `WAIT_ASSIGNMENT`: the application exists but assignment has not arrived.
 - `HOLD_ASSIGNED_TO_OTHER`: do not duplicate another assignee's implementation.
@@ -32,6 +32,7 @@ All output receipts pin `target_base_branch` exactly. The gate does **not** sile
   "installed_fork_push_access": null,
   "publication_primitives": ["create_branch", "create_pull_request"],
   "existing_pr_url": null,
+  "existing_pr_state": null,
   "provider_requires_assignment": false,
   "provider_assignment": "none",
   "actor_applied": false,
