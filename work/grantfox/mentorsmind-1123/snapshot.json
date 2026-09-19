@@ -1,0 +1,39 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "FORGE-GFOX-MM-1123-R-CINDER17-20260919",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Cinder-17",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "MentorsMind/MentorsMind-Contract",
+    "head_sha": "e90e16fc3a78122949ce63af7308320c59acb112",
+    "issue_number": 1123,
+    "state": "open",
+    "assignee": null,
+    "comments": 0
+  },
+  "grantfox": {
+    "assignment_state": "unassigned",
+    "apply_enabled": true,
+    "direct_github_comment": true,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "session_registry_blob": "4927c25d8267ba1e5dfcfeef277a86b4ba902f02",
+    "metadata_validation_blob": "7421b6206ef32505965ded047d87525de1691df6",
+    "findings": [
+      "live monitor_metadata_manipulation signature is (update_frequency, unverified_changes), not entity/old/new hash",
+      "SessionMetadataMonitoring persistence and metamon/misinfo event already exist",
+      "canonical Symbol metadata setter bypasses monitoring",
+      "no PreviousMetadata key surfaced",
+      "two textual update_session_metadata signatures use different ids/storage schemes",
+      "no direct metadata setter/monitor tests surfaced"
+    ]
+  },
+  "fence": {
+    "implementation_requires_provider_assignment": true,
+    "upstream_push_permission_via_connector": false
+  }
+}
