@@ -171,7 +171,36 @@ def _declared_dependencies(dependency_receipt: dict[str, Any]) -> list[dict[str,
             f"dependency_receipt.evidence.dependencies[{index}].state",
             max_chars=16,
         ).casefold()
-        result.append({"issue_number": number, "state": state})
+        completion = _require_object(
+            item.get("completion"),
+            f"dependency_receipt.evidence.dependencies[{index}].completion",
+        )
+        completion_status = _require_string(
+            completion.get("status"),
+            f"dependency_receipt.evidence.dependencies[{index}].completion.status",
+            max_chars=24,
+        ).upper()
+        merged_pr_url = completion.get("merged_pr_url")
+        merge_commit_sha = completion.get("merge_commit_sha")
+        if completion_status == "LANDED":
+            merged_pr_url = _require_string(
+                merged_pr_url,
+                f"dependency_receipt.evidence.dependencies[{index}].completion.merged_pr_url",
+                max_chars=512,
+            )
+            merge_commit_sha = _require_sha(
+                merge_commit_sha,
+                f"dependency_receipt.evidence.dependencies[{index}].completion.merge_commit_sha",
+            )
+        result.append(
+            {
+                "issue_number": number,
+                "state": state,
+                "completion_status": completion_status,
+                "merged_pr_url": merged_pr_url,
+                "merge_commit_sha": merge_commit_sha,
+            }
+        )
     return result
 
 
@@ -180,7 +209,8 @@ def _normalize_landings(
     *,
     owner: str,
     repo: str,
-    dependency_numbers: set[int],
+    dependencies_by_number: dict[int, dict[str, Any]],
+    expected_default_branch: str,
     evaluated_at: datetime,
     max_age: int,
 ) -> tuple[list[dict[str, Any]], bool]:
@@ -230,10 +260,11 @@ def _normalize_landings(
             )
 
         number = _require_positive_int(item.get("issue_number"), f"{field}.issue_number")
-        if number not in dependency_numbers:
+        if number not in dependencies_by_number:
             raise GrantFoxDependencyFulfillmentInputError(
                 f"{field} references undeclared prerequisite issue #{number}"
             )
+        upstream = dependencies_by_number[number]
         if number in seen:
             raise GrantFoxDependencyFulfillmentInputError(
                 f"duplicate landing evidence for issue #{number}"
@@ -258,6 +289,11 @@ def _normalize_landings(
         default_branch = _require_string(
             item.get("default_branch"), f"{field}.default_branch", max_chars=200
         )
+        if default_branch != expected_default_branch:
+            raise GrantFoxDependencyFulfillmentInputError(
+                f"{field}.default_branch must equal verified source default branch "
+                f"{expected_default_branch}"
+            )
         if item.get("contains_landed_commit") is not True:
             raise GrantFoxDependencyFulfillmentInputError(
                 f"{field}.contains_landed_commit must be true"
@@ -282,6 +318,20 @@ def _normalize_landings(
             raise GrantFoxDependencyFulfillmentInputError(
                 f"{field}.evidence_url must equal {expected_url}"
             )
+
+        if upstream["completion_status"] == "LANDED":
+            if kind != "merged_pull_request":
+                raise GrantFoxDependencyFulfillmentInputError(
+                    f"{field}.evidence_kind must preserve upstream merged PR evidence"
+                )
+            if evidence_url.casefold() != upstream["merged_pr_url"].casefold():
+                raise GrantFoxDependencyFulfillmentInputError(
+                    f"{field}.evidence_url must match upstream completion evidence"
+                )
+            if landed_sha != upstream["merge_commit_sha"]:
+                raise GrantFoxDependencyFulfillmentInputError(
+                    f"{field}.landed_commit_sha must match upstream completion evidence"
+                )
 
         observed_raw = _require_string(
             item.get("observed_at"), f"{field}.observed_at", max_chars=64
@@ -332,7 +382,21 @@ def compile_grantfox_dependency_fulfillment(request: dict[str, Any]) -> dict[str
 
     owner, repo, issue_number = _identity(dependency_receipt)
     dependencies = _declared_dependencies(dependency_receipt)
-    dependency_numbers = {item["issue_number"] for item in dependencies}
+    dependencies_by_number = {item["issue_number"]: item for item in dependencies}
+    dependency_numbers = set(dependencies_by_number)
+    source_receipt = _require_object(
+        dependency_receipt.get("source_receipt"),
+        "dependency_receipt.source_receipt",
+    )
+    repository_snapshot = _require_object(
+        source_receipt.get("repository_snapshot"),
+        "dependency_receipt.source_receipt.repository_snapshot",
+    )
+    expected_default_branch = _require_string(
+        repository_snapshot.get("default_branch"),
+        "dependency_receipt.source_receipt.repository_snapshot.default_branch",
+        max_chars=200,
+    )
 
     evaluated_raw = _require_string(
         request.get("evaluated_at"), "evaluated_at", max_chars=64
@@ -346,7 +410,8 @@ def compile_grantfox_dependency_fulfillment(request: dict[str, Any]) -> dict[str
         request.get("landings", []),
         owner=owner,
         repo=repo,
-        dependency_numbers=dependency_numbers,
+        dependencies_by_number=dependencies_by_number,
+        expected_default_branch=expected_default_branch,
         evaluated_at=evaluated_at,
         max_age=max_age,
     )
