@@ -1,0 +1,35 @@
+{
+  "schema": "grantfox-suppression/v1",
+  "operation": "GFOX3-20260919-pocketpay-sdk-447/R-stale-source-census",
+  "worker": "ZZ-Sol-Crux-83",
+  "model": "GPT-5.6 Sol",
+  "observed_date": "2026-09-19",
+  "upstream": {
+    "repository": "Axionvera/pocketpay-sdk",
+    "head_sha": "ddd18b381d2dc7286eabf10046f2f9c768b3a6fb",
+    "issue_number": 447,
+    "issue_state": "open",
+    "assignee": null,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "state": "Unassigned",
+    "visible_comments_or_applications": 0,
+    "application_route_visible": true,
+    "one_application_per_user": true
+  },
+  "evidence": {
+    "balance_types_blob": "0a021ce14a25dc3432d2b5c8c3b8ff4137dc2bdd",
+    "normalizer_blob": "66bea1da8d56dd3592e05198d4e179e0816ac707",
+    "multi_asset_tests_blob": "05582eb13fa77d1685a5e7b6a2f6f60889d21e1c",
+    "balance_tests_blob": "2d7aba6c87e534f46a120be1f54e5c901d5b9549",
+    "formatting_docs_blob": "ee89ed27c0547a8e9c7b1b485aa1175ee5aa3d4d",
+    "model_docs_blob": "757754741a353d25311661089731407553dc4b83"
+  },
+  "disposition": "DO_NOT_TAKE_AS_WRITTEN",
+  "required_next_step": "maintainer_confirmed_residual_scope",
+  "upstream_source_mutated": false
+}
