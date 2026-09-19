@@ -1,0 +1,9 @@
+{
+  "schema": "paid-work-dollar-floor-policy/v1",
+  "currency": "USD",
+  "pile_floor": "10",
+  "active_floor": "50",
+  "max_evidence_age_seconds": 86400,
+  "pile_route": "bounty-pile-10-49",
+  "active_route": "main-bounty-queue"
+}

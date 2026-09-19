@@ -3,29 +3,41 @@ name: Paid work effort value gate
 on:
   pull_request:
     paths:
+      - "concierge/paid_work_dollar_floor.py"
       - "concierge/paid_work_effort_value_gate.py"
       - "concierge/revenue_dispatch.py"
       - "concierge/_fleet_economic_admission_v1.py"
       - "concierge/fleet_economic_admission.py"
+      - "tests/test_paid_work_dollar_floor.py"
       - "tests/test_paid_work_effort_value_gate.py"
       - "tests/test_revenue_dispatch.py"
+      - "policies/paid_work_dollar_floor_v1.json"
       - "policies/paid_work_effort_value_v1.json"
+      - "policies/swarm_fleet_economics_v1.json"
       - "data/paid_work_effort_value_gate/**"
+      - "docs/PAID_WORK_DOLLAR_FLOOR.md"
       - "docs/PAID_WORK_EFFORT_VALUE_GATE.md"
+      - "docs/FLEET_ECONOMIC_ADMISSION.md"
       - "docs/PAID_WORK_IMPLEMENTATION_DISPATCH.md"
       - ".github/workflows/paid-work-effort-value-gate.yml"
   push:
     branches: [main]
     paths:
+      - "concierge/paid_work_dollar_floor.py"
       - "concierge/paid_work_effort_value_gate.py"
       - "concierge/revenue_dispatch.py"
       - "concierge/_fleet_economic_admission_v1.py"
       - "concierge/fleet_economic_admission.py"
+      - "tests/test_paid_work_dollar_floor.py"
       - "tests/test_paid_work_effort_value_gate.py"
       - "tests/test_revenue_dispatch.py"
+      - "policies/paid_work_dollar_floor_v1.json"
       - "policies/paid_work_effort_value_v1.json"
+      - "policies/swarm_fleet_economics_v1.json"
       - "data/paid_work_effort_value_gate/**"
+      - "docs/PAID_WORK_DOLLAR_FLOOR.md"
       - "docs/PAID_WORK_EFFORT_VALUE_GATE.md"
+      - "docs/FLEET_ECONOMIC_ADMISSION.md"
       - "docs/PAID_WORK_IMPLEMENTATION_DISPATCH.md"
       - ".github/workflows/paid-work-effort-value-gate.yml"
 
@@ -45,6 +57,7 @@ jobs:
       - name: Focused integration tests
         run: >-
           python -m unittest -v
+          tests/test_paid_work_dollar_floor.py
           tests/test_paid_work_effort_value_gate.py
           tests/test_revenue_dispatch.py
           tests/test_fleet_economic_admission.py
@@ -52,6 +65,7 @@ jobs:
       - name: Optimized-mode integration tests
         run: >-
           python -O -m unittest -v
+          tests/test_paid_work_dollar_floor.py
           tests/test_paid_work_effort_value_gate.py
           tests/test_revenue_dispatch.py
           tests/test_fleet_economic_admission.py
@@ -69,7 +83,9 @@ jobs:
       - name: Syntax
         run: >-
           python -m py_compile
+          concierge/paid_work_dollar_floor.py
           concierge/paid_work_effort_value_gate.py
           concierge/revenue_dispatch.py
+          tests/test_paid_work_dollar_floor.py
           tests/test_paid_work_effort_value_gate.py
           tests/test_revenue_dispatch.py

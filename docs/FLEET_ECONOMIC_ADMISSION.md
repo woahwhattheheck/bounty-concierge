@@ -70,12 +70,12 @@ The byte-exact original v1 economics implementation is preserved privately as `c
 
 | Currency | Single floor | Compatible-batch floor | Native reward / agent-hour floor |
 | --- | ---: | ---: | ---: |
-| USD | 100 USD | 500 USD | 100 USD/hour |
+| USD | 50 USD | 500 USD | 100 USD/hour |
 | RTC | 200 RTC | 500 RTC | 300 RTC/hour |
 
 The RTC shape is intentional: a 1-RTC one-hour task is held, while sufficiently large compatible batches can still make small repeated items worth processing together. The policy is content-addressed in every receipt; changing the thresholds requires changing the policy input rather than silently changing code.
 
-These numbers are dispatch-planning thresholds. They are **not** claims about fair wages, token value, market value, guaranteed bounty acceptance, expected payout, or realized revenue.
+For owner-directed new bounty labor, `concierge.paid_work_dollar_floor` runs before this generic compiler. It prevents verified USD cash below $10 from entering any batch at all, routes $10–49 to save-up inventory, and sends only $50+ items into ordinary downstream economics. The generic batch compiler intentionally remains reusable for other explicitly authorized workloads.\n\nThese numbers are dispatch-planning thresholds. They are **not** claims about fair wages, token value, market value, guaranteed bounty acceptance, expected payout, or realized revenue.
 
 ## Example
 

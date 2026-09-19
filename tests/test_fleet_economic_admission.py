@@ -19,7 +19,7 @@ POLICY = {
     "max_batch_items": 200,
     "currencies": {
         "USD": {
-            "min_single_reward": "100",
+            "min_single_reward": "50",
             "min_batch_reward": "500",
             "min_reward_per_agent_hour": "100",
         },
@@ -78,6 +78,15 @@ class FleetEconomicAdmissionTests(unittest.TestCase):
         row = receipt["candidates"][0]
         self.assertEqual(row["disposition"], "SINGLE_ELIGIBLE")
         self.assertEqual(row["reward_per_agent_hour"], "400")
+        self.assertTrue(row["economically_eligible"])
+
+    def test_50_usd_fast_single_is_eligible(self):
+        receipt = compile_fleet_economic_admission(
+            request(candidate("usd-floor", "50", "0.5", currency="USD"))
+        )
+        row = receipt["candidates"][0]
+        self.assertEqual(row["disposition"], "SINGLE_ELIGIBLE")
+        self.assertEqual(row["reward_per_agent_hour"], "100")
         self.assertTrue(row["economically_eligible"])
 
     def test_high_reward_slow_single_still_holds(self):

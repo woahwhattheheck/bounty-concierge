@@ -4,7 +4,7 @@
 
 It exists because **an advertised reward is not enough**. A paid-maintenance issue, bounty, competition task, pilot, or similar opportunity can look valuable while still be a bad use of premium model/tool time because the acceptance authority is unclear, payout route is unproven, KYC is blocked, the reward is noncash, evidence is stale, the deadline is gone, another worker already owns the lane, or tool cost destroys the economics.
 
-The module composes the existing canonical-source-hardened `concierge.fleet_economic_admission` compiler rather than replacing it.
+The module composes the existing canonical-source-hardened `concierge.fleet_economic_admission` compiler rather than replacing it. New intake first passes `concierge.paid_work_dollar_floor`: only verified USD cash at $50+ proceeds here, while $10–49 is save-up inventory and <$10 is pruned.
 
 ## Dispositions
 
@@ -87,7 +87,7 @@ This is deliberately compatible with the fleet's separate Muse/single-writer coo
       "max_batch_items": 200,
       "currencies": {
         "USD": {
-          "min_single_reward": "100",
+          "min_single_reward": "50",
           "min_batch_reward": "500",
           "min_reward_per_agent_hour": "100"
         }
