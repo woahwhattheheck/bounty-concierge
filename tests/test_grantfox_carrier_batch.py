@@ -140,6 +140,24 @@ class GrantFoxCarrierBatchTests(unittest.TestCase):
         changed["children"] = list(reversed(changed["children"]))
         self.assertFalse(verify_carrier_batch_receipt(changed))
 
+    def test_recomputed_digest_cannot_legitimize_extra_field_or_rule_change(self):
+        from concierge.grantfox_carrier_batch import _sha256_json
+
+        receipt = compile_grantfox_carrier_batch(batch(census(10)))
+        changed = deepcopy(receipt)
+        changed["surprise"] = True
+        body = dict(changed)
+        body.pop("batch_receipt_sha256")
+        changed["batch_receipt_sha256"] = _sha256_json(body)
+        self.assertFalse(verify_carrier_batch_receipt(changed))
+
+        changed = deepcopy(receipt)
+        changed["summary"]["rule"] = "everything is fresh"
+        body = dict(changed)
+        body.pop("batch_receipt_sha256")
+        changed["batch_receipt_sha256"] = _sha256_json(body)
+        self.assertFalse(verify_carrier_batch_receipt(changed))
+
     def test_cli_exit_zero_for_clear_and_two_for_suppressed(self):
         with tempfile.TemporaryDirectory() as tmp:
             clear_path = Path(tmp) / "clear.json"
