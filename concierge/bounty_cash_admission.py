@@ -396,22 +396,20 @@ def compile_bounty_cash_admission(request: Dict[str, Any]) -> Dict[str, Any]:
     return {**body, "receipt_sha256": _sha(body)}
 
 
-def verify_receipt(receipt: Dict[str, Any]) -> bool:
-    if type(receipt) is not dict or receipt.get("schema") != RECEIPT_SCHEMA:
+def verify_receipt(request: Dict[str, Any], receipt: Dict[str, Any]) -> bool:
+    """Recompile retained input and require the exact deterministic receipt.
+
+    A bare self-hash is not semantic authority: callers can recompute SHA-256
+    after changing a disposition. Verification therefore requires the original
+    request and compares the whole receipt to a fresh source-owned replay.
+    """
+    if type(request) is not dict or type(receipt) is not dict:
         return False
-    if receipt.get("disposition") not in _DISPOSITIONS:
-        return False
-    if receipt.get("policy") != _POLICY or receipt.get("policy_sha256") != _sha(_POLICY):
-        return False
-    digest = receipt.get("receipt_sha256")
-    if type(digest) is not str or _SHA_RE.fullmatch(digest) is None:
-        return False
-    body = dict(receipt)
-    body.pop("receipt_sha256", None)
     try:
-        return _sha(body) == digest
+        expected = compile_bounty_cash_admission(request)
     except BountyCashAdmissionError:
         return False
+    return receipt == expected
 
 
 def _reject_float(raw: str) -> Any:
