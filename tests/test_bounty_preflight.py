@@ -378,6 +378,7 @@ def test_maintainer_pause_classifier_recognizes_explicit_contribution_stops(text
     "text",
     [
         "Please hold this issue open for tracking.",
+        "Please do not start a discussion in this issue.",
         "Do not expose secrets in pull requests.",
         "Work continues on the maintainer branch.",
         "No new release is planned this week.",
