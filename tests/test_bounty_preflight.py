@@ -359,3 +359,147 @@ def test_format_summary_never_includes_source_comment_text():
     assert bp.format_summary(result) == (
         "acme/repo#12 attempts=6 open_prs=5 disposition=HOLD"
     )
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Hold off with any attempts for now.",
+        "Please hold off on new pull requests while we revise the contract.",
+        "No more claims until the maintainer update lands.",
+        "Please do not submit a PR for this bounty yet.",
+        "Stop new submissions while we verify the reproducer.",
+    ],
+)
+def test_maintainer_pause_classifier_recognizes_explicit_contribution_stops(text):
+    assert bp._signals_maintainer_contribution_pause(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Please hold this issue open for tracking.",
+        "Please do not start a discussion in this issue.",
+        "Do not expose secrets in pull requests.",
+        "Work continues on the maintainer branch.",
+        "No new release is planned this week.",
+    ],
+)
+def test_maintainer_pause_classifier_ignores_unrelated_language(text):
+    assert not bp._signals_maintainer_contribution_pause(text)
+
+
+def test_maintainer_pause_directive_holds_without_leaking_comment_text(monkeypatch):
+    pause_text = "Hold off with any attempts for now."
+    issue = {"body": "/bounty $800", "labels": ["$800"]}
+    session = Session(
+        issue,
+        [[comment("maintainer", pause_text, association="MEMBER")]],
+    )
+
+    monkeypatch.setattr(
+        bp,
+        "audit_bounty",
+        lambda *args, **kwargs: {
+            "issue_state": "open",
+            "open_pr_count": 0,
+            "stale_listing_signal": False,
+            "search_truncated": False,
+        },
+    )
+    monkeypatch.setattr(
+        bp,
+        "qualify_dispatch",
+        lambda snapshot, *, saturation_threshold: {
+            "disposition": "ACTIONABLE",
+            "dispatch": True,
+            "reason_codes": [],
+            "reasons": [],
+            "signals": {},
+        },
+    )
+
+    result = bp.preflight_bounty("acme/repo", 21, session=session)
+
+    assert result["maintainer_pause_signal_count"] == 1
+    assert result["qualification"]["disposition"] == "HOLD"
+    assert result["qualification"]["dispatch"] is False
+    assert "MAINTAINER_CONTRIBUTION_PAUSED" in result["qualification"]["reason_codes"]
+    assert result["qualification"]["signals"]["maintainer_contribution_pause"] is True
+    assert result["qualification"]["signals"]["maintainer_contribution_pause_count"] == 1
+    assert pause_text not in repr(result)
+
+
+def test_external_pause_language_has_no_dispatch_authority(monkeypatch):
+    issue = {"body": "/bounty $800", "labels": ["$800"]}
+    session = Session(
+        issue,
+        [[comment("outsider", "Hold off with any attempts for now.")]],
+    )
+
+    monkeypatch.setattr(
+        bp,
+        "audit_bounty",
+        lambda *args, **kwargs: {
+            "issue_state": "open",
+            "open_pr_count": 0,
+            "stale_listing_signal": False,
+            "search_truncated": False,
+        },
+    )
+    monkeypatch.setattr(
+        bp,
+        "qualify_dispatch",
+        lambda snapshot, *, saturation_threshold: {
+            "disposition": "ACTIONABLE",
+            "dispatch": True,
+            "reason_codes": [],
+            "reasons": [],
+            "signals": {},
+        },
+    )
+
+    result = bp.preflight_bounty("acme/repo", 22, session=session)
+
+    assert result["maintainer_pause_signal_count"] == 0
+    assert result["qualification"]["disposition"] == "ACTIONABLE"
+    assert result["qualification"]["dispatch"] is True
+    assert "MAINTAINER_CONTRIBUTION_PAUSED" not in result["qualification"]["reason_codes"]
+    assert result["qualification"]["signals"]["maintainer_contribution_pause"] is False
+
+
+def test_maintainer_issue_body_pause_is_authoritative(monkeypatch):
+    issue = {
+        "body": "/bounty $800\n\nNo new submissions until the API contract is final.",
+        "labels": ["$800"],
+        "author_association": "OWNER",
+    }
+    session = Session(issue, [[]])
+
+    monkeypatch.setattr(
+        bp,
+        "audit_bounty",
+        lambda *args, **kwargs: {
+            "issue_state": "open",
+            "open_pr_count": 0,
+            "stale_listing_signal": False,
+            "search_truncated": False,
+        },
+    )
+    monkeypatch.setattr(
+        bp,
+        "qualify_dispatch",
+        lambda snapshot, *, saturation_threshold: {
+            "disposition": "ACTIONABLE",
+            "dispatch": True,
+            "reason_codes": [],
+            "reasons": [],
+            "signals": {},
+        },
+    )
+
+    result = bp.preflight_bounty("acme/repo", 23, session=session)
+
+    assert result["maintainer_pause_signal_count"] == 1
+    assert result["qualification"]["disposition"] == "HOLD"
+    assert result["qualification"]["dispatch"] is False
+

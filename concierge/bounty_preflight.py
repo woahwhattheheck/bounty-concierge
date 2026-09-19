@@ -43,6 +43,30 @@ _ATTEMPT_PHRASE_RE = re.compile(
     r"i(?:'m|\s+am)\s+(?:working\s+on|taking)\s+this(?:\s+bounty)?|"
     r"i(?:'d|\s+would)\s+like\s+to\s+work\s+on\s+this(?:\s+bounty)?)\b"
 )
+_MAINTAINER_PAUSE_PATTERNS = (
+    re.compile(
+        r"(?i)\bhold\s+off(?:\s+(?:with|on))?\s+"
+        r"(?:any\s+|new\s+)?(?:attempts?|claims?|pull\s+requests?|prs?|"
+        r"submissions?|implementations?|work)\b"
+    ),
+    re.compile(
+        r"(?i)\b(?:please\s+)?do\s+not\s+(?:"
+        r"start\s+(?:any\s+|new\s+)?(?:work|implementation|attempts?)|"
+        r"attempt\s+(?:this\s+|the\s+)?(?:bounty|issue|work)|"
+        r"claim\s+(?:this\s+|the\s+)?(?:bounty|issue)|"
+        r"(?:submit|open)\s+(?:a\s+|any\s+|new\s+|another\s+)?"
+        r"(?:pull\s+requests?|prs?|claims?|submissions?)"
+        r")\b"
+    ),
+    re.compile(
+        r"(?i)\bno\s+(?:new\s+|more\s+)?"
+        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?)\b"
+    ),
+    re.compile(
+        r"(?i)\bstop\s+(?:new\s+)?"
+        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|implementation|work)\b"
+    ),
+)
 
 
 class BountyPreflightError(RuntimeError):
@@ -156,6 +180,11 @@ def _signals_attempt(body: str, repo: str) -> bool:
         rf"https?://github\.com/{re.escape(repo)}/pull/\d+(?!\d)", re.IGNORECASE
     )
     return bool(same_repo_pr.search(body))
+
+
+def _signals_maintainer_contribution_pause(body: str) -> bool:
+    """Recognize only explicit maintainer instructions that stop new contribution work."""
+    return any(pattern.search(body) for pattern in _MAINTAINER_PAUSE_PATTERNS)
 
 
 def _normalized_operator_login(operator_login: str | None) -> str | None:
@@ -667,6 +696,71 @@ def _apply_assignee_gate(
     return result
 
 
+def _apply_maintainer_contribution_pause_gate(
+    qualification: dict[str, Any], signal_count: int
+) -> dict[str, Any]:
+    """Hold new dispatch while explicit maintainer-authority pause terms exist."""
+    if not isinstance(qualification, dict):
+        raise BountyPreflightError("qualification result was not an object")
+    if (
+        isinstance(signal_count, bool)
+        or not isinstance(signal_count, int)
+        or signal_count < 0
+    ):
+        raise BountyPreflightError(
+            "maintainer contribution pause signal count was malformed"
+        )
+
+    result = dict(qualification)
+    signals = result.get("signals")
+    if signals is None:
+        signals = {}
+    elif not isinstance(signals, dict):
+        raise BountyPreflightError("qualification signals were not an object")
+    else:
+        signals = dict(signals)
+    signals["maintainer_contribution_pause"] = signal_count > 0
+    signals["maintainer_contribution_pause_count"] = signal_count
+    result["signals"] = signals
+    if signal_count == 0:
+        return result
+
+    reasons = result.get("reasons")
+    if reasons is None:
+        reasons = []
+    elif not isinstance(reasons, list):
+        raise BountyPreflightError("qualification reasons were not a list")
+    else:
+        reasons = list(reasons)
+    reason_codes = result.get("reason_codes")
+    if reason_codes is None:
+        reason_codes = []
+    elif not isinstance(reason_codes, list):
+        raise BountyPreflightError("qualification reason_codes were not a list")
+    else:
+        reason_codes = list(reason_codes)
+
+    if "MAINTAINER_CONTRIBUTION_PAUSED" not in reason_codes:
+        reason_codes.append("MAINTAINER_CONTRIBUTION_PAUSED")
+        reasons.append(
+            {
+                "code": "MAINTAINER_CONTRIBUTION_PAUSED",
+                "severity": "HOLD",
+                "message": (
+                    "Maintainer-authority issue or comment terms currently pause "
+                    "new attempts, claims, submissions, or implementation."
+                ),
+            }
+        )
+
+    result["reasons"] = reasons
+    result["reason_codes"] = reason_codes
+    result["dispatch"] = False
+    if result.get("disposition") != "REJECT":
+        result["disposition"] = "HOLD"
+    return result
+
+
 def _collect_issue_context_with_snapshot(
     repo: str,
     number: int,
@@ -728,8 +822,11 @@ def _collect_issue_context_with_snapshot(
     comment_generation: list[tuple[int, str, str]] = []
     comment_generation_complete = True
     credential_signals: set[str] = set()
+    maintainer_pause_signal_count = 0
     if _has_maintainer_authority(issue):
         credential_signals.update(credential_gate_signal_types([issue_body]))
+        if _signals_maintainer_contribution_pause(issue_body):
+            maintainer_pause_signal_count += 1
 
     comments_url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
     for page in range(1, max_pages + 1):
@@ -761,6 +858,8 @@ def _collect_issue_context_with_snapshot(
             body = body or ""
             if _has_maintainer_authority(comment) and body.strip():
                 credential_signals.update(credential_gate_signal_types([body]))
+                if _signals_maintainer_contribution_pause(body):
+                    maintainer_pause_signal_count += 1
             external_human, login = _is_external_human(comment)
             if external_human and _signals_attempt(body, repo):
                 attempt_signal_count += 1
@@ -779,6 +878,7 @@ def _collect_issue_context_with_snapshot(
             "attempt_signal_count": attempt_signal_count,
             "comments_truncated": comments_truncated,
             "credential_gate_signal_types": sorted(credential_signals),
+            "maintainer_pause_signal_count": maintainer_pause_signal_count,
             "_comment_generation": (
                 tuple(comment_generation) if comment_generation_complete else None
             ),
@@ -801,7 +901,8 @@ def collect_issue_context(
 
     External comments contribute only to ``attempt_count``. Raw external comment
     text is never forwarded into qualification. OWNER/MEMBER/COLLABORATOR terms
-    are reduced immediately to generic credential-safety signals. Formal
+    are reduced immediately to generic credential-safety and explicit
+    contribution-pause signals. Formal
     assignment is reduced to counts and membership against the authenticated
     same-token GitHub principal; a caller-supplied login is only an assertion.
     Raw identities never leave the collection boundary.
@@ -872,6 +973,10 @@ def preflight_bounty(
         qualification,
         context["credential_gate_signal_types"],
     )
+    qualification = _apply_maintainer_contribution_pause_gate(
+        qualification,
+        context["maintainer_pause_signal_count"],
+    )
     assignee_state = {
         "formal_assignee_count": context["formal_assignee_count"],
         "assigned_to_operator": context["assigned_to_operator"],
@@ -927,6 +1032,7 @@ def preflight_bounty(
         "attempt_count": context["attempt_count"],
         "attempt_signal_count": context["attempt_signal_count"],
         "comments_truncated": context["comments_truncated"],
+        "maintainer_pause_signal_count": context["maintainer_pause_signal_count"],
         **assignee_state,
         "canonical_audit": audit,
         "qualification": qualification,
