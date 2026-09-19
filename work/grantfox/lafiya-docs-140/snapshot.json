@@ -1,0 +1,66 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-026-R-ZZ-SOL-DRIFT",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Drift",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Lafiya-xyz/Lafiya-docs",
+    "default_branch": "main",
+    "head_sha": "27229a1b898ffb14a8338676ca2a5080f9786dff",
+    "issue_number": 140,
+    "issue_state": "open",
+    "assignee": null,
+    "comment_count": 1,
+    "matching_pr_found": false,
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    }
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Lafiya-xyz/repo/Lafiya-docs/issue/140",
+    "public_assignment_state": "Unassigned",
+    "application_route_visible": true,
+    "labels": [
+      "stellar",
+      "wave",
+      "advanced",
+      "Maybe Rewarded",
+      "GrantFox OSS",
+      "Third Campaign"
+    ],
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "markdown_lint_blob": "022dfd31ce3cbc68c8d9179aa397ca94ec089e30",
+    "pr_template_blob": "ad6308b0ceb840c98116ebc6fffcfaafb8c111fa",
+    "contributing_blob": "1a6ca990ebca0cbb79cee4ac15ad9ce1e4dbafbb",
+    "sync_dependency_issue": 134,
+    "signal_state": {
+      "lint": "implemented",
+      "links": "producer_not_found",
+      "sync": "tracked_open_not_implemented"
+    }
+  },
+  "design": {
+    "signal_status_values": [
+      "pass",
+      "fail",
+      "unavailable"
+    ],
+    "outputs": [
+      "json",
+      "markdown",
+      "per-build artifact",
+      "trend snapshot input"
+    ],
+    "missing_signal_policy": "fail-visible as unavailable; never silently green"
+  },
+  "fence": {
+    "implementation_requires_provider_or_maintainer_assignment": true,
+    "upstream_source_mutated": false
+  }
+}
