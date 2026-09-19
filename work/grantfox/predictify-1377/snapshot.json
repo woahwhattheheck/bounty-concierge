@@ -1,1 +1,38 @@
-{"schema":"grantfox-source-baseline/v1","issue":1377}
+{
+  "schema": "grantfox-source-baseline/v1",
+  "identity": {
+    "owner": "Predictify-org",
+    "repo": "predictify-contracts",
+    "issue_number": 1377
+  },
+  "upstream": {
+    "ref": "master",
+    "sha": "b0d4a16d15ae2e71c43a4200ed5fd3a62bbb4163"
+  },
+  "github": {
+    "state": "OPEN",
+    "assignees": [],
+    "application_comments": 2,
+    "open_pr_carriers": 0
+  },
+  "blobs": {
+    "storage": "fb77bce630a35f0b1aa3b45449856d16a918554f",
+    "cargo": "f7b29a731621edd859f0f5c74f8f3865fe81c784",
+    "disabled_collision_test": "204cc60e74c31d3c6db5fd81479c546cb337b0a6",
+    "storage_layout_tests": "794b673c40586912cc5d15bf9869c6987c625258",
+    "storage_tier_doc": "ec3ee04c81ee72237cfc87e8fbb1193a17379e85",
+    "upgrade_manager": "95f4b821594594ef9f65d2541aa20de03aa83296",
+    "oracle_lib": "b85cfc6b5913215539aa2600afc8aeec5279cd8e",
+    "governance": "b68d1aa3a30472bd8f6df3b3e834941969a3cdea"
+  },
+  "findings": [
+    "collision test disabled",
+    "disabled test covers three variants only",
+    "storage keys span multiple families and raw shapes",
+    "manual storage documentation has source drift",
+    "format migrations are placeholders",
+    "complete golden-byte manifest not found",
+    "dedicated storage-migration suite not found"
+  ],
+  "disposition": "WAIT_FOR_MAINTAINER_ASSIGNMENT"
+}
