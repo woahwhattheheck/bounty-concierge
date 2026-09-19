@@ -78,6 +78,12 @@ def dependency(number=27, state="open", **overrides):
         "observed_at": "2026-09-19T22:01:00Z",
         "basis": "Issue #33 explicitly says to build on describe-transactions tooling.",
     }
+    if state == "closed":
+        item["completion"] = {
+            "kind": "source_present",
+            "commit_sha": COMMIT,
+            "basis": "Prerequisite capability is present in the pinned source snapshot.",
+        }
     item.update(overrides)
     return item
 
@@ -118,6 +124,51 @@ class GrantFoxDependencyReadinessTests(unittest.TestCase):
         )
         self.assertEqual(receipt["reason_codes"], [])
         self.assertEqual(receipt["dependency_summary"]["closed_count"], 2)
+
+    def test_closed_without_completion_evidence_is_rejected(self):
+        with self.assertRaisesRegex(
+            GrantFoxDependencyReadinessInputError, "completion must be an object"
+        ):
+            compile_grantfox_dependency_readiness(
+                request(dependencies=[dependency(state="closed", completion=None)])
+            )
+
+    def test_closed_completion_must_match_pinned_source_commit(self):
+        with self.assertRaisesRegex(
+            GrantFoxDependencyReadinessInputError, "must equal the pinned source commit"
+        ):
+            compile_grantfox_dependency_readiness(
+                request(
+                    dependencies=[
+                        dependency(
+                            state="closed",
+                            completion={
+                                "kind": "source_present",
+                                "commit_sha": "9" * 40,
+                                "basis": "Closed issue without proof on pinned source.",
+                            },
+                        )
+                    ]
+                )
+            )
+
+    def test_open_dependency_cannot_claim_completion(self):
+        with self.assertRaisesRegex(
+            GrantFoxDependencyReadinessInputError, "only valid for a closed prerequisite"
+        ):
+            compile_grantfox_dependency_readiness(
+                request(
+                    dependencies=[
+                        dependency(
+                            completion={
+                                "kind": "source_present",
+                                "commit_sha": COMMIT,
+                                "basis": "Premature completion claim.",
+                            }
+                        )
+                    ]
+                )
+            )
 
     def test_source_hold_cannot_be_upgraded_by_closed_dependency(self):
         receipt = compile_grantfox_dependency_readiness(
