@@ -114,6 +114,41 @@ class PublicationRouteGateTests(unittest.TestCase):
         self.assertEqual(receipt["disposition"], "HANDOFF_REQUIRED")
         self.assertIn("PUBLICATION_PRIMITIVES_INSUFFICIENT", receipt["reason_codes"])
 
+    def test_branch_and_pr_without_content_write_path_requires_handoff(self):
+        receipt = compile_publication_route(
+            observation(
+                integration_access="write",
+                publication_primitives=["create_branch", "create_pull_request"],
+            )
+        )
+        self.assertEqual(receipt["disposition"], "HANDOFF_REQUIRED")
+        self.assertIn("PUBLICATION_PRIMITIVES_INSUFFICIENT", receipt["reason_codes"])
+
+    def test_contents_api_write_path_is_sufficient(self):
+        receipt = compile_publication_route(
+            observation(
+                integration_access="write",
+                publication_primitives=["create_branch", "create_file", "create_pull_request"],
+            )
+        )
+        self.assertEqual(receipt["disposition"], "DIRECT_BRANCH_PR")
+
+    def test_git_object_write_path_is_sufficient(self):
+        receipt = compile_publication_route(
+            observation(
+                integration_access="write",
+                publication_primitives=[
+                    "create_branch",
+                    "create_blob",
+                    "create_tree",
+                    "create_commit",
+                    "update_ref",
+                    "create_pull_request",
+                ],
+            )
+        )
+        self.assertEqual(receipt["disposition"], "DIRECT_BRANCH_PR")
+
     def test_assignment_required_before_application_yields_application_only(self):
         receipt = compile_publication_route(
             observation(provider_requires_assignment=True, provider_assignment="none")
