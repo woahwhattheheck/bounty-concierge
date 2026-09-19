@@ -157,11 +157,15 @@ def native_request(*, assigned=False):
     }
 
 
-def rehash_activation(receipt):
+def rehash_receipt(receipt, digest_field):
     body = dict(receipt)
-    body.pop("activation_receipt_sha256", None)
+    body.pop(digest_field, None)
     raw = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    receipt["activation_receipt_sha256"] = hashlib.sha256(raw.encode()).hexdigest()
+    receipt[digest_field] = hashlib.sha256(raw.encode()).hexdigest()
+
+
+def rehash_activation(receipt):
+    rehash_receipt(receipt, "activation_receipt_sha256")
 
 
 class ActivationGateTests(unittest.TestCase):
@@ -171,6 +175,8 @@ class ActivationGateTests(unittest.TestCase):
             patch("concierge.grantfox_activation_gate.verify_source_readiness_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_dependency_readiness_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_continuity_receipt", return_value=True),
+            patch("concierge.grantfox_activation_gate._queue_semantically_valid", return_value=True),
+            patch("concierge.grantfox_activation_gate._continuity_semantically_valid", return_value=True),
         ):
             return compile_activation(payload)
 
@@ -180,6 +186,8 @@ class ActivationGateTests(unittest.TestCase):
             patch("concierge.grantfox_activation_gate.verify_source_readiness_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_dependency_readiness_receipt", return_value=True),
             patch("concierge.grantfox_activation_gate.verify_continuity_receipt", return_value=True),
+            patch("concierge.grantfox_activation_gate._queue_semantically_valid", return_value=True),
+            patch("concierge.grantfox_activation_gate._continuity_semantically_valid", return_value=True),
         ):
             return verify_activation_receipt(receipt)
 
@@ -224,6 +232,34 @@ class ActivationGateTests(unittest.TestCase):
         forged["inputs"]["continuity_state"] = "ASSIGNED"
         rehash_activation(forged)
         self.assertFalse(verify_activation_receipt(forged))
+
+    def test_rehashed_forged_queue_disposition_is_rejected(self):
+        payload = native_request()
+        forged = deepcopy(payload["queue_receipt"])
+        forged["disposition"] = "IMPLEMENTATION_ELIGIBLE"
+        forged["advisory_next_action"] = "IMPLEMENT_ASSIGNED_SCOPE"
+        rehash_receipt(forged, "receipt_sha256")
+        payload["queue_receipt"] = forged
+
+        with self.assertRaisesRegex(
+            GrantFoxActivationInputError,
+            "queue_receipt does not verify",
+        ):
+            compile_activation(payload)
+
+    def test_rehashed_forged_continuity_state_is_rejected(self):
+        payload = native_request()
+        forged = deepcopy(payload["continuity_receipt"])
+        forged["state"] = "ASSIGNED"
+        forged["advisory_next_action"] = "IMPLEMENT_ASSIGNED_SCOPE"
+        rehash_receipt(forged, "receipt_sha256")
+        payload["continuity_receipt"] = forged
+
+        with self.assertRaisesRegex(
+            GrantFoxActivationInputError,
+            "continuity_receipt does not verify",
+        ):
+            compile_activation(payload)
 
     def test_rehashed_unknown_semantic_field_is_rejected(self):
         receipt = compile_activation(native_request())
