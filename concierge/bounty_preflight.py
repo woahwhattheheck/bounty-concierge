@@ -60,21 +60,24 @@ _MAINTAINER_PAUSE_PATTERNS = (
         r"(?:pull\s+requests?|prs?|claims?|submissions?)"
         r")\b"
     ),
-    # Explicit maintainer policy statements are authoritative even when they
-    # are not phrased as imperatives.
+    # Explicit maintainer policy statements are also sentence/line-bound.
+    # This prevents quoted/meta prose from acquiring pause authority.
     re.compile(
-        r"(?i)\bwe(?:'re|\s+are)\s+(?:not\s+(?:(?:going\s+to\s+be|currently)\s+)?|"
+        r"(?im)(?:^|[.!?]\s+)(?:(?:for\s+now|currently),?\s+)?"
+        r"we(?:'re|\s+are)\s+(?:not\s+(?:(?:going\s+to\s+be|currently)\s+)?|"
         r"no\s+longer\s+)accepting\s+(?:any\s+|new\s+|more\s+)?(?:bounty\s+)?"
-        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?)\b"
+        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|contributions?)\b"
     ),
     re.compile(
-        r"(?i)\bwe\s+(?:will\s+not|won't)\s+(?:be\s+)?accept(?:ing)?\s+"
+        r"(?im)(?:^|[.!?]\s+)(?:(?:for\s+now|currently),?\s+)?"
+        r"we\s+(?:will\s+not|won't)\s+(?:be\s+)?accept(?:ing)?\s+"
         r"(?:any\s+|new\s+|more\s+)?(?:bounty\s+)?"
-        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?)\b"
+        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|contributions?)\b"
     ),
     re.compile(
-        r"(?i)\b(?:new|further|more)\s+"
-        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?)\s+"
+        r"(?im)(?:^|[.!?]\s+)(?:(?:for\s+now|currently),?\s+)?"
+        r"(?:new|further|more)\s+"
+        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|contributions?)\s+"
         r"(?:are|remain)\s+(?:currently\s+|temporarily\s+)?paused\b"
     ),
     re.compile(
