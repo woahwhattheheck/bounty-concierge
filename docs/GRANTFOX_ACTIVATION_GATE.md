@@ -1,11 +1,12 @@
 # GrantFox activation gate
 
-`concierge.grantfox_activation_gate` composes the three independent GrantFox
+`concierge.grantfox_activation_gate` composes the four independent GrantFox
 control receipts that workers otherwise have to interpret separately:
 
 1. `grantfox-queue-gate/v1` — current provider queue/application state.
 2. the verified GrantFox source-readiness receipt — pinned repository/source state.
-3. `grantfox-application-continuity/v1` — monotonic durable lifecycle evidence.
+3. `grantfox-dependency-readiness-receipt/v1` — explicit prerequisite issue readiness, including an explicit zero-dependency receipt.
+4. `grantfox-application-continuity/v1` — monotonic durable lifecycle evidence.
 
 The gate is intentionally advisory-only. It performs no provider application,
 assignment, GitHub write, submission, adjudication, sponsor contact, payment, or
@@ -14,7 +15,7 @@ wallet action.
 ## Why a compositor is necessary
 
 Each underlying receipt is useful on its own, but no one receipt proves that all
-three views agree. In a fast swarm, these are materially different facts:
+four views agree. In a fast swarm, these are materially different facts:
 
 - source code can be perfectly aligned while the actor is only **APPLIED**;
 - a fresh queue page can render implementation-eligible while durable lifecycle
@@ -32,12 +33,13 @@ The activation gate fails closed across those seams.
   "schema": "grantfox-activation-gate/v1",
   "queue_receipt": {"...": "verified grantfox-queue-gate/v1 receipt"},
   "source_receipt": {"...": "verified GrantFox source-readiness receipt"},
+  "dependency_receipt": {"...": "verified GrantFox dependency-readiness receipt"},
   "continuity_receipt": {"...": "verified grantfox-application-continuity/v1 receipt"}
 }
 ```
 
 The queue receipt must pass semantic replay from its embedded provider snapshot;
-the source receipt must pass its native source-readiness verifier; and the
+the source and dependency receipts must pass their native verifiers; and the
 continuity receipt must replay successfully against the exact supplied queue
 receipt. The gate then binds:
 
@@ -45,6 +47,8 @@ receipt. The gate then binds:
 - exact actor between queue and continuity;
 - the source receipt's embedded queue receipt byte-for-byte to the supplied queue
   receipt;
+- the dependency receipt's embedded source receipt byte-for-byte to the supplied
+  source receipt;
 - the continuity receipt's queue anchor SHA-256 to that same queue receipt.
 
 A digest swap, actor swap, or issue swap is an input error rather than a HOLD.
@@ -57,11 +61,15 @@ A digest swap, actor swap, or issue swap is an input error rather than a HOLD.
   but source is `SOURCE_DRIFT_REPLAN`.
 - **`WAIT_ASSIGNMENT`** — durable continuity says `APPLIED`; do not duplicate
   the provider application.
+- **`WAIT_DEPENDENCIES`** — durable continuity says `ASSIGNED`, but one or more
+  verified prerequisite issues remain open.
 - **`IMPLEMENT_ASSIGNED_SCOPE`** — the only implementation activation. It
   requires queue=`IMPLEMENTATION_ELIGIBLE`, continuity=`ASSIGNED`,
-  continuity disposition not held, same actor/issue/queue anchor, and
-  source=`SOURCE_ALIGNED`.
+  continuity disposition not held, same actor/issue/queue/source anchors,
+  source=`SOURCE_ALIGNED`, and dependency=`DEPENDENCIES_CLEAR`.
 - **`HOLD_SOURCE`** — source is `HOLD`, or an assigned scope has source drift.
+- **`HOLD_DEPENDENCIES`** — dependency evidence is itself stale or held and
+  must be refreshed or reconciled.
 - **`HOLD_RECONCILE`** — contradictory lifecycle/provider receipts or a durable
   continuity reconciliation hold.
 
@@ -77,9 +85,9 @@ activation SHA-256 by itself. `verify_activation_receipt()`:
 1. requires the exact activation receipt and evidence field sets;
 2. semantically recompiles the queue receipt from its retained provider
    snapshot instead of trusting a rehashed queue body;
-3. re-runs source-readiness verification and contextually recompiles continuity
+3. re-runs source/dependency verification and contextually recompiles continuity
    from its normalized events against that exact queue receipt;
-4. re-checks issue, actor, and queue-anchor equality through
+4. re-checks issue, actor, queue, source, and dependency-anchor equality through
    `compile_activation()`;
 5. recomputes the activation state machine from the retained native evidence; and
 6. requires exact equality with the supplied activation receipt, including its
@@ -122,3 +130,12 @@ The activation receipt is canonical-JSON SHA-256 bound, but verification also
 replays the native verifiers and activation state machine from the retained
 evidence. The digest remains tamper evidence only; it is not provider authority
 and it does not turn a possible/discretionary reward into an award or payment.
+
+
+## Dependency rule
+
+Activation never infers prerequisite clearance from absence. Every activation
+request carries a verified dependency-readiness receipt. Issues with no
+prerequisites use an explicit empty dependency list, which compiles to
+`DEPENDENCIES_CLEAR`. Assigned issues with verified open prerequisites compile
+to `WAIT_DEPENDENCIES` and cannot produce `IMPLEMENT_ASSIGNED_SCOPE`.

@@ -22,10 +22,12 @@ Each landing binds:
 
 - same `repository_full_name`;
 - exact declared prerequisite `issue_number`;
-- `evidence_kind`: `merged_pull_request` or `default_branch_commit`;
-- canonical GitHub PR/commit URL;
-- landed 40-hex commit SHA;
-- observed default branch name and observed default-branch head SHA;
+- the exact upstream v1 completion identity: a `LANDED` prerequisite must preserve
+  the same canonical merged-PR URL and merge commit SHA;
+- `evidence_kind`: current v1 landed records therefore require `merged_pull_request`;
+- canonical GitHub PR URL and landed 40-hex commit SHA;
+- the exact default-branch name from the verified embedded source receipt, plus an
+  observed default-branch head SHA;
 - `contains_landed_commit: true`, representing the caller's default-branch ancestry
   observation;
 - fresh UTC observation time;

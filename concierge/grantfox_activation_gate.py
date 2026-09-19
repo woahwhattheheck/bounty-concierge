@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Fail-closed compositor for GrantFox queue, source, and lifecycle receipts."""
+"""Fail-closed compositor for GrantFox queue, source, dependency, and lifecycle receipts."""
 from __future__ import annotations
 
 import argparse
@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .grantfox_application_continuity import verify_continuity_receipt
+from .grantfox_dependency_readiness import verify_dependency_readiness_receipt
 from .grantfox_queue_gate import verify_receipt as verify_queue_receipt
 from .grantfox_source_readiness import verify_source_readiness_receipt
 
@@ -34,7 +35,12 @@ _RECEIPT_FIELDS = {
     "authority",
     "activation_receipt_sha256",
 }
-_EVIDENCE_FIELDS = {"queue_receipt", "source_receipt", "continuity_receipt"}
+_EVIDENCE_FIELDS = {
+    "queue_receipt",
+    "source_receipt",
+    "dependency_receipt",
+    "continuity_receipt",
+}
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -79,12 +85,15 @@ def compile_activation(request: dict[str, Any]) -> dict[str, Any]:
 
     queue = _obj(r.get("queue_receipt"), "queue_receipt")
     source = _obj(r.get("source_receipt"), "source_receipt")
+    dependency = _obj(r.get("dependency_receipt"), "dependency_receipt")
     continuity = _obj(r.get("continuity_receipt"), "continuity_receipt")
 
     if not verify_queue_receipt(queue, semantic=True):
         raise GrantFoxActivationInputError("queue_receipt does not verify semantically")
     if not verify_source_readiness_receipt(source):
         raise GrantFoxActivationInputError("source_receipt does not verify")
+    if not verify_dependency_readiness_receipt(dependency):
+        raise GrantFoxActivationInputError("dependency_receipt does not verify")
     if not verify_continuity_receipt(continuity, queue):
         raise GrantFoxActivationInputError(
             "continuity_receipt does not verify against queue semantics"
@@ -92,8 +101,9 @@ def compile_activation(request: dict[str, Any]) -> dict[str, Any]:
 
     qid = _identity(queue, "queue_receipt", actor=False)
     sid = _identity(source, "source_receipt", actor=False)
+    did = _identity(dependency, "dependency_receipt", actor=False)
     cid = _identity(continuity, "continuity_receipt", actor=True)
-    if qid[:3] != sid[:3] or qid[:3] != cid[:3]:
+    if qid[:3] != sid[:3] or qid[:3] != did[:3] or qid[:3] != cid[:3]:
         raise GrantFoxActivationInputError("receipts identify different issues")
 
     provider_snapshot = _obj(queue.get("provider_snapshot"), "queue_receipt.provider_snapshot")
@@ -108,12 +118,30 @@ def compile_activation(request: dict[str, Any]) -> dict[str, Any]:
     embedded = _obj(source.get("queue_receipt"), "source_receipt.queue_receipt")
     if embedded.get("receipt_sha256") != queue_digest or embedded != queue:
         raise GrantFoxActivationInputError("source receipt is anchored to a different queue receipt")
+    dependency_source = _obj(
+        dependency.get("source_receipt"), "dependency_receipt.source_receipt"
+    )
+    source_digest = _text(
+        source.get("source_receipt_sha256"), "source_receipt.source_receipt_sha256"
+    )
+    if (
+        dependency_source.get("source_receipt_sha256") != source_digest
+        or dependency_source != source
+    ):
+        raise GrantFoxActivationInputError(
+            "dependency receipt is anchored to a different source receipt"
+        )
+
     anchor = _obj(continuity.get("queue_anchor"), "continuity_receipt.queue_anchor")
     if anchor.get("receipt_sha256") != queue_digest:
         raise GrantFoxActivationInputError("continuity receipt is anchored to a different queue receipt")
 
     qdisp = _text(queue.get("disposition"), "queue_receipt.disposition")
     sdisp = _text(source.get("source_disposition"), "source_receipt.source_disposition")
+    ddisp = _text(
+        dependency.get("dependency_disposition"),
+        "dependency_receipt.dependency_disposition",
+    )
     cdisp = _text(continuity.get("disposition"), "continuity_receipt.disposition")
     state = _text(continuity.get("state"), "continuity_receipt.state")
     reasons: list[str] = []
@@ -127,6 +155,9 @@ def compile_activation(request: dict[str, Any]) -> dict[str, Any]:
     elif state in {"SUBMITTED", "APPROVED", "PAYMENT_SENT", "PAID", "REJECTED"}:
         disposition = "HOLD_RECONCILE"
         reasons.append("LIFECYCLE_ALREADY_PAST_IMPLEMENTATION")
+    elif ddisp == "HOLD":
+        disposition = "HOLD_DEPENDENCIES"
+        reasons.append("DEPENDENCY_READINESS_HOLD")
     elif state == "ASSIGNED":
         if qdisp != "IMPLEMENTATION_ELIGIBLE":
             disposition = "HOLD_RECONCILE"
@@ -134,6 +165,12 @@ def compile_activation(request: dict[str, Any]) -> dict[str, Any]:
         elif sdisp != "SOURCE_ALIGNED":
             disposition = "HOLD_SOURCE"
             reasons.append("ASSIGNED_SCOPE_SOURCE_NOT_ALIGNED")
+        elif ddisp == "DEPENDENCY_WAIT":
+            disposition = "WAIT_DEPENDENCIES"
+            reasons.append("PREREQUISITE_ISSUES_OPEN")
+        elif ddisp != "DEPENDENCIES_CLEAR":
+            disposition = "HOLD_RECONCILE"
+            reasons.append("DEPENDENCY_RECEIPT_CONTRADICTION")
         else:
             disposition = "IMPLEMENT_ASSIGNED_SCOPE"
     elif state == "APPLIED":
@@ -158,8 +195,10 @@ def compile_activation(request: dict[str, Any]) -> dict[str, Any]:
         "APPLY_ELIGIBLE": "APPLY_THROUGH_VERIFIED_PROVIDER_ROUTE",
         "REPLAN_BEFORE_APPLY": "REPLAN_FROM_PINNED_SOURCE_THEN_REFRESH_GATE",
         "WAIT_ASSIGNMENT": "WAIT_FOR_DURABLE_PROVIDER_ASSIGNMENT",
+        "WAIT_DEPENDENCIES": "WAIT_FOR_PREREQUISITES_BEFORE_IMPLEMENTATION",
         "IMPLEMENT_ASSIGNED_SCOPE": "IMPLEMENT_ONLY_THE_ASSIGNED_PINNED_SCOPE",
         "HOLD_SOURCE": "REFRESH_OR_RECONCILE_PINNED_SOURCE",
+        "HOLD_DEPENDENCIES": "REFRESH_OR_RECONCILE_DEPENDENCY_EVIDENCE",
         "HOLD_RECONCILE": "STOP_AND_RECONCILE_RECEIPTS",
     }
 
@@ -176,18 +215,24 @@ def compile_activation(request: dict[str, Any]) -> dict[str, Any]:
         },
         "anchors": {
             "queue_receipt_sha256": queue_digest,
-            "source_receipt_sha256": _text(source.get("source_receipt_sha256"), "source_receipt.source_receipt_sha256"),
+            "source_receipt_sha256": source_digest,
+            "dependency_receipt_sha256": _text(
+                dependency.get("dependency_receipt_sha256"),
+                "dependency_receipt.dependency_receipt_sha256",
+            ),
             "continuity_receipt_sha256": _text(continuity.get("receipt_sha256"), "continuity_receipt.receipt_sha256"),
         },
         "inputs": {
             "queue_disposition": qdisp,
             "source_disposition": sdisp,
+            "dependency_disposition": ddisp,
             "continuity_disposition": cdisp,
             "continuity_state": state,
         },
         "evidence": {
             "queue_receipt": queue,
             "source_receipt": source,
+            "dependency_receipt": dependency,
             "continuity_receipt": continuity,
         },
         "authority": AUTHORITY,
@@ -211,8 +256,14 @@ def verify_activation_receipt(receipt: dict[str, Any]) -> bool:
         return False
     queue = evidence.get("queue_receipt")
     source = evidence.get("source_receipt")
+    dependency = evidence.get("dependency_receipt")
     continuity = evidence.get("continuity_receipt")
-    if type(queue) is not dict or type(source) is not dict or type(continuity) is not dict:
+    if (
+        type(queue) is not dict
+        or type(source) is not dict
+        or type(dependency) is not dict
+        or type(continuity) is not dict
+    ):
         return False
 
     try:
@@ -221,6 +272,7 @@ def verify_activation_receipt(receipt: dict[str, Any]) -> bool:
                 "schema": SCHEMA,
                 "queue_receipt": queue,
                 "source_receipt": source,
+                "dependency_receipt": dependency,
                 "continuity_receipt": continuity,
             }
         )

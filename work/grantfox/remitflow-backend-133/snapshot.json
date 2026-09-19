@@ -1,0 +1,86 @@
+{
+  "schema": "grantfox-preassignment-baseline/v1",
+  "lane_id": "GFOX3-20260919-remitflow-remitflow-backend-133",
+  "identity": {
+    "repository_full_name": "RemitFlow/RemitFlow-Backend",
+    "issue_number": 133,
+    "issue_url": "https://github.com/RemitFlow/RemitFlow-Backend/issues/133",
+    "listing_url": "https://contribute.grantfox.xyz/org/RemitFlow/repo/RemitFlow-Backend/issue/133"
+  },
+  "provider_observation": {
+    "observed_date": "2026-09-19",
+    "assignment": "Unassigned",
+    "apply_route_visible": true,
+    "application_limit": "1_per_user",
+    "issue_comments": 0,
+    "linked_pr_surfaced": false,
+    "application_published_by_this_seat": false,
+    "automation_attempt": "blocked_before_execution",
+    "reward_interpretation": "possible_discretionary_only",
+    "labels": ["enhancement", "GRANTFOX OSS", "MAYBE REWARDED", "priority:high", "Third Campaign"]
+  },
+  "upstream": {
+    "default_branch": "main",
+    "commit_sha": "b0a004ab8aa00b1e6f262aa84ea2b0ec0a622e1b",
+    "permissions": {"pull": true, "push": false},
+    "blobs": {
+      "src/services/transferService.js": "1517f6254bf18cf1be4e7d52cf369e637d8ffb0f",
+      "src/config/constants.js": "fccc9dbddafc02aac8d03b059b31929e9935895c",
+      "src/store/index.js": "0024fac7dfbefe34054b9ad0f3ce4a8164828ee7",
+      "src/services/stellarService.js": "e77cea9f8ff55a38de68ee55f4a5563a7c748321",
+      "src/services/idempotencyService.js": "40b50a6f68d2ffc2da2ee0db733001be3fa47312",
+      "src/controllers/transferController.js": "4fb2e7273898d09b671d09758ac2f90d9e249daf",
+      "src/services/auditService.js": "4e5140352354a4279fe54c4fee8721981ec82233",
+      "src/utils/orderedIndex.js": "3acdfc7cfa28de6e62ab8957cc89a4e2c9531719",
+      "test/transferIdempotency.test.js": "209051a011b8ff46891415eec5a885797a6f797c"
+    }
+  },
+  "landed_predecessor": {
+    "commit_sha": "ee6880defdbf7eba19b48a75abfa4ddb45ac607f",
+    "summary": "actor-scoped creation idempotency; provider call is reserved before execution; catch releases reservation on any unchecked-operation error"
+  },
+  "current_lifecycle": {
+    "states": ["pending", "claimed", "cancelled"],
+    "allowed_transitions": {"pending": ["claimed", "cancelled"], "claimed": [], "cancelled": []},
+    "approve_path_present": false,
+    "retry_path_present": false,
+    "settle_path_present": false,
+    "settlement_worker_present": false
+  },
+  "findings": [
+    "issue prose references approve/retry/settle workers that do not exist on pinned main",
+    "claim and cancel use mutable check-then-transition with no explicit expected-version/CAS contract",
+    "provider submitPayment occurs before transfer store/index/audit persistence",
+    "createTransfer releases idempotency reservation for any downstream exception, including errors after provider success",
+    "a provider-success/local-failure retry can therefore re-enter the provider path unless terminal provider outcome is fenced separately",
+    "transfers, idempotency records, ordered indexes, and audit history are process-local and reset together",
+    "claim/cancel mutate state before audit append, so an audit failure can leave unaudited committed state"
+  ],
+  "post_assignment_contract": [
+    "confirm with maintainer whether issue 133 intentionally introduces lifecycle states/workers absent from current main",
+    "add monotonic transfer revision/version and CAS-style terminal transition primitive",
+    "return typed conflict for stale commands with no loser mutation or audit",
+    "ensure exactly one terminal winner under claim/cancel interleaving",
+    "separate provider-success terminal outcome from generic local failure so retries cannot double-submit",
+    "define honest restart semantics; add durable operation receipt only with maintainer-approved persistence scope",
+    "make transition plus audit atomic where possible or record explicit recoverable discrepancy",
+    "reuse existing idempotency and audit primitives"
+  ],
+  "required_hostile_tests": [
+    "claim_vs_cancel_same_revision",
+    "stale_expected_version",
+    "duplicate_terminal_command",
+    "provider_throw_before_success",
+    "provider_success_then_local_failure",
+    "audit_failure_after_transition_attempt",
+    "process_restart_semantics",
+    "durable_restart_replay_if_persistence_is_approved"
+  ],
+  "authority": {
+    "advisory_only": true,
+    "provider_application_authority": false,
+    "implementation_write_authority": false,
+    "submission_authority": false,
+    "award_or_payment_verified": false
+  }
+}

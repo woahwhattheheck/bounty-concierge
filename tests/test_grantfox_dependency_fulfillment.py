@@ -19,6 +19,12 @@ def dependency_receipt(disposition="DEPENDENCIES_CLEAR"):
             "observed_at": "2026-09-19T22:01:00Z",
             "snapshot_age_seconds": 60,
             "basis": "Issue #33 explicitly requires #27.",
+            "completion": {
+                "status": "LANDED",
+                "merged_pr_url": "https://github.com/Gryd-lock/grydlock-testkit/pull/127",
+                "merge_commit_sha": f"{27:040x}",
+                "observed_at": "2026-09-19T22:01:10Z",
+            },
         },
         {
             "repository_full_name": "Gryd-lock/grydlock-testkit",
@@ -28,12 +34,24 @@ def dependency_receipt(disposition="DEPENDENCIES_CLEAR"):
             "observed_at": "2026-09-19T22:01:00Z",
             "snapshot_age_seconds": 60,
             "basis": "Issue #33 explicitly requires #4.",
+            "completion": {
+                "status": "LANDED",
+                "merged_pr_url": "https://github.com/Gryd-lock/grydlock-testkit/pull/104",
+                "merge_commit_sha": f"{4:040x}",
+                "observed_at": "2026-09-19T22:01:10Z",
+            },
         },
     ]
     return {
         "schema": "grantfox-dependency-readiness-receipt/v1",
         "identity": {"owner": "Gryd-lock", "repo": "grydlock-testkit", "issue_number": 33},
         "dependency_disposition": disposition,
+        "source_receipt": {
+            "repository_snapshot": {
+                "default_branch": "main",
+                "commit_sha": "f" * 40,
+            }
+        },
         "evidence": {"dependencies": dependencies},
     }
 
@@ -66,7 +84,7 @@ def request(**overrides):
     payload = {
         "schema": "grantfox-dependency-fulfillment/v1",
         "dependency_receipt": dependency_receipt(),
-        "landings": [landing(27), landing(4, kind="default_branch_commit")],
+        "landings": [landing(27), landing(4)],
         "evaluated_at": "2026-09-19T22:03:00Z",
         "max_snapshot_age_seconds": 900,
     }
@@ -147,6 +165,35 @@ class GrantFoxDependencyFulfillmentTests(unittest.TestCase):
                         landing(4),
                     ]
                 )
+            )
+
+    def test_upstream_pr_swap_is_rejected(self):
+        with self.assertRaisesRegex(
+            GrantFoxDependencyFulfillmentInputError,
+            "must match upstream completion evidence",
+        ):
+            compile_grantfox_dependency_fulfillment(
+                request(landings=[landing(27, pull_request_number=999,
+                                           evidence_url="https://github.com/Gryd-lock/grydlock-testkit/pull/999"),
+                                  landing(4)])
+            )
+
+    def test_upstream_landed_sha_swap_is_rejected(self):
+        with self.assertRaisesRegex(
+            GrantFoxDependencyFulfillmentInputError,
+            "must match upstream completion evidence",
+        ):
+            compile_grantfox_dependency_fulfillment(
+                request(landings=[landing(27, landed_commit_sha="d" * 40), landing(4)])
+            )
+
+    def test_default_branch_swap_is_rejected(self):
+        with self.assertRaisesRegex(
+            GrantFoxDependencyFulfillmentInputError,
+            "must equal verified source default branch",
+        ):
+            compile_grantfox_dependency_fulfillment(
+                request(landings=[landing(27, default_branch="release"), landing(4)])
             )
 
     def test_tamper_breaks_verification(self):
