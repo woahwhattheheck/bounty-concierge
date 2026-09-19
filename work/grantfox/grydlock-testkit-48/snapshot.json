@@ -1,0 +1,51 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX-FRESH-GRYD-48-R1R2-ZZ-SOL-DRIFT",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Drift",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Gryd-lock/grydlock-testkit",
+    "head_sha": "7064404d6e7c44df1f980d532d23901651d79426",
+    "issue_number": 48,
+    "state": "open",
+    "assignee": null,
+    "current_total": 12,
+    "current_labels": {
+      "clean": 4,
+      "suspicious": 3,
+      "malicious": 5
+    }
+  },
+  "research": {
+    "repository": "Gryd-lock/grydlock-research",
+    "real_world_base_rate_documented": false,
+    "metrics": [
+      "accuracy",
+      "false-positive rate",
+      "latency",
+      "comprehension"
+    ]
+  },
+  "proposed_milestone": {
+    "total": 120,
+    "labels": {
+      "clean": 60,
+      "suspicious": 30,
+      "malicious": 30
+    },
+    "canonical_tracker": "docs/FIXTURE_EXPANSION.md",
+    "interpretation": "stratified evaluation corpus, not production prevalence"
+  },
+  "evidence": {
+    "destinations_blob": "c8f918089f700982d7347cc1d8af8d8677fd5774",
+    "scores_blob": "f27d17c781a9059cc1304af93def554391b63876",
+    "taxonomy_blob": "44b6890344e7a01f108af0a9ced5f1caf7e945df",
+    "validator_blob": "90ea1abb6136d939aa4d1e0ac422b23f74fa6362",
+    "expected_counts_blob": "5ff39c9bf47388b81e0523ffd3365be167da30ab"
+  },
+  "fence": {
+    "implementation_requires_assignment": true,
+    "upstream_source_mutated": false
+  }
+}
