@@ -128,6 +128,7 @@ def _normalize_dependencies(
     current_issue: int,
     evaluated_at: datetime,
     max_age: int,
+    source_commit: str,
 ) -> tuple[list[dict[str, Any]], bool]:
     if type(value) is not list:
         raise GrantFoxDependencyReadinessInputError("dependencies must be a list")
@@ -153,6 +154,7 @@ def _normalize_dependencies(
             "state",
             "observed_at",
             "basis",
+            "completion",
         }
         if unknown:
             raise GrantFoxDependencyReadinessInputError(
@@ -199,6 +201,57 @@ def _normalize_dependencies(
                 f"{field}.state must be open or closed"
             )
 
+        completion = None
+        if state == "closed":
+            completion_raw = _require_object(
+                item.get("completion"), f"{field}.completion"
+            )
+            completion_unknown = set(completion_raw) - {
+                "kind",
+                "commit_sha",
+                "basis",
+            }
+            if completion_unknown:
+                raise GrantFoxDependencyReadinessInputError(
+                    f"{field}.completion contains unsupported fields: "
+                    f"{sorted(completion_unknown)}"
+                )
+            completion_kind = _require_string(
+                completion_raw.get("kind"),
+                f"{field}.completion.kind",
+                max_chars=32,
+            ).casefold()
+            if completion_kind != "source_present":
+                raise GrantFoxDependencyReadinessInputError(
+                    f"{field}.completion.kind must equal source_present"
+                )
+            completion_commit = _require_string(
+                completion_raw.get("commit_sha"),
+                f"{field}.completion.commit_sha",
+                max_chars=40,
+            ).casefold()
+            if re.fullmatch(r"[0-9a-f]{40}", completion_commit) is None:
+                raise GrantFoxDependencyReadinessInputError(
+                    f"{field}.completion.commit_sha must be a 40-character Git SHA"
+                )
+            if completion_commit != source_commit:
+                raise GrantFoxDependencyReadinessInputError(
+                    f"{field}.completion.commit_sha must equal the pinned source commit"
+                )
+            completion = {
+                "kind": "source_present",
+                "commit_sha": completion_commit,
+                "basis": _require_string(
+                    completion_raw.get("basis"),
+                    f"{field}.completion.basis",
+                    max_chars=1024,
+                ),
+            }
+        elif item.get("completion") is not None:
+            raise GrantFoxDependencyReadinessInputError(
+                f"{field}.completion is only valid for a closed prerequisite"
+            )
+
         basis = _require_string(item.get("basis"), f"{field}.basis", max_chars=1024)
         observed_raw = _require_string(
             item.get("observed_at"), f"{field}.observed_at", max_chars=64
@@ -220,6 +273,7 @@ def _normalize_dependencies(
                 "observed_at": observed_raw,
                 "snapshot_age_seconds": age,
                 "basis": basis,
+                "completion": completion,
             }
         )
     return normalized, any_stale
@@ -237,6 +291,19 @@ def compile_grantfox_dependency_readiness(request: dict[str, Any]) -> dict[str, 
             "source_receipt failed GrantFox source-readiness verification"
         )
     owner, repo, issue_number = _source_identity(source_receipt)
+    source_snapshot = _require_object(
+        source_receipt.get("repository_snapshot"),
+        "source_receipt.repository_snapshot",
+    )
+    source_commit = _require_string(
+        source_snapshot.get("commit_sha"),
+        "source_receipt.repository_snapshot.commit_sha",
+        max_chars=40,
+    ).casefold()
+    if re.fullmatch(r"[0-9a-f]{40}", source_commit) is None:
+        raise GrantFoxDependencyReadinessInputError(
+            "source_receipt.repository_snapshot.commit_sha must be a 40-character Git SHA"
+        )
 
     evaluated_raw = _require_string(
         request.get("evaluated_at"), "evaluated_at", max_chars=64
@@ -254,6 +321,7 @@ def compile_grantfox_dependency_readiness(request: dict[str, Any]) -> dict[str, 
         current_issue=issue_number,
         evaluated_at=evaluated_at,
         max_age=max_age,
+        source_commit=source_commit,
     )
     open_dependencies = [item for item in dependencies if item["state"] == "open"]
     source_disposition = source_receipt.get("source_disposition")
@@ -341,6 +409,7 @@ def verify_dependency_readiness_receipt(receipt: dict[str, Any]) -> bool:
                     "state": item.get("state"),
                     "observed_at": item.get("observed_at"),
                     "basis": item.get("basis"),
+                    "completion": item.get("completion"),
                 }
                 for item in dependencies
             ],
