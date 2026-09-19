@@ -1,0 +1,66 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX-RAEGIS-143-COLLISION-PARALLAX-Q7N4-20260919",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ–Parallax-Q7N4",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Raegis-RWA/Raegis-sdk",
+    "default_branch": "main",
+    "head_sha": "69fff2c7e8c6fe801428fc1bb71d064c5c94949c",
+    "issue_number": 143,
+    "issue_state": "open",
+    "assignee": null
+  },
+  "provider": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Raegis-RWA/repo/Raegis-sdk/issue/143",
+    "assignment_state": "unassigned",
+    "apply_enabled": true,
+    "observed_comment_count": 1,
+    "observed_commenter": "panditdhamdhere",
+    "observed_comment": "I would like work on this",
+    "application_submitted_by_worker": false
+  },
+  "collision": {
+    "pull_request": 157,
+    "pull_request_url": "https://github.com/Raegis-RWA/Raegis-sdk/pull/157",
+    "state": "open",
+    "merged": false,
+    "head_sha": "647a5a52b4b70973171bc3a5bf89cf478110c011",
+    "base": "main",
+    "author": "panditdhamdhere",
+    "linked_issue": 52,
+    "changed_files": 11,
+    "additions": 875,
+    "deletions": 2,
+    "overlap_states": [
+      "approved",
+      "blocked",
+      "revoked",
+      "unknown",
+      "unavailable"
+    ],
+    "missing_issue_143_state": [
+      "pending"
+    ],
+    "overlap_surfaces": [
+      "typed statuses",
+      "reason codes",
+      "safe messages",
+      "InvestorModule integration",
+      "tests",
+      "dashboard docs",
+      "legal-compliance disclaimer"
+    ],
+    "residual_surfaces": [
+      "pending state authority",
+      "admin-operation readiness composition"
+    ]
+  },
+  "disposition": "REUSE_EXISTING_PR_OR_CLARIFY_DELTA",
+  "fence": {
+    "parallel_greenfield_implementation": false,
+    "application_submitted": false,
+    "upstream_source_mutated": false
+  }
+}
