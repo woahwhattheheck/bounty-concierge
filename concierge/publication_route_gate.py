@@ -258,10 +258,6 @@ def compile_publication_route(request: dict[str, Any]) -> dict[str, Any]:
         disposition = "HOLD_STALE_OBSERVATION"
         next_action = "REFRESH_REPOSITORY_PROVIDER_AND_TOOL_EVIDENCE"
         reasons.append("OBSERVATION_STALE")
-    elif existing_pr is not None and existing_pr_state == "open":
-        disposition = "REUSE_EXISTING_PR"
-        next_action = "REFRESH_AND_CONTINUE_EXISTING_PR"
-        reasons.append("EXISTING_OPEN_UPSTREAM_PR_PRESENT")
     elif existing_pr is not None and existing_pr_state == "unknown":
         disposition = "HOLD_EXISTING_PR_STATE_UNKNOWN"
         next_action = "REFRESH_EXISTING_PR_STATE"
@@ -291,6 +287,10 @@ def compile_publication_route(request: dict[str, Any]) -> dict[str, Any]:
             disposition = "HOLD_APPLICATION_UNKNOWN"
             next_action = "REFRESH_PROVIDER_APPLICATION_STATE"
             reasons.append("APPLICATION_STATE_UNKNOWN")
+    elif existing_pr is not None and existing_pr_state == "open":
+        disposition = "REUSE_EXISTING_PR"
+        next_action = "REFRESH_AND_CONTINUE_EXISTING_PR"
+        reasons.append("EXISTING_OPEN_UPSTREAM_PR_PRESENT")
     elif (
         integration_access == "write"
         and _MIN_BRANCH_PR <= primitive_set
