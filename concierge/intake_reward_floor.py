@@ -317,3 +317,105 @@ def compile_intake_reward_floor(request: dict[str, Any]) -> dict[str, Any]:
 def verify_receipt(receipt: dict[str, Any]) -> bool:
     if type(receipt) is not dict or receipt.get("schema") != _RECEIPT_SCHEMA:
         return False
+    digest = receipt.get("receipt_sha256")
+    if type(digest) is not str or _SHA256_RE.fullmatch(digest) is None:
+        return False
+    candidates = receipt.get("candidates")
+    if type(candidates) is not list:
+        return False
+    for candidate in candidates:
+        if (
+            type(candidate) is not dict
+            or candidate.get("disposition") not in _ALLOWED_DISPOSITIONS
+            or candidate.get("active_queue_eligible")
+            != (candidate.get("disposition") == "ACTIVE_FLOOR_MET")
+        ):
+            return False
+    body = dict(receipt)
+    body.pop("receipt_sha256", None)
+    try:
+        return _sha256_json(body) == digest
+    except RewardFloorInputError:
+        return False
+
+
+def _strict_json_bytes(payload: bytes, source: str) -> dict[str, Any]:
+    if not payload or len(payload) > _MAX_JSON_BYTES:
+        raise RewardFloorInputError(f"{source} has an invalid byte length")
+    try:
+        text = payload.decode("utf-8", errors="strict")
+    except UnicodeError as exc:
+        raise RewardFloorInputError(f"{source} is not strict UTF-8") from exc
+
+    def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise RewardFloorInputError(f"{source} contains duplicate key {key!r}")
+            result[key] = value
+        return result
+
+    def reject_float(raw: str) -> Any:
+        raise RewardFloorInputError(f"{source} contains a floating-point JSON number")
+
+    def reject_constant(raw: str) -> Any:
+        raise RewardFloorInputError(f"{source} contains non-finite JSON constant {raw}")
+
+    try:
+        parsed = json.loads(
+            text,
+            object_pairs_hook=unique_object,
+            parse_float=reject_float,
+            parse_constant=reject_constant,
+        )
+    except RewardFloorInputError:
+        raise
+    except (json.JSONDecodeError, ValueError, OverflowError, RecursionError) as exc:
+        raise RewardFloorInputError(f"{source} is not valid JSON") from exc
+    if type(parsed) is not dict:
+        raise RewardFloorInputError(f"{source} must contain one JSON object")
+    return parsed
+
+
+def _load_request(path: str) -> dict[str, Any]:
+    if path == "-":
+        return _strict_json_bytes(sys.stdin.buffer.read(_MAX_JSON_BYTES + 1), "stdin")
+    source = Path(path)
+    try:
+        payload = source.read_bytes()
+    except OSError as exc:
+        raise RewardFloorInputError(f"cannot read {path}") from exc
+    return _strict_json_bytes(payload, path)
+
+
+def format_summary(receipt: dict[str, Any]) -> str:
+    counts = receipt["counts"]
+    return (
+        f"active={counts['ACTIVE_FLOOR_MET']} pile={counts['PILE_10_49']} "
+        f"hold={counts['HOLD_UNCONFIRMED']} ignore={counts['IGNORE_UNDER_10']} "
+        f"receipt_sha256={receipt['receipt_sha256']}"
+    )
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="python -m concierge.intake_reward_floor",
+        description="Route verified USD bounty values into active, pile, hold, or ignore queues.",
+    )
+    parser.add_argument("request", help="request JSON path, or - for stdin")
+    parser.add_argument("--json", action="store_true", help="emit the full receipt")
+    args = parser.parse_args(argv)
+    try:
+        request = _load_request(args.request)
+        receipt = compile_intake_reward_floor(request)
+    except RewardFloorInputError as exc:
+        parser.error(str(exc))
+    if args.json:
+        print(json.dumps(receipt, sort_keys=True, indent=2))
+    else:
+        print(format_summary(receipt))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
