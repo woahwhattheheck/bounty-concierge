@@ -10,6 +10,7 @@ from pathlib import Path
 import runpy
 import shutil
 import sys
+import types
 
 import pytest
 
@@ -147,6 +148,35 @@ def copied_generation(tmp_path):
     for filename in (*SOURCE_FILES, "_claim_economic_generation.py"):
         shutil.copyfile(ROOT / "concierge" / filename, tmp_path / filename)
     return runpy.run_path(str(tmp_path / "_claim_economic_generation.py"))["load_claim_generation"]
+
+
+def test_off_posix_ctime_precision_does_not_reject_same_source_generation(monkeypatch, tmp_path):
+    import os as real_os
+
+    fake_os = types.ModuleType("os")
+    fake_os.__dict__.update(vars(real_os))
+    fake_os.name = "nt"
+    real_lstat = real_os.lstat
+
+    def skewed_lstat(path):
+        st = real_lstat(path)
+        return types.SimpleNamespace(
+            st_dev=st.st_dev,
+            st_ino=st.st_ino,
+            st_mode=st.st_mode,
+            st_size=st.st_size,
+            st_mtime_ns=st.st_mtime_ns,
+            st_ctime_ns=st.st_ctime_ns + 7_000_000,
+        )
+
+    fake_os.lstat = skewed_lstat
+    with monkeypatch.context() as patched:
+        patched.setitem(sys.modules, "os", fake_os)
+        load = copied_generation(tmp_path)
+
+    verifier = load(gate.ClaimEconomicAdmissionError)
+    assert verifier.__defaults__ is None
+    assert verifier.__kwdefaults__ is None
 
 
 def test_cold_generation_preserves_public_module_identity(tmp_path):
