@@ -178,3 +178,142 @@ def _normalize_policy(raw: Any) -> dict[str, str]:
         "active_floor_usd": _amount_text(active),
         "pile_floor_usd": _amount_text(pile),
     }
+
+def _normalize_candidate(raw: Any, index: int) -> dict[str, Any]:
+    value = _object(
+        raw,
+        f"candidates[{index}]",
+        required=frozenset(
+            {"work_id", "canonical_source_url", "reward_state", "reward_evidence_url", "observed_at"}
+        ),
+        optional=frozenset({"reward_usd", "native_reward_note"}),
+    )
+    work_id = _text(value["work_id"], f"candidates[{index}].work_id", maximum=256)
+    source = _url(value["canonical_source_url"], f"candidates[{index}].canonical_source_url")
+    evidence = _url(value["reward_evidence_url"], f"candidates[{index}].reward_evidence_url")
+    observed_at = _timestamp(value["observed_at"], f"candidates[{index}].observed_at")
+    state = value["reward_state"]
+    if state not in _ALLOWED_REWARD_STATES:
+        raise RewardFloorInputError(
+            f"candidates[{index}].reward_state must be one of {sorted(_ALLOWED_REWARD_STATES)}"
+        )
+    native_note = value.get("native_reward_note")
+    if native_note is not None:
+        native_note = _text(native_note, f"candidates[{index}].native_reward_note")
+
+    reward: Optional[Decimal] = None
+    if state == "KNOWN_USD":
+        if "reward_usd" not in value:
+            raise RewardFloorInputError(
+                f"candidates[{index}] KNOWN_USD requires reward_usd"
+            )
+        reward = _decimal(value["reward_usd"], f"candidates[{index}].reward_usd")
+    elif "reward_usd" in value:
+        raise RewardFloorInputError(
+            f"candidates[{index}] UNKNOWN must not assert reward_usd"
+        )
+
+    return {
+        "input_index": index,
+        "work_id": work_id,
+        "canonical_source_url": source,
+        "reward_state": state,
+        "reward_usd": None if reward is None else _amount_text(reward),
+        "reward_evidence_url": evidence,
+        "observed_at": observed_at,
+        "native_reward_note": native_note,
+        "_reward": reward,
+    }
+
+
+def compile_intake_reward_floor(request: dict[str, Any]) -> dict[str, Any]:
+    """Compile a deterministic reward-floor routing receipt."""
+    top = _object(
+        request,
+        "request",
+        required=frozenset({"schema", "as_of", "policy", "candidates"}),
+    )
+    if top["schema"] != _REQUEST_SCHEMA:
+        raise RewardFloorInputError(f"request.schema must be {_REQUEST_SCHEMA!r}")
+    as_of = _timestamp(top["as_of"], "as_of")
+    policy = _normalize_policy(top["policy"])
+    raw_candidates = top["candidates"]
+    if type(raw_candidates) is not list:
+        raise RewardFloorInputError("candidates must be a list")
+    if len(raw_candidates) > _MAX_CANDIDATES:
+        raise RewardFloorInputError(f"candidates cannot exceed {_MAX_CANDIDATES} items")
+
+    candidates = [_normalize_candidate(raw, i) for i, raw in enumerate(raw_candidates)]
+    seen_work: set[str] = set()
+    seen_source: set[str] = set()
+    for item in candidates:
+        if item["work_id"] in seen_work:
+            raise RewardFloorInputError(f"duplicate work_id: {item['work_id']}")
+        if item["canonical_source_url"] in seen_source:
+            raise RewardFloorInputError(
+                f"duplicate canonical_source_url: {item['canonical_source_url']}"
+            )
+        seen_work.add(item["work_id"])
+        seen_source.add(item["canonical_source_url"])
+
+    active_floor = Decimal(policy["active_floor_usd"])
+    pile_floor = Decimal(policy["pile_floor_usd"])
+    decisions: list[dict[str, Any]] = []
+    counts = {name: 0 for name in sorted(_ALLOWED_DISPOSITIONS)}
+
+    for item in candidates:
+        reward = item["_reward"]
+        if reward is None:
+            disposition = "HOLD_UNCONFIRMED"
+            reasons = ["EXACT_USD_REWARD_NOT_VERIFIED"]
+        elif reward >= active_floor:
+            disposition = "ACTIVE_FLOOR_MET"
+            reasons = ["ACTIVE_USD_REWARD_FLOOR_MET"]
+        elif reward >= pile_floor:
+            disposition = "PILE_10_49"
+            reasons = ["BELOW_ACTIVE_FLOOR", "PILE_USD_REWARD_FLOOR_MET"]
+        else:
+            disposition = "IGNORE_UNDER_10"
+            reasons = ["BELOW_PILE_USD_REWARD_FLOOR"]
+        counts[disposition] += 1
+        decisions.append(
+            {
+                "input_index": item["input_index"],
+                "work_id": item["work_id"],
+                "canonical_source_url": item["canonical_source_url"],
+                "reward_state": item["reward_state"],
+                "reward_usd": item["reward_usd"],
+                "reward_evidence_url": item["reward_evidence_url"],
+                "observed_at": item["observed_at"],
+                "native_reward_note": item["native_reward_note"],
+                "disposition": disposition,
+                "active_queue_eligible": disposition == "ACTIVE_FLOOR_MET",
+                "reason_codes": reasons,
+            }
+        )
+
+    body = {
+        "schema": _RECEIPT_SCHEMA,
+        "as_of": as_of,
+        "policy": policy,
+        "policy_sha256": _sha256_json(policy),
+        "candidate_count": len(decisions),
+        "counts": counts,
+        "candidates": decisions,
+        "authority": {
+            "usd_reward_floor_router_only": True,
+            "fx_conversion": False,
+            "batch_promotion": False,
+            "unpriced_reward_inference": False,
+            "external_claim_authority": False,
+            "external_submission_authority": False,
+            "acceptance_authority": False,
+            "payment_cash_or_revenue_authority": False,
+        },
+    }
+    return {**body, "receipt_sha256": _sha256_json(body)}
+
+
+def verify_receipt(receipt: dict[str, Any]) -> bool:
+    if type(receipt) is not dict or receipt.get("schema") != _RECEIPT_SCHEMA:
+        return False
