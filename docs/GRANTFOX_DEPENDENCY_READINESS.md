@@ -119,3 +119,8 @@ Every receipt hard-codes:
 Dependency clearance says only that declared prerequisite issue observations are
 closed and fresh. It never assigns a bounty, proves a reward, authorizes a
 provider application, or authorizes source/payment mutation.
+
+
+## Zero-prerequisite issues
+
+Use an explicit `"dependencies": []` when the pinned issue has no prerequisite issues. The compiler emits `DEPENDENCIES_CLEAR` with a zero-count summary; downstream activation can therefore require dependency evidence uniformly instead of treating a missing receipt as implicit clearance.
