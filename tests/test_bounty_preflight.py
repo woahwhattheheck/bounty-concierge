@@ -503,3 +503,33 @@ def test_maintainer_issue_body_pause_is_authoritative(monkeypatch):
     assert result["qualification"]["disposition"] == "HOLD"
     assert result["qualification"]["dispatch"] is False
 
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "No PRs yet; feel free to take this.",
+        "No new claims were filed this week.",
+        "We have no new submissions to report.",
+        "This does not stop new work.",
+        'The phrase "no more claims" is not a maintainer directive.',
+    ],
+)
+def test_maintainer_pause_classifier_rejects_descriptive_and_negated_false_holds(text):
+    assert not bp._signals_maintainer_contribution_pause(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "we are not going to be accepting new bounty attempts",
+        "we are not accepting new bounty attempts",
+        "we are no longer accepting new claims",
+        "we won't be accepting new PRs",
+        "please don't submit a PR for this bounty",
+        "new submissions are paused for now",
+        "please wait before submitting any PRs",
+    ],
+)
+def test_maintainer_pause_classifier_accepts_explicit_policy_and_wait_forms(text):
+    assert bp._signals_maintainer_contribution_pause(text)
