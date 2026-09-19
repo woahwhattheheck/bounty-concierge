@@ -1,0 +1,87 @@
+{
+  "schema": "grantfox-source-readiness/v1",
+  "operation": "GFOX3-SECUREFLOW-14-RESIDUAL/R-route-integration-map",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Alder-74",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Secureflow-protocol/secureflow",
+    "default_branch": "main",
+    "head_sha": "5a52f4ad2c6da8d29bc4a2ebb65d904251ab81c6",
+    "connector_permissions": {
+      "pull": true,
+      "push": false
+    },
+    "issue": {
+      "number": 14,
+      "state": "open",
+      "assignee": null,
+      "comments": 0
+    },
+    "grantfox": {
+      "assignment": "Unassigned",
+      "apply_visible": true,
+      "comments": 0
+    }
+  },
+  "blobs": {
+    "backend_package": "ea044fcd675e0c38c65daabeab1ba2b6ff08a3e8",
+    "backend_package_lock": "5332ba3409c8ecf5ead00ccf9839376248a89c72",
+    "backend_index": "55c811abfcdea34737454aad8962ed3d31486547",
+    "messages_route": "6614f3238feca854f2c9e11e6b18646ecc20447f",
+    "notifications_route": "a633e4fb51c752da556f8d046fc19d10879fe9d7",
+    "supabase_lib": "c1d06fca4b56bc1cd361c9a91b101bd90941ce97",
+    "groq_lib": "7e600fdcc36312ed11919c22a34d8a0d6f98f2b9",
+    "auth_middleware": "131126f4d9429717dc2ec7e488ecfd24013ee38d",
+    "node_workflow": "0e412bea6eaaa0922c66417d0dd64abaea4c25ac",
+    "root_package": "5732f436e4f933f7dba75206c8e618fdc1039a09"
+  },
+  "overlap_pr_47": {
+    "state": "open",
+    "mergeable_at_readback": true,
+    "head_sha": "c1018ce55e3c086cfbf07223cc5741eba0b26cbc",
+    "base_sha_in_pr_metadata": "27f3faad2cb1a1e3d5fc24b6efa786612fbf4626",
+    "commits": 20,
+    "changed_files": 16,
+    "adds_vitest": true,
+    "adds_supertest": true,
+    "adds_schema_unit_tests": 30,
+    "exports_import_safe_app": false,
+    "changes_backend_package_lock": false,
+    "adds_coverage_provider_or_threshold": false,
+    "changes_ci_workflow": false
+  },
+  "corrections": [
+    "Issue route shorthand is stale: production mounts messages and notifications under /v1 and uses wallet query parameters for inbox/list routes.",
+    "There is no GET /notifications/:address route on pinned main.",
+    "PR #47 adds direct Zod schema tests, not HTTP/Supertest route integration tests.",
+    "PR #47 changes backend/package.json without backend/package-lock.json.",
+    "Root CI npm test --if-present does not execute backend tests because root has no test script and backend is not a root workspace."
+  ],
+  "post_assignment_contract": {
+    "app_export": "separate import-safe Express app construction from listen()",
+    "transport_mocks": [
+      "Supabase fluent query seam",
+      "Groq seam only if broader AI routes are included"
+    ],
+    "test_surfaces": [
+      "POST /v1/messages",
+      "GET /v1/messages/inbox?wallet=",
+      "POST /v1/notifications",
+      "GET /v1/notifications?wallet="
+    ],
+    "auth_hostile": true,
+    "provider_error_hostiles": true,
+    "lockfile_sync_required": true,
+    "backend_ci_explicit": true,
+    "minimum_line_coverage_percent": 70,
+    "threshold_must_be_enforced": true,
+    "preserve_pr47_semantics": true
+  },
+  "authority": {
+    "upstream_mutated": false,
+    "provider_application_submitted": false,
+    "provider_assignment_claimed": false,
+    "reward_or_payment_claimed": false
+  }
+}
