@@ -75,16 +75,22 @@ Lifecycle states `SUBMITTED`, `APPROVED`, `PAYMENT_SENT`, `PAID`, and
 
 ## Verifiable evidence envelope
 
-An activation receipt retains the complete native queue, source-readiness, and
-continuity receipts under `evidence`. Verification does not trust the outer
-activation SHA-256 by itself. `verify_activation_receipt()`:
+An activation receipt retains the complete native queue, source-readiness,
+dependency-readiness, and continuity receipts under `evidence`. Verification
+does not trust the outer activation SHA-256 by itself.
+`verify_activation_receipt()`:
 
 1. requires the exact activation receipt and evidence field sets;
-2. re-runs all three native receipt verifiers;
-3. re-checks issue, actor, and queue-anchor equality through
+2. re-runs all four native receipt verifiers;
+3. additionally replays the queue receipt through
+   `compile_grantfox_queue_gate()` and continuity evidence through
+   `compile_continuity()` from the canonical queue, actor, and event ledger,
+   requiring exact child-receipt equality rather than trusting a recomputed child
+   SHA-256;
+4. re-checks issue, actor, queue, source, and dependency-anchor equality through
    `compile_activation()`;
-4. recomputes the activation state machine from the retained native evidence; and
-5. requires exact equality with the supplied activation receipt, including its
+5. recomputes the activation state machine from the retained native evidence; and
+6. requires exact equality with the supplied activation receipt, including its
    digest.
 
 Therefore, changing a non-implementation receipt to
@@ -121,9 +127,11 @@ Every output fixes all mutation authorities to false:
 ```
 
 The activation receipt is canonical-JSON SHA-256 bound, but verification also
-replays the native verifiers and activation state machine from the retained
-evidence. The digest remains tamper evidence only; it is not provider authority
-and it does not turn a possible/discretionary reward into an award or payment.
+replays native child semantics and the activation state machine from retained
+evidence. Rehashing either an activation receipt or a derived queue/continuity
+state cannot substitute for compiler-consistent evidence. The digest remains
+tamper evidence only; it is not provider authority and it does not turn a
+possible/discretionary reward into an award or payment.
 
 
 ## Dependency rule
