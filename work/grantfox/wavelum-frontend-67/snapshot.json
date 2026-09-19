@@ -1,0 +1,59 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX3-20260919-wavelum-frontend-67/R-route-a11y-ci-contract",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Sol-Halley-83",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "stellar-network-builders/wavelum-frontend",
+    "default_branch": "main",
+    "head_sha": "39adce49545f0114ef0ae25ad835af39de46f492",
+    "issue_number": 67,
+    "issue_state": "open",
+    "github_assignee": null,
+    "connector_push": false
+  },
+  "grantfox": {
+    "public_assignment_state": "Unassigned",
+    "application_route_visible": true,
+    "one_application_per_user": true,
+    "fixed_reward_verified": false
+  },
+  "source": {
+    "package_blob": "abd989198d17220cb482e122f8e438fe7669bf6e",
+    "workflow_blob": "a86e106c5b9b4e5aae41f00c10f0d0132dcf7e8d",
+    "playwright_config_blob": "56ae4d4cd5c09cd18cb9762e1f2396a4aaa62e5f",
+    "eslint_config_blob": "84d7a2a7b33d8930fed0f4d8671c77a4a574fd46",
+    "lighthouse_config_blob": "538c4d061e21d842d255bc3f06b13d10a8fb26a4",
+    "visual_home_blob": "90a7f47fafbb2e6499edfe201b072e79066971d4",
+    "routing_blob": "e312ea8c659001cdf362c8c766f4242f4607d529",
+    "navigation_blob": "10ae5dcf7ff7929533cf0cfefde6cb78c4068f6d",
+    "dashboard_layout_blob": "e2c05ec46f52fbc4ba946050fe7b2fc71a9f12e8",
+    "mobile_nav_blob": "87a90832dd56f31a750044277dd562fc9ecf7219",
+    "command_palette_blob": "b02dcc5ddaab90249a75539f0c8b7470f09cee87",
+    "header_blob": "d3305d490de82d9a2d9dfd2da6fc6f10266fcbfd"
+  },
+  "coverage": {
+    "locales": ["en", "ja", "ko", "zh"],
+    "route_templates": [
+      "/[locale]",
+      "/[locale]/dashboard",
+      "/[locale]/dashboard/vaults",
+      "/[locale]/dashboard/streaming",
+      "/[locale]/dashboard/claims",
+      "/[locale]/dashboard/analytics",
+      "/[locale]/dashboard/admin"
+    ],
+    "current_playwright_page_specs": 1,
+    "current_lighthouse_urls": 4,
+    "axe_playwright_present": false,
+    "jsx_a11y_present": false,
+    "accessibility_job_fail_open": true
+  },
+  "disposition": {
+    "state": "READY_FOR_ASSIGNMENT",
+    "residual": "route/role-aware axe + keyboard suite, blocking CI, always-uploaded reports, manifest drift protection",
+    "implementation_requires_assignment": true,
+    "upstream_mutated": false
+  }
+}
