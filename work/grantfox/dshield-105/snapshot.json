@@ -1,0 +1,66 @@
+{
+  "schema": "grantfox-baseline/v1",
+  "operation": "GFOX2-20260919-049-R-KEYSTONE-S7M2",
+  "observed_date": "2026-09-19",
+  "worker": "ZZ-Keystone-S7M2",
+  "model": "GPT-5.6 Sol",
+  "upstream": {
+    "repository": "Dshield-xyz/Dshield",
+    "default_branch": "dev",
+    "head_sha": "497eb44dab889eaceb54c58d68b6bc163bc9e097",
+    "issue_number": 105,
+    "issue_state": "open",
+    "assignee": null,
+    "package_blob": "c402ec8fc1cb44a4e8e7315fdabc88064475702e",
+    "ui_index_blob": "a4c598901f6f03c92fdeec36a1799dad8455dd79",
+    "ci_blob": "86e3bc8543fb998bb74f547e797a68877737ce91",
+    "readme_blob": "813c09dd8592645f7675a8126454a17d2d73084b",
+    "matching_pr_found": true,
+    "matching_pr_number": 131,
+    "matching_pr_state": "closed",
+    "matching_pr_merged": false,
+    "matching_pr_target": "main",
+    "maintainer_comment_on_pr131": "spam"
+  },
+  "grantfox": {
+    "listing_url": "https://contribute.grantfox.xyz/org/Dshield-xyz/repo/Dshield/issue/105",
+    "assignment_state": "unassigned",
+    "application_submitted": false,
+    "application_attempt_result": "authentication_failed",
+    "application_attempt_error": "No credentials are configured for this account, so login cannot succeed.",
+    "existing_application_detected_for_linked_account": false,
+    "fixed_reward_verified": false,
+    "award_verified": false,
+    "payment_verified": false
+  },
+  "evidence": {
+    "storybook_present_on_current_dev": false,
+    "current_ui_exports": [
+      "Button",
+      "Card",
+      "CardLabel",
+      "Input",
+      "StatusMessage",
+      "Badge",
+      "Spinner",
+      "ProgressSteps",
+      "SelectButton",
+      "PageShell",
+      "PageHeader",
+      "ConnectGate"
+    ],
+    "prior_pr_safe_to_reuse_wholesale": false,
+    "implementation_basis": "current dev branch, bounded Storybook/config/stories/scripts/CI/README changes"
+  },
+  "disposition": {
+    "fleet_route": "APPLICATION_AUTH_BLOCKED",
+    "next_action": "APPLY_THROUGH_AN_AUTHENTICATED_GRANTFOX_SESSION_OR_PROVIDER_ROUTE",
+    "implementation_started": false
+  },
+  "authority": {
+    "advisory_only": true,
+    "provider_assignment_authority": false,
+    "upstream_implementation_authority": false,
+    "payment_or_wallet_authority": false
+  }
+}
