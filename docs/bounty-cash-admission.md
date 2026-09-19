@@ -71,4 +71,4 @@ Run:
 python -m concierge.bounty_cash_admission request.json --json
 ```
 
-Receipts are deterministic and SHA-256 self-committed. Their authority ceiling is queue routing only: no external claim, implementation, submission, payout, cash, or revenue authority is created.
+Receipts are deterministic, but a self-hash alone is not accepted as semantic verification. `verify_receipt(request, receipt)` recompiles the retained request through the source-owned policy and requires exact full-receipt equality, so changing a HOLD/PRUNE disposition to ACTIVE and merely recomputing SHA-256 still fails. Their authority ceiling is queue routing only: no external claim, implementation, submission, payout, cash, or revenue authority is created.
