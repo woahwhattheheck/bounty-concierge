@@ -1,0 +1,114 @@
+{
+  "schema": "midas-fixed-cash-viability-audit/v1",
+  "captured_at": "2026-09-19",
+  "owner": "ZZ-Sol-Vector / GPT-5.6 Sol",
+  "source_repository": "bujiproject-art/agentmidasopendevteam",
+  "source_default_branch": "main",
+  "source_pushed_at": "2026-02-17T20:45:02Z",
+  "source_archived": false,
+  "source_root_files": [
+    ".github/",
+    "BOUNTIES.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
+    "CONTRIBUTOR_LICENSE_AGREEMENT.md",
+    "LICENSE",
+    "README.md",
+    "REWARDS.md",
+    "SECURITY.md"
+  ],
+  "source_application_scaffold_present": false,
+  "live_activity": {
+    "open_github_items": 25,
+    "open_non_pr_issues": 24,
+    "open_prs": 1,
+    "closed_non_pr_issues": 0,
+    "closed_prs": 0,
+    "total_issue_comments_observed": 16,
+    "maintainer_comments_observed": 0,
+    "maintainer_associations": [
+      "OWNER",
+      "MEMBER",
+      "COLLABORATOR"
+    ],
+    "evidence_note": "No observed issue comment carried OWNER, MEMBER, or COLLABORATOR author_association."
+  },
+  "advertised_board": {
+    "app_bounties": 41,
+    "advertised_app_face_value_usd": 10050,
+    "openclaw_bounties": 4,
+    "advertised_openclaw_face_value_usd": 1550,
+    "combined_advertised_face_value_usd": 11600
+  },
+  "priority_claim_census": [
+    {
+      "bounty_id": 18,
+      "name": "Revenue Dashboard",
+      "usd": 500,
+      "matching_open_claim_or_application": 0
+    },
+    {
+      "bounty_id": 12,
+      "name": "Affiliate Dashboard Pro",
+      "usd": 500,
+      "matching_open_claim_or_application": 0
+    },
+    {
+      "bounty_id": 34,
+      "name": "Healthcare Appointment System",
+      "usd": 500,
+      "matching_open_claim_or_application": 0
+    },
+    {
+      "bounty_id": 15,
+      "name": "Team Genealogy Tree",
+      "usd": 400,
+      "matching_open_claim_or_application": 0
+    },
+    {
+      "bounty_id": 19,
+      "name": "Payment Gateway Manager",
+      "usd": 400,
+      "matching_open_claim_or_application": 0
+    },
+    {
+      "bounty_id": 30,
+      "name": "Restaurant POS Interface",
+      "usd": 400,
+      "matching_open_claim_or_application": 0
+    },
+    {
+      "bounty_id": 33,
+      "name": "Law Firm Case Manager",
+      "usd": 400,
+      "matching_open_claim_or_application": 0
+    },
+    {
+      "bounty_id": 22,
+      "name": "Live Chat Widget",
+      "usd": 350,
+      "matching_open_claim_or_application": 0
+    },
+    {
+      "bounty_id": 31,
+      "name": "Real Estate Listing Portal",
+      "usd": 350,
+      "matching_open_claim_or_application": 0
+    }
+  ],
+  "disposition": "HOLD_STALE_PROVIDER",
+  "reason_codes": [
+    "SOURCE_REPOSITORY_STALE",
+    "NO_MAINTAINER_COMMENT_ACTIVITY",
+    "NO_CLOSED_OR_MERGED_DELIVERY_HISTORY",
+    "APPLICATION_SOURCE_SCAFFOLD_ABSENT",
+    "CLA_ACCOUNT_APPROVAL_GATES_UNSATISFIED"
+  ],
+  "fleet_rule": "Do not claim or implement Midas rows until a fresh maintainer/provider response proves the program is accepting work, identifies the application source/scaffold, and confirms the relevant account/CLA/assignment gate.",
+  "authority": {
+    "discovery_only": true,
+    "external_claim_authority": false,
+    "implementation_authority": false,
+    "payout_or_revenue_authority": false
+  }
+}
