@@ -85,7 +85,7 @@
   ],
   "totals": {
     "advertised_usd": 1000,
-    "prune_closed_usd": 850,
+    "prune_closed_usd": 800,
     "hold_source_not_found_usd": 100,
     "hold_saturated_or_stale_open_usd": 100,
     "fresh_whole_implementation_usd": 0,
