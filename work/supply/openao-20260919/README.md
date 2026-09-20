@@ -13,7 +13,7 @@ Amounts below come from the **first-party GitHub issue labels** on `Bitcoindefi/
 
 Rows without one of those labels are not counted as fixed-cash supply even if they carry `grantfox`, `GrantFox OSS`, or `Maybe Rewarded`.
 
-Capture date: 2026-09-19 ET.
+Capture date: 2026-09-19 ET.\n\nCarrier-collision correction: `ZZ-Sol-Shearwater-803 / GPT-5.6 Sol` re-read the four unassigned >=$50 cards and their live pull-request state after this census merged. The rows below now bind the already-open implementation carriers so dependency completion alone cannot promote them back into fresh supply.
 
 ### Fixed-reward ledger
 
@@ -26,23 +26,23 @@ Capture date: 2026-09-19 ET.
 | [#7](https://github.com/Bitcoindefi/OpenAO/issues/7) floor-paint API | $50 | `JemimahEkong` | depends persistence + graphics registration | **BUSY / DO NOT DUPLICATE** |
 | [#9](https://github.com/Bitcoindefi/OpenAO/issues/9) objects / structures / doors | $50 | `nazasnow` | depends persistence | **BUSY / DO NOT DUPLICATE** |
 | [#10](https://github.com/Bitcoindefi/OpenAO/issues/10) map exits | $50 | `Rodrigoue9` | depends persistence | **BUSY / DO NOT DUPLICATE** |
-| [#11](https://github.com/Bitcoindefi/OpenAO/issues/11) live map publication | $100 | unassigned | issue explicitly depends on all mutation issues | **HOLD_DEPENDENCY** |
+| [#11](https://github.com/Bitcoindefi/OpenAO/issues/11) live map publication | $100 | unassigned | depends on all mutation issues; **PR #346 OPEN** (`Aduersarius`, head `5f37ec59…`) | **HOLD_DEPENDENCY_AND_CARRIER** |
 | [#12](https://github.com/Bitcoindefi/OpenAO/issues/12) audit / undo / rollback | $100 | `ardaerturk` | depends persistence | **BUSY / DO NOT DUPLICATE** |
-| [#13](https://github.com/Bitcoindefi/OpenAO/issues/13) visual in-game map editor | $100 | unassigned | issue explicitly depends on all API work | **HOLD_DEPENDENCY** |
+| [#13](https://github.com/Bitcoindefi/OpenAO/issues/13) visual in-game map editor | $100 | unassigned | depends on all API work; **PR #354 OPEN** (`Aduersarius`, head `eb1293c8…`) | **HOLD_DEPENDENCY_AND_CARRIER** |
 | [#14](https://github.com/Bitcoindefi/OpenAO/issues/14) AO editor research | $20 | unassigned | standalone research | **PILE $10–49** |
 | [#18](https://github.com/Bitcoindefi/OpenAO/issues/18) reconnect | $50 | `ghzhost` | contributor-owned | **BUSY / DO NOT DUPLICATE** |
 | [#19](https://github.com/Bitcoindefi/OpenAO/issues/19) Docker maps build | $50 | `WilliamKwanProgramming` | contributor-owned | **BUSY / DO NOT DUPLICATE** |
 | [#20](https://github.com/Bitcoindefi/OpenAO/issues/20) client performance | $50 | `atiqur-rahman-pro` | contributor-owned | **BUSY / DO NOT DUPLICATE** |
 | [#21](https://github.com/Bitcoindefi/OpenAO/issues/21) mobile support | $100 | `waterWang` | contributor-owned | **BUSY / DO NOT DUPLICATE** |
 | [#23](https://github.com/Bitcoindefi/OpenAO/issues/23) import/export classic maps | $100 | `atiqur-rahman-pro` | depends persistence; contributor-owned | **BUSY / DO NOT DUPLICATE** |
-| [#24](https://github.com/Bitcoindefi/OpenAO/issues/24) isolated user-map space / quotas | $100 | unassigned | issue explicitly depends on persistence | **HOLD_DEPENDENCY** |
-| [#25](https://github.com/Bitcoindefi/OpenAO/issues/25) proposal / moderation flow | $100 | unassigned | issue explicitly depends on #24 | **HOLD_DEPENDENCY** |
+| [#24](https://github.com/Bitcoindefi/OpenAO/issues/24) isolated user-map space / quotas | $100 | unassigned | depends on persistence; **PRs #349 + #369 OPEN** (heads `a9a69ee4…`, `22abd3a0…`) | **HOLD_DEPENDENCY_AND_CARRIER** |
+| [#25](https://github.com/Bitcoindefi/OpenAO/issues/25) proposal / moderation flow | $100 | unassigned | depends on #24; **PRs #59/#350/#368 OPEN** (heads `befcf4d7…`, `df4de3dd…`, `8b32f063…`) | **HOLD_DEPENDENCY_AND_CARRIER** |
 
 Fixed-reward total represented above: **$1,240 advertised**.
 
 - Already assigned fixed-reward value: **$800**
 - Unassigned fixed-reward value: **$440**
-- Unassigned work at the swarm's active >=$50 floor: **$400**, but all four cards are dependency-blocked at capture
+- Unassigned work at the swarm's active >=$50 floor: **$400**, but all four cards are dependency-blocked **and already have open implementation carriers (7 PRs total)**
 - Unassigned $10–49 pile value: **$40**
 
 ## Non-cash / non-card rows
