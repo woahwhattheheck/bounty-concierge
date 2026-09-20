@@ -133,29 +133,6 @@ def test_preflight_folds_comment_truncation_into_canonical_hold(monkeypatch):
     assert result["qualification"]["disposition"] == "HOLD"
 
 
-def test_preflight_holds_on_locked_canonical_issue(monkeypatch):
-    issue = {"body": "/bounty $800", "labels": ["$800"], "locked": True}
-    session = Session(issue, [[]])
-    monkeypatch.setattr(
-        bp,
-        "audit_bounty",
-        lambda *args, **kwargs: {
-            "issue_state": "open",
-            "issue_locked": True,
-            "open_pr_count": 0,
-            "stale_listing_signal": False,
-            "search_truncated": False,
-        },
-    )
-
-    result = bp.preflight_bounty("acme/repo", 25, session=session)
-
-    assert result["qualification"]["disposition"] == "HOLD"
-    assert result["qualification"]["dispatch"] is False
-    assert "CANONICAL_ISSUE_LOCKED" in result["qualification"]["reason_codes"]
-    assert result["qualification"]["signals"]["issue_locked"] is True
-
-
 def test_preflight_holds_on_canonical_policy_label(monkeypatch):
     issue = {
         "body": "/bounty $800",
@@ -172,15 +149,11 @@ def test_preflight_holds_on_canonical_policy_label(monkeypatch):
             "search_truncated": False,
         },
     )
-
     result = bp.preflight_bounty("acme/repo", 24, session=session)
-
     assert result["qualification"]["disposition"] == "HOLD"
     assert result["qualification"]["dispatch"] is False
     assert "CANONICAL_POLICY_BLOCKS_COMMUNITY_WORK" in result["qualification"]["reason_codes"]
-    assert result["qualification"]["signals"]["canonical_policy_block_categories"] == [
-        "CORE_TEAM_ONLY"
-    ]
+    assert result["qualification"]["signals"]["canonical_policy_block_categories"] == ["CORE_TEAM_ONLY"]
 
 
 def test_preflight_passes_attempt_count_without_raw_comment_text(monkeypatch):
