@@ -89,19 +89,43 @@ class BountyDeadlineGateTests(unittest.TestCase):
         self.assertIn("SPONSOR_DEADLINE_ELAPSED", receipt["reason_codes"])
         self.assertEqual(receipt["deadline"]["extension_status"], "NONE")
 
-    def test_date_only_deadline_on_same_utc_day_holds_for_clock_ambiguity(self):
-        payload = request(evaluated_at="2026-09-25T12:00:00Z")
-        payload["issue"] = {
-            **payload["issue"],
-            "observed_at": "2026-09-25T11:58:00Z",
-        }
+    def test_date_only_deadline_near_boundary_holds_for_timezone_and_clock_ambiguity(self):
+        for evaluated_at, observed_at in (
+            ("2026-09-24T12:00:00Z", "2026-09-24T11:58:00Z"),
+            ("2026-09-25T12:00:00Z", "2026-09-25T11:58:00Z"),
+            ("2026-09-26T12:00:00Z", "2026-09-26T11:58:00Z"),
+        ):
+            with self.subTest(evaluated_at=evaluated_at):
+                payload = request(evaluated_at=evaluated_at)
+                payload["issue"] = {**payload["issue"], "observed_at": observed_at}
+                payload["deadline_evidence"] = {
+                    **payload["deadline_evidence"],
+                    "observed_at": observed_at,
+                }
+                receipt = compile_bounty_deadline_gate(payload)
+                self.assertEqual(receipt["disposition"], "HOLD")
+                self.assertIn("DATE_BOUNDARY_CLOCK_AMBIGUOUS", receipt["reason_codes"])
+
+    def test_date_only_deadline_two_days_ahead_is_unambiguously_current(self):
+        payload = request(evaluated_at="2026-09-23T12:00:00Z")
+        payload["issue"] = {**payload["issue"], "observed_at": "2026-09-23T11:58:00Z"}
         payload["deadline_evidence"] = {
             **payload["deadline_evidence"],
-            "observed_at": "2026-09-25T11:58:00Z",
+            "observed_at": "2026-09-23T11:58:00Z",
+        }
+        receipt = compile_bounty_deadline_gate(payload)
+        self.assertEqual(receipt["disposition"], "DEADLINE_CURRENT")
+
+    def test_date_only_deadline_two_days_past_is_unambiguously_elapsed(self):
+        payload = request(evaluated_at="2026-09-27T12:00:00Z")
+        payload["issue"] = {**payload["issue"], "observed_at": "2026-09-27T11:58:00Z"}
+        payload["deadline_evidence"] = {
+            **payload["deadline_evidence"],
+            "observed_at": "2026-09-27T11:58:00Z",
         }
         receipt = compile_bounty_deadline_gate(payload)
         self.assertEqual(receipt["disposition"], "HOLD")
-        self.assertIn("DATE_BOUNDARY_CLOCK_AMBIGUOUS", receipt["reason_codes"])
+        self.assertIn("SPONSOR_DEADLINE_ELAPSED", receipt["reason_codes"])
 
     def test_instant_deadline_is_exact_at_boundary(self):
         payload = request(evaluated_at="2026-09-25T12:00:00Z")
