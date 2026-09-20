@@ -37,6 +37,7 @@ def observation(**overrides):
         "installed_fork_repo": None,
         "installed_fork_push_access": None,
         "installed_fork_parent_repo": None,
+        "installed_fork_source_repo": None,
         "publication_primitives": PRIMITIVES,
         "existing_pr_url": None,
         "existing_pr_state": None,
@@ -96,9 +97,9 @@ class PublicationRouteGateTests(unittest.TestCase):
             )
         )
         self.assertEqual(receipt["disposition"], "HANDOFF_REQUIRED")
-        self.assertIn("INSTALLED_FORK_PARENT_NOT_OBSERVED", receipt["reason_codes"])
+        self.assertIn("INSTALLED_FORK_IDENTITY_NOT_OBSERVED", receipt["reason_codes"])
         self.assertIsNone(
-            receipt["observed_publication_path"]["installed_fork_parent_matches_upstream"]
+            receipt["observed_publication_path"]["installed_fork_identity_matches_upstream"]
         )
 
     def test_actor_owned_unrelated_repo_cannot_masquerade_as_fork(self):
@@ -110,9 +111,29 @@ class PublicationRouteGateTests(unittest.TestCase):
             )
         )
         self.assertEqual(receipt["disposition"], "HANDOFF_REQUIRED")
-        self.assertIn("INSTALLED_FORK_PARENT_MISMATCH", receipt["reason_codes"])
+        self.assertIn("INSTALLED_FORK_IDENTITY_MISMATCH", receipt["reason_codes"])
+        self.assertFalse(
+            receipt["observed_publication_path"]["installed_fork_identity_matches_upstream"]
+        )
+
+    def test_nested_fork_source_binding_can_route_to_canonical_upstream(self):
+        receipt = compile_publication_route(
+            observation(
+                installed_fork_repo="woahwhattheheck/GrantFox",
+                installed_fork_push_access=True,
+                installed_fork_parent_repo="intermediate/GrantFox",
+                installed_fork_source_repo="GrantChain/GrantFox",
+            )
+        )
+        self.assertEqual(receipt["disposition"], "OWNED_FORK_PR")
         self.assertFalse(
             receipt["observed_publication_path"]["installed_fork_parent_matches_upstream"]
+        )
+        self.assertTrue(
+            receipt["observed_publication_path"]["installed_fork_source_matches_upstream"]
+        )
+        self.assertTrue(
+            receipt["observed_publication_path"]["installed_fork_identity_matches_upstream"]
         )
 
     def test_read_only_upstream_plus_fork_routes_via_fork(self):
@@ -343,6 +364,12 @@ class PublicationRouteGateTests(unittest.TestCase):
         with self.assertRaisesRegex(PublicationRouteInputError, "must be null"):
             compile_publication_route(
                 observation(installed_fork_parent_repo="GrantChain/GrantFox")
+            )
+
+    def test_fork_source_without_fork_is_contradictory(self):
+        with self.assertRaisesRegex(PublicationRouteInputError, "must be null"):
+            compile_publication_route(
+                observation(installed_fork_source_repo="GrantChain/GrantFox")
             )
 
     def test_duplicate_or_unknown_primitives_fail_closed(self):
