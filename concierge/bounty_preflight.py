@@ -43,59 +43,94 @@ _ATTEMPT_PHRASE_RE = re.compile(
     r"i(?:'m|\s+am)\s+(?:working\s+on|taking)\s+this(?:\s+bounty)?|"
     r"i(?:'d|\s+would)\s+like\s+to\s+work\s+on\s+this(?:\s+bounty)?)\b"
 )
+_MAINTAINER_DIRECTIVE_PREFIX = (
+    r"(?:^|[.!?]\s+)[ \t]*"
+    r"(?:(?:[-*+]|#{1,6})[ \t]+)?"
+    r"(?:(?:update|status|notice):[ \t]+)?"
+)
 _MAINTAINER_PAUSE_PATTERNS = (
-    # Imperative forms are anchored to a sentence/line boundary so descriptive
-    # prose such as "this does not stop new work" cannot acquire dispatch authority.
+    # Directive forms accept ordinary Markdown list/heading prefixes and a small
+    # status-label vocabulary, but deliberately exclude blockquotes ("> ...").
     re.compile(
-        r"(?im)(?:^|[.!?]\s+)(?:please\s+)?hold\s+off(?:\s+(?:with|on))?\s+"
+        _MAINTAINER_DIRECTIVE_PREFIX
+        + r"(?:please\s+)?hold\s+off(?:\s+(?:with|on))?\s+"
         r"(?:any\s+|new\s+)?(?:attempts?|claims?|pull\s+requests?|prs?|"
-        r"submissions?|implementations?|work)\b"
+        r"submissions?|implementations?|work)\b",
+        re.IGNORECASE | re.MULTILINE,
     ),
     re.compile(
-        r"(?im)(?:^|[.!?]\s+)(?:please\s+)?(?:do\s+not|don't)\s+(?:"
-        r"start\s+(?:any\s+|new\s+)?(?:work|implementation|attempts?)|"
+        _MAINTAINER_DIRECTIVE_PREFIX
+        + r"(?:please\s+)?(?:do\s+not|don't)\s+(?:"
+        r"start\s+(?:(?:any|new)\s+){0,2}(?:work|implementation|attempts?)|"
         r"attempt\s+(?:this\s+|the\s+)?(?:bounty|issue|work)|"
         r"claim\s+(?:this\s+|the\s+)?(?:bounty|issue)|"
-        r"(?:submit|open)\s+(?:a\s+|any\s+|new\s+|another\s+)?"
+        r"work\s+on\s+(?:this\s+|the\s+)?(?:bounty|issue|task|work)|"
+        r"(?:submit|open)\s+"
+        r"(?:a\s+(?:new\s+)?|another\s+|(?:(?:any|new)\s+){1,2})?"
         r"(?:pull\s+requests?|prs?|claims?|submissions?)"
-        r")\b"
+        r")\b",
+        re.IGNORECASE | re.MULTILINE,
     ),
-    # Explicit maintainer policy statements are also sentence/line-bound.
-    # This prevents quoted/meta prose from acquiring pause authority.
+    # Explicit maintainer policy statements remain boundary-shaped. Quoted/meta
+    # prose cannot match because the prefix excludes quote syntax.
     re.compile(
-        r"(?im)(?:^|[.!?]\s+)(?:(?:for\s+now|currently),?\s+)?"
-        r"we(?:'re|\s+are)\s+(?:not\s+(?:(?:going\s+to\s+be|currently)\s+)?|"
-        r"no\s+longer\s+)accepting\s+(?:any\s+|new\s+|more\s+)?(?:bounty\s+)?"
-        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|contributions?)\b"
+        _MAINTAINER_DIRECTIVE_PREFIX
+        + r"(?:(?:for\s+now|currently),?\s+)?"
+        r"(?:we(?:'re|\s+are)\s+(?:"
+        r"not\s+(?:(?:going\s+to\s+be|currently)\s+)?|no\s+longer\s+)"
+        r"|we\s+aren't\s+)"
+        r"accepting\s+(?:any\s+|new\s+|more\s+)?(?:bounty\s+)?"
+        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|contributions?)\b",
+        re.IGNORECASE | re.MULTILINE,
     ),
     re.compile(
-        r"(?im)(?:^|[.!?]\s+)(?:(?:for\s+now|currently),?\s+)?"
+        _MAINTAINER_DIRECTIVE_PREFIX
+        + r"(?:(?:for\s+now|currently),?\s+)?"
         r"we\s+(?:will\s+not|won't)\s+(?:be\s+)?accept(?:ing)?\s+"
         r"(?:any\s+|new\s+|more\s+)?(?:bounty\s+)?"
-        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|contributions?)\b"
+        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|contributions?)\b",
+        re.IGNORECASE | re.MULTILINE,
     ),
     re.compile(
-        r"(?im)(?:^|[.!?]\s+)(?:(?:for\s+now|currently),?\s+)?"
+        _MAINTAINER_DIRECTIVE_PREFIX
+        + r"(?:(?:for\s+now|currently),?\s+)?"
         r"(?:new|further|more)\s+"
         r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|contributions?)\s+"
-        r"(?:are|remain)\s+(?:currently\s+|temporarily\s+)?paused\b"
+        r"(?:are|remain)\s+(?:currently\s+|temporarily\s+)?paused\b",
+        re.IGNORECASE | re.MULTILINE,
+    ),
+    # Bare "submissions/PRs are paused" is authoritative only with explicit
+    # current-time language, avoiding historical "were paused" prose.
+    re.compile(
+        _MAINTAINER_DIRECTIVE_PREFIX
+        + r"(?:(?:for\s+now|currently),?\s+)?"
+        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|contributions?)\s+"
+        r"(?:are|remain)\s+(?:currently\s+|temporarily\s+)?paused\s+"
+        r"(?:for\s+now\b|right\s+now\b|at\s+this\s+time\b|until\b|while\b)",
+        re.IGNORECASE | re.MULTILINE,
     ),
     re.compile(
-        r"(?im)(?:^|[.!?]\s+)(?:please\s+)?wait\s+before\s+"
-        r"(?:submitting|opening|starting|claiming|attempting)\b"
+        _MAINTAINER_DIRECTIVE_PREFIX
+        + r"(?:please\s+)?wait\s+before\s+"
+        r"(?:submitting|opening|starting|claiming|attempting)\b",
+        re.IGNORECASE | re.MULTILINE,
     ),
     re.compile(
-        r"(?im)(?:^|[.!?]\s+)(?:please\s+)?stop\s+(?:all\s+|new\s+|further\s+)?"
-        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|implementation|work)\b"
+        _MAINTAINER_DIRECTIVE_PREFIX
+        + r"(?:please\s+)?stop\s+(?:all\s+|new\s+|further\s+)?"
+        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|implementation|work)\b",
+        re.IGNORECASE | re.MULTILINE,
     ),
     # "No new/more ..." is too ambiguous by itself. Require a temporal
     # directive continuation; historical prose ("no new claims were filed")
     # must not pause dispatch.
     re.compile(
-        r"(?im)(?:^|[.!?]\s+)no\s+(?:new|more|further)\s+"
+        _MAINTAINER_DIRECTIVE_PREFIX
+        + r"no\s+(?:new|more|further)\s+"
         r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?)\s+"
         r"(?:until\b|while\b|for\s+now\b|right\s+now\b|"
-        r"at\s+this\s+time\b|effective\b)"
+        r"at\s+this\s+time\b|effective\b)",
+        re.IGNORECASE | re.MULTILINE,
     ),
 )
 
