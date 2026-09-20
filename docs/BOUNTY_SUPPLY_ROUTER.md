@@ -20,8 +20,16 @@ and unsafe private-context requirements.
 | `PRUNE` | `< $10` | Disregard for paid-work dispatch |
 | `HOLD` | stale/incomplete/ambiguous or no trustworthy fixed USD floor | Refresh source/terms; do not infer value |
 
+The **$50 ACTIVE / $10 MAYBE floors are fixed owner policy**, not caller
+configuration. API calls that attempt to override either floor fail closed, and
+the CLI does not expose floor override flags.
+
 A qualification-level `REJECT` is routed to `PRUNE`/suppression. A
-qualification-level `HOLD` stays `HOLD`.
+qualification-level `HOLD` stays `HOLD`. Fresh otherwise-actionable rows also
+pass through `bounty_acceptance_safety_gate`; API-key, session-cookie,
+`.env`, private-runtime, hidden-instruction, or private-reasoning disclosure
+demands route `HOLD / UNTRUSTED_ACCEPTANCE_TEXT` without persisting source
+prose.
 
 RTC and other native-token amounts are intentionally **not converted to USD**.
 An RTC-only listing therefore cannot satisfy the USD work floor through this
@@ -75,8 +83,7 @@ python -m concierge.bounty_supply supply.json \
   --evaluated-at 2026-09-20T01:00:00Z --json
 
 python -m concierge.bounty_supply supply.json \
-  --evaluated-at 2026-09-20T01:00:00Z \
-  --active-floor-usd 50 --maybe-floor-usd 10 --max-age-seconds 900
+  --evaluated-at 2026-09-20T01:00:00Z --max-age-seconds 900
 ```
 
 ## Deduplication and receipts
@@ -94,8 +101,12 @@ A future-dated newest observation still fails closed rather than falling back to
 an older row.
 
 If duplicate generations disagree on safe qualification/economic evidence, the
-router **fails closed** to `HOLD` with
-`CONFLICTING_DUPLICATE_EVIDENCE`. It never chooses the higher reward or the
+router **fails closed** with `CONFLICTING_DUPLICATE_EVIDENCE`. A canonical
+qualification `REJECT` is never downgraded by a conflicting permissive row:
+REJECT conflicts route `PRUNE`; HOLD conflicts stay `HOLD`; otherwise
+conflicting ACTIONABLE observations route `HOLD`. Conflict receipts bind the
+sorted safe candidate-semantic signatures, so distinct conflict sets cannot
+alias to the same receipt. The router never chooses the higher reward or the
 more permissive semantic state.
 
 Rows and the aggregate result carry deterministic SHA-256 receipts over
