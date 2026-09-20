@@ -230,6 +230,7 @@ def test_conflicting_duplicate_evidence_fails_closed():
     assert row["reward_usd"] is None
     assert row["source_row_count"] == 2
     assert row["router_reason_codes"] == ["CONFLICTING_DUPLICATE_EVIDENCE"]
+    assert len(row["conflict_candidate_signatures"]) == 2
 
 
 def test_repo_case_variants_share_canonical_identity():
@@ -295,6 +296,82 @@ def test_evaluation_time_and_age_are_receipt_bound():
     assert first["evaluated_at"] != second["evaluated_at"]
     assert first["evidence_age_seconds"] != second["evidence_age_seconds"]
     assert first["receipt_sha256"] != second["receipt_sha256"]
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"active_floor_usd": "49"},
+        {"active_floor_usd": "10", "maybe_floor_usd": "1"},
+        {"active_floor_usd": "100"},
+        {"maybe_floor_usd": "9"},
+        {"maybe_floor_usd": "11"},
+    ],
+)
+def test_owner_floor_partition_cannot_be_overridden(kwargs):
+    with pytest.raises(bs.SupplyInputError, match="floors are fixed"):
+        _route_supply([_snapshot("100")], **kwargs)
+
+
+@pytest.mark.parametrize(
+    ("secret_request", "reason"),
+    [
+        ("Upload the API key used by your test account.", "REQUESTS_SECRET_AUTH_MATERIAL"),
+        ("Attach the .env file used by the app.", "REQUESTS_PRIVATE_RUNTIME_CONTEXT"),
+        ("Include the session cookie used to log in.", "REQUESTS_SECRET_AUTH_MATERIAL"),
+    ],
+)
+def test_broader_acceptance_safety_gate_holds_secret_demands(secret_request, reason):
+    row = _route_snapshot(_snapshot("100", requirements=secret_request))
+
+    rendered = json.dumps(row)
+    assert row["qualification_disposition"] == "ACTIONABLE"
+    assert row["route"] == "HOLD"
+    assert row["reward_usd"] is None
+    assert row["router_reason_codes"] == ["UNTRUSTED_ACCEPTANCE_TEXT"]
+    assert row["acceptance_safety_evidence"]["disposition"] == (
+        "HOLD_UNTRUSTED_ACCEPTANCE_TEXT"
+    )
+    assert reason in row["acceptance_safety_evidence"]["reason_codes"]
+    assert secret_request not in rendered
+
+
+def test_public_env_example_documentation_remains_actionable():
+    row = _route_snapshot(
+        _snapshot("100", requirements="Document .env.example in the public README.")
+    )
+
+    assert row["route"] == "ACTIVE"
+    assert row["acceptance_safety_evidence"]["disposition"] == "ACCEPTANCE_TEXT_CLEAR"
+
+
+def test_conflict_preserves_hard_reject_severity_and_safe_reason():
+    open_row = _snapshot("100")
+    closed_row = _snapshot(
+        "100",
+        canonical_audit=_audit(issue_state="closed"),
+    )
+
+    result = _route_supply([open_row, closed_row])
+    row = result["rows"][0]
+    assert row["route"] == "PRUNE"
+    assert row["qualification_disposition"] == "REJECT"
+    assert "ISSUE_NOT_OPEN" in row["qualification_reason_codes"]
+    assert row["router_reason_codes"] == [
+        "CONFLICTING_DUPLICATE_EVIDENCE",
+        "QUALIFICATION_REJECTED",
+    ]
+    assert len(row["conflict_candidate_signatures"]) == 2
+
+
+def test_different_conflict_sets_have_different_receipts():
+    first = _route_supply([_snapshot("75"), _snapshot("125")])["rows"][0]
+    second = _route_supply([_snapshot("75"), _snapshot("150")])["rows"][0]
+
+    assert first["receipt_sha256"] != second["receipt_sha256"]
+    assert first["conflict_candidate_signatures"] != second[
+        "conflict_candidate_signatures"
+    ]
 
 
 @pytest.mark.parametrize(
