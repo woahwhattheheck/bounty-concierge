@@ -1,0 +1,367 @@
+# SPDX-License-Identifier: MIT
+"""Deterministic queue router for source-qualified bounty snapshots.
+
+This module deliberately performs no network I/O and no currency conversion.
+Callers fetch/capture canonical evidence once, then reuse that immutable snapshot
+for routing.  The existing bounty_qualification gate remains the authority for
+source safety, live-state completeness, competition, and advertised reward
+consistency; this module only applies operator queue economics and deduplicates
+canonical issue identities.
+
+Routes:
+    ACTIVE -- source-qualified fixed USD reward >= active floor.
+    MAYBE  -- source-qualified fixed USD reward >= maybe floor, below active.
+    HOLD   -- evidence is incomplete/ambiguous or no fixed USD floor is proven.
+    PRUNE  -- terminally rejected evidence or reward below the maybe floor.
+
+Output is safe to persist: source body/comment text is never copied into rows.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+from decimal import Decimal, InvalidOperation
+from pathlib import Path
+from typing import Any
+
+from concierge.bounty_qualification import QualificationInputError, qualify_dispatch
+
+
+_REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+_ROUTE_ORDER = {"ACTIVE": 0, "MAYBE": 1, "HOLD": 2, "PRUNE": 3}
+
+
+class SupplyInputError(ValueError):
+    """Raised when a supply snapshot cannot be routed safely."""
+
+
+def _decimal(value: Any, name: str) -> Decimal:
+    if isinstance(value, bool):
+        raise SupplyInputError(f"{name} must be a finite non-negative decimal")
+    try:
+        amount = Decimal(str(value))
+    except (InvalidOperation, ValueError) as exc:
+        raise SupplyInputError(
+            f"{name} must be a finite non-negative decimal"
+        ) from exc
+    if not amount.is_finite() or amount < 0:
+        raise SupplyInputError(f"{name} must be a finite non-negative decimal")
+    return amount
+
+
+def _decimal_text(value: Decimal) -> str:
+    text = format(value, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
+
+
+def _policy(
+    active_floor_usd: Any, maybe_floor_usd: Any, saturation_threshold: int
+) -> dict[str, Any]:
+    active = _decimal(active_floor_usd, "active_floor_usd")
+    maybe = _decimal(maybe_floor_usd, "maybe_floor_usd")
+    if maybe >= active:
+        raise SupplyInputError("maybe_floor_usd must be lower than active_floor_usd")
+    if (
+        isinstance(saturation_threshold, bool)
+        or not isinstance(saturation_threshold, int)
+        or saturation_threshold <= 0
+    ):
+        raise SupplyInputError("saturation_threshold must be a positive integer")
+    return {
+        "active_floor_usd": _decimal_text(active),
+        "maybe_floor_usd": _decimal_text(maybe),
+        "saturation_threshold": saturation_threshold,
+    }
+
+
+def _identity(snapshot: dict[str, Any]) -> tuple[str, str, int]:
+    repo = snapshot.get("repo")
+    number = snapshot.get("number")
+    if not isinstance(repo, str) or not _REPO_RE.fullmatch(repo.strip()):
+        raise SupplyInputError("repo must be an owner/repository slug")
+    if isinstance(number, bool) or not isinstance(number, int) or number < 1:
+        raise SupplyInputError("number must be a positive integer")
+
+    # GitHub owner/repository names are case-insensitive for identity purposes.
+    canonical_repo = repo.strip().casefold()
+    return f"{canonical_repo}#{number}", canonical_repo, number
+
+
+def _authoritative_usd(signals: dict[str, Any]) -> Decimal | None:
+    advertised = signals.get("advertised_reward_usd", [])
+    live = signals.get("live_label_reward_usd", [])
+    if len(advertised) == 1:
+        return _decimal(advertised[0], "advertised_reward_usd")
+    if len(advertised) == 0 and len(live) == 1:
+        return _decimal(live[0], "live_label_reward_usd")
+    return None
+
+
+def _receipt(payload: dict[str, Any]) -> str:
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _safe_evidence(result: dict[str, Any]) -> dict[str, Any]:
+    """Return only qualification fields that are safe for persistence/deduping."""
+    return {
+        "disposition": result["disposition"],
+        "reason_codes": list(result.get("reason_codes", [])),
+        "signals": result.get("signals", {}),
+    }
+
+
+def route_snapshot(
+    snapshot: dict[str, Any],
+    *,
+    active_floor_usd: Any = "50",
+    maybe_floor_usd: Any = "10",
+    saturation_threshold: int = 4,
+) -> dict[str, Any]:
+    """Route one canonical bounty snapshot without copying source prose."""
+    if not isinstance(snapshot, dict):
+        raise SupplyInputError("snapshot must be an object")
+
+    policy = _policy(active_floor_usd, maybe_floor_usd, saturation_threshold)
+    canonical_id, repo, number = _identity(snapshot)
+
+    try:
+        qualification = qualify_dispatch(
+            snapshot, saturation_threshold=saturation_threshold
+        )
+    except QualificationInputError as exc:
+        raise SupplyInputError(str(exc)) from exc
+
+    reward = _authoritative_usd(qualification.get("signals", {}))
+    disposition = qualification["disposition"]
+    router_codes: list[str] = []
+
+    if disposition == "REJECT":
+        route = "PRUNE"
+        queue = None
+        router_codes.append("QUALIFICATION_REJECTED")
+        reward = None
+    elif disposition == "HOLD":
+        route = "HOLD"
+        queue = None
+        router_codes.append("QUALIFICATION_HOLD")
+        reward = None
+    elif reward is None:
+        # RTC-only and other non-USD offers intentionally stay HOLD.  This layer
+        # never invents an exchange rate or treats marketplace prose as fixed USD.
+        route = "HOLD"
+        queue = None
+        router_codes.append("USD_FLOOR_NOT_VERIFIABLE")
+    else:
+        active = Decimal(policy["active_floor_usd"])
+        maybe = Decimal(policy["maybe_floor_usd"])
+        if reward >= active:
+            route = "ACTIVE"
+            queue = "main"
+            router_codes.append("MEETS_ACTIVE_USD_FLOOR")
+        elif reward >= maybe:
+            route = "MAYBE"
+            queue = "bounty-pile-10-49"
+            router_codes.append("BELOW_ACTIVE_USD_FLOOR")
+        else:
+            route = "PRUNE"
+            queue = None
+            router_codes.append("BELOW_MAYBE_USD_FLOOR")
+
+    row = {
+        "canonical_id": canonical_id,
+        "repo": repo,
+        "number": number,
+        "route": route,
+        "queue": queue,
+        "reward_usd": _decimal_text(reward) if reward is not None else None,
+        "qualification_disposition": disposition,
+        "qualification_reason_codes": list(
+            qualification.get("reason_codes", [])
+        ),
+        "router_reason_codes": router_codes,
+        "policy": policy,
+        "qualification_evidence": _safe_evidence(qualification),
+        "source_row_count": 1,
+    }
+    row["receipt_sha256"] = _receipt(row)
+    return row
+
+
+def _dedupe_signature(row: dict[str, Any]) -> str:
+    evidence = {
+        key: value
+        for key, value in row.items()
+        if key not in {"receipt_sha256", "source_row_count"}
+    }
+    return _receipt(evidence)
+
+
+def _conflict_row(
+    canonical_id: str,
+    rows: list[dict[str, Any]],
+    policy: dict[str, Any],
+) -> dict[str, Any]:
+    repo, issue_text = canonical_id.rsplit("#", 1)
+    row = {
+        "canonical_id": canonical_id,
+        "repo": repo,
+        "number": int(issue_text),
+        "route": "HOLD",
+        "queue": None,
+        "reward_usd": None,
+        "qualification_disposition": "HOLD",
+        "qualification_reason_codes": [],
+        "router_reason_codes": ["CONFLICTING_DUPLICATE_EVIDENCE"],
+        "policy": policy,
+        "qualification_evidence": {
+            "disposition": "HOLD",
+            "reason_codes": [],
+            "signals": {},
+        },
+        "source_row_count": len(rows),
+    }
+    row["receipt_sha256"] = _receipt(row)
+    return row
+
+
+def _route_sort_key(row: dict[str, Any]) -> tuple[Any, ...]:
+    reward = Decimal(row["reward_usd"]) if row["reward_usd"] is not None else Decimal("-1")
+    return (_ROUTE_ORDER[row["route"]], -reward, row["canonical_id"])
+
+
+def route_supply(
+    snapshots: list[dict[str, Any]],
+    *,
+    active_floor_usd: Any = "50",
+    maybe_floor_usd: Any = "10",
+    saturation_threshold: int = 4,
+) -> dict[str, Any]:
+    """Route and deduplicate a collection of canonical bounty snapshots."""
+    if not isinstance(snapshots, list):
+        raise SupplyInputError("snapshots must be a list")
+
+    policy = _policy(active_floor_usd, maybe_floor_usd, saturation_threshold)
+    grouped: dict[str, list[dict[str, Any]]] = {}
+
+    for snapshot in snapshots:
+        row = route_snapshot(
+            snapshot,
+            active_floor_usd=policy["active_floor_usd"],
+            maybe_floor_usd=policy["maybe_floor_usd"],
+            saturation_threshold=saturation_threshold,
+        )
+        grouped.setdefault(row["canonical_id"], []).append(row)
+
+    rows: list[dict[str, Any]] = []
+    for canonical_id in sorted(grouped):
+        candidates = grouped[canonical_id]
+        signatures = {_dedupe_signature(row) for row in candidates}
+        if len(signatures) != 1:
+            rows.append(_conflict_row(canonical_id, candidates, policy))
+            continue
+
+        row = dict(candidates[0])
+        row["source_row_count"] = len(candidates)
+        row["receipt_sha256"] = _receipt(
+            {key: value for key, value in row.items() if key != "receipt_sha256"}
+        )
+        rows.append(row)
+
+    rows.sort(key=_route_sort_key)
+    counts = {route: 0 for route in _ROUTE_ORDER}
+    for row in rows:
+        counts[row["route"]] += 1
+
+    result = {
+        "schema_version": 1,
+        "policy": policy,
+        "counts": counts,
+        "rows": rows,
+    }
+    result["receipt_sha256"] = _receipt(result)
+    return result
+
+
+def _load_candidates(path: str) -> list[dict[str, Any]]:
+    if path == "-":
+        import sys
+
+        payload = json.load(sys.stdin)
+    else:
+        with Path(path).open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+
+    if isinstance(payload, dict) and "candidates" in payload:
+        payload = payload["candidates"]
+    elif isinstance(payload, dict):
+        payload = [payload]
+
+    if not isinstance(payload, list) or not all(
+        isinstance(item, dict) for item in payload
+    ):
+        raise SupplyInputError(
+            "input JSON must be a snapshot, a list of snapshots, or an object "
+            "with a candidates list"
+        )
+    return payload
+
+
+def format_summary(result: dict[str, Any]) -> str:
+    counts = result["counts"]
+    return (
+        f"ACTIVE={counts['ACTIVE']} MAYBE={counts['MAYBE']} "
+        f"HOLD={counts['HOLD']} PRUNE={counts['PRUNE']} "
+        f"receipt={result['receipt_sha256']}"
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="python -m concierge.bounty_supply",
+        description=(
+            "Route source-qualified bounty snapshots into ACTIVE/MAYBE/HOLD/PRUNE "
+            "without network I/O."
+        ),
+    )
+    parser.add_argument("snapshot", help="JSON snapshot path, or - for stdin")
+    parser.add_argument("--active-floor-usd", default="50")
+    parser.add_argument("--maybe-floor-usd", default="10")
+    parser.add_argument("--saturation-threshold", type=int, default=4)
+    parser.add_argument("--json", action="store_true", help="Emit full result JSON")
+    args = parser.parse_args(argv)
+
+    try:
+        candidates = _load_candidates(args.snapshot)
+        result = route_supply(
+            candidates,
+            active_floor_usd=args.active_floor_usd,
+            maybe_floor_usd=args.maybe_floor_usd,
+            saturation_threshold=args.saturation_threshold,
+        )
+    except (
+        OSError,
+        json.JSONDecodeError,
+        SupplyInputError,
+    ) as exc:
+        parser.error(str(exc))
+
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        print(format_summary(result))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
