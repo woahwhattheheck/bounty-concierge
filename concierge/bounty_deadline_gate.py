@@ -261,12 +261,15 @@ def _deadline_relation(deadline: dict[str, Any], evaluated: datetime) -> str:
     day = deadline["parsed_value"]
     assert isinstance(day, date) and not isinstance(day, datetime)
     eval_day = evaluated.date()
-    if eval_day < day:
+    delta_days = (day - eval_day).days
+    # A bare civil date has neither a sponsor timezone nor a clock cutoff.
+    # UTC can differ from civil time by up to a day at real-world offsets, so
+    # fail closed within one calendar day on either side. Only a 2+ day lead is
+    # unambiguously current and only a 2+ day lag is unambiguously elapsed.
+    if delta_days >= 2:
         return "CURRENT"
-    if eval_day > day:
+    if delta_days <= -2:
         return "ELAPSED"
-    # A source that gives only a civil date does not establish a UTC cutoff or
-    # sponsor timezone. Refuse to invent a same-day clock boundary.
     return "BOUNDARY_AMBIGUOUS"
 
 
