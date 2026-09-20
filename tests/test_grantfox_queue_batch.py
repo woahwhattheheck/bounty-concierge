@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from concierge.grantfox_queue_batch import (
     GrantFoxBatchInputError,
@@ -131,6 +132,16 @@ class GrantFoxQueueBatchTests(unittest.TestCase):
         changed = deepcopy(receipt)
         changed["children"][0]["provider_snapshot"]["application_count"] = 99
         self.assertFalse(verify_batch_receipt(changed))
+
+    def test_child_verification_requests_semantic_replay(self):
+        receipt = compile_grantfox_queue_batch(batch(child(33)))
+        with patch(
+            "concierge.grantfox_queue_batch.verify_receipt", return_value=True
+        ) as child_verify:
+            self.assertTrue(verify_batch_receipt(receipt))
+        child_verify.assert_called_once_with(
+            receipt["children"][0], semantic=True
+        )
 
     def test_count_or_bucket_tamper_breaks_verification(self):
         receipt = compile_grantfox_queue_batch(batch(child(33), child(34, actor_applied=True)))
