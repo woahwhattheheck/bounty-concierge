@@ -224,6 +224,64 @@ class BountyValueRouterTests(unittest.TestCase):
         changed["candidates"][0]["disposition"] = "PILE_10_49"
         self.assertFalse(verify_receipt(changed))
 
+    def test_verify_receipt_rejects_non_object_root(self):
+        for value in ([], "not-a-receipt", 7, None):
+            with self.subTest(value=value):
+                self.assertFalse(verify_receipt(value))
+
+    def test_verify_receipt_rejects_reflected_equality_forgery(self):
+        class ForgingDict(dict):
+            def __eq__(self, other):
+                return True
+
+            def __ne__(self, other):
+                return False
+
+        receipt = compile_bounty_value_routing(request(candidate()))
+        receipt["authority"] = ForgingDict({"advisory_only": False})
+        self.assertFalse(verify_receipt(receipt))
+
+    def test_verify_receipt_never_invokes_attacker_equality(self):
+        class ExplosiveDict(dict):
+            def __eq__(self, other):
+                raise AssertionError("verifier executed caller-owned __eq__")
+
+            def __ne__(self, other):
+                raise AssertionError("verifier executed caller-owned __ne__")
+
+        receipt = compile_bounty_value_routing(request(candidate()))
+        receipt["input"]["policy"]["routes"] = ExplosiveDict(
+            receipt["input"]["policy"]["routes"]
+        )
+        self.assertFalse(verify_receipt(receipt))
+
+    def test_verify_receipt_rejects_nested_json_subclasses(self):
+        class ForeignList(list):
+            pass
+
+        class ForeignStr(str):
+            pass
+
+        for mutate in (
+            lambda receipt: receipt["input"].__setitem__(
+                "candidates", ForeignList(receipt["input"]["candidates"])
+            ),
+            lambda receipt: receipt["candidates"][0].__setitem__(
+                "work_id", ForeignStr(receipt["candidates"][0]["work_id"])
+            ),
+        ):
+            with self.subTest(mutate=mutate):
+                receipt = compile_bounty_value_routing(request(candidate()))
+                mutate(receipt)
+                self.assertFalse(verify_receipt(receipt))
+
+    def test_verify_receipt_rejects_cyclic_nested_json(self):
+        receipt = compile_bounty_value_routing(request(candidate()))
+        cycle = []
+        cycle.append(cycle)
+        receipt["candidates"][0]["reason_codes"] = cycle
+        self.assertFalse(verify_receipt(receipt))
+
     def test_checked_in_policy_matches_operator_floor(self):
         checked = json.loads(Path("policies/bounty_value_routing_v1.json").read_text())
         self.assertEqual(checked, POLICY)

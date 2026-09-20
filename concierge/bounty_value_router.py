@@ -58,6 +58,32 @@ def _obj(value: Any, field: str) -> dict[str, Any]:
     return value
 
 
+def _owned_receipt_json(value: Any, field: str = "receipt", depth: int = 0) -> Any:
+    """Copy a receipt into verifier-owned exact JSON types before comparisons."""
+    if depth > 100:
+        raise BountyValueRoutingInputError(f"{field} exceeds maximum JSON nesting depth")
+    kind = type(value)
+    if kind is dict:
+        out: dict[str, Any] = {}
+        for key, child in value.items():
+            if type(key) is not str:
+                raise BountyValueRoutingInputError(
+                    f"{field} contains a non-string JSON object key"
+                )
+            out[key] = _owned_receipt_json(child, f"{field}.{key}", depth + 1)
+        return out
+    if kind is list:
+        return [
+            _owned_receipt_json(child, f"{field}[{index}]", depth + 1)
+            for index, child in enumerate(value)
+        ]
+    if kind in {str, int, bool} or value is None:
+        return value
+    raise BountyValueRoutingInputError(
+        f"{field} must contain only exact built-in JSON types"
+    )
+
+
 def _text(value: Any, field: str, *, max_chars: int = 2048) -> str:
     if type(value) is not str or not value or value != value.strip():
         raise BountyValueRoutingInputError(f"{field} must be a non-empty trimmed string")
@@ -465,7 +491,13 @@ def compile_bounty_value_routing(request: dict[str, Any]) -> dict[str, Any]:
 
 
 def verify_receipt(receipt: dict[str, Any]) -> bool:
-    if type(receipt) is not dict or receipt.get("schema") != _RECEIPT_SCHEMA:
+    try:
+        receipt = _owned_receipt_json(receipt)
+    except (BountyValueRoutingInputError, RecursionError):
+        return False
+    if type(receipt) is not dict:
+        return False
+    if receipt.get("schema") != _RECEIPT_SCHEMA:
         return False
     if receipt.get("authority") != _AUTHORITY:
         return False
