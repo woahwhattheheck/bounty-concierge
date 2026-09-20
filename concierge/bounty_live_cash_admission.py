@@ -24,9 +24,12 @@ _RECEIPT_SCHEMA = "bounty-live-cash-admission-receipt/v1"
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _USD_TOKEN_RE = re.compile(r"\$([0-9][0-9,]*(?:\.[0-9]{1,2})?)\b")
 _REWARD_WORD_RE = re.compile(r"(?i)\b(?:bounty|reward|prize)\b|/(?:bounty)\b")
+_REWARD_CONTEXT_RE = re.compile(
+    r"(?i)\b(?:bounty|reward|prize|payment|payout|amount|compensation|milestones?)\b"
+)
 _NONFIXED_WORD_RE = re.compile(
     r"(?i)\b(?:up\s+to|at\s+most|max(?:imum)?|ceiling|range|between|"
-    r"variable|depending\s+on|prize\s+pool|reward\s+pool|bounty\s+pool)\b"
+    r"variable|depend(?:s|ing)?\s+on|prize\s+pool|reward\s+pool|bounty\s+pool)\b"
 )
 _MILESTONE_TOTAL_RE = re.compile(
     r"(?i)(?:\bmilestones?\b.{0,40}\btotal\b|\btotal\b.{0,40}\bmilestones?\b)"
@@ -105,7 +108,8 @@ def _nonfixed_usd_semantics(
     """Identify ceilings/ranges/pools and never treat them as fixed cash."""
     title, body, labels = _source_text(issue)
     for text in (title, body, *labels):
-        for line in text.splitlines() or [text]:
+        lines = text.splitlines() or [text]
+        for index, line in enumerate(lines):
             raw_amounts = _USD_TOKEN_RE.findall(line)
             if not raw_amounts:
                 continue
@@ -122,6 +126,17 @@ def _nonfixed_usd_semantics(
             )
             if selected_present and qualified:
                 return True
+            if selected_present:
+                for neighbor_index in (index - 1, index + 1):
+                    if neighbor_index < 0 or neighbor_index >= len(lines):
+                        continue
+                    neighbor = lines[neighbor_index]
+                    neighbor_qualified = (
+                        _NONFIXED_WORD_RE.search(neighbor) is not None
+                        or _MILESTONE_TOTAL_RE.search(neighbor) is not None
+                    )
+                    if neighbor_qualified and _REWARD_CONTEXT_RE.search(neighbor):
+                        return True
             if _REWARD_WORD_RE.search(line) and len(amounts) > 1:
                 return True
     return False

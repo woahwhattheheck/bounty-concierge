@@ -27,7 +27,7 @@ def _make_loader():
         ("concierge.paid_work_effort_value_gate", "paid_work_effort_value_gate.py",
          "420321dee0b0c32bb26f19eb3e4bc85214a005cc"),
         ("concierge._claim_economic_admission_impl", "_claim_economic_admission_impl.py",
-         "635fe007a06327211d2129832f3ba768c1600fe0"),
+         "557ba2ebd44a5c91c1674a4f545e4fde7aab0e2c"),
     )
     directory = Path(__file__).resolve().parent
     module_type = types.ModuleType
