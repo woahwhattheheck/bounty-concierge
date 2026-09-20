@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "generated_local_date": "2026-09-19",
+  "owner": "ZZ-Solstice-Aurora-417",
+  "floor_usd": 50,
+  "decisions": [
+    {
+      "repo": "tenstorrent/tt-metal",
+      "issue": 56908,
+      "advertised_usd": 3000,
+      "status": "SUPPRESS_ASSIGNED",
+      "assignee": "Adraca",
+      "reason": "canonical maintainer assignment; first-come/proposer assignment policy; competing PRs 56983/57039/57084",
+      "url": "https://github.com/tenstorrent/tt-metal/issues/56908"
+    },
+    {
+      "repo": "Open-Hub-Tec/raiz",
+      "issues": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "advertised": "150-400 USDC estimated",
+      "status": "HOLD_ECONOMICS",
+      "reason": "issues are drips-eligible estimates, but README says candidate funding and Drips setup remains incomplete; no source-side funded solver contract found",
+      "url": "https://github.com/Open-Hub-Tec/raiz"
+    },
+    {
+      "repo": "fluxerapp/fluxer-meta",
+      "issue": 2,
+      "advertised_usd": 500,
+      "status": "SUPPRESS_COLLISION",
+      "reason": "canonical maintainer names active full-scope implementer; multiple competing carriers/submissions",
+      "url": "https://github.com/fluxerapp/fluxer-meta/issues/2"
+    },
+    {
+      "repo": "fluxerapp/fluxer-meta",
+      "issue": 8,
+      "advertised_usd": 250,
+      "status": "SUPPRESS_COLLISION",
+      "reason": "BountyHub exists but canonical thread has named active work plus multiple completed/competing implementations and restricted upstream PR creation",
+      "url": "https://github.com/fluxerapp/fluxer-meta/issues/8"
+    },
+    {
+      "repo": "fluxerapp/fluxer-meta",
+      "issue": 9,
+      "advertised_usd": 500,
+      "status": "HOLD_SCOPE_AND_FUNDING",
+      "reason": "maintainer explicitly states no BountyHub record; placeholder until concrete spec",
+      "url": "https://github.com/fluxerapp/fluxer-meta/issues/9"
+    }
+  ],
+  "ready_count": 0,
+  "suppressed_or_held_lane_count": 10
+}
