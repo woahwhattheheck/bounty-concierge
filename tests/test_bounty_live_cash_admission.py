@@ -158,6 +158,25 @@ def test_ceiling_range_pool_or_milestone_total_never_promotes(
     ]
 
 
+def test_title_ceiling_matching_label_amount_never_promotes(monkeypatch):
+    install_preflight(monkeypatch, preflight("500"))
+    receipt = live.evaluate_live_cash_admission(
+        "acme/repo",
+        7,
+        session=IssueSession(
+            [
+                issue(
+                    "Implement the requested feature.",
+                    title="Up to $500 for accepted work",
+                    labels=["$500"],
+                )
+            ]
+        ),
+    )
+    assert receipt["disposition"] == "HOLD_NON_FIXED_USD_REWARD"
+    assert receipt["route"] is None
+
+
 def test_canonical_preflight_hold_precedes_large_amount(monkeypatch):
     install_preflight(
         monkeypatch,
