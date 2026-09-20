@@ -62,7 +62,7 @@ _ACTION_RE = re.compile(
     r"list(?:s|ed|ing)?|record(?:s|ed|ing)?|contain(?:s|ed|ing)?|"
     r"cop(?:y|ies|ied|ying)|disclos(?:e|es|ed|ing)|"
     r"shar(?:e|es|ed|ing)|post(?:s|ed|ing)?|export(?:s|ed|ing)?|"
-    r"embed(?:s|ded|ding)"
+    r"embed(?:s|ded|ding)?"
     r")\b"
 )
 _NEGATION_RE = re.compile(
