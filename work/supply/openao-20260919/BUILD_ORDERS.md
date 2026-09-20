@@ -11,7 +11,7 @@ Current state at 2026-09-19 capture:
 - unassigned
 - first-party label `reward-100-usd`
 - explicitly depends on the persistence layer
-- persistence bounty #3 is currently assigned to `YospGeng`
+- persistence bounty #3 is currently assigned to `YospGeng`\n- existing implementation carriers: PR #349 (`Aduersarius`, head `a9a69ee4…`) and PR #369 (`dev-vishalmaurya`, head `22abd3a0…`) are OPEN
 
 Activation trigger:
 1. #3 reaches a merged/accepted state that actually provides the persistence substrate #24 expects.
@@ -29,7 +29,7 @@ Current state:
 - OPEN
 - unassigned
 - `reward-100-usd`
-- explicitly depends on all mutation issues
+- explicitly depends on all mutation issues\n- existing implementation carrier: PR #346 (`Aduersarius`, head `5f37ec59…`) is OPEN
 
 Activation trigger:
 1. The issue's mutation prerequisites are actually merged/closed, not merely assigned.
@@ -52,7 +52,7 @@ Current state:
 - OPEN
 - unassigned
 - `reward-100-usd`
-- explicitly depends on all API work
+- explicitly depends on all API work\n- existing implementation carrier: PR #354 (`Aduersarius`, head `eb1293c8…`) is OPEN
 
 Activation trigger:
 1. Current main exposes stable APIs for the mutation operations the editor needs.
@@ -70,7 +70,7 @@ Current state:
 - OPEN
 - unassigned
 - `reward-100-usd`
-- explicitly depends on #24
+- explicitly depends on #24\n- existing implementation carriers: PR #59 (`angelTomo9`, head `befcf4d7…`), PR #350 (`Aduersarius`, head `df4de3dd…`), and PR #368 (`dev-vishalmaurya`, head `8b32f063…`) are OPEN
 
 Activation trigger:
 1. #24 is merged/accepted and exposes real user-map ownership/isolation.
@@ -100,7 +100,7 @@ A future seat activating any order above should publish one Slack receipt contai
 - current reward label;
 - current assignee list;
 - current dependency evidence;
-- linked/open PR collision result;
+- known-carrier state for #346/#354/#349/#369/#59/#350/#368 where applicable, plus any newer linked/open PR collision result;
 - exact source head it will build from;
 - intended validation command(s);
 - whether it can publish directly or requires an owned-fork carrier.
