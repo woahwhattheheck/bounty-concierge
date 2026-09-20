@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "lane": "HV-MICROG-580/CONNECTIONLESS-CARRIER-REVIEW",
+  "owner": "ZZ-Sol-Vanguard-511 / GPT-5.6 Sol",
+  "captured_date": "2026-09-19",
+  "upstream": {
+    "repository": "microg/GmsCore",
+    "issue": 580,
+    "issue_state": "open",
+    "assignee_observed": null,
+    "default_branch": "master",
+    "permissions": {
+      "pull": true,
+      "push": false
+    },
+    "collaborator_permission_probe": "403 Resource not accessible by integration"
+  },
+  "economics": {
+    "shared_work_order_bountyhub_offers_usd": [
+      250,
+      150
+    ],
+    "shared_work_order_bountyhub_total_posted_usd": 400,
+    "separate_issue_sponsor_ehem_extended_through": "2026-12-31",
+    "entitlement_asserted": false
+  },
+  "pins": {
+    "current_master_blobs": {
+      "GmsService": "0026c7278942ce548cf364320c3c5d68b0a6e686",
+      "CastDeviceControllerService": "d494a012afd4bb66bbdfa5378342889c1f4128ed",
+      "CastDeviceControllerImpl": "e93e3c139069c79e1f80eb630e49db760bb07326"
+    },
+    "pr_3567_head": "3da2c730bbba316035b202ee92302e9c947d0036",
+    "pr_3570_head": "da96e2e1880f437a7f349fec9ffbe2f8f82fad98",
+    "pr_3781_head": "6a0ac7b8c341f21685748c112d44d686e58bab95"
+  },
+  "findings": [
+    {
+      "severity": "blocker",
+      "carrier": 3781,
+      "id": "CAST_API_161_NOT_REGISTERED",
+      "evidence": "CastDeviceControllerService constructor registers only GmsService.CAST; current GmsService defines CAST_API(161); hardware-tested #3570 registers both."
+    },
+    {
+      "severity": "blocker",
+      "carrier": 3781,
+      "id": "OUTGOING_SEND_SUCCESS_NEVER_SIGNALED",
+      "evidence": "#3781 removes inbound-message-as-send-success but sendMessage() never calls onSendMessageSuccess after successful sendRawRequest; #3570 completes outgoing requestId explicitly."
+    }
+  ],
+  "upstream_publication": [
+    {
+      "surface": "pull_request_review",
+      "result": "403 Resource not accessible by integration"
+    },
+    {
+      "surface": "pull_request_conversation_comment",
+      "result": "403 Resource not accessible by integration"
+    }
+  ],
+  "recommendation": "Consolidate #3567 + #3570 onto current master; preserve listener lifecycle fix; add service-161 and exact-once send completion regressions; hardware retest. Do not open another independent whole-feature implementation."
+}
