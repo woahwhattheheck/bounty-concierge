@@ -104,7 +104,7 @@ class SourceProvenanceTests(unittest.TestCase):
                     verify_source_provenance(value)
 
     def test_incomplete_canonical_audit_holds_standalone_dispatch(self):
-        for missing in ("stale_listing_signal", "search_truncated"):
+        for missing in ("open_pr_count", "stale_listing_signal", "search_truncated"):
             with self.subTest(missing=missing):
                 value = snapshot()
                 value["canonical_audit"] = dict(value["canonical_audit"])
@@ -114,6 +114,33 @@ class SourceProvenanceTests(unittest.TestCase):
                 self.assertFalse(result["dispatch"])
                 self.assertIn("CANONICAL_AUDIT_INCOMPLETE", result["reason_codes"])
                 self.assertFalse(result["signals"]["canonical_source_verified"])
+
+    def test_open_implementation_carriers_hold_dispatch(self):
+        for count in (1, 4):
+            with self.subTest(open_pr_count=count):
+                value = snapshot()
+                value["canonical_audit"] = dict(value["canonical_audit"])
+                value["canonical_audit"]["open_pr_count"] = count
+                result = verify_source_provenance(value)
+                self.assertEqual(result["disposition"], "HOLD")
+                self.assertFalse(result["dispatch"])
+                self.assertIn(
+                    "OPEN_IMPLEMENTATION_CARRIERS_PRESENT",
+                    result["reason_codes"],
+                )
+                self.assertEqual(result["signals"]["open_pr_count"], count)
+
+    def test_invalid_open_pr_count_fails_closed(self):
+        for count in (-1, True, 1.5, "1"):
+            with self.subTest(open_pr_count=count):
+                value = snapshot()
+                value["canonical_audit"] = dict(value["canonical_audit"])
+                value["canonical_audit"]["open_pr_count"] = count
+                with self.assertRaisesRegex(
+                    ProvenanceInputError,
+                    "open_pr_count must be a non-negative integer",
+                ):
+                    verify_source_provenance(value)
 
     def test_mismatched_canonical_issue_url_fails_closed(self):
         value = snapshot()
