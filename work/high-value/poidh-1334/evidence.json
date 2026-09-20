@@ -1,0 +1,34 @@
+{
+  "lane": "POIDH-1334/contract+registration-public-mint-slice",
+  "source": {
+    "repository": "jvaleskadevs/onchain-poaps",
+    "commit": "c313c856cd9f26bbc9e61e4ef12cb3e463409708",
+    "contract_path": "src/Poap.sol",
+    "contract_blob": "d5042a374107bca5d33142485a31159eb31288de",
+    "readme_blob": "2b16e1939b7c652e0164c62e038a392cc678d532"
+  },
+  "base_sepolia": {
+    "chain_id": 84532,
+    "readme_declared_contract": "0xC3249356a483fbe17d5355D39105D2eA666d9de6",
+    "rpc_execution": "NOT_RUN",
+    "rpc_execution_reason": "Foundry cast is not installed in the available runtime; no wallet or funded action was substituted"
+  },
+  "local_validation": {
+    "command": "bash -n /tmp/poidh_read_only_smoke.sh",
+    "exit_code": 0,
+    "scope": "shell syntax only"
+  },
+  "git_installation": {
+    "upstream_permission": "pull",
+    "installed_owner_fork_found": false,
+    "repository_creation_primitive_exposed": false
+  },
+  "authority": {
+    "wallet_signing": false,
+    "deployment": false,
+    "base_mainnet_transaction": false,
+    "bounty_claim": false,
+    "social_post": false,
+    "provider_acceptance": false
+  }
+}
