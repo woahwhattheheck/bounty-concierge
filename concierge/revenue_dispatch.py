@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 import hashlib
 import json
 from pathlib import Path
@@ -64,6 +65,17 @@ _EXPECTED_LIVE_CASH_AUTHORITY = {
     "submission_authority": False,
     "outbound_contact_authority": False,
     "payment_or_wallet_authority": False,
+}
+_LIVE_CASH_DISPOSITIONS = {
+    "ACTIVE_REVIEW",
+    "PILE_SAVE_UP",
+    "PRUNE_BELOW_DOLLAR_FLOOR",
+    "HOLD_SOURCE_GENERATION_CHANGED",
+    "REJECT_CANONICAL_PREFLIGHT",
+    "HOLD_CANONICAL_PREFLIGHT",
+    "HOLD_NON_FIXED_USD_REWARD",
+    "HOLD_MIXED_REWARD_CURRENCY",
+    "HOLD_NO_FIXED_USD_REWARD",
 }
 _LIVE_CASH_EVALUATOR = evaluate_live_cash_admission
 
@@ -459,18 +471,17 @@ def _apply_live_cash_gate(
         or not isinstance(source, dict)
         or not isinstance(economics, dict)
         or not isinstance(authority, dict)
-        or not isinstance(disposition, str)
+        or disposition not in _LIVE_CASH_DISPOSITIONS
         or (route is not None and not isinstance(route, str))
         or not isinstance(reason_codes, list)
         or not all(isinstance(code, str) and code for code in reason_codes)
     ):
         raise RevenueDispatchError("live cash admission receipt is malformed")
-    if (
-        identity.get("repo") != repo
-        or identity.get("issue_number") != number
-        or identity.get("canonical_issue_url")
-        != f"https://github.com/{repo}/issues/{number}"
-    ):
+    if identity != {
+        "repo": repo,
+        "issue_number": number,
+        "canonical_issue_url": f"https://github.com/{repo}/issues/{number}",
+    }:
         raise RevenueDispatchError("live cash admission target binding mismatch")
     if source.get("kind") != "LIVE_GITHUB_PREFLIGHT":
         raise RevenueDispatchError("live cash admission source kind is unsupported")
@@ -489,13 +500,22 @@ def _apply_live_cash_gate(
         raise RevenueDispatchError("live cash fixed amount is malformed")
 
     if disposition == "ACTIVE_REVIEW":
+        projection = source.get("preflight")
         if (
             route != "main_bounty_queue"
             or economics.get("currency") != "USD"
             or fixed_amount is None
             or economics.get("fixed_semantics") is not True
+            or not isinstance(projection, dict)
+            or projection.get("dispatch") is not True
         ):
             raise RevenueDispatchError("active live cash admission contract is malformed")
+        try:
+            amount = Decimal(fixed_amount)
+        except (InvalidOperation, ValueError):
+            raise RevenueDispatchError("active live cash amount is malformed") from None
+        if not amount.is_finite() or amount < Decimal("50"):
+            raise RevenueDispatchError("active live cash amount is below the active floor")
         promoted = dict(result)
         promoted["live_cash_admission"] = _live_cash_status(
             status="VERIFIED_ACTIVE",
