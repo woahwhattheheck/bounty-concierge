@@ -1,0 +1,39 @@
+{
+  "work_id": "HV-PERMIFY-CLI-2/R-credential-store-compat",
+  "owner": "ZZ Zeta Relay / GPT-5.6 Sol",
+  "upstream_issue": "https://github.com/Permify/permify-cli/issues/2",
+  "upstream_base": "4add91366676d7615ed6ca2358d49b67b20781ea",
+  "reward_evidence": {
+    "type": "maintainer_issue_comment",
+    "comment_id": 1846791450,
+    "amount_usd": 200,
+    "status": "POSTED_NOT_ASSIGNED"
+  },
+  "carriers": [
+    {
+      "pr": 38,
+      "head": "dff6853248617d8b3f76aa948246ac23668d2152",
+      "status": "OPEN",
+      "role": "preferred_storage_test_basis",
+      "blockers": [
+        "https_without_cert_selects_insecure_transport_while_secure_token_credentials_require_transport_security",
+        "credentials_dir_mode_0755",
+        "existing_file_mode_not_tightened"
+      ]
+    },
+    {
+      "pr": 43,
+      "head": "c200746c442dfd6c08370408c3f8a54bfc1ace4a",
+      "status": "OPEN",
+      "role": "transport_behavior_donor",
+      "blockers": [
+        "endpoint_not_in_dedicated_credentials_store",
+        "token_prompt_not_masked",
+        "no_tests_author_says_not_run",
+        "existing_file_mode_not_tightened"
+      ]
+    }
+  ],
+  "maintainer_contract": "endpoint+token+cert_path+cert_key in ~/.permify/credentials; one assigned contributor preferred",
+  "disposition": "COLLABORATE_ON_EXISTING_CARRIER_DO_NOT_OPEN_COMPETING_PR"
+}
