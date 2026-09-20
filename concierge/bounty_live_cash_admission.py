@@ -99,19 +99,30 @@ def _source_text(issue: dict[str, Any]) -> tuple[str, str, list[str]]:
     return title, body, labels
 
 
-def _nonfixed_usd_semantics(issue: dict[str, Any]) -> bool:
+def _nonfixed_usd_semantics(
+    issue: dict[str, Any], selected_amount: Decimal | None
+) -> bool:
     """Identify ceilings/ranges/pools and never treat them as fixed cash."""
     title, body, labels = _source_text(issue)
     for text in (title, body, *labels):
         for line in text.splitlines() or [text]:
-            if not _REWARD_WORD_RE.search(line):
+            raw_amounts = _USD_TOKEN_RE.findall(line)
+            if not raw_amounts:
                 continue
-            amounts = _USD_TOKEN_RE.findall(line)
-            if not amounts:
-                continue
-            if len(amounts) > 1:
+            amounts = {
+                _decimal(value, "canonical source USD token")
+                for value in raw_amounts
+            }
+            selected_present = (
+                selected_amount is not None and selected_amount in amounts
+            )
+            qualified = (
+                _NONFIXED_WORD_RE.search(line) is not None
+                or _MILESTONE_TOTAL_RE.search(line) is not None
+            )
+            if selected_present and qualified:
                 return True
-            if _NONFIXED_WORD_RE.search(line) or _MILESTONE_TOTAL_RE.search(line):
+            if _REWARD_WORD_RE.search(line) and len(amounts) > 1:
                 return True
     return False
 
@@ -274,8 +285,8 @@ def _build_api():
             raise LiveCashAdmissionError("preflight disposition was malformed")
 
         generation_stable = marker_before == marker_after
-        nonfixed = _nonfixed_usd_semantics(issue_after)
         amount = _usd_amount_from_preflight(preflight)
+        nonfixed = _nonfixed_usd_semantics(issue_after, amount)
         native_non_usd = _has_native_non_usd_reward(preflight)
 
         reasons: list[str] = []
