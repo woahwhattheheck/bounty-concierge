@@ -6,10 +6,11 @@ Because those instructions can still start expensive speculative work, live clai
 
 1. a verified payoff bundle binds a current `BOUNTY / SUBMIT_WORK` path to the exact GitHub issue and retains bounded speculative-work budget;
 2. a verified `paid_work_effort_value_gate` receipt for the same payoff-derived `work_id` and exact issue URL returns `GO`;
-3. canonical bounty preflight remains dispatchable; and
-4. maintainer availability remains clear.
+3. source-bound `bounty_live_cash_admission` re-reads canonical GitHub state and returns `ACTIVE_REVIEW / main_bounty_queue` under the owner-owned USD $50 active / $10 pile floor;
+4. canonical bounty preflight remains dispatchable; and
+5. maintainer availability remains clear.
 
-The economics check runs **before provider reads**. Live admission reads one retained paid-work request and its receipt through stable regular-file descriptors, re-runs the existing paid-work gate, and requires the supplied receipt to equal that deterministic replay. A missing, stale, future-dated, tampered, source-mismatched, work-mismatched, policy-mismatched, non-`GO`, or authority-amplified artifact prevents the wrapper from spending live preflight/availability reads.
+The payoff and economics checks run **before provider reads**. The first provider-backed authority is the source-bound live-cash admission gate; its reward amount, currency, and evidence authority are derived from canonical GitHub state rather than caller fields. Live admission reads one retained paid-work request and its receipt through stable regular-file descriptors, re-runs the existing paid-work gate, and requires the supplied receipt to equal that deterministic replay. A missing, stale, future-dated, tampered, source-mismatched, work-mismatched, policy-mismatched, non-`GO`, or authority-amplified artifact prevents the wrapper from spending live preflight/availability reads.
 
 ## Economics remains single-source
 
