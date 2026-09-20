@@ -1,0 +1,29 @@
+{
+  "schema": "competitor-assistance-policy/v1",
+  "effective_date": "2026-09-20",
+  "default_for_foreign_bounty_carrier": "HOLD_NO_PAYABLE_ROUTE",
+  "allowed_without_compensation": [
+    "private_collision_check",
+    "private_economics_check",
+    "private_status_readback"
+  ],
+  "prohibited_without_compensation": [
+    "public_defect_diagnosis",
+    "public_repair_instructions",
+    "public_test_design",
+    "patching_foreign_carrier",
+    "hardware_validation_for_foreign_carrier",
+    "iterative_rereview"
+  ],
+  "exceptions": [
+    "our_payable_carrier",
+    "documented_sponsor_paid_review",
+    "explicit_owner_override"
+  ],
+  "on_foreign_carrier_detected": [
+    "do_not_duplicate",
+    "release_bounty_fleet_capacity",
+    "route_to_payable_lane"
+  ],
+  "notes": "A paid bounty attached to another contributor's carrier does not make our review labor payable. Public technical assistance requires a documented compensation/entitlement path or explicit owner override."
+}
