@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from decimal import Decimal, ROUND_HALF_EVEN
 import json
-from typing import Iterable, Literal
+from typing import Literal
 
 DType = Literal["uint8", "int8", "int32"]
 
@@ -78,17 +78,21 @@ class RequantVector:
     input_zero_point: int
     output_scale: str
     output_zero_point: int
-    dtype: DType
+    input_dtype: DType
+    output_dtype: DType
 
     @property
     def expected(self) -> int:
+        lo, hi = _LIMITS[self.input_dtype]
+        if not (lo <= self.value <= hi):
+            raise ValueError(f"{self.name}: input {self.value} is outside {self.input_dtype} bounds")
         return requantize(
             self.value,
             self.input_scale,
             self.input_zero_point,
             self.output_scale,
             self.output_zero_point,
-            self.dtype,
+            self.output_dtype,
         )
 
 
@@ -115,21 +119,21 @@ def quant_vectors() -> tuple[QuantVector, ...]:
 
 def requant_vectors() -> tuple[RequantVector, ...]:
     return (
-        RequantVector("u8_negative_source", -1000, "1", 0, "1", 0, "uint8"),
-        RequantVector("u8_negative_after_input_zp", 9, "2", 10, "1", 0, "uint8"),
-        RequantVector("u8_exact_zero", 10, "2", 10, "1", 0, "uint8"),
-        RequantVector("u8_in_range", 64, "1", 0, "1", 0, "uint8"),
-        RequantVector("u8_scaled_in_range", 64, "0.5", 0, "0.25", 10, "uint8"),
-        RequantVector("u8_upper_saturation", 1000, "1", 0, "1", 0, "uint8"),
-        RequantVector("u8_output_zp_lower", 0, "1", 10, "2", 3, "uint8"),
-        RequantVector("u8_half_even_down", 1, "1", 0, "2", 0, "uint8"),
-        RequantVector("u8_half_even_up", 3, "1", 0, "2", 0, "uint8"),
-        RequantVector("i8_lower_saturation", -500, "1", 0, "1", 0, "int8"),
-        RequantVector("i8_negative_in_range", -25, "1", 0, "2", 0, "int8"),
-        RequantVector("i8_positive_in_range", 125, "2", 0, "2", 0, "int8"),
-        RequantVector("i8_upper_saturation", 500, "1", 0, "1", 0, "int8"),
+        RequantVector("u8_negative_source", -1000, "1", 0, "1", 0, "int32", "uint8"),
+        RequantVector("u8_negative_after_input_zp", 9, "2", 10, "1", 0, "uint8", "uint8"),
+        RequantVector("u8_input_lower_hostile", 1, "1", 10, "1", 0, "uint8", "uint8"),
+        RequantVector("u8_exact_zero", 10, "2", 10, "1", 0, "uint8", "uint8"),
+        RequantVector("u8_in_range", 64, "1", 0, "1", 0, "uint8", "uint8"),
+        RequantVector("u8_scaled_in_range", 64, "0.5", 0, "0.25", 10, "uint8", "uint8"),
+        RequantVector("u8_upper_saturation", 1000, "1", 0, "1", 0, "int32", "uint8"),
+        RequantVector("u8_output_zp_lower", 0, "1", 10, "2", 3, "uint8", "uint8"),
+        RequantVector("u8_half_even_down", 1, "1", 0, "2", 0, "uint8", "uint8"),
+        RequantVector("u8_half_even_up", 3, "1", 0, "2", 0, "uint8", "uint8"),
+        RequantVector("i8_lower_saturation", -500, "1", 0, "1", 0, "int32", "int8"),
+        RequantVector("i8_negative_in_range", -25, "1", 0, "2", 0, "int8", "int8"),
+        RequantVector("i8_positive_in_range", 125, "2", 0, "2", 0, "int8", "int8"),
+        RequantVector("i8_upper_saturation", 500, "1", 0, "1", 0, "int32", "int8"),
     )
-
 
 def vector_table() -> dict[str, list[dict[str, object]]]:
     q = [{**asdict(v), "expected": v.expected} for v in quant_vectors()]
@@ -141,10 +145,10 @@ def render_markdown() -> str:
     lines = ["# Exact-output clamp vectors", "", "## quantize", "", "|name|value|scale|zp|dtype|expected|", "|---|---:|---:|---:|---|---:|"]
     for v in quant_vectors():
         lines.append(f"|{v.name}|{v.value}|{v.scale}|{v.zero_point}|{v.dtype}|{v.expected}|")
-    lines += ["", "## requantize", "", "|name|value|in scale|in zp|out scale|out zp|dtype|expected|", "|---|---:|---:|---:|---:|---:|---|---:|"]
+    lines += ["", "## requantize", "", "|name|value|in scale|in zp|out scale|out zp|input dtype|output dtype|expected|", "|---|---:|---:|---:|---:|---:|---|---|---:|"]
     for v in requant_vectors():
         lines.append(
-            f"|{v.name}|{v.value}|{v.input_scale}|{v.input_zero_point}|{v.output_scale}|{v.output_zero_point}|{v.dtype}|{v.expected}|"
+            f"|{v.name}|{v.value}|{v.input_scale}|{v.input_zero_point}|{v.output_scale}|{v.output_zero_point}|{v.input_dtype}|{v.output_dtype}|{v.expected}|"
         )
     return "\n".join(lines) + "\n"
 

@@ -38,7 +38,7 @@ Current `quantization.cpp` has materially different routes, so device validation
 
 `clamp_oracle.py` uses Decimal and explicit `ROUND_HALF_EVEN`, then saturates to the destination bounds. That gives deterministic expected integers without depending on Python binary-float accident. It deliberately models the **public math contract only**; it is not an SFPU simulator.
 
-The table contains 29 named cases: 16 quantize and 13 requantize. It covers:
+The table contains 30 named cases: 16 quantize and 14 requantize. It covers:
 
 - negative values well below zero and immediately below the lower boundary;
 - tie-to-even points (`0.5`, `1.5`, and requantized half steps);
@@ -46,6 +46,7 @@ The table contains 29 named cases: 16 quantize and 13 requantize. It covers:
 - non-zero input/output zero points and unequal scales;
 - the last in-range UInt8 region and upper saturation to 255;
 - INT8 lower/in-range/upper controls so a UInt8 repair cannot silently change signed behavior;
+- an explicit UINT8-input → UINT8-output requantize hostile (`q_in=1`, `input_zero_point=10`) which must clamp to `0`;
 - the issue’s critical anti-symmetry hostile: `quantize(-5, 0.1, 0, uint8) == 0`, while `quantize(+5, 0.1, 0, uint8) == 50`.
 
 Run from this directory:
@@ -63,7 +64,7 @@ Host exactness is necessary but not sufficient. Authorized Wormhole B0 + Blackho
 1. architecture: WH B0 / BH;
 2. operation: quantize / requantize;
 3. route: direct scalar kernel / composite tensor-argument fallback;
-4. source dtype: FP32 + BF16 for quantize; INT32 + supported INT8 route for requantize;
+4. source dtype: FP32 + BF16 for quantize; INT32 + INT8 + UINT8 routes for requantize;
 5. output dtype: UINT8 target plus INT8 control;
 6. boundary class: negative, `-0`, zero, tie, ordinary in-range, 254/255 edge, >255, very large magnitude;
 7. zero-point: zero and non-zero; scales equal and unequal for requantize;
@@ -76,7 +77,7 @@ For every candidate device test, compute expected output with the host oracle **
 A complete fix is not just “negative becomes zero” in one SFPU branch. Acceptance requires all of the following together:
 
 - direct UInt8 QUANT lower saturation;
-- direct UInt8 REQUANT lower saturation;
+- direct UInt8 REQUANT lower saturation, including UINT8 input below `input_zero_point` → UINT8 output `0`;
 - upper saturation remains 255;
 - composite UInt8 narrowing no longer wraps/truncates out-of-range results;
 - INT8 exact outputs are unchanged on boundary vectors;

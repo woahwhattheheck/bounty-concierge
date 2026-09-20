@@ -33,9 +33,17 @@
     "normal_unittest": "11/11 PASS",
     "optimized_unittest": "11/11 PASS",
     "py_compile": "PASS",
-    "vector_count": 29,
+    "vector_count": 30,
     "device_or_hardware_execution": false,
-    "performance_measurement": false
+    "performance_measurement": false,
+    "review_repair": {
+      "source_review_comment": 5746730189,
+      "repaired_gap": "UINT8 input -> UINT8 output requant lower clamp",
+      "hostile_vector": "u8_input_lower_hostile",
+      "input_value": 1,
+      "input_zero_point": 10,
+      "expected_output": 0
+    }
   },
   "authority": {
     "upstream_write_permission": "pull-only",

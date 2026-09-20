@@ -59,11 +59,15 @@ class ClampOracleTests(unittest.TestCase):
         q = {v.name: v.expected for v in quant_vectors()}
         rq = {v.name: v.expected for v in requant_vectors()}
         self.assertEqual(len(q), 16)
-        self.assertEqual(len(rq), 13)
+        self.assertEqual(len(rq), 14)
         self.assertEqual(q["u8_far_negative"], 0)
         self.assertEqual(q["u8_overflow"], 255)
         self.assertEqual(rq["u8_negative_source"], 0)
+        self.assertEqual(rq["u8_input_lower_hostile"], 0)
         self.assertEqual(rq["u8_upper_saturation"], 255)
+        hostile = next(v for v in requant_vectors() if v.name == "u8_input_lower_hostile")
+        self.assertEqual(hostile.input_dtype, "uint8")
+        self.assertEqual(hostile.output_dtype, "uint8")
 
     def test_uint8_sign_symmetry_is_intentionally_broken_by_clamp(self):
         # The bug makes negative values behave like magnitudes. The contract must not.
