@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "issue": "tenstorrent/tt-metal#51655",
+  "advertised_reward_usd": 1000,
+  "upstream_assignee": "kinginu",
+  "tt_metal_main": "708e7f58aef9d089f0e5097d4a772c7c8ee129ea",
+  "carrier": {
+    "pr": 53639,
+    "head": "11c41b499c36ea55624226cf0fb3b665cdc0780a",
+    "state": "open"
+  },
+  "source_blobs": {
+    "blackhole_typecast": "d78ce8c9fa922f7b9491070eb8af393917814458",
+    "wormhole_typecast": "bb5a5848dad46bfc5b6b40c27f27cc4362741f26",
+    "host_tensor_apis": "c3c678557016af5962ac64f6a3e651b3b8e712cf",
+    "sweep_golden": "2b226f32a07cb9d6e51e95dc5a918af5d8c63056",
+    "copy_test": "340a330f03043af18c7f951dd240c4a957b801af",
+    "llk_golden": "a03adaa505bba87c134434dc1bb58040319bd389"
+  },
+  "oracle": {
+    "bf16_uint16_in_range": 18305,
+    "legacy_disagreements": 576,
+    "residual_fp32_bits": [
+      "0x3F7FFFFE",
+      "0x3F7FFFFF",
+      "0x3FFFFFFF"
+    ],
+    "carrier_quarter_step_covers_any_residual": false
+  },
+  "local_tests": {
+    "command": "python -m pytest -q tests/test_tt_metal_51655_oracle.py",
+    "passed": 9,
+    "failed": 0
+  },
+  "claims": {
+    "hardware_run": false,
+    "upstream_mutation": false,
+    "assignment_changed": false,
+    "payment_claimed": false
+  }
+}
