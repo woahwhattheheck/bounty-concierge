@@ -301,7 +301,10 @@ def route_snapshot(
         "reason_codes": [],
         "receipt_sha256": None,
     }
-    if disposition == "ACTIONABLE" and freshness == "FRESH":
+    # Evaluate on every ACTIONABLE row, including stale/future twins. Freshness
+    # still owns the route; skipping the gate here made identical snapshots look
+    # like semantic conflicts (NOT_EVALUATED vs ACCEPTANCE_TEXT_CLEAR).
+    if disposition == "ACTIONABLE":
         acceptance_safety = _acceptance_safety(
             snapshot,
             repo=repo,
