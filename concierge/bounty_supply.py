@@ -28,11 +28,19 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+from concierge.bounty_acceptance_safety_gate import (
+    BountyAcceptanceSafetyInputError,
+    SCHEMA as ACCEPTANCE_SAFETY_SCHEMA,
+    compile_bounty_acceptance_safety_gate,
+)
 from concierge.bounty_qualification import QualificationInputError, qualify_dispatch
 
 
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _ROUTE_ORDER = {"ACTIVE": 0, "MAYBE": 1, "HOLD": 2, "PRUNE": 3}
+_ACTIVE_FLOOR_USD = Decimal("50")
+_MAYBE_FLOOR_USD = Decimal("10")
+_MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
 
 
 class SupplyInputError(ValueError):
@@ -98,8 +106,14 @@ def _policy(
     active = _decimal(active_floor_usd, "active_floor_usd")
     maybe = _decimal(maybe_floor_usd, "maybe_floor_usd")
     max_age = _decimal(max_age_seconds, "max_age_seconds")
-    if maybe >= active:
-        raise SupplyInputError("maybe_floor_usd must be lower than active_floor_usd")
+
+    # Owner economics are an invariant, not a caller preference.  Keeping the
+    # parameters for API compatibility is deliberate, but any attempted override
+    # fails closed so $10-49 can never be promoted into ACTIVE/main.
+    if active != _ACTIVE_FLOOR_USD or maybe != _MAYBE_FLOOR_USD:
+        raise SupplyInputError(
+            "bounty floors are fixed: active_floor_usd=50 and maybe_floor_usd=10"
+        )
     if (
         isinstance(saturation_threshold, bool)
         or not isinstance(saturation_threshold, int)
@@ -107,8 +121,8 @@ def _policy(
     ):
         raise SupplyInputError("saturation_threshold must be a positive integer")
     return {
-        "active_floor_usd": _decimal_text(active),
-        "maybe_floor_usd": _decimal_text(maybe),
+        "active_floor_usd": "50",
+        "maybe_floor_usd": "10",
         "max_age_seconds": _decimal_text(max_age),
         "saturation_threshold": saturation_threshold,
     }
@@ -153,6 +167,73 @@ def _safe_evidence(result: dict[str, Any]) -> dict[str, Any]:
         "disposition": result["disposition"],
         "reason_codes": list(result.get("reason_codes", [])),
         "signals": result.get("signals", {}),
+    }
+
+
+def _acceptance_text(snapshot: dict[str, Any]) -> str:
+    """Collect sponsor-controlled acceptance prose without persisting it."""
+    parts: list[str] = []
+    for key in ("title", "body"):
+        value = snapshot.get(key)
+        if isinstance(value, str) and value:
+            parts.append(value)
+
+    for key in ("contribution_terms", "requirements"):
+        value = snapshot.get(key)
+        if isinstance(value, str):
+            parts.append(value)
+        elif isinstance(value, list):
+            parts.extend(item for item in value if isinstance(item, str))
+
+    comments = snapshot.get("comments")
+    if isinstance(comments, list):
+        for comment in comments:
+            if not isinstance(comment, dict):
+                continue
+            association = comment.get("author_association")
+            body = comment.get("body")
+            if (
+                isinstance(association, str)
+                and association.strip().upper() in _MAINTAINER_ASSOCIATIONS
+                and isinstance(body, str)
+            ):
+                parts.append(body)
+    return "\n".join(parts)
+
+
+def _acceptance_safety(
+    snapshot: dict[str, Any],
+    *,
+    repo: str,
+    number: int,
+    observed_at: str,
+    evaluated_at: str,
+) -> dict[str, Any]:
+    """Run the broader acceptance-text gate and persist only safe receipt fields."""
+    source_text = _acceptance_text(snapshot)
+    source_digest = hashlib.sha256(source_text.encode("utf-8")).hexdigest()
+    issue_url = f"https://github.com/{repo}/issues/{number}"
+    request = {
+        "schema": ACCEPTANCE_SAFETY_SCHEMA,
+        "issue_url": issue_url,
+        "source_url": issue_url,
+        "source_text": source_text,
+        "source_content_sha256": source_digest,
+        "observed_at": observed_at,
+        "evaluated_at": evaluated_at,
+    }
+    try:
+        receipt = compile_bounty_acceptance_safety_gate(request)
+    except BountyAcceptanceSafetyInputError:
+        return {
+            "disposition": "HOLD_SAFETY_GATE_INPUT_INVALID",
+            "reason_codes": ["SAFETY_GATE_INPUT_INVALID"],
+            "receipt_sha256": None,
+        }
+    return {
+        "disposition": receipt["disposition"],
+        "reason_codes": list(receipt.get("reason_codes", [])),
+        "receipt_sha256": receipt["receipt_sha256"],
     }
 
 
@@ -215,6 +296,20 @@ def route_snapshot(
         evaluated=evaluated,
         max_age_seconds=Decimal(policy["max_age_seconds"]),
     )
+    acceptance_safety = {
+        "disposition": "NOT_EVALUATED",
+        "reason_codes": [],
+        "receipt_sha256": None,
+    }
+    if disposition == "ACTIONABLE" and freshness == "FRESH":
+        acceptance_safety = _acceptance_safety(
+            snapshot,
+            repo=repo,
+            number=number,
+            observed_at=observed_text,
+            evaluated_at=evaluated_text,
+        )
+
     router_codes: list[str] = []
 
     if disposition == "REJECT":
@@ -238,6 +333,11 @@ def route_snapshot(
                 "EXPIRED": "SOURCE_EVIDENCE_EXPIRED",
             }[freshness]
         )
+    elif acceptance_safety["disposition"] != "ACCEPTANCE_TEXT_CLEAR":
+        route = "HOLD"
+        queue = None
+        reward = None
+        router_codes.append("UNTRUSTED_ACCEPTANCE_TEXT")
     elif reward is None:
         # RTC-only and other non-USD offers intentionally stay HOLD.  This layer
         # never invents an exchange rate or treats marketplace prose as fixed USD.
@@ -278,6 +378,7 @@ def route_snapshot(
         "router_reason_codes": router_codes,
         "policy": policy,
         "qualification_evidence": _safe_evidence(qualification),
+        "acceptance_safety_evidence": acceptance_safety,
         "source_row_count": 1,
     }
     row["receipt_sha256"] = _receipt(row)
@@ -292,6 +393,12 @@ def _semantic_signature(row: dict[str, Any]) -> str:
             "qualification_disposition": row["qualification_disposition"],
             "qualification_reason_codes": row["qualification_reason_codes"],
             "qualification_evidence": row["qualification_evidence"],
+            "acceptance_safety_disposition": row["acceptance_safety_evidence"][
+                "disposition"
+            ],
+            "acceptance_safety_reason_codes": row["acceptance_safety_evidence"][
+                "reason_codes"
+            ],
         }
     )
 
@@ -314,26 +421,69 @@ def _conflict_row(
     evaluated_at: str,
 ) -> dict[str, Any]:
     repo, issue_text = canonical_id.rsplit("#", 1)
+    signatures = sorted({_semantic_signature(candidate) for candidate in rows})
+    dispositions = {candidate["qualification_disposition"] for candidate in rows}
+    if "REJECT" in dispositions:
+        qualification_disposition = "REJECT"
+        route = "PRUNE"
+        router_codes = [
+            "CONFLICTING_DUPLICATE_EVIDENCE",
+            "QUALIFICATION_REJECTED",
+        ]
+    elif "HOLD" in dispositions:
+        qualification_disposition = "HOLD"
+        route = "HOLD"
+        router_codes = [
+            "CONFLICTING_DUPLICATE_EVIDENCE",
+            "QUALIFICATION_HOLD",
+        ]
+    else:
+        qualification_disposition = "ACTIONABLE"
+        route = "HOLD"
+        router_codes = ["CONFLICTING_DUPLICATE_EVIDENCE"]
+
+    qualification_reasons = sorted(
+        {
+            reason
+            for candidate in rows
+            for reason in candidate.get("qualification_reason_codes", [])
+        }
+    )
+    acceptance_reasons = sorted(
+        {
+            reason
+            for candidate in rows
+            for reason in candidate.get("acceptance_safety_evidence", {}).get(
+                "reason_codes", []
+            )
+        }
+    )
     row = {
         "canonical_id": canonical_id,
         "repo": repo,
         "number": int(issue_text),
-        "route": "HOLD",
+        "route": route,
         "queue": None,
         "reward_usd": None,
         "observed_at": None,
         "evaluated_at": evaluated_at,
         "evidence_age_seconds": None,
         "freshness": "CONFLICT",
-        "qualification_disposition": "HOLD",
-        "qualification_reason_codes": [],
-        "router_reason_codes": ["CONFLICTING_DUPLICATE_EVIDENCE"],
+        "qualification_disposition": qualification_disposition,
+        "qualification_reason_codes": qualification_reasons,
+        "router_reason_codes": router_codes,
         "policy": policy,
         "qualification_evidence": {
-            "disposition": "HOLD",
-            "reason_codes": [],
+            "disposition": qualification_disposition,
+            "reason_codes": qualification_reasons,
             "signals": {},
         },
+        "acceptance_safety_evidence": {
+            "disposition": "CONFLICT",
+            "reason_codes": acceptance_reasons,
+            "receipt_sha256": None,
+        },
+        "conflict_candidate_signatures": signatures,
         "source_row_count": len(rows),
     }
     row["receipt_sha256"] = _receipt(row)
@@ -466,8 +616,6 @@ def main(argv: list[str] | None = None) -> int:
         required=True,
         help="offset-aware ISO-8601 time used to evaluate evidence freshness",
     )
-    parser.add_argument("--active-floor-usd", default="50")
-    parser.add_argument("--maybe-floor-usd", default="10")
     parser.add_argument(
         "--max-age-seconds",
         default="900",
@@ -482,8 +630,6 @@ def main(argv: list[str] | None = None) -> int:
         result = route_supply(
             candidates,
             evaluated_at=args.evaluated_at,
-            active_floor_usd=args.active_floor_usd,
-            maybe_floor_usd=args.maybe_floor_usd,
             max_age_seconds=args.max_age_seconds,
             saturation_threshold=args.saturation_threshold,
         )
