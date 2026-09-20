@@ -49,6 +49,70 @@ def availability(*, dispatch=True, reason=None):
     }
 
 
+LIVE_CASH_AUTHORITY = {
+    "advisory_only": True,
+    "claim_authority": False,
+    "implementation_authority": False,
+    "submission_authority": False,
+    "outbound_contact_authority": False,
+    "payment_or_wallet_authority": False,
+}
+
+
+def seal_live_cash(value):
+    body = deepcopy(value)
+    body.pop("receipt_sha256", None)
+    value["receipt_sha256"] = hashlib.sha256(
+        json.dumps(
+            body,
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode()
+    ).hexdigest()
+    return value
+
+
+def live_cash(
+    *,
+    disposition="ACTIVE_REVIEW",
+    route="main_bounty_queue",
+    amount="50",
+    currency="USD",
+    fixed_semantics=True,
+    reasons=(),
+    repo="acme/widgets",
+    number=17,
+):
+    body = {
+        "schema": "bounty-live-cash-admission-receipt/v1",
+        "identity": {
+            "repo": repo,
+            "issue_number": number,
+            "canonical_issue_url": f"https://github.com/{repo}/issues/{number}",
+        },
+        "source": {
+            "kind": "LIVE_GITHUB_PREFLIGHT",
+            "issue_generation_sha256": "1" * 64,
+            "preflight_sha256": "2" * 64,
+            "preflight": {},
+        },
+        "economics": {
+            "currency": currency,
+            "fixed_amount": amount,
+            "fixed_semantics": fixed_semantics,
+            "active_floor": "50",
+            "pile_floor": "10",
+        },
+        "disposition": disposition,
+        "route": route,
+        "reason_codes": list(reasons),
+        "authority": deepcopy(LIVE_CASH_AUTHORITY),
+    }
+    return seal_live_cash(body)
+
+
 POLICY_SHA = "b" * 64
 REQUEST_SHA = "c" * 64
 
@@ -159,11 +223,22 @@ class RevenueDispatchTests(unittest.TestCase):
         expected_policy_sha=POLICY_SHA,
         dispatch_as_of="2026-09-16T20:30:00Z",
         verify=True,
+        cash=None,
+        cash_error=None,
     ):
         if gate_bytes is None and gate is not None:
             gate_bytes = raw(gate)
         if gate_bytes is not None and expected_bytes_sha is None:
             expected_bytes_sha = hashlib.sha256(gate_bytes).hexdigest()
+        cash_patch = patch(
+            "concierge.revenue_dispatch.evaluate_live_cash_admission",
+            return_value=cash or live_cash(),
+        )
+        if cash_error is not None:
+            cash_patch = patch(
+                "concierge.revenue_dispatch.evaluate_live_cash_admission",
+                side_effect=cash_error,
+            )
         with patch(
             "concierge.revenue_dispatch.qualify_live_revenue_intake",
             return_value=incoming or intake(),
@@ -173,7 +248,7 @@ class RevenueDispatchTests(unittest.TestCase):
         ), patch(
             "concierge.revenue_dispatch.verify_paid_work_receipt",
             return_value=verify,
-        ):
+        ), cash_patch:
             return qualify_available_live_revenue_intake(
                 "acme/widgets",
                 17,
@@ -206,6 +281,9 @@ class RevenueDispatchTests(unittest.TestCase):
         ), patch(
             "concierge.revenue_dispatch.inspect_bounty_availability",
             return_value=availability(),
+        ), patch(
+            "concierge.revenue_dispatch.evaluate_live_cash_admission",
+            return_value=live_cash(),
         ):
             result = qualify_available_live_revenue_intake(
                 "acme/widgets",
@@ -235,7 +313,14 @@ class RevenueDispatchTests(unittest.TestCase):
         authority = result["dispatch_authority"]
         self.assertEqual(authority["evidence_binding_sha256"], economics["binding_sha256"])
         self.assertTrue(authority["internal_implementation_only"])
+        self.assertEqual(
+            authority["live_cash"], "verified_source_bound_50_10_admission"
+        )
+        self.assertEqual(
+            result["live_cash_admission"]["disposition"], "ACTIVE_REVIEW"
+        )
         self.assertFalse(authority["external_claim_authority"])
+        self.assertFalse(authority["external_submission_authority"])
         self.assertFalse(authority["payment_cash_or_revenue_authority"])
 
     def test_every_non_go_decision_fails_closed_with_binding(self):
@@ -294,6 +379,143 @@ class RevenueDispatchTests(unittest.TestCase):
     def test_tampered_receipt_fails(self):
         with self.assertRaisesRegex(RevenueDispatchError, "integrity"):
             self.run_dispatch(gate=receipt(), work_id="work-17", verify=False)
+
+    def test_25_dollar_pile_blocks_internal_dispatch(self):
+        result = self.run_dispatch(
+            gate=receipt(),
+            work_id="work-17",
+            cash=live_cash(
+                disposition="PILE_SAVE_UP",
+                route="bounty_pile_10_49",
+                amount="25",
+            ),
+        )
+        self.assertFalse(result["dispatch"])
+        self.assertEqual(result["disposition"], "HOLD")
+        self.assertIn("LIVE_CASH:PILE_SAVE_UP", result["reason_codes"])
+        self.assertEqual(
+            result["live_cash_admission"]["fixed_amount_usd"], "25"
+        )
+        self.assertFalse(result["dispatch_authority"]["internal_implementation_only"])
+
+    def test_below_10_prune_rejects_internal_dispatch(self):
+        result = self.run_dispatch(
+            gate=receipt(),
+            work_id="work-17",
+            cash=live_cash(
+                disposition="PRUNE_BELOW_DOLLAR_FLOOR",
+                route=None,
+                amount="5",
+                reasons=("FIXED_USD_REWARD_BELOW_10",),
+            ),
+        )
+        self.assertFalse(result["dispatch"])
+        self.assertEqual(result["disposition"], "REJECT")
+        self.assertIn(
+            "LIVE_CASH:PRUNE_BELOW_DOLLAR_FLOOR", result["reason_codes"]
+        )
+
+    def test_nonfixed_mixed_and_no_fixed_cash_all_hold(self):
+        cases = (
+            live_cash(
+                disposition="HOLD_NON_FIXED_USD_REWARD",
+                route=None,
+                amount="75",
+                fixed_semantics=False,
+                reasons=("USD_REWARD_NOT_FIXED_GUARANTEED_AMOUNT",),
+            ),
+            live_cash(
+                disposition="HOLD_MIXED_REWARD_CURRENCY",
+                route=None,
+                amount="75",
+                reasons=("MIXED_USD_AND_NATIVE_TOKEN_REWARD",),
+            ),
+            live_cash(
+                disposition="HOLD_NO_FIXED_USD_REWARD",
+                route=None,
+                amount=None,
+                currency=None,
+                fixed_semantics=False,
+                reasons=("FIXED_USD_REWARD_NOT_OBSERVED",),
+            ),
+        )
+        for cash in cases:
+            with self.subTest(disposition=cash["disposition"]):
+                result = self.run_dispatch(
+                    gate=receipt(), work_id="work-17", cash=cash
+                )
+                self.assertFalse(result["dispatch"])
+                self.assertEqual(result["disposition"], "HOLD")
+                self.assertIn(
+                    f"LIVE_CASH:{cash['disposition']}", result["reason_codes"]
+                )
+
+    def test_live_cash_target_binding_is_exact(self):
+        with self.assertRaisesRegex(RevenueDispatchError, "target binding"):
+            self.run_dispatch(
+                gate=receipt(),
+                work_id="work-17",
+                cash=live_cash(repo="other/widgets"),
+            )
+
+    def test_active_live_cash_route_corruption_fails_closed(self):
+        bad = live_cash(route="bounty_pile_10_49")
+        with self.assertRaisesRegex(RevenueDispatchError, "active live cash"):
+            self.run_dispatch(gate=receipt(), work_id="work-17", cash=bad)
+
+    def test_live_cash_authority_amplification_fails_closed(self):
+        bad = live_cash()
+        bad["authority"]["implementation_authority"] = True
+        seal_live_cash(bad)
+        with self.assertRaisesRegex(RevenueDispatchError, "authority ceiling"):
+            self.run_dispatch(gate=receipt(), work_id="work-17", cash=bad)
+
+    def test_live_cash_digest_tamper_fails_closed(self):
+        bad = live_cash()
+        bad["economics"]["fixed_amount"] = "500"
+        with self.assertRaisesRegex(RevenueDispatchError, "sha256 mismatch"):
+            self.run_dispatch(gate=receipt(), work_id="work-17", cash=bad)
+
+    def test_live_cash_provider_failure_fails_closed(self):
+        from concierge.bounty_live_cash_admission import LiveCashAdmissionError
+
+        with self.assertRaisesRegex(
+            RevenueDispatchError, "live source-bound cash admission failed"
+        ):
+            self.run_dispatch(
+                gate=receipt(),
+                work_id="work-17",
+                cash_error=LiveCashAdmissionError("provider read failed"),
+            )
+
+    def test_economic_hold_skips_live_cash_provider(self):
+        gate = receipt(decision="HOLD_VALUE_UNKNOWN")
+        payload = raw(gate)
+        with patch(
+            "concierge.revenue_dispatch.qualify_live_revenue_intake",
+            return_value=intake(),
+        ), patch(
+            "concierge.revenue_dispatch.inspect_bounty_availability",
+            return_value=availability(),
+        ), patch(
+            "concierge.revenue_dispatch.verify_paid_work_receipt",
+            return_value=True,
+        ), patch(
+            "concierge.revenue_dispatch.evaluate_live_cash_admission"
+        ) as cash_mock:
+            result = qualify_available_live_revenue_intake(
+                "acme/widgets",
+                17,
+                gate_receipt_bytes=payload,
+                work_id="work-17",
+                expected_gate_receipt_bytes_sha256=hashlib.sha256(payload).hexdigest(),
+                expected_policy_sha256=POLICY_SHA,
+                dispatch_as_of="2026-09-16T20:30:00Z",
+            )
+        cash_mock.assert_not_called()
+        self.assertFalse(result["dispatch"])
+        self.assertEqual(result["live_cash_admission"]["status"], "NOT_CHECKED")
+        self.assertEqual(result["dispatch_authority"]["live_cash"], "not_reached")
 
     def test_deterministic_binding_for_same_evidence_and_time(self):
         gate = receipt()
