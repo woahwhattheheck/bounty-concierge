@@ -34,7 +34,10 @@ LEGACY_OBSERVED = {
     3.0059: 3.0058651,
 }
 
-# The issue table displays x to four decimals while its reference/output values\n# come from the underlying linspace sample. Treat these pairs as rounded table\n# evidence, not an assertion that exact_gelu(displayed_x) is bit-identical.\nISSUE_TORCH_REFERENCE = {
+# The issue table displays x to four decimals while its reference/output values
+# come from the underlying linspace sample. Treat these pairs as rounded table
+# evidence, not an assertion that exact_gelu(displayed_x) is bit-identical.
+ISSUE_TORCH_REFERENCE = {
     -3.0059: -0.00398016,
     -0.5034: -0.15471851,
     0.5034: 0.348702799,
