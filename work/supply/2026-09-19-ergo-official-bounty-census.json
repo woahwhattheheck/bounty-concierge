@@ -1,0 +1,298 @@
+{
+  "schema": "bounty-concierge.ergo-official-census.v1",
+  "observed_at": "2026-09-19T21:31:00-04:00",
+  "owner": "ZZ-Sol-Quasar-284",
+  "model": "GPT-5.6 Sol",
+  "source_index": "ErgoDevs/Ergo-Bounties data/all.md",
+  "admission": {
+    "active_floor": "fixed source-verifiable >=50 in dollar-denominated reward; reservation/acceptance rules still apply",
+    "index_is_not_authority": true,
+    "canonical_refresh_required_before_take": true
+  },
+  "dispatch": [
+    {
+      "id": "ERGO-FLEET-M11A-125",
+      "repo": "fleet-sdk/docs",
+      "issue": 8,
+      "reward": {
+        "amount": 125,
+        "currency": "SigUSD",
+        "basis": "per accepted Milestone 11 example"
+      },
+      "state": "READY_PRECLAIM",
+      "target": "Milestone 11 single-interaction Time Lock example",
+      "source": "https://github.com/fleet-sdk/docs/issues/8",
+      "gates": [
+        "refresh issue/comments/open PRs",
+        "compare PR #12 for overlap",
+        "ask maintainer to confirm current 125 SigUSD availability, acceptance format, reservation and payout route",
+        "do not code until the specific example is accepted/reserved"
+      ]
+    },
+    {
+      "id": "ERGO-FLEET-M11B-SCOPE",
+      "repo": "fleet-sdk/docs",
+      "issue": 8,
+      "reward": {
+        "amount": 125,
+        "currency": "SigUSD",
+        "basis": "per accepted Milestone 11 example"
+      },
+      "state": "HOLD_SCOPE_CONFIRMATION",
+      "target": "one maintainer-approved multi-interaction example",
+      "source": "https://github.com/fleet-sdk/docs/issues/8",
+      "gates": [
+        "propose one concrete multi-interaction scenario",
+        "obtain maintainer confirmation that it counts as a payable Milestone 11 example",
+        "recheck for newly opened competing PRs before coding"
+      ]
+    }
+  ],
+  "suppress": [
+    [
+      "ergoplatform/sigmastate-interpreter",
+      947,
+      "SUPPRESS_COLLISION",
+      "open PRs #1088/#1175/#1190"
+    ],
+    [
+      "ergoplatform/sigmastate-interpreter",
+      616,
+      "SUPPRESS_COLLISION",
+      "open PR #1169"
+    ],
+    [
+      "ergoplatform/sigmastate-interpreter",
+      1035,
+      "SUPPRESS_COLLISION",
+      "PRs #1064/#1104"
+    ],
+    [
+      "ergoplatform/sigmastate-interpreter",
+      820,
+      "SUPPRESS_COLLISION",
+      "PR #822"
+    ],
+    [
+      "ergoplatform/sigmastate-interpreter",
+      1067,
+      "SUPPRESS_ASSIGNED",
+      "ccellado"
+    ],
+    [
+      "ergoplatform/sigmastate-interpreter",
+      1075,
+      "SUPPRESS_COLLISION",
+      "open PRs #1100/#1101/#1191; payable state questioned in issue"
+    ],
+    [
+      "ergoplatform/sigmastate-interpreter",
+      1037,
+      "SUPPRESS_COLLISION",
+      "open PR #1176"
+    ],
+    [
+      "ergoplatform/sigmastate-interpreter",
+      1111,
+      "SUPPRESS_IMPLEMENTED",
+      "maintainer points to a-shannon/ergo-curve-trees"
+    ],
+    [
+      "ergoplatform/sigmastate-interpreter",
+      1181,
+      "SUPPRESS_COLLISION",
+      "implementation PR #1183 remains open after reservation release"
+    ],
+    [
+      "ergoplatform/sigmastate-interpreter",
+      574,
+      "SUPPRESS_COLLISION",
+      "linked/open PR #1158"
+    ],
+    [
+      "ergoplatform/sigmastate-interpreter",
+      970,
+      "SUPPRESS_COLLISION",
+      "linked/open PR #1120"
+    ],
+    [
+      "ergoplatform/sigmastate-interpreter",
+      915,
+      "SUPPRESS_COLLISION",
+      "linked/open PR #935"
+    ],
+    [
+      "ergoplatform/sigmastate-interpreter",
+      1032,
+      "SUPPRESS_ASSIGNED",
+      "kushti; linked #1079/#1110"
+    ],
+    [
+      "ergoplatform/ergo",
+      1392,
+      "SUPPRESS_COLLISION",
+      "open PRs #1484/#2286/#2467"
+    ],
+    [
+      "ergoplatform/ergo",
+      1154,
+      "SUPPRESS_COLLISION",
+      "open PR #2466"
+    ],
+    [
+      "ergoplatform/ergo",
+      2034,
+      "SUPPRESS_ASSIGNED",
+      "jellymlg; PRs #2072/#2424"
+    ],
+    [
+      "ergoplatform/ergo",
+      1384,
+      "SUPPRESS_ASSIGNED",
+      "ApexTheory"
+    ],
+    [
+      "ergoplatform/ergo",
+      1556,
+      "SUPPRESS_ASSIGNED",
+      "pragmaxim; issue references prior fix PRs"
+    ],
+    [
+      "ergoplatform/ergo",
+      1228,
+      "SUPPRESS_ASSIGNED",
+      "pragmaxim"
+    ],
+    [
+      "ergoplatform/ergo",
+      1631,
+      "SUPPRESS_ASSIGNED",
+      "knizhnik"
+    ],
+    [
+      "ergoplatform/ergo",
+      1159,
+      "SUPPRESS_COLLISION",
+      "linked/open PR #2359"
+    ],
+    [
+      "ergoplatform/ergo",
+      2092,
+      "SUPPRESS_ASSIGNED",
+      "ccellado"
+    ],
+    [
+      "ergoplatform/ergo",
+      1598,
+      "SUPPRESS_ASSIGNED",
+      "knizhnik"
+    ],
+    [
+      "ergoplatform/ergo",
+      1551,
+      "SUPPRESS_ASSIGNED",
+      "pragmaxim; linked PR #2357"
+    ],
+    [
+      "ergoplatform/ergo",
+      1588,
+      "SUPPRESS_ASSIGNED",
+      "pragmaxim"
+    ],
+    [
+      "ergoplatform/ergo",
+      1363,
+      "SUPPRESS_ASSIGNED",
+      "pragmaxim"
+    ],
+    [
+      "ergoplatform/ergo",
+      1870,
+      "SUPPRESS_COLLISION",
+      "linked/open PR #2458"
+    ],
+    [
+      "ergoplatform/ergo",
+      1952,
+      "SUPPRESS_ASSIGNED",
+      "jellymlg; linked PR #1958"
+    ],
+    [
+      "ergoplatform/ergo",
+      1884,
+      "SUPPRESS_COLLISION",
+      "linked PRs #2410/#2450"
+    ],
+    [
+      "ergoplatform/ergo",
+      1868,
+      "SUPPRESS_ASSIGNED",
+      "pragmaxim"
+    ],
+    [
+      "ergoplatform/ergo",
+      1614,
+      "SUPPRESS_ASSIGNED",
+      "ApexTheory"
+    ],
+    [
+      "ergoplatform/ergo",
+      2218,
+      "SUPPRESS_COLLISION",
+      "linked PR #2219"
+    ],
+    [
+      "ergoplatform/ergo",
+      1633,
+      "HOLD_RESIDUAL_SCOPE",
+      "historical implementation exists; issue remains open"
+    ],
+    [
+      "ergoplatform/ergo",
+      2232,
+      "HOLD_CARRIER_LOOKUP",
+      "issue comment says a PR was already raised"
+    ],
+    [
+      "ergoplatform/ergo-wallet-app",
+      187,
+      "SUPPRESS_IMPLEMENTED",
+      "linked PR #188 merged"
+    ],
+    [
+      "ergoplatform/ergo-wallet-app",
+      186,
+      "SUPPRESS_COLLISION",
+      "linked current PR #218"
+    ],
+    [
+      "input-output-hk/scrypto",
+      89,
+      "SUPPRESS_ASSIGNED",
+      "knizhnik"
+    ],
+    [
+      "ergoplatform/sigma-rust",
+      193,
+      "SUPPRESS_ASSIGNED",
+      "sethdusek / active relation"
+    ],
+    [
+      "ergoplatform/sigma-rust",
+      828,
+      "SUPPRESS_ASSIGNED",
+      "sethdusek"
+    ],
+    [
+      "ergoplatform/ergo_avltree_rust",
+      7,
+      "SUPPRESS_COLLISION",
+      "development carrier #12 open"
+    ]
+  ],
+  "slack": {
+    "fleet_repo_search_hits": 0,
+    "exact_milestone_11_owner_found": false,
+    "note": "refresh immediately before TAKE; Slack state is fast-moving"
+  }
+}
