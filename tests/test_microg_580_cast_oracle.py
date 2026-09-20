@@ -173,3 +173,51 @@ def test_missing_implementation_owned_feature_set_is_rejected(tmp_path):
     path.write_text(content, encoding="utf-8")
     failures, _ = oracle.check(root)
     assert "MISSING INVARIANT: service declares implementation-owned Cast FEATURES" in failures
+
+
+def test_non_owned_assignment_on_checked_connection_info_is_rejected(tmp_path):
+    oracle = load_oracle()
+    root = passing_tree(tmp_path, oracle)
+    path = root / oracle.FILES["service"]
+    content = path.read_text(encoding="utf-8").replace(
+        "info.features = CAST_FEATURES;",
+        "info.features = computedFeatures;",
+    )
+    path.write_text(content, encoding="utf-8")
+    failures, _ = oracle.check(root)
+    assert (
+        "FEATURE CONTRACT: ConnectionInfo features must come from the implementation-owned feature set"
+        in failures
+    )
+
+
+def test_decoy_owned_assignment_does_not_hide_non_owned_connection_info(tmp_path):
+    oracle = load_oracle()
+    root = passing_tree(tmp_path, oracle)
+    path = root / oracle.FILES["service"]
+    content = path.read_text(encoding="utf-8").replace(
+        "info.features = CAST_FEATURES;",
+        "decoy.features = CAST_FEATURES;\n    info.features = computedFeatures;",
+    )
+    path.write_text(content, encoding="utf-8")
+    failures, _ = oracle.check(root)
+    assert (
+        "FEATURE CONTRACT: ConnectionInfo features must come from the implementation-owned feature set"
+        in failures
+    )
+
+
+def test_second_unsafe_assignment_is_rejected(tmp_path):
+    oracle = load_oracle()
+    root = passing_tree(tmp_path, oracle)
+    path = root / oracle.FILES["service"]
+    content = path.read_text(encoding="utf-8").replace(
+        "info.features = CAST_FEATURES;",
+        "info.features = CAST_FEATURES;\n    info.features = request.defaultFeatures;",
+    )
+    path.write_text(content, encoding="utf-8")
+    failures, _ = oracle.check(root)
+    assert (
+        "FEATURE CONTRACT: caller-controlled apiFeatures/defaultFeatures must not be advertised directly"
+        in failures
+    )
