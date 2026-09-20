@@ -296,11 +296,15 @@ def _semantic_signature(row: dict[str, Any]) -> str:
     )
 
 
-def _observation_sort_key(row: dict[str, Any]) -> str:
-    # Normalized UTC timestamps sort lexicographically. Missing evidence is older
-    # than any bound observation; a future timestamp remains newest and therefore
-    # wins into a fail-closed FUTURE hold rather than being silently ignored.
-    return row["observed_at"] or ""
+def _observation_sort_key(row: dict[str, Any]) -> datetime:
+    # Parse the normalized timestamp rather than sorting ISO text: variable
+    # fractional-second precision is not lexicographically time-ordered.
+    # Missing evidence is older than any bound observation. A future timestamp
+    # remains newest and therefore wins into a fail-closed FUTURE hold.
+    observed = row["observed_at"]
+    if observed is None:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    return _timestamp(observed, "observed_at")
 
 
 def _conflict_row(
