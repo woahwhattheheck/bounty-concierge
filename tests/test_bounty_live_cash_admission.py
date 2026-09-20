@@ -158,6 +158,40 @@ def test_ceiling_range_pool_or_milestone_total_never_promotes(
     ]
 
 
+@pytest.mark.parametrize(
+    "body",
+    [
+        "Bounty: $500\nPayment is up to maintainer discretion.",
+        "Reward amount depends on accepted scope.\nBounty: $500",
+        "Bounty: $500\nPrize pool is shared across accepted submissions.",
+        "Milestone total depends on final acceptance.\nReward: $500",
+    ],
+)
+def test_adjacent_reward_qualifier_never_promotes(monkeypatch, body):
+    install_preflight(monkeypatch, preflight("500"))
+    receipt = live.evaluate_live_cash_admission(
+        "acme/repo", 7, session=IssueSession([issue(body)])
+    )
+    assert receipt["disposition"] == "HOLD_NON_FIXED_USD_REWARD"
+    assert receipt["route"] is None
+    assert receipt["reason_codes"] == [
+        "USD_REWARD_NOT_FIXED_GUARANTEED_AMOUNT"
+    ]
+
+
+def test_adjacent_unrelated_maximum_does_not_hold_fixed_reward(monkeypatch):
+    install_preflight(monkeypatch, preflight("500"))
+    receipt = live.evaluate_live_cash_admission(
+        "acme/repo",
+        7,
+        session=IssueSession(
+            [issue("Bounty: $500\nMaximum supported file size: 10 MB")]
+        ),
+    )
+    assert receipt["disposition"] == "ACTIVE_REVIEW"
+    assert receipt["route"] == "main_bounty_queue"
+
+
 def test_title_ceiling_matching_label_amount_never_promotes(monkeypatch):
     install_preflight(monkeypatch, preflight("500"))
     receipt = live.evaluate_live_cash_admission(
