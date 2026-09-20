@@ -35,7 +35,7 @@ class ReinvestmentCaseBase(unittest.TestCase):
         package = self.root / "concierge"
         package.mkdir()
         (package / "__init__.py").write_text("# isolated test package\n", encoding="utf-8")
-        for name in ('reinvestment_allocator.py', '_reinvestment_allocator_api.py', '_reinvestment_allocator_transport.py', '_reinvestment_allocator_cli.py', '_reinvestment_allocator_worker.py', '_reinvestment_allocator_core.source'):
+        for name in ('reinvestment_allocator.py', '_reinvestment_allocator_api.py', '_reinvestment_allocator_transport.py', '_reinvestment_allocator_cli.py', '_reinvestment_allocator_worker.py', '_reinvestment_allocator_reload_guard.py', '_reinvestment_allocator_core.source'):
             shutil.copy2(MODULE_DIR / name, package / name)
         # Local development may use a deliberately tiny provider/core fixture.
         # Hosted CI leaves this unset and therefore exercises the exact checked-in
