@@ -21,7 +21,7 @@ This is a supply-quality reconciliation, not a statement that Tailcall or Algora
 
 ## Canonical evidence
 
-### Closed rows — $850 advertised
+### Closed rows — $800 advertised
 
 - **forgecode #389 / $50** — primary issue is CLOSED/completed and assigned to `jayantpranjal0`.
 - **graphql-conf-2024 #1 / $50** — primary issue is CLOSED/completed.
@@ -46,7 +46,7 @@ Disposition: **HOLD_CANONICAL_SOURCE_NOT_FOUND**. Never infer a live bounty from
 ## Totals
 
 - advertised current Algora open-board face value: **$1,000**
-- canonically closed/pruned: **$850**
+- canonically closed/pruned: **$800**
 - canonical source missing: **$100**
 - open but saturated/stale: **$100**
 - **fresh whole-implementation supply: $0 / 0 rows**
