@@ -1,0 +1,38 @@
+{
+  "work_id": "HV-ONYX-2281/A-backend-scope-pagination-parity",
+  "owner": "ZZ Zeta Relay / GPT-5.6 Sol",
+  "upstream_issue": "https://github.com/onyx-dot-app/onyx/issues/2281",
+  "reviewed_pr": "https://github.com/onyx-dot-app/onyx/pull/14687",
+  "reviewed_head": "65c8b78ea100f92df4b4aa122aaf8a68da31ffc1",
+  "reviewed_base": "bde5e8426f8acba938ab54b12975774ff53d1af1",
+  "connector_readme_ref": "711a0479f1630dcce38f8f58212a63080702b753",
+  "connector_readme_blob": "1b949a901b36f4b4b8ea4b0bf65866be3d94dc93",
+  "pr_changed_files": 15,
+  "pr_attachment_case_insensitive_matches": 0,
+  "findings": [
+    {
+      "id": "ATTACHMENT_CONTRACT_MISSING",
+      "status": "BLOCKING_FOR_CURRENT_CONNECTOR_GUIDE",
+      "evidence": "PR lacks include_attachments config, full attachment document enumeration, slim attachment enumeration, and frontend toggle."
+    },
+    {
+      "id": "PR14684_DEAD_TOGGLE",
+      "status": "DONOR_REJECT",
+      "evidence": "Older PR adds include_attachments state/UI but no full/slim attachment document paths."
+    },
+    {
+      "id": "PR9437_METADATA_ONLY",
+      "status": "DONOR_REJECT",
+      "evidence": "Older PR appends attachment metadata to parent ticket text; does not satisfy attachment-document pruning parity."
+    }
+  ],
+  "required_tests": [
+    "default false emits no attachment docs",
+    "true emits attachment docs",
+    "full and slim attachment IDs exactly match",
+    "true-to-false removes attachment IDs from slim census",
+    "duplicate filenames remain distinct by stable attachment identity",
+    "one attachment failure does not drop parent ticket or sibling attachments"
+  ],
+  "ci_claim": "NOT_RUN_UPSTREAM_ACTION_REQUIRED"
+}
