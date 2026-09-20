@@ -59,6 +59,19 @@ _REWARDED_LABEL_RE = re.compile(r"\brewarded\b", re.IGNORECASE)
 _BOUNTY_WORD_RE = re.compile(r"\b(?:bounty|reward)\b", re.IGNORECASE)
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
 
+_POLICY_LABEL_EXACT = {
+    "core team only": "CORE_TEAM_ONLY",
+    "maintainer only": "CORE_TEAM_ONLY",
+    "maintainers only": "CORE_TEAM_ONLY",
+    "internal only": "CORE_TEAM_ONLY",
+    "hold": "CONTRIBUTION_HOLD",
+    "on hold": "CONTRIBUTION_HOLD",
+    "status hold": "CONTRIBUTION_HOLD",
+    "status on hold": "CONTRIBUTION_HOLD",
+    "blocked": "BLOCKED",
+    "status blocked": "BLOCKED",
+}
+
 _PRIVATE_CONTEXT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("system_prompt", re.compile(r"\bsystem\s+prompt\b", re.IGNORECASE)),
     ("developer_prompt", re.compile(r"\bdeveloper\s+prompt\b", re.IGNORECASE)),
@@ -112,6 +125,24 @@ def _advertised_rewards(text: str) -> set[Decimal]:
 
 def _has_bounty_label(labels: list[str]) -> bool:
     return any(label.strip().casefold() == "bounty" for label in labels)
+
+
+def _policy_label_categories(labels: list[str]) -> list[str]:
+    """Reduce explicit canonical work-policy labels to dispatch-block categories."""
+    categories: set[str] = set()
+    for label in labels:
+        normalized = " ".join(re.findall(r"[a-z0-9]+", label.casefold()))
+        category = _POLICY_LABEL_EXACT.get(normalized)
+        if category is not None:
+            categories.add(category)
+            continue
+        if normalized.startswith("core team only "):
+            categories.add("CORE_TEAM_ONLY")
+        elif normalized.startswith(("hold ", "on hold ", "status hold ", "status on hold ")):
+            categories.add("CONTRIBUTION_HOLD")
+        elif normalized.startswith(("blocked ", "status blocked ")):
+            categories.add("BLOCKED")
+    return sorted(categories)
 
 
 def _title_rtc_rewards(title: str, labels: list[str]) -> set[Decimal]:
@@ -314,6 +345,7 @@ def qualify_dispatch(
         }
     )
     already_rewarded = any(_REWARDED_LABEL_RE.search(label) for label in labels)
+    policy_label_categories = _policy_label_categories(labels)
 
     attempt_count = _nonnegative_int(snapshot.get("attempt_count"), "attempt_count")
     open_pr_count = _nonnegative_int(
@@ -353,6 +385,15 @@ def qualify_dispatch(
             "ISSUE_NOT_OPEN",
             "REJECT",
             "Canonical repository state says the issue is not open.",
+        )
+    if policy_label_categories:
+        add(
+            "CANONICAL_POLICY_BLOCKS_COMMUNITY_WORK",
+            "HOLD",
+            (
+                "Canonical issue labels explicitly reserve, pause, or block implementation; "
+                "require maintainer clearance before dispatch."
+            ),
         )
 
     if not audit_complete:
@@ -455,6 +496,7 @@ def qualify_dispatch(
             "live_label_reward_rtc": _amount_strings(label_rtc_rewards),
             "rtc_reward_source": rtc_reward_source,
             "already_rewarded": already_rewarded,
+            "canonical_policy_block_categories": policy_label_categories,
             "attempt_count": attempt_count,
             "open_pr_count": open_pr_count,
             "private_context_signal_types": private_signal_types,
