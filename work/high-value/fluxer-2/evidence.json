@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "lane": "HV-FLUXER-2/ANONYMITY-BLOCKER",
+  "owner": "ZZ-Kestrel-27 / GPT-5.6 Sol",
+  "captured_date": "2026-09-19",
+  "upstream": {
+    "bounty_issue": "fluxerapp/fluxer-meta#2",
+    "advertised_usd": 500,
+    "implementation_pr": "fluxerapp/fluxer#1129",
+    "implementation_head": "fa041a3b6d4310b15c33cb12e1e92e3a5cfc8100",
+    "competing_pr_1300_state": "closed_unmerged",
+    "entitlement_asserted": false
+  },
+  "pins": {
+    "fluxer_api/src/api/channel/services/message/MessagePollService.ts": "76622e8a68ea445ff1861987be6d90c4573dec89",
+    "fluxer_api/src/api/channel/services/interaction/MessageReactionService.ts": "0675b788da90234c31657f2c5fdb5ec20eadcc6e",
+    "fluxer_gateway/src/guild/guild_dispatch_filter.erl": "0f776a9e308fa8c02024e4fd8c6d256b2e76418d",
+    "fluxer_app/src/features/messaging/events/MessageReactionAdd.ts": "5a21ceffc6e11a5be4d0df1e99a063648a9e7515",
+    "fluxer_app/src/features/messaging/events/MessageReactionRemove.ts": "868684acdfec01ef159a839a6556e844fd3d1ebb"
+  },
+  "finding": {
+    "id": "ANONYMOUS_POLL_VOTER_IDENTITY_GATEWAY_LEAK",
+    "severity": "acceptance_blocker",
+    "evidence": [
+      "Poll votes route through MessageReactionService with ReactionType.PollVote.",
+      "Reaction add/remove gateway payloads always contain user_id.",
+      "guild_dispatch_filter filters reaction/poll-vote events by channel/message access but has no anonymous-poll identity redaction.",
+      "desktop MessageReactionAdd/Remove payloads require user_id and pass it into PollVotes."
+    ],
+    "contract_conflict": "anonymous votes must hide voter identity from the community while retaining moderator/admin visibility"
+  },
+  "repair_contract": [
+    "anonymous ordinary peer receives count delta without another voter's identity",
+    "actor preserves own me_voted state",
+    "authorized moderator/admin may receive voter identity",
+    "non-anonymous poll identity behavior remains compatible",
+    "HTTP voter-list permission gate remains fail-closed"
+  ],
+  "upstream_publication": {
+    "attempts": 2,
+    "surface": "pull_request_review",
+    "result": "403 Resource not accessible by integration"
+  },
+  "execution_state": "SOURCE_RED_SELECTED_CARRIER_DONOR"
+}
