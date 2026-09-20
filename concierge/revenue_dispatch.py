@@ -33,6 +33,10 @@ from concierge.bounty_availability import (
     BountyAvailabilityError,
     inspect_bounty_availability,
 )
+from concierge.bounty_live_cash_admission import (
+    LiveCashAdmissionError,
+    evaluate_live_cash_admission,
+)
 from concierge.paid_work_effort_value_gate import verify_receipt as verify_paid_work_receipt
 from concierge.revenue_intake import (
     RevenueIntakeInputError,
@@ -52,6 +56,14 @@ _EXPECTED_GATE_AUTHORITY = {
     "payment_cash_or_revenue_authority": False,
     "fx_conversion": False,
     "noncash_valuation": False,
+}
+_EXPECTED_LIVE_CASH_AUTHORITY = {
+    "advisory_only": True,
+    "claim_authority": False,
+    "implementation_authority": False,
+    "submission_authority": False,
+    "outbound_contact_authority": False,
+    "payment_or_wallet_authority": False,
 }
 
 
@@ -379,6 +391,195 @@ def _apply_paid_work_gate(
     return promoted
 
 
+def _live_cash_receipt_sha256(receipt: dict[str, Any]) -> str:
+    body = dict(receipt)
+    body.pop("receipt_sha256", None)
+    try:
+        payload = json.dumps(
+            body,
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise RevenueDispatchError("live cash receipt is not canonical JSON") from exc
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _live_cash_status(
+    *,
+    status: str,
+    disposition: Optional[str] = None,
+    route: Optional[str] = None,
+    fixed_amount: Optional[str] = None,
+    receipt_sha256: Optional[str] = None,
+) -> dict[str, Any]:
+    return {
+        "status": status,
+        "disposition": disposition,
+        "route": route,
+        "fixed_amount_usd": fixed_amount,
+        "receipt_sha256": receipt_sha256,
+    }
+
+
+def _apply_live_cash_gate(
+    result: dict[str, Any],
+    receipt: dict[str, Any],
+    *,
+    repo: str,
+    number: int,
+) -> dict[str, Any]:
+    if not isinstance(result, dict) or result.get("dispatch") is not True:
+        raise RevenueDispatchError(
+            "live cash gate may only evaluate an economic dispatch candidate"
+        )
+    if not isinstance(receipt, dict):
+        raise RevenueDispatchError("live cash admission did not return an object")
+    if receipt.get("schema") != "bounty-live-cash-admission-receipt/v1":
+        raise RevenueDispatchError("live cash admission schema is unsupported")
+
+    digest = receipt.get("receipt_sha256")
+    if not isinstance(digest, str) or _SHA256_RE.fullmatch(digest) is None:
+        raise RevenueDispatchError("live cash admission receipt sha256 is malformed")
+    if _live_cash_receipt_sha256(receipt) != digest:
+        raise RevenueDispatchError("live cash admission receipt sha256 mismatch")
+
+    identity = receipt.get("identity")
+    source = receipt.get("source")
+    economics = receipt.get("economics")
+    authority = receipt.get("authority")
+    disposition = receipt.get("disposition")
+    route = receipt.get("route")
+    reason_codes = receipt.get("reason_codes")
+    if (
+        not isinstance(identity, dict)
+        or not isinstance(source, dict)
+        or not isinstance(economics, dict)
+        or not isinstance(authority, dict)
+        or not isinstance(disposition, str)
+        or (route is not None and not isinstance(route, str))
+        or not isinstance(reason_codes, list)
+        or not all(isinstance(code, str) and code for code in reason_codes)
+    ):
+        raise RevenueDispatchError("live cash admission receipt is malformed")
+    if (
+        identity.get("repo") != repo
+        or identity.get("issue_number") != number
+        or identity.get("canonical_issue_url")
+        != f"https://github.com/{repo}/issues/{number}"
+    ):
+        raise RevenueDispatchError("live cash admission target binding mismatch")
+    if source.get("kind") != "LIVE_GITHUB_PREFLIGHT":
+        raise RevenueDispatchError("live cash admission source kind is unsupported")
+    if authority != _EXPECTED_LIVE_CASH_AUTHORITY:
+        raise RevenueDispatchError("live cash admission authority ceiling is invalid")
+    if (
+        economics.get("active_floor") != "50"
+        or economics.get("pile_floor") != "10"
+    ):
+        raise RevenueDispatchError("live cash floor generation is unsupported")
+
+    fixed_amount = economics.get("fixed_amount")
+    if fixed_amount is not None and not isinstance(fixed_amount, str):
+        raise RevenueDispatchError("live cash fixed amount is malformed")
+
+    if disposition == "ACTIVE_REVIEW":
+        if (
+            route != "main_bounty_queue"
+            or economics.get("currency") != "USD"
+            or fixed_amount is None
+            or economics.get("fixed_semantics") is not True
+        ):
+            raise RevenueDispatchError("active live cash admission contract is malformed")
+        promoted = dict(result)
+        promoted["live_cash_admission"] = _live_cash_status(
+            status="VERIFIED_ACTIVE",
+            disposition=disposition,
+            route=route,
+            fixed_amount=fixed_amount,
+            receipt_sha256=digest,
+        )
+        promoted["dispatch"] = True
+        dispatch_authority = dict(promoted.get("dispatch_authority") or {})
+        dispatch_authority.update(
+            {
+                "live_cash": "verified_source_bound_50_10_admission",
+                "new_work_dispatch": True,
+                "internal_implementation_only": True,
+                "external_claim_authority": False,
+                "external_submission_authority": False,
+                "payment_cash_or_revenue_authority": False,
+            }
+        )
+        promoted["dispatch_authority"] = dispatch_authority
+        return promoted
+
+    held = dict(result)
+    existing_codes = held.get("reason_codes")
+    if not isinstance(existing_codes, list) or not all(
+        isinstance(code, str) for code in existing_codes
+    ):
+        raise RevenueDispatchError("intake reason_codes must be a list of strings")
+    codes = list(existing_codes)
+    live_code = f"LIVE_CASH:{disposition}"
+    if live_code not in codes:
+        codes.append(live_code)
+    for code in reason_codes:
+        source_code = f"LIVE_CASH_SOURCE:{code}"
+        if source_code not in codes:
+            codes.append(source_code)
+
+    existing_reasons = held.get("reasons")
+    if not isinstance(existing_reasons, list):
+        raise RevenueDispatchError("intake reasons must be a list")
+    reasons = list(existing_reasons)
+    reasons.append(
+        {
+            "gate": "live_cash_admission",
+            "code": disposition,
+            "severity": "HOLD",
+            "message": (
+                "Live source-bound cash admission did not clear the owner's "
+                "$50 active-work floor."
+            ),
+        }
+    )
+    held["reason_codes"] = codes
+    held["reasons"] = reasons
+    held["dispatch"] = False
+    if held.get("disposition") != "REJECT":
+        held["disposition"] = (
+            "REJECT"
+            if disposition in {
+                "REJECT_CANONICAL_PREFLIGHT",
+                "PRUNE_BELOW_DOLLAR_FLOOR",
+            }
+            else "HOLD"
+        )
+    held["live_cash_admission"] = _live_cash_status(
+        status="BLOCKED",
+        disposition=disposition,
+        route=route,
+        fixed_amount=fixed_amount,
+        receipt_sha256=digest,
+    )
+    dispatch_authority = dict(held.get("dispatch_authority") or {})
+    dispatch_authority.update(
+        {
+            "live_cash": "source_bound_50_10_admission_blocked",
+            "new_work_dispatch": False,
+            "internal_implementation_only": False,
+            "external_claim_authority": False,
+            "external_submission_authority": False,
+            "payment_cash_or_revenue_authority": False,
+        }
+    )
+    held["dispatch_authority"] = dispatch_authority
+    return held
+
+
 def _availability_hold(
     intake: dict[str, Any],
     availability: dict[str, Any],
@@ -397,6 +598,7 @@ def _availability_hold(
             "intake": "canonical_live_intake",
             "availability": "stable_maintainer_outcome_guard",
             "economics": "required_before_implementation",
+            "live_cash": "required_after_economics",
             "new_work_dispatch": False,
             "internal_implementation_only": False,
             "external_claim_authority": False,
@@ -445,6 +647,7 @@ def _availability_hold(
         "intake": "canonical_live_intake",
         "availability": "stable_maintainer_outcome_guard",
         "economics": "not_reached",
+        "live_cash": "not_reached",
         "new_work_dispatch": False,
         "internal_implementation_only": False,
         "external_claim_authority": False,
@@ -514,10 +717,12 @@ def qualify_available_live_revenue_intake(
             "binding_sha256": None,
             "verified": False,
         }
+        result["live_cash_admission"] = _live_cash_status(status="NOT_CHECKED")
         result["dispatch_authority"] = {
             "intake": "canonical_live_intake",
             "availability": "not_needed",
             "economics": "not_needed",
+            "live_cash": "not_needed",
             "new_work_dispatch": False,
             "internal_implementation_only": False,
             "external_claim_authority": False,
@@ -544,8 +749,10 @@ def qualify_available_live_revenue_intake(
             "binding_sha256": None,
             "verified": False,
         }
+        result["live_cash_admission"] = _live_cash_status(status="NOT_CHECKED")
         return result
-    return _apply_paid_work_gate(
+
+    economic_result = _apply_paid_work_gate(
         result,
         gate_receipt_bytes,
         work_id=work_id,
@@ -553,6 +760,32 @@ def qualify_available_live_revenue_intake(
         expected_policy_sha256=expected_policy_sha256,
         dispatch_as_of=dispatch_as_of,
         gate_max_age_seconds=gate_max_age_seconds,
+    )
+    if not economic_result["dispatch"]:
+        economic_result["live_cash_admission"] = _live_cash_status(status="NOT_CHECKED")
+        dispatch_authority = dict(economic_result.get("dispatch_authority") or {})
+        dispatch_authority["live_cash"] = "not_reached"
+        economic_result["dispatch_authority"] = dispatch_authority
+        return economic_result
+
+    try:
+        live_cash = evaluate_live_cash_admission(
+            repo,
+            number,
+            token,
+            session=session,
+            max_pages=max_pages,
+            saturation_threshold=saturation_threshold,
+        )
+    except (LiveCashAdmissionError, ValueError, TypeError) as exc:
+        raise RevenueDispatchError(
+            f"live source-bound cash admission failed: {exc}"
+        ) from exc
+    return _apply_live_cash_gate(
+        economic_result,
+        live_cash,
+        repo=repo,
+        number=number,
     )
 
 
@@ -570,12 +803,17 @@ def format_summary(result: dict[str, Any]) -> str:
     binding_sha = (
         economics.get("binding_sha256") if isinstance(economics, dict) else None
     )
+    live_cash = result.get("live_cash_admission")
+    live_cash_disposition = (
+        live_cash.get("disposition") if isinstance(live_cash, dict) else None
+    )
     return (
         f"disposition={result['disposition']} "
         f"dispatch={str(result['dispatch']).lower()} "
         f"source={result.get('canonical_source_url') or 'none'} "
         f"availability_reason={availability_reason or 'none'} "
         f"economic_decision={economic_decision or 'none'} "
+        f"live_cash_disposition={live_cash_disposition or 'none'} "
         f"binding_sha256={binding_sha or 'none'}"
     )
 
