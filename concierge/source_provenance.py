@@ -72,6 +72,12 @@ def _positive_issue_number(value: Any) -> int:
     return value
 
 
+def _nonnegative_integer(value: Any, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ProvenanceInputError(f"{name} must be a non-negative integer")
+    return value
+
+
 def _boolean(value: Any, name: str) -> bool:
     if type(value) is not bool:
         raise ProvenanceInputError(f"{name} must be boolean")
@@ -156,6 +162,7 @@ def verify_source_provenance(snapshot: dict[str, Any]) -> dict[str, Any]:
                 "canonical_source_verified": False,
                 "canonical_repo": None,
                 "issue_number": None,
+                "open_pr_count": None,
                 "canonical_reward_evidence_count": 0,
                 "ignored_reward_evidence_count": 0,
                 "stale_listing_signal": False,
@@ -171,6 +178,7 @@ def verify_source_provenance(snapshot: dict[str, Any]) -> dict[str, Any]:
         "number",
         "issue_url",
         "issue_state",
+        "open_pr_count",
         "stale_listing_signal",
         "search_truncated",
     }
@@ -191,6 +199,7 @@ def verify_source_provenance(snapshot: dict[str, Any]) -> dict[str, Any]:
                 "canonical_source_verified": False,
                 "canonical_repo": None,
                 "issue_number": None,
+                "open_pr_count": None,
                 "canonical_reward_evidence_count": 0,
                 "ignored_reward_evidence_count": 0,
                 "stale_listing_signal": False,
@@ -203,6 +212,10 @@ def verify_source_provenance(snapshot: dict[str, Any]) -> dict[str, Any]:
     number = _positive_issue_number(audit.get("number"))
 
     state = _exact_string(audit.get("issue_state"), "canonical_audit.issue_state")
+    open_pr_count = _nonnegative_integer(
+        audit.get("open_pr_count"),
+        "canonical_audit.open_pr_count",
+    )
     stale = _boolean(
         audit.get("stale_listing_signal"),
         "canonical_audit.stale_listing_signal",
@@ -242,6 +255,12 @@ def verify_source_provenance(snapshot: dict[str, Any]) -> dict[str, Any]:
             "HOLD",
             "Canonical GitHub audit was truncated and cannot authorize dispatch.",
         )
+    if open_pr_count > 0:
+        add(
+            "OPEN_IMPLEMENTATION_CARRIERS_PRESENT",
+            "HOLD",
+            "Canonical GitHub audit reports open implementation PRs; collision review is required before dispatch.",
+        )
     if canonical_evidence_count == 0:
         add(
             "CANONICAL_REWARD_EVIDENCE_MISSING",
@@ -267,6 +286,7 @@ def verify_source_provenance(snapshot: dict[str, Any]) -> dict[str, Any]:
             "canonical_source_verified": True,
             "canonical_repo": repo,
             "issue_number": number,
+            "open_pr_count": open_pr_count,
             "canonical_reward_evidence_count": canonical_evidence_count,
             "ignored_reward_evidence_count": ignored_evidence_count,
             "stale_listing_signal": stale,

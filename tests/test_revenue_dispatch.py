@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch, sentinel
 
+from concierge.bounty_live_cash_admission import LiveCashAdmissionError
 from concierge.paid_work_effort_value_gate import compile_paid_work_effort_value_gate
 from concierge.revenue_dispatch import (
     RevenueDispatchError,
@@ -46,6 +47,46 @@ def availability(*, dispatch=True, reason=None):
             "raw_comment_text_retained": False,
             "user_identity_retained": False,
         },
+    }
+
+
+def live_cash(
+    *,
+    disposition="ACTIVE_REVIEW",
+    route="main_bounty_queue",
+    amount="75",
+    currency="USD",
+):
+    return {
+        "schema": "bounty-live-cash-admission-receipt/v1",
+        "identity": {
+            "repo": "acme/widgets",
+            "issue_number": 17,
+            "canonical_issue_url": "https://github.com/acme/widgets/issues/17",
+        },
+        "source": {
+            "kind": "LIVE_GITHUB_PREFLIGHT",
+            "preflight": {"dispatch": disposition == "ACTIVE_REVIEW"},
+        },
+        "economics": {
+            "currency": currency,
+            "fixed_amount": amount,
+            "fixed_semantics": amount is not None,
+            "active_floor": "50",
+            "pile_floor": "10",
+        },
+        "disposition": disposition,
+        "route": route,
+        "reason_codes": [],
+        "authority": {
+            "advisory_only": True,
+            "claim_authority": False,
+            "implementation_authority": False,
+            "submission_authority": False,
+            "outbound_contact_authority": False,
+            "payment_or_wallet_authority": False,
+        },
+        "receipt_sha256": "d" * 64,
     }
 
 
@@ -159,6 +200,7 @@ class RevenueDispatchTests(unittest.TestCase):
         expected_policy_sha=POLICY_SHA,
         dispatch_as_of="2026-09-16T20:30:00Z",
         verify=True,
+        cash=None,
     ):
         if gate_bytes is None and gate is not None:
             gate_bytes = raw(gate)
@@ -170,6 +212,9 @@ class RevenueDispatchTests(unittest.TestCase):
         ), patch(
             "concierge.revenue_dispatch.inspect_bounty_availability",
             return_value=avail or availability(),
+        ), patch(
+            "concierge.revenue_dispatch.evaluate_live_cash_admission",
+            return_value=cash or live_cash(),
         ), patch(
             "concierge.revenue_dispatch.verify_paid_work_receipt",
             return_value=verify,
@@ -206,6 +251,9 @@ class RevenueDispatchTests(unittest.TestCase):
         ), patch(
             "concierge.revenue_dispatch.inspect_bounty_availability",
             return_value=availability(),
+        ), patch(
+            "concierge.revenue_dispatch.evaluate_live_cash_admission",
+            return_value=live_cash(),
         ):
             result = qualify_available_live_revenue_intake(
                 "acme/widgets",
@@ -246,6 +294,100 @@ class RevenueDispatchTests(unittest.TestCase):
                 self.assertEqual(result["disposition"], "HOLD")
                 self.assertIn(f"ECONOMICS:{decision}", result["reason_codes"])
                 self.assertRegex(result["economic_admission"]["binding_sha256"], r"^[0-9a-f]{64}$")
+
+
+    def test_live_cash_active_floor_composes_before_economics(self):
+        gate = receipt()
+        result = self.run_dispatch(gate=gate, work_id="work-17", cash=live_cash(amount="75"))
+        self.assertTrue(result["dispatch"])
+        self.assertEqual(result["live_cash_admission"]["status"], "VERIFIED")
+        self.assertEqual(result["live_cash_admission"]["fixed_amount"], "75")
+        self.assertEqual(
+            result["dispatch_authority"]["live_cash"],
+            "source_bound_owner_50_floor",
+        )
+
+    def test_live_cash_nonactive_routes_stop_before_economics(self):
+        cases = (
+            live_cash(disposition="PILE_SAVE_UP", route="bounty_pile_10_49", amount="25"),
+            live_cash(disposition="PRUNE_BELOW_DOLLAR_FLOOR", route=None, amount="5"),
+            live_cash(
+                disposition="HOLD_NON_FIXED_USD_REWARD",
+                route=None,
+                amount=None,
+                currency=None,
+            ),
+            live_cash(
+                disposition="HOLD_MIXED_REWARD_CURRENCY",
+                route=None,
+                amount="75",
+                currency="USD",
+            ),
+            live_cash(
+                disposition="HOLD_NO_FIXED_USD_REWARD",
+                route=None,
+                amount=None,
+                currency=None,
+            ),
+        )
+        for cash in cases:
+            with self.subTest(disposition=cash["disposition"]):
+                result = self.run_dispatch(
+                    gate=receipt(),
+                    work_id="work-17",
+                    cash=cash,
+                )
+                self.assertFalse(result["dispatch"])
+                self.assertEqual(result["economic_admission"]["status"], "NOT_CHECKED")
+                self.assertIn(
+                    f"LIVE_CASH:{cash['disposition']}",
+                    result["reason_codes"],
+                )
+                self.assertFalse(result["dispatch_authority"]["new_work_dispatch"])
+
+    def test_live_cash_under_floor_active_is_contract_error(self):
+        with self.assertRaisesRegex(RevenueDispatchError, "below the active floor"):
+            self.run_dispatch(
+                gate=receipt(),
+                work_id="work-17",
+                cash=live_cash(amount="49.99"),
+            )
+
+    def test_live_cash_route_or_authority_drift_is_contract_error(self):
+        bad_route = live_cash(route="bounty_pile_10_49")
+        with self.assertRaisesRegex(RevenueDispatchError, "active live cash admission"):
+            self.run_dispatch(gate=receipt(), work_id="work-17", cash=bad_route)
+
+        bad_authority = live_cash()
+        bad_authority["authority"]["future_dispatch_authority"] = True
+        with self.assertRaisesRegex(RevenueDispatchError, "receipt is malformed"):
+            self.run_dispatch(
+                gate=receipt(),
+                work_id="work-17",
+                cash=bad_authority,
+            )
+
+    def test_live_cash_provider_failure_fails_closed_before_economics(self):
+        with patch(
+            "concierge.revenue_dispatch.qualify_live_revenue_intake",
+            return_value=intake(),
+        ), patch(
+            "concierge.revenue_dispatch.inspect_bounty_availability",
+            return_value=availability(),
+        ), patch(
+            "concierge.revenue_dispatch.evaluate_live_cash_admission",
+            side_effect=LiveCashAdmissionError("provider unavailable"),
+        ), patch(
+            "concierge.revenue_dispatch.verify_paid_work_receipt"
+        ) as verify_mock:
+            with self.assertRaisesRegex(RevenueDispatchError, "evaluation failed"):
+                qualify_available_live_revenue_intake(
+                    "acme/widgets",
+                    17,
+                    gate_receipt_bytes=raw(receipt()),
+                    work_id="work-17",
+                )
+        verify_mock.assert_not_called()
 
     def test_exact_byte_digest_mismatch_fails(self):
         with self.assertRaisesRegex(RevenueDispatchError, "exact-byte"):
