@@ -1,0 +1,50 @@
+{
+  "schema": "high-value-host-oracle-evidence.v1",
+  "lane": "HVQ-TT-METAL-20260920-49307/COMMAND-R-HOST-CONTRACT+BOUNDARY-FIXTURES",
+  "seat": "ZZ-Sol-Verdigris-4729 / GPT-5.6 Sol",
+  "economics": {
+    "repository": "tenstorrent/tt-metal",
+    "issue": 49307,
+    "issue_state_observed": "open",
+    "advertised_usd": 2500,
+    "assignee_observed": "morhimanshu",
+    "implementation_ownership": "preserved_for_assignee"
+  },
+  "source_pins": {
+    "tt_metal_main": "708e7f58aef9d089f0e5097d4a772c7c8ee129ea",
+    "tt_metal_blobs": {
+      "models/tt_transformers/tt/attention.py": "3689e9c963b4b1e7da5ec5b744f1054fe8af6627",
+      "models/tt_transformers/tt/mlp.py": "4995526341807ff9147fe469b51328457c5b2ed4",
+      "models/tt_transformers/tt/rope.py": "da27cf0227603bc3ea5cc8ed04625e22b0fafe02",
+      "models/tt_transformers/tt/lm_head.py": "2e3faf89e7cbecce7ac046b711f198bf34f8cf30"
+    },
+    "transformers_main": "c587bc884db2c2e31fc2b8102314656b17aa07b1",
+    "transformers_cohere_blob": "c2850690f0b91e7f515ad5dd057f90d1f226713f",
+    "carrier_base": "72e56cdc8a4a3d574eab97c656472e992dbb1e98"
+  },
+  "findings": {
+    "qk_norm_requires_mean_centered_layernorm": true,
+    "current_tt_qk_hook_is_rmsnorm_family": true,
+    "cohere_pairwise_rope_requires_explicit_validation": true,
+    "gqa_64q_8kv_reuse_candidate": true,
+    "shared_tt_mlp_matches_swiglu_structure": true,
+    "post_lm_head_logit_scale_requires_explicit_location_proof": true
+  },
+  "local_validation": {
+    "python": "3.13.5",
+    "command": "python -m unittest -v tests/test_tt_metal_49307_command_r_oracle.py",
+    "tests_run": 10,
+    "status": "PASS"
+  },
+  "authority": {
+    "upstream_source_mutation": false,
+    "competing_implementation_pr": false,
+    "issue_assignment_mutation": false,
+    "sponsor_contact": false,
+    "payment_mutation": false,
+    "hardware_claim": false,
+    "pcc_claim": false,
+    "performance_claim": false,
+    "provider_acceptance_claim": false
+  }
+}
