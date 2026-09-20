@@ -1,0 +1,69 @@
+{
+  "lane": "HVQ-TT-METAL-20260920-52037/oracle+boundary-vectors+regression",
+  "captured_utc_date": "2026-09-20",
+  "upstream": {
+    "repository": "tenstorrent/tt-metal",
+    "issue": 52037,
+    "issue_title": "[Bounty $1500] logaddexp / logaddexp2: overflow-safe reformulation",
+    "issue_state": "open",
+    "issue_assignees": [
+      "EazyHood"
+    ],
+    "bounty_labels": [
+      "bounty",
+      "bounty_difficulty/medium"
+    ],
+    "advertised_usd": 1500,
+    "main": "708e7f58aef9d089f0e5097d4a772c7c8ee129ea",
+    "source_blobs": {
+      "ttnn/cpp/ttnn/operations/eltwise/binary_ng/device/binary_ng_utils.cpp": "c373108e47be43abacbb2edd458f15f475850b8c",
+      "ttnn/cpp/ttnn/operations/eltwise/binary/common/binary_op_utils.cpp": "9a9ca5eae81a730a2561dbac92489ceb0fd18c50"
+    },
+    "composition_sites": {
+      "binary_ng": [
+        "LOGADDEXP lines 251-255",
+        "LOGADDEXP2 lines 258-262"
+      ],
+      "common_fpu": [
+        "LOGADDEXP begins line 130",
+        "LOGADDEXP2 begins line 170"
+      ],
+      "common_sfpu": [
+        "LOGADDEXP begins line 401",
+        "LOGADDEXP2 begins line 410"
+      ]
+    }
+  },
+  "artifact": {
+    "oracle": "work/high-value/tt-metal-52037/logaddexp_oracle.py",
+    "acceptance": "work/high-value/tt-metal-52037/ACCEPTANCE.md",
+    "test": "tests/test_tt_metal_52037_logaddexp_oracle.py",
+    "model": "binary32 intermediates with explicit optional FTZ; stable host double reference rounded to binary32",
+    "hardware_or_device_simulator": false
+  },
+  "required_host_checks": [
+    "python work/high-value/tt-metal-52037/logaddexp_oracle.py",
+    "python -m pytest -q tests/test_tt_metal_52037_logaddexp_oracle.py",
+    "python -O -m pytest -q tests/test_tt_metal_52037_logaddexp_oracle.py",
+    "python -m py_compile work/high-value/tt-metal-52037/logaddexp_oracle.py tests/test_tt_metal_52037_logaddexp_oracle.py"
+  ],
+  "hosted_validation": {
+    "workflow": "Unit Tests",
+    "python_versions": [
+      "3.9",
+      "3.13"
+    ],
+    "state": "PENDING_EXACT_HEAD_CI_AT_PUBLICATION",
+    "success_claimed_in_this_file": false
+  },
+  "authority": {
+    "implementation_owner_preserved": "EazyHood",
+    "upstream_issue_or_pr_mutated": false,
+    "competing_upstream_pr_opened": false,
+    "issue_assignment_mutated": false,
+    "bounty_entitlement_claimed": false,
+    "payment_action": false,
+    "hardware_claim": false,
+    "performance_claim": false
+  }
+}
