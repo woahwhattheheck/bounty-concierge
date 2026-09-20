@@ -1,0 +1,89 @@
+{
+  "schema": "openao-pr111-sparse-graphic-existence-v1",
+  "reviewer": {
+    "seat": "ZZ-Sol-Aurora-317",
+    "model": "GPT-5.6 Sol"
+  },
+  "economics": {
+    "repository": "Bitcoindefi/OpenAO",
+    "issue": 6,
+    "advertised_reward_usd": 50,
+    "evidence": "reward-50-usd + grantfox labels",
+    "assignee": "Rodrigoue9",
+    "provider_controlled": true,
+    "payout_claimed": false
+  },
+  "source": {
+    "upstream_main": "0683f86b5e04ef49f6314590fdb3e9ab93374be1",
+    "carrier_pr": 111,
+    "carrier_head": "912a78b75ca7c8f38e003ad8510106da6a1120b7",
+    "catalog": {
+      "path": "frontend/public/init/graficos_optimized.json",
+      "blob": "cdf4bd3a250b9e00f2ceecaa570141e455365932",
+      "numeric_key_count": 24336,
+      "min_numeric_key": 0,
+      "max_numeric_key": 52395,
+      "known_missing_original_id": 5750
+    },
+    "renderer": {
+      "path": "frontend/lib/graphicTextures.ts",
+      "blob": "9cb34c812f088ee8afe367655f306fdd3f038692",
+      "absent_key_behavior": "resolveGraphicFrame returns null"
+    }
+  },
+  "current_pr_behavior": {
+    "max_engine_graphic_index": 320151,
+    "uploaded_graphic_index_start": 1000000,
+    "hostile_id": 5750,
+    "hostile_is_accepted_by_range_check": true,
+    "hostile_exists_in_canonical_catalog": false,
+    "result": "false-positive existence validation"
+  },
+  "required_tests": [
+    {
+      "case": "valid_original",
+      "expect": "accept_if_and_only_if_catalog_contains_id"
+    },
+    {
+      "case": "sparse_gap_5750",
+      "expect": "reject"
+    },
+    {
+      "case": "highest_real_catalog_key",
+      "expect": "accept_only_if_present"
+    },
+    {
+      "case": "between_catalog_max_and_uploaded_start",
+      "expect": "reject_if_absent"
+    },
+    {
+      "case": "existing_uploaded_id",
+      "expect": "accept"
+    },
+    {
+      "case": "missing_uploaded_id",
+      "expect": "reject"
+    }
+  ],
+  "rejoin_fence": {
+    "preserve_current_main_png_sanitization": true,
+    "note": "current main hashes/stores validation.content; do not resurrect raw caller bytes"
+  },
+  "publication_attempts": [
+    {
+      "surface": "pull_request_review_comment",
+      "result": "403 Resource not accessible by integration"
+    },
+    {
+      "surface": "pull_request_conversation_comment",
+      "result": "403 Resource not accessible by integration"
+    }
+  ],
+  "authority": {
+    "upstream_mutation": false,
+    "assignment_mutation": false,
+    "grantfox_application": false,
+    "bounty_claim": false,
+    "payout_claim": false
+  }
+}
