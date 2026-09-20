@@ -202,6 +202,12 @@ def compile_publication_route(request: dict[str, Any]) -> dict[str, Any]:
         if fork_parent_raw is None
         else _repo(fork_parent_raw, "installed_fork_parent_repo")
     )
+    fork_source_raw = request.get("installed_fork_source_repo")
+    fork_source = (
+        None
+        if fork_source_raw is None
+        else _repo(fork_source_raw, "installed_fork_source_repo")
+    )
     if installed_fork is None and fork_push_access is not None:
         raise PublicationRouteInputError(
             "installed_fork_push_access must be null without installed_fork_repo"
@@ -209,6 +215,10 @@ def compile_publication_route(request: dict[str, Any]) -> dict[str, Any]:
     if installed_fork is None and fork_parent is not None:
         raise PublicationRouteInputError(
             "installed_fork_parent_repo must be null without installed_fork_repo"
+        )
+    if installed_fork is None and fork_source is not None:
+        raise PublicationRouteInputError(
+            "installed_fork_source_repo must be null without installed_fork_repo"
         )
     if installed_fork is not None and fork_push_access is None:
         raise PublicationRouteInputError(
@@ -220,6 +230,16 @@ def compile_publication_route(request: dict[str, Any]) -> dict[str, Any]:
         None
         if installed_fork is None or fork_parent is None
         else fork_parent.casefold() == upstream_repo.casefold()
+    )
+    fork_source_matches_upstream = (
+        None
+        if installed_fork is None or fork_source is None
+        else fork_source.casefold() == upstream_repo.casefold()
+    )
+    fork_identity_matches_upstream = (
+        None
+        if installed_fork is None or (fork_parent is None and fork_source is None)
+        else bool(fork_parent_matches_upstream or fork_source_matches_upstream)
     )
 
     primitives = _primitives(request.get("publication_primitives"))
@@ -318,14 +338,14 @@ def compile_publication_route(request: dict[str, Any]) -> dict[str, Any]:
         installed_fork is not None
         and fork_actor_owned is True
         and fork_push_access is True
-        and fork_parent_matches_upstream is True
+        and fork_identity_matches_upstream is True
         and _MIN_BRANCH_PR <= primitive_set
         and _has_content_write_path(primitive_set)
     ):
         disposition = "OWNED_FORK_PR"
         next_action = "PUBLISH_TO_INSTALLED_FORK_THEN_OPEN_UPSTREAM_PR"
         reasons.append("INSTALLED_FORK_PUSH_OBSERVED")
-        reasons.append("INSTALLED_FORK_PARENT_MATCHES_UPSTREAM")
+        reasons.append("INSTALLED_FORK_IDENTITY_MATCHES_UPSTREAM")
         if integration_access == "resource_not_accessible":
             reasons.append("UPSTREAM_CONNECTOR_ACCESS_UNKNOWN_NOT_PERMISSION_DENIAL")
     else:
@@ -346,10 +366,10 @@ def compile_publication_route(request: dict[str, Any]) -> dict[str, Any]:
         elif fork_push_access is not True:
             reasons.append("INSTALLED_FORK_PUSH_NOT_OBSERVED")
         if installed_fork is not None:
-            if fork_parent is None:
-                reasons.append("INSTALLED_FORK_PARENT_NOT_OBSERVED")
-            elif fork_parent_matches_upstream is not True:
-                reasons.append("INSTALLED_FORK_PARENT_MISMATCH")
+            if fork_parent is None and fork_source is None:
+                reasons.append("INSTALLED_FORK_IDENTITY_NOT_OBSERVED")
+            elif fork_identity_matches_upstream is not True:
+                reasons.append("INSTALLED_FORK_IDENTITY_MISMATCH")
         if not _MIN_BRANCH_PR <= primitive_set or not _has_content_write_path(primitive_set):
             reasons.append("PUBLICATION_PRIMITIVES_INSUFFICIENT")
         reasons = list(dict.fromkeys(reasons))
@@ -375,6 +395,9 @@ def compile_publication_route(request: dict[str, Any]) -> dict[str, Any]:
             "installed_fork_push_access": fork_push_access,
             "installed_fork_parent_repo": fork_parent,
             "installed_fork_parent_matches_upstream": fork_parent_matches_upstream,
+            "installed_fork_source_repo": fork_source,
+            "installed_fork_source_matches_upstream": fork_source_matches_upstream,
+            "installed_fork_identity_matches_upstream": fork_identity_matches_upstream,
             "publication_primitives": primitives,
         },
         "provider_gate": {
