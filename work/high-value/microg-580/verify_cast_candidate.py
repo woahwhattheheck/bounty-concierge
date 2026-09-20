@@ -76,14 +76,35 @@ def check(root: Path) -> tuple[list[str], list[str]]:
     require(r"onPostInitCompleteWithConnectionInfo\s*\(", src["service"],
             "service returns ConnectionInfo", failures)
     service = src["service"]
-    if re.search(r"\.features\s*=\s*request\.(?:apiFeatures|defaultFeatures)\b", service):
+    if re.search(
+        r"(?m)^[ \t]*\w+\.features\s*=\s*request\.(?:apiFeatures|defaultFeatures)\b",
+        service,
+    ):
         failures.append(
             "FEATURE CONTRACT: caller-controlled apiFeatures/defaultFeatures must not be advertised directly"
         )
-    require(r"(?:static\s+final|final\s+static)\s+Feature\[\]\s+[A-Z][A-Z0-9_]*FEATURES\b",
-            service, "service declares implementation-owned Cast FEATURES", failures)
-    require(r"\.features\s*=\s*[A-Z][A-Z0-9_]*FEATURES\b",
-            service, "service advertises implementation-owned Cast FEATURES", failures)
+
+    feature_names = set(
+        re.findall(
+            r"(?m)^[ \t]*(?:(?:public|private|protected)\s+)?"
+            r"(?:static\s+final|final\s+static)\s+Feature\[\]\s+"
+            r"([A-Z][A-Z0-9_]*FEATURES)\b",
+            service,
+        )
+    )
+    if not feature_names:
+        failures.append("MISSING INVARIANT: service declares implementation-owned Cast FEATURES")
+
+    advertised = re.search(
+        r"(?m)^[ \t]*\w+\.features\s*=\s*([A-Z][A-Z0-9_]*FEATURES)\b",
+        service,
+    )
+    if advertised is None:
+        failures.append("MISSING INVARIANT: service advertises implementation-owned Cast FEATURES")
+    elif advertised.group(1) not in feature_names:
+        failures.append(
+            "FEATURE CONTRACT: advertised Cast FEATURES must be one of the implementation-owned declarations"
+        )
 
     require(r"registerMediaRouterCallbackImpl\s*\(", src["context"],
             "CastContext registers MediaRouterCallbackImpl", failures)
