@@ -30,6 +30,82 @@ def _result(disposition="ACTIONABLE", codes=(), attempts=1, prs=1):
     }
 
 
+def _cash(
+    *,
+    repo="acme/widget",
+    issue=42,
+    disposition="ACTIVE_REVIEW",
+    reason_codes=(),
+    attempts=1,
+    prs=1,
+):
+    preflight_disposition = "ACTIONABLE"
+    preflight_dispatch = True
+    if disposition == "HOLD_CANONICAL_PREFLIGHT":
+        preflight_disposition = "HOLD"
+        preflight_dispatch = False
+    elif disposition == "REJECT_CANONICAL_PREFLIGHT":
+        preflight_disposition = "REJECT"
+        preflight_dispatch = False
+    amount = (
+        "75"
+        if disposition == "ACTIVE_REVIEW"
+        else "25"
+        if disposition == "PILE_SAVE_UP"
+        else "5"
+        if disposition == "PRUNE_BELOW_DOLLAR_FLOOR"
+        else None
+    )
+    return {
+        "schema": "bounty-live-cash-admission-receipt/v1",
+        "identity": {
+            "repo": repo,
+            "issue_number": issue,
+            "canonical_issue_url": f"https://github.com/{repo}/issues/{issue}",
+        },
+        "source": {
+            "kind": "LIVE_GITHUB_PREFLIGHT",
+            "issue_generation_sha256": "1" * 64,
+            "preflight_sha256": "2" * 64,
+            "preflight": {
+                "disposition": preflight_disposition,
+                "dispatch": preflight_dispatch,
+                "reason_codes": list(reason_codes),
+                "signals": {
+                    "attempt_count": attempts,
+                    "open_pr_count": prs,
+                },
+                "audit": {"open_pr_count": prs},
+            },
+        },
+        "economics": {
+            "currency": "USD" if amount is not None else None,
+            "fixed_amount": amount,
+            "fixed_semantics": amount is not None,
+            "active_floor": "50",
+            "pile_floor": "10",
+        },
+        "disposition": disposition,
+        "route": (
+            "main_bounty_queue"
+            if disposition == "ACTIVE_REVIEW"
+            else "bounty_pile_10_49"
+            if disposition == "PILE_SAVE_UP"
+            else None
+        ),
+        "reason_codes": list(reason_codes),
+        "authority": {
+            "advisory_only": True,
+            "claim_authority": False,
+            "implementation_authority": False,
+            "submission_authority": False,
+            "outbound_contact_authority": False,
+            "payment_or_wallet_authority": False,
+        },
+        "receipt_sha256": "3" * 64,
+    }
+
+
 def _availability(dispatch=True, reason=None, signals=()):
     return {
         "dispatch": dispatch,
@@ -59,13 +135,16 @@ def _argv(*, repo="acme/widget", json_out=False, dry=False):
     return out + (["--dry-run"] if dry else [])
 
 
-def _override_economic_verifier(monkeypatch, verifier):
+def _override_economic_verifier(monkeypatch, verifier, cash_evaluator=None):
     monkeypatch.setattr(e, "verify_claim_economic_receipt", verifier)
+    if cash_evaluator is None:
+        cash_evaluator = lambda repo, issue: _cash(repo=repo, issue=issue)
     monkeypatch.setattr(
         e,
         "_preflight_claim",
         e._build_preflight_claim(
             verifier,
+            cash_evaluator,
             now=datetime.now,
             utc=timezone.utc,
         ),
@@ -107,8 +186,13 @@ def _allow(monkeypatch, seen=None):
             )
         return {"schema": "claim-economic-admission-proof/v2", "verified": True}
 
+    def cash(repo, issue):
+        if seen is not None:
+            seen.append(("live_cash", repo, issue))
+        return _cash(repo=repo, issue=issue)
+
     monkeypatch.setattr(e, "verify_claim_payoff_bundle", payoff)
-    _override_economic_verifier(monkeypatch, economics)
+    _override_economic_verifier(monkeypatch, economics, cash)
     monkeypatch.setattr(
         e,
         "preflight_bounty",
@@ -149,9 +233,10 @@ def test_live_claim_orders_authorities_strips_option_and_restores_argv(monkeypat
 
     e.main()
 
-    assert [item[0] for item in seen[:4]] == [
+    assert [item[0] for item in seen[:5]] == [
         "payoff",
         "economics",
+        "live_cash",
         "preflight",
         "availability",
     ]
@@ -165,7 +250,7 @@ def test_live_claim_orders_authorities_strips_option_and_restores_argv(monkeypat
         ECONOMIC_RECEIPT,
     )
     assert seen[1][6].endswith("Z")
-    assert seen[4][0] == "cli"
+    assert seen[5][0] == "cli"
     assert e.sys.argv is original
 
 
@@ -183,6 +268,7 @@ def test_live_preflight_uses_process_owned_utc_clock(monkeypatch):
         "_preflight_claim",
         e._build_preflight_claim(
             e.verify_claim_economic_receipt,
+            lambda repo, issue: _cash(repo=repo, issue=issue),
             now=lambda tz: trusted_now.astimezone(tz),
             utc=timezone.utc,
         ),
@@ -260,6 +346,7 @@ def test_short_repo_and_equals_forms_are_normalized(monkeypatch):
     assert [item[0] for item in seen] == [
         "payoff",
         "economics",
+        "live_cash",
         "preflight",
         "availability",
     ]
@@ -382,6 +469,90 @@ def test_preflight_block_is_safe_and_short_circuits(
     assert payload["qualification"]["reason_codes"] == [code]
     assert payload["attempt_count"] == 5
     assert "DO NOT ECHO" not in output
+
+
+@pytest.mark.parametrize(
+    "cash_disposition,reason",
+    [
+        ("PILE_SAVE_UP", "FIXED_USD_REWARD_BELOW_50"),
+        ("PRUNE_BELOW_DOLLAR_FLOOR", "FIXED_USD_REWARD_BELOW_10"),
+        ("HOLD_NON_FIXED_USD_REWARD", "USD_REWARD_NOT_FIXED_GUARANTEED_AMOUNT"),
+    ],
+)
+def test_live_cash_floor_blocks_before_preflight(
+    monkeypatch, capsys, cash_disposition, reason
+):
+    _allow(monkeypatch)
+    _override_economic_verifier(
+        monkeypatch,
+        e.verify_claim_economic_receipt,
+        lambda repo, issue: _cash(
+            repo=repo,
+            issue=issue,
+            disposition=cash_disposition,
+            reason_codes=[reason],
+            attempts=4,
+            prs=2,
+        ),
+    )
+    monkeypatch.setattr(e, "preflight_bounty", lambda *_: pytest.fail("preflight"))
+    monkeypatch.setattr(
+        e, "inspect_bounty_availability", lambda *_: pytest.fail("availability")
+    )
+    monkeypatch.setattr(e, "_cli_main", lambda: pytest.fail("cli"))
+    monkeypatch.setattr(e.sys, "argv", _argv(json_out=True))
+
+    with pytest.raises(SystemExit) as caught:
+        e.main()
+
+    payload = json.loads(capsys.readouterr().out)
+    assert caught.value.code == 2
+    assert payload["qualification"]["disposition"] == "HOLD"
+    assert payload["qualification"]["reason_codes"][0] == f"LIVE_CASH:{cash_disposition}"
+    assert f"LIVE_CASH:{reason}" in payload["qualification"]["reason_codes"]
+    assert payload["attempt_count"] == 4
+    assert payload["open_pr_count"] == 2
+
+
+def test_live_cash_provider_failure_fails_closed_before_preflight(monkeypatch, capsys):
+    _allow(monkeypatch)
+
+    def fail_cash(*_args, **_kwargs):
+        raise e.LiveCashAdmissionError("hostile source text DO NOT ECHO")
+
+    _override_economic_verifier(monkeypatch, e.verify_claim_economic_receipt, fail_cash)
+    monkeypatch.setattr(e, "preflight_bounty", lambda *_: pytest.fail("preflight"))
+    monkeypatch.setattr(
+        e, "inspect_bounty_availability", lambda *_: pytest.fail("availability")
+    )
+    monkeypatch.setattr(e, "_cli_main", lambda: pytest.fail("cli"))
+    monkeypatch.setattr(e.sys, "argv", _argv(json_out=True))
+
+    with pytest.raises(SystemExit) as caught:
+        e.main()
+
+    output = capsys.readouterr().out
+    assert caught.value.code == 2
+    assert json.loads(output) == {"error": "claim_preflight_unavailable"}
+    assert "DO NOT ECHO" not in output
+
+
+def test_active_live_cash_route_contract_is_fail_closed(monkeypatch):
+    _allow(monkeypatch)
+    bad = _cash()
+    bad["route"] = "bounty_pile_10_49"
+    _override_economic_verifier(
+        monkeypatch,
+        e.verify_claim_economic_receipt,
+        lambda *_: bad,
+    )
+    monkeypatch.setattr(e, "preflight_bounty", lambda *_: pytest.fail("preflight"))
+    monkeypatch.setattr(e.sys, "argv", _argv())
+
+    with pytest.raises(SystemExit) as caught:
+        e.main()
+
+    assert caught.value.code == 2
 
 
 def test_terminal_availability_blocks_without_exposing_source(monkeypatch, capsys):
