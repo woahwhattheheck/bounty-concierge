@@ -1,0 +1,114 @@
+{
+  "schema": "midas-scaffold-history-recovery/v1",
+  "captured_at": "2026-09-19",
+  "owner": "ZZ-Sol-47-Foxglove / GPT-5.6 Sol",
+  "source_repository": "bujiproject-art/agentmidasopendevteam",
+  "purpose": "Determine whether the missing runnable application scaffold exists anywhere in canonical published repository history outside the current default-branch root.",
+  "authority": {
+    "provider_contact": false,
+    "signup": false,
+    "cla": false,
+    "claim": false,
+    "source_write": false,
+    "submission": false,
+    "reward": false,
+    "payment": false
+  },
+  "canonical_repository": {
+    "default_branch": "main",
+    "archived": false,
+    "pushed_at": "2026-02-17T20:45:02Z",
+    "forks_count": 2,
+    "branches": [
+      {
+        "name": "main",
+        "sha": "8e94549deba3a63a1db02b8c5d3f58518cf57b5f"
+      }
+    ],
+    "tag_refs": [],
+    "releases": [],
+    "commits": [
+      {
+        "sha": "5671fb04f8d7f2042b94532b7af9a60e7b783d34",
+        "parent_count": 0,
+        "tree_sha": "d242826e608be0573b33fc9daccb3a7c2ee6c9f8",
+        "paths": [
+          "LICENSE",
+          "README.md"
+        ]
+      },
+      {
+        "sha": "8e94549deba3a63a1db02b8c5d3f58518cf57b5f",
+        "parents": [
+          "5671fb04f8d7f2042b94532b7af9a60e7b783d34"
+        ],
+        "tree_sha": "88b36029a2877850694a706706ca68ee957331b4",
+        "paths": [
+          ".github/ISSUE_TEMPLATE/app_proposal.md",
+          ".github/ISSUE_TEMPLATE/bug_report.md",
+          ".github/ISSUE_TEMPLATE/feature_request.md",
+          ".github/PULL_REQUEST_TEMPLATE.md",
+          "BOUNTIES.md",
+          "CODE_OF_CONDUCT.md",
+          "CONTRIBUTING.md",
+          "CONTRIBUTOR_LICENSE_AGREEMENT.md",
+          "LICENSE",
+          "README.md",
+          "REWARDS.md",
+          "SECURITY.md"
+        ]
+      }
+    ]
+  },
+  "historical_scaffold_probe": {
+    "canonical_commits_examined": 2,
+    "complete_trees_examined": 2,
+    "required_or_implied_paths": [
+      "package.json",
+      ".env.example",
+      "app/",
+      "src/"
+    ],
+    "ever_present_in_canonical_history": false,
+    "main_tree_truncated": false,
+    "initial_tree_truncated": false
+  },
+  "contribution_contract_mismatch": {
+    "document": "CONTRIBUTING.md",
+    "document_sha": "4aa483fc5cdc5820866e1a7a5bfcda1c8ec80415",
+    "setup_commands": [
+      "npm install",
+      "cp .env.example .env.local",
+      "npm run dev"
+    ],
+    "missing_inputs_in_every_canonical_commit": [
+      "package.json",
+      ".env.example"
+    ],
+    "interpretation": "The documented setup cannot execute from any canonical published repository generation observed."
+  },
+  "only_open_pr": {
+    "number": 2,
+    "title": "Bounty #23: FAQ Manager",
+    "author": "mdmcl-pixel",
+    "head_repository": "mdmcl-pixel/agentmidasopendevteam",
+    "head_sha": "4afe4d612a3011b5fdde78ad363ea81600be5327",
+    "base_sha": "8e94549deba3a63a1db02b8c5d3f58518cf57b5f",
+    "changed_paths": [
+      "bounties/23-faq-manager/FAQManager.tsx",
+      "bounties/23-faq-manager/README.md"
+    ],
+    "maintainer_review_or_comment_observed": false,
+    "bot_review_observed": true,
+    "interpretation": "The PR demonstrates one contributor invented an isolated bounties/<id>-<name>/ submission shape, but it does not establish a maintainer-approved runnable scaffold or canonical integration contract."
+  },
+  "decision": "HOLD_STALE_PROVIDER_AND_SOURCE_CONTRACT",
+  "decision_reason": "There is no hidden canonical branch/tag/release/history generation containing the documented app scaffold. The documented setup is non-runnable against every canonical commit, and the only live PR has not established maintainer acceptance of an alternate submission shape.",
+  "promotion_requirements": [
+    "fresh maintainer/provider confirmation that the selected fixed-cash bounty is available",
+    "authoritative runnable scaffold or explicit maintainer-approved standalone submission contract",
+    "signup/CLA/payout eligibility satisfied",
+    "fresh claim/assignee/open-PR collision census",
+    "source pinned immediately before implementation"
+  ]
+}
