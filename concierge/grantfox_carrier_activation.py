@@ -8,7 +8,9 @@ live-cash/deadline receipt from being dispatched as fresh work when current
 carrier evidence says to reuse or review existing work.
 
 Carrier evidence is re-evaluated against the process UTC clock at composition
-and verification time. The module is advisory-only and grants no provider,
+and verification time, with a compositor-owned hard cap on the upstream census
+freshness ceiling so callers cannot widen dispatch freshness to a day. The module
+is advisory-only and grants no provider,
 repository, submission, contact, wallet, or payment authority.
 """
 from __future__ import annotations
@@ -34,6 +36,7 @@ from .grantfox_deadline_activation import (
 SCHEMA = "grantfox-carrier-activation/v1"
 RECEIPT_SCHEMA = "grantfox-carrier-activation-receipt/v1"
 MAX_RECEIPT_AGE_SECONDS = 300
+MAX_CARRIER_SNAPSHOT_AGE_SECONDS = 900
 UPSTREAM_HOLDS = frozenset({"HOLD_UPSTREAM", "HOLD_DEADLINE"})
 AUTHORITY = {
     "advisory_only": True,
@@ -146,6 +149,17 @@ def _carrier_identity(receipt: dict[str, Any]) -> tuple[str, str, int]:
     )
 
 
+def _carrier_snapshot_max_age(receipt: dict[str, Any]) -> int:
+    """Return the semantically verified census age ceiling for outer policy."""
+    census = _obj(receipt.get("census"), "carrier_census_receipt.census")
+    value = census.get("max_snapshot_age_seconds")
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise GrantFoxCarrierActivationInputError(
+            "carrier_census_receipt.census.max_snapshot_age_seconds must be a positive integer"
+        )
+    return value
+
+
 def _current_carrier_receipt(
     receipt: dict[str, Any],
     evaluated_at: datetime,
@@ -242,6 +256,8 @@ def compile_carrier_activation(
             "carrier_census_receipt does not verify semantically"
         )
 
+    carrier_snapshot_max_age = _carrier_snapshot_max_age(carrier)
+
     owner, repo, issue_number, actor = _activation_identity(activation)
     c_owner, c_repo, c_issue = _carrier_identity(carrier)
     if (owner, repo, issue_number) != (c_owner, c_repo, c_issue):
@@ -272,7 +288,11 @@ def compile_carrier_activation(
         )
 
     reasons: list[str] = []
-    if upstream_disposition not in PASSTHROUGH:
+    if carrier_snapshot_max_age > MAX_CARRIER_SNAPSHOT_AGE_SECONDS:
+        disposition = "HOLD_CARRIER_CENSUS_POLICY"
+        reasons.append("CARRIER_CENSUS_MAX_AGE_EXCEEDS_POLICY")
+        next_action = "REFRESH_CARRIER_CENSUS_WITH_BOUNDED_MAX_AGE"
+    elif upstream_disposition not in PASSTHROUGH:
         disposition = "HOLD_UPSTREAM"
         reasons.append("GRANTFOX_DEADLINE_ACTIVATION_NOT_ACTIONABLE")
         next_action = _text(
@@ -349,6 +369,7 @@ def compile_carrier_activation(
             "active_or_merged_count": census_view.get("active_or_merged_count"),
             "process_closed_count": census_view.get("process_closed_count"),
             "other_closed_count": census_view.get("other_closed_count"),
+            "max_snapshot_age_seconds": census_view.get("max_snapshot_age_seconds"),
         },
         "anchors": {
             "deadline_activation_receipt_sha256": activation_digest,
@@ -358,6 +379,7 @@ def compile_carrier_activation(
         "evaluation": {
             "composed_at": _stamp(evaluated),
             "max_receipt_age_seconds": MAX_RECEIPT_AGE_SECONDS,
+            "max_carrier_snapshot_age_seconds": MAX_CARRIER_SNAPSHOT_AGE_SECONDS,
         },
         "evidence": {
             "deadline_activation_receipt": activation,
@@ -409,9 +431,15 @@ def verify_carrier_activation_receipt(
     if type(evaluation) is not dict or set(evaluation) != {
         "composed_at",
         "max_receipt_age_seconds",
+        "max_carrier_snapshot_age_seconds",
     }:
         return False
     if evaluation.get("max_receipt_age_seconds") != MAX_RECEIPT_AGE_SECONDS:
+        return False
+    if (
+        evaluation.get("max_carrier_snapshot_age_seconds")
+        != MAX_CARRIER_SNAPSHOT_AGE_SECONDS
+    ):
         return False
     try:
         composed_at = _parse_stamp(evaluation.get("composed_at"), "evaluation.composed_at")
