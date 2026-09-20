@@ -1,0 +1,83 @@
+{
+  "schema": "grantfox-source-census.v1",
+  "captured_at": "2026-09-20T00:55:00Z",
+  "worker": "ZZ-Solace",
+  "model": "GPT-5.6 Sol",
+  "active_floor_usd": 50,
+  "items": [
+    {
+      "repo": "MergeFi/frontend",
+      "issue": 68,
+      "route": "PRUNE_SOURCE_FIXED",
+      "issue_state": "open",
+      "assignee": "rudra496",
+      "source_evidence": {
+        "path": "src/lib/utils.ts",
+        "blob_sha": "cfd734a110c8cf962a3873290280f2c651e6b441",
+        "observation": "single validateTeamSplits implementation on current default branch"
+      }
+    },
+    {
+      "repo": "scout-off/scout-off-backend",
+      "issue": 639,
+      "route": "PRUNE_SOURCE_FIXED",
+      "issue_state": "open",
+      "assignee": null,
+      "source_evidence": {
+        "path": "src/db/postgres-driver.ts",
+        "blob_sha": "6534813c97a3ff11bd137ff4f52b2548dda96aef",
+        "observation": "PostgresDriver is async end-to-end with pg.Pool; integration test surface exists"
+      }
+    },
+    {
+      "repo": "StellarSend/backend",
+      "issue": 17,
+      "route": "HOLD_ECONOMICS",
+      "issue_state": "open",
+      "assignee": null,
+      "source_evidence": {
+        "model_blob_sha": "88876aafa68aa90c1afc21e9e4eb8903eade990e",
+        "route_blob_sha": "a46e5d0e1b8c118ef91dd828a4cc9b345e777887",
+        "observation": "raw amount strings remain unvalidated at the named payment routes"
+      },
+      "fixed_cash_ge_50_verified": false
+    },
+    {
+      "repo": "Gryd-lock/grydlock-testkit",
+      "issue": 10,
+      "route": "HOLD_ECONOMICS_AND_ASSIGNMENT",
+      "issue_state": "open",
+      "assignee": null,
+      "source_evidence": {
+        "package_blob_sha": "7d674c82cfca132d720a02dbc56d45df3979e950",
+        "destinations_blob_sha": "c8f918089f700982d7347cc1d8af8d8677fd5774",
+        "scores_blob_sha": "f27d17c781a9059cc1304af93def554391b63876",
+        "fixture_report_exists": false,
+        "current_fixture_count": 12
+      },
+      "fixed_cash_ge_50_verified": false
+    },
+    {
+      "repo": "BETAIL-BOYS/TradeFlow-API",
+      "issue": 43,
+      "route": "HOLD_ECONOMICS",
+      "issue_state": "open",
+      "assignee": null,
+      "source_evidence": {
+        "source_commit": "666b47088ae51cf0b0e657a8d56872b40fd327c7",
+        "main_blob_sha": "87169f559892fb7b8227b14664e85792085983f4",
+        "indexer_blob_sha": "d095cefbb4a873a5507efdbaffaff7f928a0fc27",
+        "standalone_redis_blob_sha": "2aeccd07a5fe209ed1f45ac3ea2613a89bc05403",
+        "gas_blob_sha": "d03c4f12aa70e930c7b9c2582bb21d2abe9c63d9"
+      },
+      "fixed_cash_ge_50_verified": false
+    }
+  ],
+  "authority": {
+    "apply": false,
+    "claim": false,
+    "implementation": false,
+    "merge_upstream": false,
+    "payment": false
+  }
+}
