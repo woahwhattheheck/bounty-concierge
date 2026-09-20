@@ -18,6 +18,7 @@ def snapshot(**overrides):
             "number": 17,
             "issue_url": issue_url,
             "issue_state": "open",
+            "issue_locked": False,
             "open_pr_count": 0,
             "stale_listing_signal": False,
             "search_truncated": False,
@@ -114,6 +115,16 @@ class SourceProvenanceTests(unittest.TestCase):
                 self.assertFalse(result["dispatch"])
                 self.assertIn("CANONICAL_AUDIT_INCOMPLETE", result["reason_codes"])
                 self.assertFalse(result["signals"]["canonical_source_verified"])
+
+    def test_locked_canonical_issue_holds_dispatch(self):
+        value = snapshot()
+        value["canonical_audit"] = dict(value["canonical_audit"])
+        value["canonical_audit"]["issue_locked"] = True
+        result = verify_source_provenance(value)
+        self.assertEqual(result["disposition"], "HOLD")
+        self.assertFalse(result["dispatch"])
+        self.assertIn("CANONICAL_ISSUE_LOCKED", result["reason_codes"])
+        self.assertTrue(result["signals"]["issue_locked"])
 
     def test_open_implementation_carriers_hold_dispatch(self):
         for count in (1, 4):
