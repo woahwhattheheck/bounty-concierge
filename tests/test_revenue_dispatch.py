@@ -231,12 +231,12 @@ class RevenueDispatchTests(unittest.TestCase):
         if gate_bytes is not None and expected_bytes_sha is None:
             expected_bytes_sha = hashlib.sha256(gate_bytes).hexdigest()
         cash_patch = patch(
-            "concierge.revenue_dispatch.evaluate_live_cash_admission",
+            "concierge.revenue_dispatch._LIVE_CASH_EVALUATOR",
             return_value=cash or live_cash(),
         )
         if cash_error is not None:
             cash_patch = patch(
-                "concierge.revenue_dispatch.evaluate_live_cash_admission",
+                "concierge.revenue_dispatch._LIVE_CASH_EVALUATOR",
                 side_effect=cash_error,
             )
         with patch(
@@ -282,7 +282,7 @@ class RevenueDispatchTests(unittest.TestCase):
             "concierge.revenue_dispatch.inspect_bounty_availability",
             return_value=availability(),
         ), patch(
-            "concierge.revenue_dispatch.evaluate_live_cash_admission",
+            "concierge.revenue_dispatch._LIVE_CASH_EVALUATOR",
             return_value=live_cash(),
         ):
             result = qualify_available_live_revenue_intake(
@@ -501,7 +501,7 @@ class RevenueDispatchTests(unittest.TestCase):
             "concierge.revenue_dispatch.verify_paid_work_receipt",
             return_value=True,
         ), patch(
-            "concierge.revenue_dispatch.evaluate_live_cash_admission"
+            "concierge.revenue_dispatch._LIVE_CASH_EVALUATOR"
         ) as cash_mock:
             result = qualify_available_live_revenue_intake(
                 "acme/widgets",
