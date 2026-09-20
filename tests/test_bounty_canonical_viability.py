@@ -16,9 +16,10 @@ from concierge.bounty_canonical_viability import (
 
 def snapshot(**overrides):
     base = {
-        "schema": "bounty-canonical-viability/v1",
+        "schema": "bounty-canonical-viability/v2",
         "value_gate": {
             "work_id": "algora-acme-42",
+            "canonical_source_url": "https://github.com/acme/widget/issues/42",
             "disposition": "VALUE_50_PLUS",
             "receipt_sha256": "a" * 64,
         },
@@ -51,6 +52,7 @@ def snapshot(**overrides):
             "open_prs": [],
             "active_claim_count": 0,
             "maintainer_confirmed_residual": False,
+            "observed_at": "2026-09-19T23:52:00Z",
         },
         "evaluated_at": "2026-09-19T23:55:00Z",
         "max_snapshot_age_seconds": 900,
@@ -75,6 +77,19 @@ class BountyCanonicalViabilityTests(unittest.TestCase):
         self.assertIn("LISTING_CANONICAL_STATE_MISMATCH", receipt["reason_codes"])
         self.assertIn("CANONICAL_ISSUE_NOT_OPEN", receipt["reason_codes"])
         self.assertTrue(receipt["state"]["canonical_state_mismatch"])
+
+    def test_closed_or_unknown_listing_never_routes_ready(self):
+        closed = deepcopy(snapshot()["listing"])
+        closed["state"] = "CLOSED"
+        receipt = compile_bounty_canonical_viability(snapshot(listing=closed))
+        self.assertEqual(receipt["disposition"], "PRUNE")
+        self.assertIn("LISTING_NOT_OPEN", receipt["reason_codes"])
+
+        unknown = deepcopy(snapshot()["listing"])
+        unknown["state"] = "UNKNOWN"
+        receipt = compile_bounty_canonical_viability(snapshot(listing=unknown))
+        self.assertEqual(receipt["disposition"], "HOLD")
+        self.assertIn("LISTING_STATE_UNKNOWN", receipt["reason_codes"])
 
     def test_archived_repository_is_pruned_even_if_issue_says_open(self):
         repo = deepcopy(snapshot()["repository"])
@@ -211,6 +226,19 @@ class BountyCanonicalViabilityTests(unittest.TestCase):
         receipt = compile_bounty_canonical_viability(snapshot(collisions=collisions))
         self.assertEqual(receipt["disposition"], "HOLD")
         self.assertIn("COLLISION_SNAPSHOT_STALE", receipt["reason_codes"])
+
+    def test_value_gate_canonical_source_must_match_canonical_issue(self):
+        value = deepcopy(snapshot()["value_gate"])
+        value["canonical_source_url"] = "https://github.com/other/widget/issues/42"
+        with self.assertRaisesRegex(BountyCanonicalViabilityInputError, "canonical issue"):
+            compile_bounty_canonical_viability(snapshot(value_gate=value))
+
+    def test_stale_claim_pressure_snapshot_holds_without_open_prs(self):
+        collisions = deepcopy(snapshot()["collisions"])
+        collisions["observed_at"] = "2026-09-19T23:00:00Z"
+        receipt = compile_bounty_canonical_viability(snapshot(collisions=collisions))
+        self.assertEqual(receipt["disposition"], "HOLD")
+        self.assertIn("SNAPSHOT_STALE", receipt["reason_codes"])
 
     def test_non_50_plus_value_binding_is_rejected(self):
         value = deepcopy(snapshot()["value_gate"])
