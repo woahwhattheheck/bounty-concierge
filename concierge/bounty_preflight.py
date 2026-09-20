@@ -108,8 +108,8 @@ _MAINTAINER_PAUSE_PATTERNS = (
         _MAINTAINER_DIRECTIVE_PREFIX
         + r"(?:(?:for\s+now|currently),?\s+)?"
         r"(?:new|further|more)\s+"
-        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|contributions?|work)\s+"
-        r"(?:are|remain)\s+(?:currently\s+|temporarily\s+)?paused\b",
+        r"(?:(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|contributions?)\s+"
+        r"(?:are|remain)|work\s+(?:is|remains))\s+(?:currently\s+|temporarily\s+)?paused\b",
         re.IGNORECASE | re.MULTILINE,
     ),
     # Bare "submissions/PRs are paused" is authoritative only with explicit
@@ -117,8 +117,8 @@ _MAINTAINER_PAUSE_PATTERNS = (
     re.compile(
         _MAINTAINER_DIRECTIVE_PREFIX
         + r"(?:(?:for\s+now|currently),?\s+)?"
-        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|contributions?|work)\s+"
-        r"(?:are|remain)\s+(?:currently\s+|temporarily\s+)?paused\s+"
+        r"(?:(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|contributions?)\s+"
+        r"(?:are|remain)|work\s+(?:is|remains))\s+(?:currently\s+|temporarily\s+)?paused\s+"
         r"(?:for\s+now\b|right\s+now\b|at\s+this\s+time\b|until\b|while\b)",
         re.IGNORECASE | re.MULTILINE,
     ),
