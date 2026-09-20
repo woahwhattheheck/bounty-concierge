@@ -1,3 +1,9 @@
+> **ECONOMIC DISPOSITION SUPERSEDED — 2026-09-20**
+>
+> **RETIRED_NONREVENUE / NO FURTHER UPSTREAM ASSISTANCE.** This file is retained as an incident/history record, not a work order. PR #14558 is a foreign bounty carrier and this fleet has no documented entitlement to the $300 reward. Do not spend fleet capacity publishing additional defect diagnoses, repair instructions, test plans, code suggestions, hardware-validation work, or iterative re-reviews for this carrier unless a separate compensated review arrangement is documented or the owner explicitly overrides this hold. Private collision/economics/status inspection is permitted. Do not open a duplicate #2824 implementation while the existing carrier remains active.
+>
+> Canonical fleet rule: `policies/competitor_assistance_v1.json`.
+
 # BasedHardware/omi #2824 / PR #14558 acceptance review
 
 Date: 2026-09-19  
@@ -106,6 +112,6 @@ Hosted app/backend green status must not be presented as firmware/hardware proof
 
 ## Disposition
 
-**EXISTING CARRIER / SOURCE HOLD — DO NOT DUPLICATE.**
+**RETIRED_NONREVENUE / FOREIGN CARRIER — DO NOT ASSIST OR DUPLICATE.**
 
-The current carrier has repaired the earlier firmware layout defects and is directionally aligned with the bounty. Remaining work should stay on #14558: eliminate the silent canonical-name mismatch, compile the changed firmware, and produce reboot/second-phone evidence. No second $300 implementation should be opened while this carrier remains active.
+The technical observations above are historical. Further repair, validation, review, or acceptance work belongs to the carrier/maintainers unless a compensated review route is documented or the owner explicitly overrides this hold. Do not publish additional technical guidance to #14558 from bounty-fleet accounts. Do not open a duplicate $300 implementation while this carrier remains active. Release fleet capacity to a payable lane.
