@@ -503,3 +503,127 @@ def test_maintainer_issue_body_pause_is_authoritative(monkeypatch):
     assert result["qualification"]["disposition"] == "HOLD"
     assert result["qualification"]["dispatch"] is False
 
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "No PRs yet; feel free to take this.",
+        "No new claims were filed this week.",
+        "We have no new submissions to report.",
+        "This does not stop new work.",
+        'The phrase "no more claims" is not a maintainer directive.',
+    ],
+)
+def test_maintainer_pause_classifier_rejects_descriptive_and_negated_false_holds(text):
+    assert not bp._signals_maintainer_contribution_pause(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "we are not going to be accepting new bounty attempts",
+        "we are not accepting new bounty attempts",
+        "we are no longer accepting new claims",
+        "we won't be accepting new PRs",
+        "please don't submit a PR for this bounty",
+        "new submissions are paused for now",
+        "please wait before submitting any PRs",
+    ],
+)
+def test_maintainer_pause_classifier_accepts_explicit_policy_and_wait_forms(text):
+    assert bp._signals_maintainer_contribution_pause(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        'The phrase "we are not accepting new bounty attempts" is not policy.',
+        "The example says new submissions are paused for now.",
+        "> we are not accepting new bounty attempts\nThat quoted statement is obsolete.",
+    ],
+)
+def test_maintainer_pause_classifier_rejects_quoted_policy_meta_language(text):
+    assert not bp._signals_maintainer_contribution_pause(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "For now, we are not accepting new bounty attempts.",
+        "Currently, we are no longer accepting new contributions.",
+        "For now, new submissions are paused.",
+    ],
+)
+def test_maintainer_pause_classifier_accepts_temporal_policy_prefixes(text):
+    assert bp._signals_maintainer_contribution_pause(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "- Please do not submit a PR for this bounty.",
+        "Update: we are not accepting new PRs.",
+        "Submissions are paused for now.",
+        "We aren't accepting new submissions.",
+        "Please do not submit any new PRs.",
+        "Please do not work on this issue.",
+        "* Status: We aren't accepting new submissions.",
+        "## Notice: Submissions are paused until the migration lands.",
+        "We're not accepting any more PRs.",
+        "We are not accepting any new PRs.",
+        "- [ ] We are not accepting new PRs.",
+        "New work is paused for now.",
+        "Work is paused for now.",
+    ],
+)
+def test_maintainer_pause_classifier_accepts_review_stop_syntax_corpus(text):
+    assert bp._signals_maintainer_contribution_pause(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "> Please do not submit a PR for this bounty.",
+        "> Status: we are not accepting new submissions.",
+        "We are accepting new submissions.",
+        "Update: we are accepting new PRs.",
+        "Submissions were paused last week.",
+        "- [ ] We are accepting new PRs.",
+    ],
+)
+def test_maintainer_pause_classifier_keeps_blockquotes_and_history_non_authoritative(text):
+    assert not bp._signals_maintainer_contribution_pause(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "```\nwe are not accepting new bounty attempts\n```",
+        "~~~text\nplease don't submit a PR for this bounty\n~~~",
+        "Example:\nwe are not accepting new bounty attempts",
+        "Example:\n- Please do not submit a PR for this bounty.",
+        "### Example\nwe are not accepting new bounty attempts",
+        "Example. we are not accepting new bounty attempts",
+        "Documentation. Please don't submit a PR for this bounty.",
+        "Quote. Status: we are not accepting new PRs.",
+        "Documentation:\n- Please do not submit a PR for this bounty.\n- We are not accepting new PRs.",
+        "Quote:\nStatus: we are not accepting new PRs.",
+        "    we are not accepting new bounty attempts",
+        "\tplease don't submit a PR for this bounty",
+        "> we are not accepting new bounty attempts",
+    ],
+)
+def test_maintainer_pause_classifier_rejects_markdown_presentation_contexts(text):
+    assert not bp._signals_maintainer_contribution_pause(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Example:\nwe are not accepting new PRs.\n\nUpdate: we are not accepting new PRs.",
+        "```\nwe are not accepting new PRs\n```\n\nStatus: we are not accepting new PRs.",
+    ],
+)
+def test_maintainer_pause_classifier_resumes_after_presentation_block(text):
+    assert bp._signals_maintainer_contribution_pause(text)
