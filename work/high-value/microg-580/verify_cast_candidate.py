@@ -73,11 +73,16 @@ def check(root: Path) -> tuple[list[str], list[str]]:
 
     require(r"GmsService\.CAST\s*,\s*GmsService\.CAST_API", src["service"],
             "service accepts CAST_API 161 alongside CAST", failures)
-    require(r"onPostInitCompleteWithConnectionInfo\s*\(", src["service"],
-            "service returns ConnectionInfo", failures)
     service = src["service"]
-    info_match = re.search(
-        r"(?m)^[ \t]*ConnectionInfo\s+(\w+)\s*=\s*new\s+ConnectionInfo\s*\(\s*\)\s*;",
+    connection_info_names = set(
+        re.findall(
+            r"(?m)^[ \t]*ConnectionInfo\s+(\w+)\s*=\s*new\s+ConnectionInfo\s*\(\s*\)\s*;",
+            service,
+        )
+    )
+    callback_info_names = re.findall(
+        r"(?m)^[ \t]*(?:[\w.]+\.)?onPostInitCompleteWithConnectionInfo\s*\("
+        r"\s*[^,\n]+\s*,\s*[^,\n]+\s*,\s*(\w+)\s*\)\s*;",
         service,
     )
     feature_names = set(
@@ -88,12 +93,18 @@ def check(root: Path) -> tuple[list[str], list[str]]:
             service,
         )
     )
-    if info_match is None:
-        failures.append("FEATURE CONTRACT: service must construct ConnectionInfo explicitly")
+    if not callback_info_names:
+        failures.append("MISSING INVARIANT: service returns ConnectionInfo")
     if not feature_names:
         failures.append("MISSING INVARIANT: service declares implementation-owned Cast FEATURES")
-    if info_match is not None and feature_names:
-        info_name = info_match.group(1)
+
+    for info_name in sorted(set(callback_info_names)):
+        if info_name not in connection_info_names:
+            failures.append(
+                "FEATURE CONTRACT: returned ConnectionInfo must be constructed explicitly"
+            )
+            continue
+
         assignments = re.findall(
             rf"(?m)^[ \t]*{re.escape(info_name)}\.features\s*=\s*([^;]+);",
             service,
