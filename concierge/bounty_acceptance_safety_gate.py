@@ -4,7 +4,7 @@
 Bounty and provider text is untrusted input. A reward must never become authority
 for a contributor to disclose hidden instructions, private reasoning, secrets,
 auth/session material, or private runtime configuration. This module scans frozen
-acceptance text and emits a deterministic advisory receipt without echoing the raw
+acceptance text and emits a time-bound advisory receipt without echoing the raw
 text into the receipt.
 
 The gate performs no network access and grants no provider, repository-write,
@@ -17,7 +17,7 @@ import hashlib
 import json
 import re
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import urlsplit
@@ -52,8 +52,18 @@ _AUTHORITY = {
 # bounty. A non-negated disclosure verb must occur in the same sentence/line and
 # within a bounded distance of the sensitive target.
 _ACTION_RE = re.compile(
-    r"\b(?:provide|include|paste|print|dump|upload|attach|expose|reveal|submit|"
-    r"commit|write|publish|send|return|show|list|record|contain|copy|disclose)\b"
+    r"\b(?:"
+    r"provid(?:e|es|ed|ing)|includ(?:e|es|ed|ing)|past(?:e|es|ed|ing)|"
+    r"print(?:s|ed|ing)?|dump(?:s|ed|ing)?|upload(?:s|ed|ing)?|"
+    r"attach(?:es|ed|ing)?|expos(?:e|es|ed|ing)|reveal(?:s|ed|ing)?|"
+    r"submit(?:s|ted|ting)?|commit(?:s|ted|ting)?|"
+    r"writ(?:e|es|ing|ten)|wrote|publish(?:es|ed|ing)?|"
+    r"send(?:s|ing)?|sent|return(?:s|ed|ing)?|show(?:s|ed|ing)?|"
+    r"list(?:s|ed|ing)?|record(?:s|ed|ing)?|contain(?:s|ed|ing)?|"
+    r"cop(?:y|ies|ied|ying)|disclos(?:e|es|ed|ing)|"
+    r"shar(?:e|es|ed|ing)|post(?:s|ed|ing)?|export(?:s|ed|ing)?|"
+    r"embed(?:s|ded|ding)?"
+    r")\b"
 )
 _NEGATION_RE = re.compile(
     r"(?:\bdo\s+not\b|\bdon['’]t\b|\bnever\b|\bmust\s+not\b|"
@@ -241,6 +251,25 @@ def _parse_timestamp(value: Any, field: str) -> datetime:
     return parsed
 
 
+def _require_utc_datetime(value: datetime, field: str) -> datetime:
+    if type(value) is not datetime:
+        raise BountyAcceptanceSafetyInputError(f"{field} must be a datetime")
+    offset = value.utcoffset()
+    if value.tzinfo is None or offset is None or offset.total_seconds() != 0:
+        raise BountyAcceptanceSafetyInputError(f"{field} must be UTC")
+    return value.astimezone(timezone.utc)
+
+
+def _trusted_utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _format_utc_timestamp(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat(timespec="seconds").replace(
+        "+00:00", "Z"
+    )
+
+
 def _normalize_for_scan(text: str) -> str:
     return unicodedata.normalize("NFKC", text).casefold()
 
@@ -289,8 +318,10 @@ def _classify_text(text: str) -> tuple[list[str], dict[str, int]]:
     return reasons, counts
 
 
-def compile_bounty_acceptance_safety_gate(request: dict[str, Any]) -> dict[str, Any]:
-    """Compile frozen acceptance text into an advisory-only safety receipt."""
+def _compile_bounty_acceptance_safety_gate_at(
+    request: dict[str, Any], evaluated: datetime
+) -> dict[str, Any]:
+    """Compile at an already trusted UTC time; private replay/testing primitive."""
     request = _require_object(request, "request")
     _require_exact_keys(
         request,
@@ -326,10 +357,13 @@ def compile_bounty_acceptance_safety_gate(request: dict[str, Any]) -> dict[str, 
         )
 
     observed = _parse_timestamp(request["observed_at"], "observed_at")
-    evaluated = _parse_timestamp(request["evaluated_at"], "evaluated_at")
+    # v1 keeps evaluated_at as a syntactically validated compatibility field, but
+    # it is untrusted caller input and MUST NOT control freshness.
+    _parse_timestamp(request["evaluated_at"], "evaluated_at")
+    evaluated = _require_utc_datetime(evaluated, "evaluation time")
     if observed > evaluated:
         raise BountyAcceptanceSafetyInputError(
-            "observed_at must not be after evaluated_at"
+            "observed_at must not be after trusted evaluation time"
         )
     age_seconds = int((evaluated - observed).total_seconds())
 
@@ -361,7 +395,7 @@ def compile_bounty_acceptance_safety_gate(request: dict[str, Any]) -> dict[str, 
             "url": request["source_url"],
             "content_sha256": actual_digest,
             "observed_at": request["observed_at"],
-            "evaluated_at": request["evaluated_at"],
+            "evaluated_at": _format_utc_timestamp(evaluated),
             "age_seconds": age_seconds,
             "text_bytes": len(source_bytes),
         },
@@ -372,10 +406,15 @@ def compile_bounty_acceptance_safety_gate(request: dict[str, Any]) -> dict[str, 
     return {**body, "receipt_sha256": _sha256_json(body)}
 
 
+def compile_bounty_acceptance_safety_gate(request: dict[str, Any]) -> dict[str, Any]:
+    """Compile frozen acceptance text using process-owned current UTC time."""
+    return _compile_bounty_acceptance_safety_gate_at(request, _trusted_utc_now())
+
+
 def verify_bounty_acceptance_safety_receipt(
     receipt: dict[str, Any], source_text: str
 ) -> bool:
-    """Verify receipt integrity and recompile semantics from the original source text."""
+    """Verify receipt integrity, semantics, and freshness at process-owned UTC time."""
     if type(receipt) is not dict or type(source_text) is not str:
         return False
     if receipt.get("schema") != RECEIPT_SCHEMA or receipt.get("authority") != _AUTHORITY:
@@ -390,6 +429,13 @@ def verify_bounty_acceptance_safety_receipt(
             return False
         source = _require_object(receipt.get("source"), "receipt.source")
         identity = _require_object(receipt.get("identity"), "receipt.identity")
+        now = _trusted_utc_now()
+        observed = _parse_timestamp(source["observed_at"], "receipt.source.observed_at")
+        generated = _parse_timestamp(source["evaluated_at"], "receipt.source.evaluated_at")
+        if observed > now or generated > now:
+            return False
+        if int((now - observed).total_seconds()) > _MAX_SOURCE_AGE_SECONDS:
+            return False
         request = {
             "schema": SCHEMA,
             "issue_url": identity["issue_url"],
@@ -399,7 +445,7 @@ def verify_bounty_acceptance_safety_receipt(
             "observed_at": source["observed_at"],
             "evaluated_at": source["evaluated_at"],
         }
-        expected = compile_bounty_acceptance_safety_gate(request)
+        expected = _compile_bounty_acceptance_safety_gate_at(request, generated)
     except (BountyAcceptanceSafetyInputError, KeyError, TypeError, ValueError):
         return False
     return expected == receipt
