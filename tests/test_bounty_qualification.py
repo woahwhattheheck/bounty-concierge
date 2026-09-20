@@ -11,6 +11,7 @@ from concierge import bounty_qualification as bq
 def _audit(**overrides):
     value = {
         "issue_state": "open",
+        "issue_locked": False,
         "open_pr_count": 0,
         "stale_listing_signal": False,
         "search_truncated": False,
@@ -76,6 +77,21 @@ def test_rewarded_or_closed_work_is_terminal_reject():
     assert rewarded["reason_codes"] == ["ALREADY_REWARDED"]
     assert closed["disposition"] == "REJECT"
     assert closed["reason_codes"] == ["ISSUE_NOT_OPEN"]
+
+
+def test_locked_canonical_issue_holds_even_with_clean_reward():
+    result = bq.qualify_dispatch(
+        {
+            "body": "/bounty $250",
+            "labels": ["$250"],
+            "canonical_audit": _audit(issue_locked=True),
+        }
+    )
+
+    assert result["disposition"] == "HOLD"
+    assert result["dispatch"] is False
+    assert result["reason_codes"] == ["CANONICAL_ISSUE_LOCKED"]
+    assert result["signals"]["issue_locked"] is True
 
 
 def test_missing_canonical_audit_holds_fail_closed():
