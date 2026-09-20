@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Installed claim composes payoff, economics, preflight, and availability."""
+"""Installed claim composes payoff, economics, preflight, availability, and live cash."""
 
 from datetime import datetime, timezone
 import json
@@ -40,6 +40,36 @@ def _availability(dispatch=True, reason=None, signals=()):
     }
 
 
+def _cash(
+    disposition="ACTIVE_REVIEW",
+    *,
+    route="main_bounty_queue",
+    reasons=(),
+    amount="50",
+):
+    return {
+        "schema": "bounty-live-cash-admission-receipt/v1",
+        "economics": {
+            "currency": "USD" if amount is not None else None,
+            "fixed_amount": amount,
+            "fixed_semantics": amount is not None,
+            "active_floor": "50",
+            "pile_floor": "10",
+        },
+        "disposition": disposition,
+        "route": route,
+        "reason_codes": list(reasons),
+        "authority": {
+            "advisory_only": True,
+            "claim_authority": False,
+            "implementation_authority": False,
+            "submission_authority": False,
+            "outbound_contact_authority": False,
+            "payment_or_wallet_authority": False,
+        },
+    }
+
+
 def _argv(*, repo="acme/widget", json_out=False, dry=False):
     out = ["concierge"] + (["--json"] if json_out else []) + [
         "claim",
@@ -59,13 +89,17 @@ def _argv(*, repo="acme/widget", json_out=False, dry=False):
     return out + (["--dry-run"] if dry else [])
 
 
-def _override_economic_verifier(monkeypatch, verifier):
+def _override_economic_verifier(monkeypatch, verifier, cash=None):
+    if cash is None:
+        cash = lambda *_args, **_kwargs: _cash()
     monkeypatch.setattr(e, "verify_claim_economic_receipt", verifier)
+    monkeypatch.setattr(e, "evaluate_live_cash_admission", cash)
     monkeypatch.setattr(
         e,
         "_preflight_claim",
         e._build_preflight_claim(
             verifier,
+            cash,
             now=datetime.now,
             utc=timezone.utc,
         ),
@@ -107,8 +141,13 @@ def _allow(monkeypatch, seen=None):
             )
         return {"schema": "claim-economic-admission-proof/v2", "verified": True}
 
+    def cash(repo, issue):
+        if seen is not None:
+            seen.append(("live_cash", repo, issue))
+        return _cash()
+
     monkeypatch.setattr(e, "verify_claim_payoff_bundle", payoff)
-    _override_economic_verifier(monkeypatch, economics)
+    _override_economic_verifier(monkeypatch, economics, cash)
     monkeypatch.setattr(
         e,
         "preflight_bounty",
@@ -149,11 +188,12 @@ def test_live_claim_orders_authorities_strips_option_and_restores_argv(monkeypat
 
     e.main()
 
-    assert [item[0] for item in seen[:4]] == [
+    assert [item[0] for item in seen[:5]] == [
         "payoff",
         "economics",
         "preflight",
         "availability",
+        "live_cash",
     ]
     assert seen[0] == ("payoff", "acme/widget", 42, BUNDLE)
     assert seen[1][:6] == (
@@ -165,7 +205,7 @@ def test_live_claim_orders_authorities_strips_option_and_restores_argv(monkeypat
         ECONOMIC_RECEIPT,
     )
     assert seen[1][6].endswith("Z")
-    assert seen[4][0] == "cli"
+    assert seen[5][0] == "cli"
     assert e.sys.argv is original
 
 
@@ -183,6 +223,7 @@ def test_live_preflight_uses_process_owned_utc_clock(monkeypatch):
         "_preflight_claim",
         e._build_preflight_claim(
             e.verify_claim_economic_receipt,
+            e.evaluate_live_cash_admission,
             now=lambda tz: trusted_now.astimezone(tz),
             utc=timezone.utc,
         ),
@@ -197,6 +238,75 @@ def test_live_preflight_uses_process_owned_utc_clock(monkeypatch):
         ECONOMIC_RECEIPT,
     )
     assert seen[1][6] == "2026-09-17T20:30:00Z"
+
+
+def test_live_cash_evaluator_is_generation_bound_after_builder(monkeypatch):
+    seen = []
+    _allow(monkeypatch, seen)
+    bound = e._preflight_claim
+    monkeypatch.setattr(
+        e,
+        "evaluate_live_cash_admission",
+        lambda *_args, **_kwargs: pytest.fail("rebound live cash evaluator"),
+    )
+    bound(_argv())
+    assert [item[0] for item in seen][-2:] == ["availability", "live_cash"]
+
+
+@pytest.mark.parametrize(
+    ("disposition", "route", "amount", "reason"),
+    [
+        ("PILE_SAVE_UP", "bounty_pile_10_49", "20", "LIVE_CASH:PILE_SAVE_UP"),
+        ("PRUNE_BELOW_DOLLAR_FLOOR", None, "5", "LIVE_CASH:PRUNE_BELOW_DOLLAR_FLOOR"),
+        ("HOLD_NO_FIXED_USD_REWARD", None, None, "LIVE_CASH:HOLD_NO_FIXED_USD_REWARD"),
+    ],
+)
+def test_live_cash_nonactive_routes_block_claim_instructions(
+    monkeypatch, capsys, disposition, route, amount, reason
+):
+    seen = []
+    _allow(monkeypatch, seen)
+
+    def cash(repo, issue):
+        seen.append(("live_cash", repo, issue))
+        return _cash(disposition, route=route, amount=amount)
+
+    _override_economic_verifier(monkeypatch, e.verify_claim_economic_receipt, cash)
+    monkeypatch.setattr(e, "_cli_main", lambda: pytest.fail("cli"))
+    monkeypatch.setattr(e.sys, "argv", _argv(json_out=True))
+
+    with pytest.raises(SystemExit) as caught:
+        e.main()
+
+    assert caught.value.code == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["qualification"]["reason_codes"][0] == reason
+    assert [item[0] for item in seen][-3:] == [
+        "preflight",
+        "availability",
+        "live_cash",
+    ]
+
+
+def test_live_cash_malformed_authority_fails_closed(monkeypatch, capsys):
+    _allow(monkeypatch)
+
+    def cash(*_args, **_kwargs):
+        receipt = _cash()
+        receipt["authority"]["claim_authority"] = True
+        return receipt
+
+    _override_economic_verifier(monkeypatch, e.verify_claim_economic_receipt, cash)
+    monkeypatch.setattr(e, "_cli_main", lambda: pytest.fail("cli"))
+    monkeypatch.setattr(e.sys, "argv", _argv(json_out=True))
+
+    with pytest.raises(SystemExit) as caught:
+        e.main()
+
+    assert caught.value.code == 2
+    assert json.loads(capsys.readouterr().out) == {
+        "error": "claim_preflight_unavailable"
+    }
 
 
 def test_live_preflight_ignores_public_economic_verifier_rebinding(monkeypatch, tmp_path):
@@ -262,6 +372,7 @@ def test_short_repo_and_equals_forms_are_normalized(monkeypatch):
         "economics",
         "preflight",
         "availability",
+        "live_cash",
     ]
     assert seen[0] == ("payoff", "Scottcjn/widget", 42, BUNDLE)
     assert seen[1][1:6] == (
@@ -412,6 +523,7 @@ def test_dry_run_help_and_non_claim_skip_new_authorities(monkeypatch):
         "verify_claim_economic_receipt",
         "preflight_bounty",
         "inspect_bounty_availability",
+        "evaluate_live_cash_admission",
     ):
         monkeypatch.setattr(e, name, lambda *x, n=name: pytest.fail(n))
     calls = []
