@@ -51,3 +51,10 @@ Exit `0` means `ACCEPTANCE_TEXT_CLEAR`; exit `2` means HOLD. Malformed input is 
 ## Receipt verification
 
 `verify_bounty_acceptance_safety_receipt(receipt, source_text)` checks the receipt hash, rebinds the original text to the stored digest, and recompiles semantics. A mutated receipt or different source text does not verify.
+
+
+## Freshness and multiline criteria
+
+Acceptance criteria are scanned conservatively across Markdown directive continuations such as `Upload:\n- API key` and `Provide the following:\n- .env file`, while unrelated list items remain separate.
+
+Receipt verification is currentness-sensitive. Callers must pass an explicit UTC `verified_at` to `verify_bounty_acceptance_safety_receipt(..., verified_at=...)`. A receipt fails verification when `verified_at` is before the receipt evaluation time or more than 24 hours after the source observation. The exact 24-hour boundary is accepted; any fractional amount beyond it is stale.
