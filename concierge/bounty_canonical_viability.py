@@ -6,7 +6,9 @@ import argparse, hashlib, json, re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit\n\nfrom concierge.bounty_value_router import verify_receipt as verify_value_receipt
+from urllib.parse import urlsplit
+
+from concierge.bounty_value_router import verify_receipt as verify_value_receipt
 
 SCHEMA = "bounty-canonical-viability/v2"
 RECEIPT = "bounty-canonical-viability-receipt/v2"
