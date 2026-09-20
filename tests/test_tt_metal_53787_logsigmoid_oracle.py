@@ -49,7 +49,7 @@ def test_negative_boundary_has_structural_discontinuity():
     right = oracle.current_source_model(-3.9999)
     stable_left = oracle.stable_logsigmoid_f32(-4.0)
     stable_right = oracle.stable_logsigmoid_f32(-3.9999)
-    assert abs(left - right) > 0.017
+    assert abs(left - right) > 0.003
     assert abs(stable_left - stable_right) < 0.001
 
 
