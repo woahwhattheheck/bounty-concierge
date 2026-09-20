@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "snapshot_date": "2026-09-20",
+  "issue": {
+    "repo": "microg/GmsCore",
+    "number": 2994,
+    "url": "https://github.com/microg/GmsCore/issues/2994",
+    "state": "open",
+    "assignee": null,
+    "bounty_usd": 14999,
+    "bounty_evidence": [
+      {"kind": "bountyhub_bot", "comment_id": 3145368949, "amount_usd": 5000, "total_usd": 5000},
+      {"kind": "bountyhub_bot", "comment_id": 3156926692, "amount_usd": 5000, "total_usd": 10000},
+      {"kind": "bountyhub_bot", "comment_id": 3550980382, "amount_usd": 4999, "total_usd": 14999}
+    ]
+  },
+  "upstream": {
+    "master_sha": "4c74e5acb79479004428be755547432294639878",
+    "maintainer_policy": "review_and_test_existing_prs_do_not_create_another_rcs_implementation",
+    "physical_phone_with_sim_required_for_rcs_implementation_claims": true,
+    "bounty_attribution_is_separate_from_merge": true
+  },
+  "working_reference": {
+    "pr": 3360,
+    "url": "https://github.com/microg/GmsCore/pull/3360",
+    "head_sha": "2a680646cbfaf3a4a484bd4dc8f53c21404c8c4b",
+    "state": "open",
+    "base_sha_at_snapshot": "9a206ae115d6f4d99300def2aea447332ac84260",
+    "mergeable_at_snapshot": true,
+    "sponsor_validation": "reported working for 30 users across 10+ carriers with MT/SMS and TS.43 flows; attribution explicitly unresolved",
+    "role": "oldest_working_reference_not_current-master-merge-proof"
+  },
+  "integration_candidate": {
+    "pr": 3808,
+    "url": "https://github.com/microg/GmsCore/pull/3808",
+    "head_sha": "223f91fe0cde7be17bcd19bb0e28087526d98bc4",
+    "base_sha": "4c74e5acb79479004428be755547432294639878",
+    "state": "open",
+    "mergeable_at_snapshot": true,
+    "mergeable_state": "unstable",
+    "review_count": 0,
+    "changed_files": 124,
+    "commits": 78,
+    "source_complete": false
+  },
+  "required_source_followups": [
+    {
+      "repo": "Chess-Debug/GmsCore",
+      "pr": 4,
+      "url": "https://github.com/Chess-Debug/GmsCore/pull/4",
+      "state": "open",
+      "base_sha": "223f91fe0cde7be17bcd19bb0e28087526d98bc4",
+      "head_sha": "7de6271183220679b983c208148061bcf20f8870",
+      "changed_files": 3,
+      "additions": 43,
+      "deletions": 1,
+      "reason": "3808 configures com.google.android.ims.library but its ConfigurationProvider returns an empty cursor; this follow-up exposes the already-configured RCS flag",
+      "physical_evidence": "locked Pixel 3 A/B changes the bounded provider query from no result to the configured true flag",
+      "proves_full_rcs": false
+    }
+  ],
+  "device_gates": [
+    {
+      "id": "locked_no_root_google_messages_e2e",
+      "required": true,
+      "status": "missing",
+      "acceptance": "Google Messages on microG-only locked/no-root physical device activates RCS and sends/receives RCS messages"
+    },
+    {
+      "id": "real_carrier_ts43",
+      "required": true,
+      "status": "missing",
+      "acceptance": "TS.43 provisioning is exercised on a real carrier and completes without synthetic or emulator-only substitution"
+    },
+    {
+      "id": "samsung_play_integrity_compatibility",
+      "required": true,
+      "status": "missing",
+      "acceptance": "Samsung/CompositeToken and Play Integrity compatibility is physically exercised on relevant hardware"
+    }
+  ],
+  "routing": {
+    "new_implementation_pr": "forbidden_by_maintainer_direction",
+    "current_status": "HOLD_SOURCE_INTEGRATION_AND_HARDWARE",
+    "next_action": "review/test existing carriers; integrate or supersede the provider follow-up, then execute the missing physical gates",
+    "payout_claim": false
+  }
+}
