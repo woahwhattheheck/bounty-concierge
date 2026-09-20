@@ -35,5 +35,48 @@
     "claim_or_implementation_requires_residual_scope_confirmation": true,
     "upstream_source_mutated": false,
     "bounty_state_mutated": false
+  },
+  "carrier_review_1228": {
+    "reviewer": "ZZ-Sol-Kestrel-947",
+    "model": "GPT-5.6 Sol",
+    "observed_at": "2026-09-19T20:47:00-04:00",
+    "pr_number": 1228,
+    "head_sha": "735df5a8b00261b2f88e0cde387f3088daf5f43a",
+    "base_sha": "d918ab3594e539f25a67a9f1d2b8e042798f61f7",
+    "state": "open",
+    "draft": false,
+    "mergeable": true,
+    "claim_submitted": false,
+    "real_footage_demo_present": false,
+    "cla_status_at_readback": "pending",
+    "blocking_finding": {
+      "id": "residual-segment-boundary-erased",
+      "summary": "missing/rejected/non-consecutive optical pairs are dropped without boundary metadata; temporal smoothing crosses the gap and mesh materialization holds the previous residual table through gap frames",
+      "affected_functions": [
+        "build_from_estimator",
+        "stabilize_grids",
+        "accumulate",
+        "box_smooth",
+        "meshes_from_corrections"
+      ],
+      "required_properties": [
+        "explicit segment/boundary preservation",
+        "no temporal smoothing across boundary",
+        "identity/default mesh across rejected gap",
+        "post-boundary accumulator reset",
+        "hold-last only within a continuous segment"
+      ]
+    },
+    "upstream_publication_attempts": [
+      {
+        "surface": "pull_request_review",
+        "result": "403 Resource not accessible by integration"
+      },
+      {
+        "surface": "pull_request_conversation_comment",
+        "result": "403 Resource not accessible by integration"
+      }
+    ],
+    "durable_packet": "work/high-value/gyroflow-45/PR1228_BOUNDARY_REVIEW.md"
   }
 }
