@@ -1,0 +1,46 @@
+{
+  "schema": "tarsnap-spiped-first-report-audit/v1",
+  "generated_date": "2026-09-19",
+  "upstream": {
+    "repo": "Tarsnap/spiped",
+    "ref": "master",
+    "commit": "1881fdb0c56ab12f4cc745214980ca2c90fe0660",
+    "blobs": {
+      "AGENTS.md": "46e824f4c67a4154de94bc3e2edd3fff1d9a7bc8",
+      "lib/proto/proto_crypt.c": "c8bfac2ca95299f74196896f31ef6ed23f9ee67f",
+      "libcperciva/alg/sha256.h": "d18b05d972b2e9d2aaac53d30deaaafc7ad2acd7",
+      "libcperciva/alg/sha256.c": "1321f1f06d2964c2a288630f31bae317c4e32fca",
+      "libcperciva/crypto/crypto_aes.c": "04e77c812ebe6d3f14238bb9a78977cb8ff9a21e"
+    }
+  },
+  "candidate": {
+    "component": "lib/proto/proto_crypt.c::proto_crypt_free",
+    "finding": "persistent HMAC_SHA256_CTX ctx_init is freed without insecure_memzero",
+    "scope": "post-teardown per-session MAC key-material retention",
+    "severity": "UNADJUDICATED",
+    "bounty": "UNADJUDICATED"
+  },
+  "duplicate_fence": {
+    "targeted_queries": [
+      "proto_crypt_free",
+      "ctx_init wipe",
+      "heap key material",
+      "HMAC free"
+    ],
+    "closest_issues": [
+      436,
+      440
+    ],
+    "exact_match_found": false
+  },
+  "fix_contract": {
+    "after": "crypto_aes_key_free(k->k_aes)",
+    "action": "insecure_memzero(k, sizeof(struct proto_keys)); free(k);",
+    "protocol_change": false
+  },
+  "publication": {
+    "upstream_mutated": false,
+    "blocked_reason": "AGENTS.md requires LLM disclosure; account owner has standing no-disclosure instruction",
+    "do_not_omit_required_disclosure": true
+  }
+}
