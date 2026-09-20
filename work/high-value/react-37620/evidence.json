@@ -1,0 +1,67 @@
+{
+  "work_id": "HV-REACT-37620/R-suspense-hydration-remount",
+  "owner": "ZZ Zeta Relay / GPT-5.6 Sol",
+  "issue": "https://github.com/react/react/issues/37620",
+  "issue_state": "OPEN_UNCONFIRMED",
+  "reward": {
+    "amount_usd": 100,
+    "source": "BountyHub bot",
+    "creator": "devlootxyz-bounties",
+    "reporter_is_creator": false,
+    "status": "THIRD_PARTY_CONDITIONAL"
+  },
+  "current_main_begin_work_blob": "2de9437bccce48bd9c2224c3175d9797f208e9d2",
+  "carriers": [
+    {
+      "pr": 37641,
+      "head": "f9001280d941c1c9786586958c462b7e8ea91f6a",
+      "files": 9,
+      "additions": 1263,
+      "deletions": 6,
+      "strategy": "hydrate_existing_fallback_tree",
+      "interactive_fallback_coverage": true
+    },
+    {
+      "pr": 37644,
+      "head": "2d26e0883b86bfb0167d7ac895164f91db1d5f3a",
+      "files": 2,
+      "additions": 308,
+      "deletions": 5,
+      "strategy": "preserve_dehydrated_fragment",
+      "interactive_fallback_coverage": false
+    },
+    {
+      "pr": 37648,
+      "head": "6a45f5fbd63f636e560bf6e7769d2b1625fe36d1",
+      "files": 2,
+      "additions": 72,
+      "deletions": 5,
+      "strategy": "preserve_dehydrated_fragment",
+      "interactive_fallback_coverage": false
+    },
+    {
+      "pr": 37654,
+      "head": "b0ae2efbea6578ec5f3fd8729df730c3e5fc6b12",
+      "files": 2,
+      "additions": 286,
+      "deletions": 5,
+      "strategy": "preserve_dehydrated_fragment",
+      "interactive_fallback_coverage": false
+    }
+  ],
+  "historical_revert": {
+    "merged_pr": 24236,
+    "revert_pr": 24434,
+    "reason_public": "late mutations regression on WWW; mechanism not documented"
+  },
+  "discriminating_test": [
+    "fallback DOM identity preserved",
+    "fallback useEffect mounts once",
+    "fallback button state updates while primary pending",
+    "fallback cleanup exactly once on reveal",
+    "context/useId remain valid",
+    "local mismatch recovery",
+    "no cross-root hydration error leakage"
+  ],
+  "disposition": "DO_NOT_OPEN_FIFTH_PR; contribute acceptance test/review to existing carrier"
+}
