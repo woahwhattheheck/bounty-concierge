@@ -1,0 +1,95 @@
+{
+  "schema": "openao-13-pr354-acceptance-v1",
+  "reviewer": {
+    "seat": "ZZ-Sol-Sundial-426",
+    "model": "GPT-5.6 Sol"
+  },
+  "economics": {
+    "repository": "Bitcoindefi/OpenAO",
+    "issue": 13,
+    "advertised_reward_usd": 100,
+    "evidence": "first-party reward-100-usd label",
+    "issue_state": "open",
+    "assignees": [],
+    "micro_bounty_proposal_usd": 30,
+    "micro_bounty_routing": "MAYBE_SAVE_UP_ONLY_NOT_ACTIVE",
+    "bounty_claimed": false,
+    "payout_claimed": false
+  },
+  "source": {
+    "carrier_pr": 354,
+    "carrier_head": "eb1293c8724bc61f2f3cfc70ff69e6bd075b7c16",
+    "carrier_base": "12b967c163f4eca01e80f758aeedc8b153bfc249",
+    "upstream_main": "0683f86b5e04ef49f6314590fdb3e9ab93374be1",
+    "relevant_blobs": {
+      "frontend/components/editor/EditorCanvas.tsx": "652ff403d662e5130fe4bd1e39961b799a5ef9dd",
+      "frontend/lib/editor/paintHistory.ts": "5f5550a68e2c6fb3c67306310d973b36bbf55ae6",
+      "frontend/lib/editor/paintHistory.test.ts": "8e4e2d58d6eab9ccc30639197cfa19aaeb6099ac",
+      "frontend/components/editor/InGameMapEditor.tsx": "ccf49ed1a9ef603ad45df14655bda5045cd65b11"
+    }
+  },
+  "findings": [
+    {
+      "id": "HISTORY_ADVANCES_BEFORE_PERSISTENCE",
+      "severity": "acceptance_blocker",
+      "fact": "undoPaint/redoPaint call PaintHistory.undo/redo before applyHistoryTiles persistence finishes.",
+      "failure": "A rejected paintTiles write leaves server state unchanged but the stroke has already moved to the opposite history stack.",
+      "required": "Commit history movement only after persistence success, or restore it exactly on failure; commands must remain retryable."
+    },
+    {
+      "id": "OVERLAPPING_HISTORY_COMMANDS",
+      "severity": "acceptance_blocker",
+      "fact": "History keyboard handlers can enter while another replay is applying; flushPending can return after scheduling retry and does not serialize the history command.",
+      "failure": "Rapid undo/redo can pop multiple strokes and start overlapping persistence.",
+      "required": "Serialize history replay or reject/queue commands while persistence is active."
+    },
+    {
+      "id": "EXIT_TOOL_DEFERRED",
+      "severity": "scope_blocker",
+      "fact": "Issue scope requires an exit definition tool; PR body explicitly defers dedicated exit/salida placement because #10 is in flight.",
+      "failure": "Current carrier does not implement the full stated tool-selector scope.",
+      "required": "Resolve dependency and implement exit placement, or obtain explicit maintainer scope change."
+    }
+  ],
+  "third_party_evidence": {
+    "issue_comment_id": 5647461762,
+    "author": "menwo535-jpg",
+    "base_revision": "eb1293c8724bc61f2f3cfc70ff69e6bd075b7c16",
+    "classification": "public third-party reported execution; not independently rerun by reviewer",
+    "reported_upstream_source_extracted_callbacks": "3/12 pass; 9/12 fail",
+    "reported_patched_callbacks": "12/12 pass",
+    "reported_history_tests_after_patch": "10/10 pass",
+    "reported_typescript": "pass",
+    "reported_production_build": "not completed due remote font download failure"
+  },
+  "hosted_checks": [
+    {
+      "workflow": "CI",
+      "run_id": 34038543167,
+      "status": "completed",
+      "conclusion": "action_required",
+      "jobs": 0,
+      "classification": "not executed; not a test failure"
+    },
+    {
+      "workflow": "Secret Scan",
+      "run_id": 34038542971,
+      "status": "completed",
+      "conclusion": "action_required",
+      "jobs": 0,
+      "classification": "not executed; not a test failure"
+    }
+  ],
+  "closure": {
+    "disposition": "HOLD_DEPENDENCY_AND_ACCEPTANCE",
+    "next_action": "Converge a transactional/serialized history fix into #354, resolve the #10/API dependency and exit-tool scope, rejoin current main, then execute real hosted CI and editor/API acceptance.",
+    "do_not": "Open a competing full editor or activate the old $30 side-stage as active bounty work."
+  },
+  "authority": {
+    "upstream_source_changed": false,
+    "assignment_changed": false,
+    "grantfox_application": false,
+    "bounty_claim": false,
+    "payout_claim": false
+  }
+}
