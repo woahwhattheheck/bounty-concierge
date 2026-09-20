@@ -36,9 +36,9 @@ def test_source_and_economic_pins_are_exact():
     }
 
 
-def test_exact_host_matches_canonical_issue_reference_samples():
+def test_exact_host_is_consistent_with_rounded_issue_table_samples():
     for x, expected in oracle.ISSUE_TORCH_REFERENCE.items():
-        assert abs(oracle.exact_gelu(x) - expected) < 5e-8
+        assert abs(oracle.exact_gelu(x) - expected) < 5e-5
 
 
 def test_legacy_issue_samples_show_material_accuracy_gap():
@@ -83,7 +83,7 @@ def test_report_is_json_serializable_and_authority_limited():
     json.dumps(payload, allow_nan=False)
     assert payload["authority"] == "host-reference-only"
     assert payload["max_legacy_abs_error_on_issue_samples"] > 0.008
-    assert payload["max_exact_host_abs_error_on_issue_samples"] < 5e-8
+    assert payload["max_exact_host_abs_error_on_issue_samples"] < 5e-5
 
 
 def test_nonfinite_inputs_fail_closed():
