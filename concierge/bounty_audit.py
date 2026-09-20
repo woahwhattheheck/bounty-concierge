@@ -229,6 +229,9 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
     merged_pr_count = sum(1 for pr in linked_prs if pr["merged"])
     closed_unmerged_pr_count = sum(1 for pr in linked_prs if pr["state"] == "closed" and not pr["merged"])
     issue_state = issue.get("state") or "unknown"
+    issue_locked = issue.get("locked", False)
+    if type(issue_locked) is not bool:
+        raise BountyAuditError(f"GitHub issue locked state was malformed for {repo}#{number}")
 
     maintainer_expiry_comments: list[dict[str, Any]] = []
     comments_truncated = False
@@ -248,6 +251,7 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
         "number": number,
         "issue_url": issue.get("html_url") or f"https://github.com/{repo}/issues/{number}",
         "issue_state": issue_state,
+        "issue_locked": issue_locked,
         "linked_pr_count": len(linked_prs),
         "open_pr_count": open_pr_count,
         "merged_pr_count": merged_pr_count,
@@ -285,6 +289,7 @@ def format_summary(audit: dict[str, Any]) -> str:
     truncation = " (search truncated)" if audit["search_truncated"] else ""
     return (
         f"{audit['repo']}#{audit['number']} issue={audit['issue_state']} "
+        f"locked={str(bool(audit.get('issue_locked', False))).lower()} "
         f"linked_prs={audit['linked_pr_count']} open={audit['open_pr_count']} "
         f"merged={audit['merged_pr_count']} closed_unmerged={audit['closed_unmerged_pr_count']} "
         f"competition={audit['competition_level']} maintainer_expiry_signal={maintainer_signal} "
