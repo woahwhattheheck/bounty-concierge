@@ -43,28 +43,107 @@ _ATTEMPT_PHRASE_RE = re.compile(
     r"i(?:'m|\s+am)\s+(?:working\s+on|taking)\s+this(?:\s+bounty)?|"
     r"i(?:'d|\s+would)\s+like\s+to\s+work\s+on\s+this(?:\s+bounty)?)\b"
 )
+_MAINTAINER_DIRECTIVE_PREFIX = (
+    r"(?:^|[.!?]\s+)[ \t]*"
+    r"(?:(?:[-*+][ \t]+(?:\[[ xX]\][ \t]+)?|#{1,6}[ \t]+))?"
+    r"(?:(?:update|status|notice):[ \t]+)?"
+)
+_MAINTAINER_FENCE_RE = re.compile(r"^[ \t]{0,3}(`{3,}|~{3,})")
+_MAINTAINER_META_INTRO_RE = re.compile(
+    r"(?i)^[ \t]{0,3}(?:(?:[-*+]|#{1,6})[ \t]+)?"
+    r"(?:examples?|for\s+example|e\.?g\.?|samples?|documentation|docs?|"
+    r"quotes?|quoted\s+(?:policy|text)|illustration)"
+    r"[ \t]*(?:[:.])?[ \t]*$"
+)
+_MAINTAINER_META_INLINE_RE = re.compile(
+    r"(?i)^[ \t]{0,3}(?:(?:[-*+]|#{1,6})[ \t]+)?"
+    r"(?:examples?|for\s+example|e\.?g\.?|samples?|documentation|docs?|"
+    r"quotes?|quoted\s+(?:policy|text)|illustration)"
+    r"[ \t]*[:.][ \t]+\S"
+)
 _MAINTAINER_PAUSE_PATTERNS = (
+    # Directive forms accept ordinary Markdown list/heading prefixes and a small
+    # status-label vocabulary, but deliberately exclude blockquotes ("> ...").
     re.compile(
-        r"(?i)\bhold\s+off(?:\s+(?:with|on))?\s+"
+        _MAINTAINER_DIRECTIVE_PREFIX
+        + r"(?:please\s+)?hold\s+off(?:\s+(?:with|on))?\s+"
         r"(?:any\s+|new\s+)?(?:attempts?|claims?|pull\s+requests?|prs?|"
-        r"submissions?|implementations?|work)\b"
+        r"submissions?|implementations?|work)\b",
+        re.IGNORECASE | re.MULTILINE,
     ),
     re.compile(
-        r"(?i)\b(?:please\s+)?do\s+not\s+(?:"
-        r"start\s+(?:any\s+|new\s+)?(?:work|implementation|attempts?)|"
+        _MAINTAINER_DIRECTIVE_PREFIX
+        + r"(?:please\s+)?(?:do\s+not|don't)\s+(?:"
+        r"start\s+(?:(?:any|new)\s+){0,2}(?:work|implementation|attempts?)|"
         r"attempt\s+(?:this\s+|the\s+)?(?:bounty|issue|work)|"
         r"claim\s+(?:this\s+|the\s+)?(?:bounty|issue)|"
-        r"(?:submit|open)\s+(?:a\s+|any\s+|new\s+|another\s+)?"
+        r"work\s+on\s+(?:this\s+|the\s+)?(?:bounty|issue|task|work)|"
+        r"(?:submit|open)\s+"
+        r"(?:a\s+(?:new\s+)?|another\s+|(?:(?:any|new)\s+){1,2})?"
         r"(?:pull\s+requests?|prs?|claims?|submissions?)"
-        r")\b"
+        r")\b",
+        re.IGNORECASE | re.MULTILINE,
+    ),
+    # Explicit maintainer policy statements remain boundary-shaped. Quoted/meta
+    # prose cannot match because the prefix excludes quote syntax.
+    re.compile(
+        _MAINTAINER_DIRECTIVE_PREFIX
+        + r"(?:(?:for\s+now|currently),?\s+)?"
+        r"(?:we(?:'re|\s+are)\s+(?:"
+        r"not\s+(?:(?:going\s+to\s+be|currently)\s+)?|no\s+longer\s+)"
+        r"|we\s+aren't\s+)"
+        r"accepting\s+(?:(?:any\s+)?(?:new|more)\s+|any\s+)?(?:bounty\s+)?"
+        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|contributions?)\b",
+        re.IGNORECASE | re.MULTILINE,
     ),
     re.compile(
-        r"(?i)\bno\s+(?:new\s+|more\s+)?"
-        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?)\b"
+        _MAINTAINER_DIRECTIVE_PREFIX
+        + r"(?:(?:for\s+now|currently),?\s+)?"
+        r"we\s+(?:will\s+not|won't)\s+(?:be\s+)?accept(?:ing)?\s+"
+        r"(?:(?:any\s+)?(?:new|more)\s+|any\s+)?(?:bounty\s+)?"
+        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|contributions?)\b",
+        re.IGNORECASE | re.MULTILINE,
     ),
     re.compile(
-        r"(?i)\bstop\s+(?:new\s+)?"
-        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|implementation|work)\b"
+        _MAINTAINER_DIRECTIVE_PREFIX
+        + r"(?:(?:for\s+now|currently),?\s+)?"
+        r"(?:new|further|more)\s+"
+        r"(?:(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|contributions?)\s+"
+        r"(?:are|remain)|work\s+(?:is|remains))\s+(?:currently\s+|temporarily\s+)?paused\b",
+        re.IGNORECASE | re.MULTILINE,
+    ),
+    # Bare "submissions/PRs are paused" is authoritative only with explicit
+    # current-time language, avoiding historical "were paused" prose.
+    re.compile(
+        _MAINTAINER_DIRECTIVE_PREFIX
+        + r"(?:(?:for\s+now|currently),?\s+)?"
+        r"(?:(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|contributions?)\s+"
+        r"(?:are|remain)|work\s+(?:is|remains))\s+(?:currently\s+|temporarily\s+)?paused\s+"
+        r"(?:for\s+now\b|right\s+now\b|at\s+this\s+time\b|until\b|while\b)",
+        re.IGNORECASE | re.MULTILINE,
+    ),
+    re.compile(
+        _MAINTAINER_DIRECTIVE_PREFIX
+        + r"(?:please\s+)?wait\s+before\s+"
+        r"(?:submitting|opening|starting|claiming|attempting)\b",
+        re.IGNORECASE | re.MULTILINE,
+    ),
+    re.compile(
+        _MAINTAINER_DIRECTIVE_PREFIX
+        + r"(?:please\s+)?stop\s+(?:all\s+|new\s+|further\s+)?"
+        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?|implementation|work)\b",
+        re.IGNORECASE | re.MULTILINE,
+    ),
+    # "No new/more ..." is too ambiguous by itself. Require a temporal
+    # directive continuation; historical prose ("no new claims were filed")
+    # must not pause dispatch.
+    re.compile(
+        _MAINTAINER_DIRECTIVE_PREFIX
+        + r"no\s+(?:new|more|further)\s+"
+        r"(?:attempts?|claims?|pull\s+requests?|prs?|submissions?)\s+"
+        r"(?:until\b|while\b|for\s+now\b|right\s+now\b|"
+        r"at\s+this\s+time\b|effective\b)",
+        re.IGNORECASE | re.MULTILINE,
     ),
 )
 
@@ -182,9 +261,58 @@ def _signals_attempt(body: str, repo: str) -> bool:
     return bool(same_repo_pr.search(body))
 
 
+def _maintainer_directive_candidates(body: str) -> list[str]:
+    """Return directive-bearing prose while excluding Markdown presentation contexts."""
+    candidates: list[str] = []
+    fence_char: str | None = None
+    fence_len = 0
+    meta_block = False
+
+    for raw_line in body.splitlines():
+        fence = _MAINTAINER_FENCE_RE.match(raw_line)
+        if fence_char is not None:
+            if (
+                fence
+                and fence.group(1)[0] == fence_char
+                and len(fence.group(1)) >= fence_len
+            ):
+                fence_char = None
+                fence_len = 0
+            continue
+        if fence:
+            fence_char = fence.group(1)[0]
+            fence_len = len(fence.group(1))
+            continue
+
+        if not raw_line.strip():
+            meta_block = False
+            continue
+
+        stripped = raw_line.lstrip(" ")
+        indent = len(raw_line) - len(stripped)
+        if raw_line.startswith("\t") or indent >= 4 or stripped.startswith(">"):
+            continue
+
+        if _MAINTAINER_META_INTRO_RE.fullmatch(raw_line):
+            meta_block = True
+            continue
+        if _MAINTAINER_META_INLINE_RE.match(raw_line):
+            continue
+        if meta_block:
+            continue
+
+        candidates.append(raw_line)
+
+    return candidates
+
+
 def _signals_maintainer_contribution_pause(body: str) -> bool:
     """Recognize only explicit maintainer instructions that stop new contribution work."""
-    return any(pattern.search(body) for pattern in _MAINTAINER_PAUSE_PATTERNS)
+    return any(
+        pattern.search(line)
+        for line in _maintainer_directive_candidates(body)
+        for pattern in _MAINTAINER_PAUSE_PATTERNS
+    )
 
 
 def _normalized_operator_login(operator_login: str | None) -> str | None:
