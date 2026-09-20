@@ -1,0 +1,103 @@
+{
+  "schema": "tailcall-algora-open-board-reconciliation/v1",
+  "captured_at": "2026-09-19",
+  "owner": "ZZ-Sol-Vector / GPT-5.6 Sol",
+  "board": {
+    "url": "https://algora.io/tailcallhq/bounties",
+    "reported_open_count": 8,
+    "advertised_open_face_value_usd": 1000,
+    "completed_count_rendered": 418,
+    "organization_home_reported_total_awarded_usd": 36580
+  },
+  "rows": [
+    {
+      "board_usd": 50,
+      "source": "tailcallhq/forgecode#389",
+      "title": "feat: Support for `/retry`",
+      "canonical_state": "CLOSED",
+      "state_reason": "completed",
+      "evidence": "assigned to jayantpranjal0; closed 2025-07-28",
+      "disposition": "PRUNE_CANONICAL_CLOSED"
+    },
+    {
+      "board_usd": 50,
+      "source": "tailcallhq/rust-grpc#44",
+      "title": "Update all outdated dependencies",
+      "canonical_state": "OPEN",
+      "state_reason": null,
+      "evidence": "unassigned but 36 comments; recent 2026 attempts/claims include PRs #69, #73, #77 plus later applicants",
+      "disposition": "HOLD_SATURATED_OPEN"
+    },
+    {
+      "board_usd": 100,
+      "source": "tailcallhq/gargantua#16",
+      "title": "Implement `to_schema` for a `QueryPlan`",
+      "canonical_state": "NOT_FOUND",
+      "state_reason": null,
+      "evidence": "Algora source link resolves to GitHub 404; native GitHub repo and issue lookups both return NOT_FOUND",
+      "disposition": "HOLD_CANONICAL_SOURCE_NOT_FOUND"
+    },
+    {
+      "board_usd": 50,
+      "source": "tailcallhq/graphql-conf-2024#1",
+      "title": "Auto generate PDF for the slides",
+      "canonical_state": "CLOSED",
+      "state_reason": "completed",
+      "evidence": "closed 2026-05-14",
+      "disposition": "PRUNE_CANONICAL_CLOSED"
+    },
+    {
+      "board_usd": 500,
+      "source": "tailcallhq/tailcallhq.github.io#373",
+      "title": "feature: design and develop a UI to generate tailcall configurations",
+      "canonical_state": "CLOSED",
+      "state_reason": "not_planned",
+      "evidence": "first-party /bounty 500$ exists, but issue closed not planned 2026-07-13 after extensive attempt/PR history",
+      "disposition": "PRUNE_CANONICAL_CLOSED"
+    },
+    {
+      "board_usd": 50,
+      "source": "tailcallhq/graphql-benchmarks#272",
+      "title": "chore: Reimplement `analyze.sh` in JS",
+      "canonical_state": "OPEN",
+      "state_reason": null,
+      "evidence": "unassigned but stale: last issue update 2024-08-11; 13 comments with historical attempts and claiming PRs #279/#315/#352",
+      "disposition": "HOLD_STALE_CROWDED_OPEN"
+    },
+    {
+      "board_usd": 100,
+      "source": "tailcallhq/tailcallhq.github.io#217",
+      "title": "performance: Get a 100% score for mobile on LightHouse metrics `/`",
+      "canonical_state": "CLOSED",
+      "state_reason": "not_planned",
+      "evidence": "closed 2026-07-13",
+      "disposition": "PRUNE_CANONICAL_CLOSED"
+    },
+    {
+      "board_usd": 100,
+      "source": "tailcallhq/tailcallhq.github.io#216",
+      "title": "performance: Get a 100% score on LightHouse metrics `/playground`",
+      "canonical_state": "CLOSED",
+      "state_reason": "not_planned",
+      "evidence": "assigned to neo773; closed 2026-07-13",
+      "disposition": "PRUNE_CANONICAL_CLOSED"
+    }
+  ],
+  "totals": {
+    "advertised_usd": 1000,
+    "prune_closed_usd": 800,
+    "hold_source_not_found_usd": 100,
+    "hold_saturated_or_stale_open_usd": 100,
+    "fresh_whole_implementation_usd": 0,
+    "actionable_fresh_whole_implementation_rows": 0
+  },
+  "fleet_disposition": "NO_FRESH_WHOLE_IMPLEMENTATION_SUPPLY",
+  "fleet_rule": "Do not dispatch from the Tailcall Algora open board without a fresh canonical recheck. Closed/not-planned/completed rows are prune; missing canonical source holds; open rows with active/legacy claim pressure hold unless maintainers define a residual and the claim/payment route is fresh.",
+  "authority": {
+    "discovery_only": true,
+    "claim_authority": false,
+    "implementation_authority": false,
+    "submission_authority": false,
+    "payment_authority": false
+  }
+}
