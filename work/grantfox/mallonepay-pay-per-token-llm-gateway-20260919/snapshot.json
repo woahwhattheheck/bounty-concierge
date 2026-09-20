@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "work_id": "GFOX-MALLONEPAY-BACKLOG-CENSUS-20260919/R-source-residual-map",
+  "observed_at": "2026-09-20T00:54:07Z",
+  "upstream": {
+    "repository": "mallonepay/pay-per-token-llm-gateway",
+    "head": "9b259a1be1b4431d270797fcc6707bc08af661a6",
+    "grant_submission_blob": "b2064a2a13827b027eb38997436d7b4c122c85fa",
+    "wave8_issues_blob": "5c31d1a8d753a2fdff41831f39f96700708470c8"
+  },
+  "live_issue_query": {
+    "query": "repo:mallonepay/pay-per-token-llm-gateway is:issue is:open label:\"GrantFox OSS\"",
+    "open_matches": 0
+  },
+  "historical_wave": {
+    "issue_count": 18,
+    "point_scale_total": 2700,
+    "current_github_closed": 18,
+    "current_tree_implemented": 17,
+    "exception": {
+      "issue": 33,
+      "status": "closed_feature_removed",
+      "dispatch": "PRUNE",
+      "reason": "Email notification implementation was deliberately removed as dead code; no current open bounty authority."
+    }
+  },
+  "issues": [
+    {"number":25,"points":200,"scope":"credit-escrow settlement","dispatch":"PRUNE","reason":"closed+implemented"},
+    {"number":26,"points":200,"scope":"SDK external signer","dispatch":"PRUNE","reason":"closed+implemented"},
+    {"number":27,"points":150,"scope":"bounded contract pagination","dispatch":"PRUNE","reason":"closed+implemented"},
+    {"number":28,"points":150,"scope":"remove read-path extend_ttl","dispatch":"PRUNE","reason":"closed+implemented"},
+    {"number":29,"points":150,"scope":"streaming receipt headers","dispatch":"PRUNE","reason":"closed+implemented"},
+    {"number":30,"points":150,"scope":"DNS rebinding protection","dispatch":"PRUNE","reason":"closed+implemented"},
+    {"number":31,"points":100,"scope":"minPaymentAmount enforcement","dispatch":"PRUNE","reason":"closed+implemented"},
+    {"number":32,"points":150,"scope":"dashboard unit tests","dispatch":"PRUNE","reason":"closed+implemented"},
+    {"number":33,"points":150,"scope":"email notification channel","dispatch":"PRUNE","reason":"closed; implementation later removed"},
+    {"number":34,"points":150,"scope":"escrow accounting invariant tests","dispatch":"PRUNE","reason":"closed+implemented"},
+    {"number":40,"points":200,"scope":"multisig payout automation","dispatch":"PRUNE","reason":"closed+implemented"},
+    {"number":41,"points":150,"scope":"TRUST_PROXY + wallet rate limiting","dispatch":"PRUNE","reason":"closed+implemented"},
+    {"number":42,"points":150,"scope":"payout-wallet validation + approval","dispatch":"PRUNE","reason":"closed+implemented"},
+    {"number":43,"points":150,"scope":"durable in-app notifications","dispatch":"PRUNE","reason":"closed+implemented"},
+    {"number":44,"points":150,"scope":"SQL time-series bucketing","dispatch":"PRUNE","reason":"closed+implemented"},
+    {"number":45,"points":150,"scope":"SDK unit tests","dispatch":"PRUNE","reason":"closed+implemented"},
+    {"number":46,"points":100,"scope":"route in payment receipts","dispatch":"PRUNE","reason":"closed+implemented"},
+    {"number":47,"points":100,"scope":"remove Session/ApiKey models","dispatch":"PRUNE","reason":"closed+implemented"}
+  ],
+  "authority": {
+    "provider_application": false,
+    "provider_assignment": false,
+    "upstream_source_write": false,
+    "wallet_or_mainnet_action": false,
+    "award_or_payment_state": false
+  }
+}
