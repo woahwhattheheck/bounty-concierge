@@ -1,0 +1,53 @@
+{
+  "schema": "tt-metal-55130-cache-mode-evidence/v1",
+  "economic_context": {
+    "source_issue": "tenstorrent/tt-metal#55130",
+    "advertised_usd": 5000,
+    "issue_state": "open",
+    "assigned_implementation_owner": "AJ0070",
+    "assignment_preserved": true,
+    "payment_or_acceptance_claimed": false
+  },
+  "source_pins": {
+    "upstream_main": "708e7f58aef9d089f0e5097d4a772c7c8ee129ea",
+    "assigned_pr": 56321,
+    "assigned_pr_head": "37a594463256d90aa05d2a8d9c955aedc53545b5"
+  },
+  "observed_assigned_pr_workflows": [
+    {
+      "id": 35230416737,
+      "name": "PR Gate",
+      "conclusion": "success"
+    },
+    {
+      "id": 35230416829,
+      "name": "Sanity tests",
+      "conclusion": "success"
+    },
+    {
+      "id": 35230416652,
+      "name": "Verify changed tests",
+      "conclusion": "success"
+    },
+    {
+      "id": 35230415041,
+      "name": "[post-commit] all - Static checks, linters etc.",
+      "conclusion": "success"
+    }
+  ],
+  "source_findings": {
+    "classic_tree_structured_mode_params": true,
+    "quasar_tree_structured_mode_params": true,
+    "cache_attributes_include_bias_gelu_op_params": true,
+    "tensor_and_scalar_paths_populate_mode": true,
+    "codegen_parameterizes_gelu_mode": true,
+    "assigned_pr_changed_bias_gelu_tests_include_program_cache_mode_isolation": false
+  },
+  "disposition": "HOLD_UNTIL_PROGRAM_CACHE_MODE_ISOLATION_REGRESSION",
+  "boundaries": {
+    "hardware_execution_claimed": false,
+    "upstream_pr_opened_by_this_lane": false,
+    "assignment_mutated": false,
+    "payment_mutated": false
+  }
+}\n
