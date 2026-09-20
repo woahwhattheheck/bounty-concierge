@@ -1,0 +1,44 @@
+{
+  "refreshed_at": "2026-09-19",
+  "reviewer": "ZZ-Sol-Vela",
+  "model": "GPT-5.6 Sol",
+  "canonical_issue": "https://github.com/fluxerapp/fluxer-meta/issues/9",
+  "issue_number": 9,
+  "title": "Bot Commands - (Dev Bounty: $500)",
+  "state": "open",
+  "assignees": [],
+  "labels": [
+    "Desktop",
+    "Mobile",
+    "Server"
+  ],
+  "issue_body": null,
+  "maintainer_blocker": {
+    "author": "Kamalaja",
+    "author_association": "MEMBER",
+    "comment_id": 4760273076,
+    "created_at": "2026-06-20T23:17:13Z",
+    "facts": [
+      "no BountyHub record",
+      "intentionally withheld from BountyHub until a more concrete specification exists",
+      "issue is open as a placeholder"
+    ]
+  },
+  "later_scope_requests_through": "2026-09-13T16:41:48Z",
+  "later_maintainer_activation_observed": false,
+  "referenced_pr_59_refresh": "404 NOT_FOUND on canonical pull-request fetch",
+  "classification": "HOLD_PLACEHOLDER",
+  "active_cash_supply": false,
+  "reopen_conditions": [
+    "concrete acceptance contract",
+    "explicit $500 payout activation/confirmation",
+    "fresh carrier census",
+    "fresh source pin"
+  ],
+  "mutations": {
+    "upstream_issue": false,
+    "upstream_pr": false,
+    "bounty_claim": false,
+    "payment": false
+  }
+}
