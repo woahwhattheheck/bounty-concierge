@@ -495,6 +495,8 @@ def verify_receipt(receipt: dict[str, Any]) -> bool:
         receipt = _owned_receipt_json(receipt)
     except (BountyValueRoutingInputError, RecursionError):
         return False
+    if type(receipt) is not dict:
+        return False
     if receipt.get("schema") != _RECEIPT_SCHEMA:
         return False
     if receipt.get("authority") != _AUTHORITY:

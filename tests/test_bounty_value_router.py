@@ -224,6 +224,11 @@ class BountyValueRouterTests(unittest.TestCase):
         changed["candidates"][0]["disposition"] = "PILE_10_49"
         self.assertFalse(verify_receipt(changed))
 
+    def test_verify_receipt_rejects_non_object_root(self):
+        for value in ([], "not-a-receipt", 7, None):
+            with self.subTest(value=value):
+                self.assertFalse(verify_receipt(value))
+
     def test_verify_receipt_rejects_reflected_equality_forgery(self):
         class ForgingDict(dict):
             def __eq__(self, other):
