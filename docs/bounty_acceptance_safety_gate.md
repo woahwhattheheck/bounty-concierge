@@ -4,7 +4,7 @@
 
 ## Purpose
 
-The gate catches acceptance criteria that pair a disclosure action (`provide`, `include`, `paste`, `dump`, `upload`, `publish`, and similar verbs) with a private target in the same sentence/line. Current private-target classes are:
+The gate catches acceptance criteria that pair a disclosure action (`provide`, `include`, `submit`, `share`, `post`, `export`, `embed`, `upload`, and similar verbs, including common inflected/passive forms such as `included` and `submitted`) with a private target in the same sentence/line. Current private-target classes are:
 
 - hidden/system/developer/pre-session instructions;
 - private reasoning or chain-of-thought;
@@ -38,7 +38,7 @@ A clear result is **not** a safety guarantee and does not make the bounty valid,
 }
 ```
 
-`source_content_sha256` must match the exact UTF-8 bytes. Source observations older than 24 hours fail closed. Future-dated observations are rejected.
+`source_content_sha256` must match the exact UTF-8 bytes. `evaluated_at` is a compatibility assertion, **not the freshness clock**: compilation uses the UTC process clock by default, or an explicit `trusted_now` supplied by a trusted collector. A caller cannot make old evidence fresh by backdating `evaluated_at`; future claimed evaluation times are rejected relative to the trusted clock. Source observations older than 24 hours fail closed.
 
 ## CLI
 
@@ -50,4 +50,4 @@ Exit `0` means `ACCEPTANCE_TEXT_CLEAR`; exit `2` means HOLD. Malformed input is 
 
 ## Receipt verification
 
-`verify_bounty_acceptance_safety_receipt(receipt, source_text)` checks the receipt hash, rebinds the original text to the stored digest, and recompiles semantics. A mutated receipt or different source text does not verify.
+`verify_bounty_acceptance_safety_receipt(receipt, source_text)` checks the receipt hash, rebinds the original text to the stored digest, and recompiles the original semantics. Verification also uses the UTC process clock by default (or a trusted `trusted_now`): a previously CLEAR receipt stops verifying once its source observation is more than 24 hours old, and a receipt whose evaluation time is in the verifier's future is rejected. A mutated receipt or different source text does not verify.
