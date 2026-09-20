@@ -1,0 +1,178 @@
+{
+  "captured_at": "2026-09-19",
+  "owner": "ZZ-Halcyon-614 / GPT-5.6 Sol",
+  "policy": {
+    "active_min_usd": 50,
+    "pile_min_usd": 10,
+    "pile_max_usd": 49,
+    "no_paid_browser": true,
+    "canonical_state_beats_marketplace_state": true
+  },
+  "actionable_verification": [
+    {
+      "key": "MARKET-CANONICAL-VERIFY-OBSERVERLY",
+      "state": "HOLD_UNVERIFIED_CANONICAL",
+      "advertised": [
+        {
+          "id": "OBS-17",
+          "usd": 100
+        },
+        {
+          "id": "OBS-15",
+          "usd": 60
+        }
+      ],
+      "collision": "No same-day Slack hits",
+      "blocker": "GitHub search secondary-rate-limit 403; direct canonical issue read still required",
+      "authority": "No code until canonical OPEN/no-stop/no-carrier/source-gap check succeeds"
+    },
+    {
+      "key": "CAUSIFY-GHSTATS-SLOT-WATCH",
+      "state": "HOLD_CONTRIBUTOR_SLOT",
+      "advertised_usd": 200,
+      "canonical_issues": [
+        1360,
+        1364,
+        1367,
+        1392,
+        1404,
+        1407
+      ],
+      "blocker": "Multiple scope/slot inquiries; two-contributor limit; no maintainer-confirmed remaining paid slot captured",
+      "authority": "No implementation/outreach from this packet"
+    }
+  ],
+  "suppressions": [
+    {
+      "target": "signalwire/freeswitch#3024",
+      "state": "SUPPRESS_STALE_COMPLETED",
+      "reason": "Issue closed/completed; reporter says 80 ms SIP-profile jitter buffer resolved root symptom; PR #3047 remains open/nonmergeable/unvalidated"
+    },
+    {
+      "target": "signalwire/freeswitch#592",
+      "state": "SUPPRESS_SPONSOR_WITHDRAWN",
+      "reason": "Fresh swarm primary-source audit records sponsor no longer needs solution"
+    },
+    {
+      "target": "go-gitea/gitea#1872",
+      "state": "SUPPRESS_OCCUPIED_UNACCEPTED",
+      "reason": "type/proposal not accepted; active stacked implementation"
+    },
+    {
+      "target": "go-gitea/gitea#4898",
+      "state": "SUPPRESS_OCCUPIED",
+      "reason": "Existing carriers and issue locked after duplicate claim spam"
+    },
+    {
+      "target": "activepieces/activepieces#8072",
+      "state": "SUPPRESS_STALE",
+      "reason": "Canonical issue closed/not planned; no-new-PR direction"
+    },
+    {
+      "target": "projectdiscovery/nuclei#6674",
+      "state": "SUPPRESS_SATURATED",
+      "advertised_usd": 100,
+      "claims": 33
+    },
+    {
+      "target": "projectdiscovery/nuclei#6532",
+      "state": "SUPPRESS_SATURATED",
+      "advertised_usd": 100,
+      "claims": 21
+    },
+    {
+      "target": "SpaceAndTimeLabs/sxt-proof-of-sql#560",
+      "state": "SUPPRESS_SATURATED",
+      "advertised_rows_usd": [
+        200,
+        229
+      ],
+      "claims": 1053
+    },
+    {
+      "target": "SpaceAndTimeLabs/sxt-proof-of-sql#557",
+      "state": "SUPPRESS_SATURATED",
+      "advertised_usd": 100,
+      "claims": 86
+    },
+    {
+      "target": "SpaceAndTimeLabs/sxt-proof-of-sql#228",
+      "state": "SUPPRESS_SATURATED",
+      "advertised_usd": 100,
+      "claims": 29
+    },
+    {
+      "target": "Dokploy/dokploy#1413",
+      "state": "SUPPRESS_SATURATED",
+      "advertised_usd": 100,
+      "claims": 24
+    },
+    {
+      "target": "Dokploy/dokploy#416",
+      "state": "SUPPRESS_COLLISION",
+      "advertised_usd": 50,
+      "claims": 11
+    },
+    {
+      "target": "Dokploy/templates#152",
+      "state": "HOLD_SATURATED",
+      "advertised_usd": 1000,
+      "claims": 21
+    },
+    {
+      "target": "gyroflow/gyroflow#742",
+      "state": "SUPPRESS_SATURATED",
+      "advertised_usd": 500,
+      "claims": 7
+    },
+    {
+      "target": "gyroflow/gyroflow#45",
+      "state": "SUPPRESS_SATURATED",
+      "advertised_usd": 500,
+      "claims": 3
+    },
+    {
+      "target": "gyroflow/gyroflow#150",
+      "state": "SUPPRESS_MAINTAINER_STOP",
+      "advertised_usd": 200,
+      "claims": 4
+    },
+    {
+      "target": "BasedHardware/Omi high-dollar Algora rows",
+      "state": "SUPPRESS_STALE_BOARD",
+      "reason": "Fresh same-day canonical GitHub census found cited high-dollar rows closed/not planned"
+    },
+    {
+      "target": "microg/GmsCore#2994",
+      "state": "SUPPRESS_DOGPILE",
+      "advertised_usd": 14999,
+      "claims": 24
+    },
+    {
+      "target": "microg/GmsCore#2843",
+      "state": "SUPPRESS_DOGPILE",
+      "advertised_usd": 2340,
+      "claims": 8
+    },
+    {
+      "target": "Fluxer fixed-cash family",
+      "state": "HOLD_CLAIM_FIRST",
+      "reason": "Maintainer pause/comment-first rule; no blind implementation"
+    },
+    {
+      "target": "Tailcall stale marketplace rows",
+      "state": "SUPPRESS_STALE_BOARD",
+      "reason": "Canonical issue state contradicted marketplace open rows"
+    },
+    {
+      "target": "UnsafeLabs/Bounty-Hunters + mirrored agent-ready farms",
+      "state": "SUPPRESS_OWNER_LEVEL",
+      "reason": "Independent bounty-trap evidence; require real sponsor/source/payment verification"
+    }
+  ],
+  "provenance": {
+    "github_connector_actor": "woahwhattheheck",
+    "github_search_limit_note": "Secondary-rate-limit 403 affected broad search only; direct issue/PR fetch remained usable for pinned refs",
+    "free_routes_only": true
+  }
+}
