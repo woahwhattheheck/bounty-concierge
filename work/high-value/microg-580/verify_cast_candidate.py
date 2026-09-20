@@ -40,6 +40,61 @@ def require(pattern: str, text: str, label: str, failures: list[str]) -> None:
         failures.append(f"MISSING INVARIANT: {label}")
 
 
+def _strip_java_comments(text: str) -> str:
+    """Remove Java line/block comments while preserving strings and line layout."""
+    out: list[str] = []
+    i = 0
+    state = "code"
+    quote = ""
+
+    while i < len(text):
+        ch = text[i]
+
+        if state == "code":
+            if text.startswith("//", i):
+                out.extend((" ", " "))
+                i += 2
+                state = "line_comment"
+            elif text.startswith("/*", i):
+                out.extend((" ", " "))
+                i += 2
+                state = "block_comment"
+            elif ch in {'"', "'"}:
+                out.append(ch)
+                quote = ch
+                i += 1
+                state = "quoted"
+            else:
+                out.append(ch)
+                i += 1
+        elif state == "line_comment":
+            if ch == "\n":
+                out.append(ch)
+                i += 1
+                state = "code"
+            else:
+                out.append(" ")
+                i += 1
+        elif state == "block_comment":
+            if text.startswith("*/", i):
+                out.extend((" ", " "))
+                i += 2
+                state = "code"
+            else:
+                out.append("\n" if ch == "\n" else " ")
+                i += 1
+        else:
+            out.append(ch)
+            i += 1
+            if ch == "\\" and i < len(text):
+                out.append(text[i])
+                i += 1
+            elif ch == quote:
+                state = "code"
+
+    return "".join(out)
+
+
 def method_body(text: str, signature_pattern: str) -> str:
     match = re.search(signature_pattern + r"\s*\{", text, re.MULTILINE)
     if not match:
@@ -71,13 +126,18 @@ def check(root: Path) -> tuple[list[str], list[str]]:
     require(r"\bvoid\s+onConnectedWithResult\s*\(\s*int\s+\w+\s*\)\s*=\s*13\s*;",
             src["listener_aidl"], "listener onConnectedWithResult(int) transaction 13", failures)
 
-    require(r"GmsService\.CAST\s*,\s*GmsService\.CAST_API", src["service"],
+    service = _strip_java_comments(src["service"])
+    require(r"GmsService\.CAST\s*,\s*GmsService\.CAST_API", service,
             "service accepts CAST_API 161 alongside CAST", failures)
-    require(r"onPostInitCompleteWithConnectionInfo\s*\(", src["service"],
-            "service returns ConnectionInfo", failures)
-    service = src["service"]
-    info_match = re.search(
-        r"(?m)^[ \t]*ConnectionInfo\s+(\w+)\s*=\s*new\s+ConnectionInfo\s*\(\s*\)\s*;",
+    connection_info_names = set(
+        re.findall(
+            r"(?m)^[ \t]*ConnectionInfo\s+(\w+)\s*=\s*new\s+ConnectionInfo\s*\(\s*\)\s*;",
+            service,
+        )
+    )
+    callback_info_names = re.findall(
+        r"(?m)^[ \t]*(?:[\w.]+\.)?onPostInitCompleteWithConnectionInfo\s*\("
+        r"\s*[^,\n]+\s*,\s*[^,\n]+\s*,\s*(\w+)\s*\)\s*;",
         service,
     )
     feature_names = set(
@@ -88,12 +148,18 @@ def check(root: Path) -> tuple[list[str], list[str]]:
             service,
         )
     )
-    if info_match is None:
-        failures.append("FEATURE CONTRACT: service must construct ConnectionInfo explicitly")
+    if not callback_info_names:
+        failures.append("MISSING INVARIANT: service returns ConnectionInfo")
     if not feature_names:
         failures.append("MISSING INVARIANT: service declares implementation-owned Cast FEATURES")
-    if info_match is not None and feature_names:
-        info_name = info_match.group(1)
+
+    for info_name in sorted(set(callback_info_names)):
+        if info_name not in connection_info_names:
+            failures.append(
+                "FEATURE CONTRACT: returned ConnectionInfo must be constructed explicitly"
+            )
+            continue
+
         assignments = re.findall(
             rf"(?m)^[ \t]*{re.escape(info_name)}\.features\s*=\s*([^;]+);",
             service,
