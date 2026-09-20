@@ -1,0 +1,95 @@
+{
+  "schema": "supply-canonical-stale-board-audit.v1",
+  "observed_date": "2026-09-19",
+  "marketplace": {
+    "provider": "Algora",
+    "url": "https://algora.io/BasedHardware/bounties",
+    "displayed_open_count": 12,
+    "visibly_enumerated_rows": 10,
+    "note": "Only the ten visibly enumerated rows are audited; two provider-count rows are not inferred."
+  },
+  "routing": "SUPPRESS_CANONICAL_CLOSED",
+  "rows": [
+    {
+      "issue": 2316,
+      "reward_usd": 1000,
+      "title": "send uber app",
+      "canonical_state": "closed",
+      "canonical_closed_date": "2026-05-21"
+    },
+    {
+      "issue": 2315,
+      "reward_usd": 300,
+      "title": "Send emails app",
+      "canonical_state": "closed",
+      "canonical_closed_date": "2025-08-20",
+      "assignees": [
+        "affan880"
+      ]
+    },
+    {
+      "issue": 1643,
+      "reward_usd": 200,
+      "title": "Mic Mute Toggle",
+      "canonical_state": "closed",
+      "canonical_closed_date": "2026-05-28"
+    },
+    {
+      "issue": 1980,
+      "reward_usd": 300,
+      "title": "Google Calendar ($300)",
+      "canonical_state": "closed",
+      "canonical_closed_date": "2025-11-30"
+    },
+    {
+      "issue": 2008,
+      "reward_usd": 1500,
+      "title": "Make omi work in browser (for coding)",
+      "canonical_state": "closed",
+      "canonical_closed_date": "2025-11-26"
+    },
+    {
+      "issue": 1944,
+      "reward_usd": 20000,
+      "title": "Rebuild app in React Native",
+      "canonical_state": "closed",
+      "canonical_closed_date": "2026-02-10"
+    },
+    {
+      "issue": 1895,
+      "reward_usd": 300,
+      "title": "import data from email ($300)",
+      "canonical_state": "closed",
+      "canonical_closed_date": "2025-11-30"
+    },
+    {
+      "issue": 1812,
+      "reward_usd": 500,
+      "title": "Design omi recording from omi mobile app",
+      "canonical_state": "closed",
+      "canonical_closed_date": "2025-08-20"
+    },
+    {
+      "issue": 1249,
+      "reward_usd": 20000,
+      "title": "Local storage or encryption",
+      "canonical_state": "closed",
+      "canonical_closed_date": "2026-01-30"
+    },
+    {
+      "issue": 619,
+      "reward_usd": 2000,
+      "title": "Apple watch integration",
+      "canonical_state": "closed",
+      "canonical_closed_date": "2026-01-27"
+    }
+  ],
+  "authority": {
+    "claim": false,
+    "provider_mutation": false,
+    "sponsor_contact": false,
+    "payment": false,
+    "wallet": false,
+    "upstream_source_mutation": false
+  }
+}
