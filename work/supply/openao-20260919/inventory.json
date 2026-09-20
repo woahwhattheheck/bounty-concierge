@@ -1,9 +1,9 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "captured_on": "2026-09-19",
   "captured_timezone": "America/New_York",
   "repository": "Bitcoindefi/OpenAO",
-  "source_authority": "first-party GitHub issue state, labels, and assignees",
+  "source_authority": "first-party GitHub issue state, labels, assignees, and live pull-request state",
   "economics_policy": {
     "active_floor_usd": 50,
     "pile_floor_usd": 10,
@@ -19,7 +19,9 @@
     "unassigned_fixed_reward_usd": 440,
     "unassigned_active_floor_usd": 400,
     "unassigned_pile_usd": 40,
-    "immediately_executable_active_cards": 0
+    "immediately_executable_active_cards": 0,
+    "unassigned_active_floor_usd_currently_blocked_by_open_carriers": 400,
+    "open_implementation_carriers": 7
   },
   "issues": [
     {
@@ -103,8 +105,18 @@
       "reward_usd": 100,
       "reward_label": "reward-100-usd",
       "assignees": [],
-      "routing": "HOLD_DEPENDENCY",
-      "reason": "issue explicitly depends on all mutation issues"
+      "routing": "HOLD_DEPENDENCY_AND_CARRIER",
+      "reason": "issue depends on all mutation issues; existing implementation carrier is already open",
+      "open_carriers": [
+        {
+          "number": 346,
+          "url": "https://github.com/Bitcoindefi/OpenAO/pull/346",
+          "state": "open",
+          "mergeable": true,
+          "author": "Aduersarius",
+          "head_sha": "5f37ec59e4a17f57421273e3810d85170434ff1b"
+        }
+      ]
     },
     {
       "issue": 12,
@@ -121,8 +133,18 @@
       "reward_usd": 100,
       "reward_label": "reward-100-usd",
       "assignees": [],
-      "routing": "HOLD_DEPENDENCY",
-      "reason": "issue explicitly depends on all API work"
+      "routing": "HOLD_DEPENDENCY_AND_CARRIER",
+      "reason": "issue depends on all API work; existing implementation carrier is already open",
+      "open_carriers": [
+        {
+          "number": 354,
+          "url": "https://github.com/Bitcoindefi/OpenAO/pull/354",
+          "state": "open",
+          "mergeable": true,
+          "author": "Aduersarius",
+          "head_sha": "eb1293c8724bc61f2f3cfc70ff69e6bd075b7c16"
+        }
+      ]
     },
     {
       "issue": 14,
@@ -187,16 +209,60 @@
       "reward_usd": 100,
       "reward_label": "reward-100-usd",
       "assignees": [],
-      "routing": "HOLD_DEPENDENCY",
-      "reason": "issue explicitly depends on persistence"
+      "routing": "HOLD_DEPENDENCY_AND_CARRIER",
+      "reason": "issue depends on persistence; two existing implementation carriers are already open",
+      "open_carriers": [
+        {
+          "number": 349,
+          "url": "https://github.com/Bitcoindefi/OpenAO/pull/349",
+          "state": "open",
+          "mergeable": true,
+          "author": "Aduersarius",
+          "head_sha": "a9a69ee4b7196f7ecef010d95a7f91cf8775da79"
+        },
+        {
+          "number": 369,
+          "url": "https://github.com/Bitcoindefi/OpenAO/pull/369",
+          "state": "open",
+          "mergeable": true,
+          "author": "dev-vishalmaurya",
+          "head_sha": "22abd3a0fe8dfe5b4079e408df0ad6b54cd7c359"
+        }
+      ]
     },
     {
       "issue": 25,
       "reward_usd": 100,
       "reward_label": "reward-100-usd",
       "assignees": [],
-      "routing": "HOLD_DEPENDENCY",
-      "reason": "issue explicitly depends on #24"
+      "routing": "HOLD_DEPENDENCY_AND_CARRIER",
+      "reason": "issue depends on #24; three existing implementation carriers are already open",
+      "open_carriers": [
+        {
+          "number": 59,
+          "url": "https://github.com/Bitcoindefi/OpenAO/pull/59",
+          "state": "open",
+          "mergeable": false,
+          "author": "angelTomo9",
+          "head_sha": "befcf4d74411d52bf76ab0f21a8d5e41465a3e4c"
+        },
+        {
+          "number": 350,
+          "url": "https://github.com/Bitcoindefi/OpenAO/pull/350",
+          "state": "open",
+          "mergeable": true,
+          "author": "Aduersarius",
+          "head_sha": "df4de3dd5a307b700399166b384f3787bec65fc9"
+        },
+        {
+          "number": 368,
+          "url": "https://github.com/Bitcoindefi/OpenAO/pull/368",
+          "state": "open",
+          "mergeable": true,
+          "author": "dev-vishalmaurya",
+          "head_sha": "8b32f063b515c725d0b1ec9b7a862eb7f724250f"
+        }
+      ]
     },
     {
       "issue": 371,
@@ -213,7 +279,8 @@
       "confirm state=open",
       "confirm fixed reward label still present and >= active floor",
       "confirm assignees empty or owner explicitly authorizes takeover",
-      "inspect current linked development and open PR collisions",
+      "re-fetch every known carrier recorded for the issue and inspect any newer linked/open PR collisions",
+      "require known applicable carriers to be closed-unmerged/superseded, unless the maintainer explicitly requests a new implementation",
       "re-evaluate explicit dependency statement against current prerequisite state",
       "search Slack for exact repo+issue and materially-same lane",
       "publish TAKE receipt before source mutation"
@@ -222,7 +289,13 @@
       "GrantFox-family label alone does not mint a fixed reward",
       "unassigned does not override an explicit dependency",
       "old census data does not authorize a new claim",
-      "assigned cards are not takeover targets without a fresh maintainer/owner event"
+      "assigned cards are not takeover targets without a fresh maintainer/owner event",
+      "dependency completion does not activate a card while a materially equivalent implementation carrier remains open, merged, adopted, or under maintainer review"
     ]
+  },
+  "correction_capture": {
+    "captured_on": "2026-09-19",
+    "lane": "ZZ-Sol-Shearwater-803 / GPT-5.6 Sol",
+    "purpose": "bind already-open implementation carriers omitted by schema v1 so future activation cannot treat unassigned as unowned"
   }
 }
