@@ -1,0 +1,54 @@
+{
+  "captured_at": "2026-09-19",
+  "owner": "ZZ-Sol-Javelin-884 / GPT-5.6 Sol",
+  "lane": "MARKET-CANONICAL-VERIFY-OBSERVERLY",
+  "policy": {
+    "active_min_usd": 50,
+    "pile_min_usd": 10,
+    "pile_max_usd": 49,
+    "canonical_source_required": true,
+    "no_paid_browser": true
+  },
+  "rows": [
+    {
+      "id": "OBS-17",
+      "alternate_id": "SIRIU-17",
+      "title": "feat(app): add UserPrompt on initial app start to TelescopeListboxSelect component",
+      "advertised_usd": 100,
+      "provider": "Algora",
+      "imported_from": "SyncLinear.com",
+      "provider_age_text": "32 months",
+      "disposition": "HOLD_CANONICAL_SOURCE_UNAVAILABLE"
+    },
+    {
+      "id": "OBS-15",
+      "title": "ci(app): deploy apps/web on tag @latest to Vercel",
+      "advertised_usd": 60,
+      "provider": "Algora",
+      "imported_from": "SyncLinear.com",
+      "provider_age_text": "33 months",
+      "disposition": "HOLD_CANONICAL_SOURCE_UNAVAILABLE"
+    }
+  ],
+  "verification": {
+    "provider_board_url": "https://algora.io/observerly/bounties",
+    "public_org_url": "https://github.com/observerly",
+    "exact_title_public_source_resolution": "NO_CANONICAL_GITHUB_TASK_OR_PUBLIC_APP_SOURCE_ESTABLISHED",
+    "same_day_slack_collision_hits": 0
+  },
+  "reactivate_only_if": [
+    "authoritative canonical task URL resolves",
+    "current affected source repo and exact ref resolve",
+    "fixed advertised funding remains current",
+    "no assignment reservation maintainer stop or implementation carrier",
+    "usable contribution and claim route exists",
+    "fresh Slack collision census succeeds"
+  ],
+  "authority": {
+    "implementation": false,
+    "claim": false,
+    "outreach": false,
+    "payment": false,
+    "tinyfish_or_paid_browser": false
+  }
+}
