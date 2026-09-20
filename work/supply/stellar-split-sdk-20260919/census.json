@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "observed_date": "2026-09-19",
+  "upstream_repo": "Stellar-split/split-sdk",
+  "owner_fork": "woahwhattheheck/split-sdk",
+  "contributor_policy": {
+    "path": "CONTRIBUTING.md",
+    "blob_sha": "c50200ca02f11665714f494ea8a8bf97d0cc8594",
+    "coding_requires_maintainer_assignment": true
+  },
+  "economic_policy": {
+    "active_floor_usd": 50,
+    "status": "HOLD",
+    "reason_codes": [
+      "UNPRICED",
+      "MAINTAINER_ASSIGNMENT_REQUIRED"
+    ]
+  },
+  "issues": [
+    {
+      "number": 771,
+      "state": "open",
+      "assignees": [],
+      "reward_terms": [],
+      "disposition": "HOLD"
+    },
+    {
+      "number": 772,
+      "state": "open",
+      "assignees": [],
+      "reward_terms": [],
+      "disposition": "HOLD"
+    },
+    {
+      "number": 773,
+      "state": "open",
+      "assignees": [],
+      "reward_terms": [],
+      "disposition": "HOLD"
+    },
+    {
+      "number": 774,
+      "state": "open",
+      "assignees": [],
+      "reward_terms": [],
+      "disposition": "HOLD"
+    },
+    {
+      "number": 775,
+      "state": "open",
+      "assignees": [],
+      "reward_terms": [],
+      "disposition": "HOLD"
+    },
+    {
+      "number": 776,
+      "state": "open",
+      "assignees": [],
+      "reward_terms": [],
+      "disposition": "HOLD"
+    },
+    {
+      "number": 777,
+      "state": "open",
+      "assignees": [],
+      "reward_terms": [],
+      "disposition": "HOLD"
+    },
+    {
+      "number": 778,
+      "state": "open",
+      "assignees": [],
+      "reward_terms": [],
+      "disposition": "HOLD"
+    },
+    {
+      "number": 779,
+      "state": "open",
+      "assignees": [],
+      "reward_terms": [],
+      "disposition": "HOLD"
+    },
+    {
+      "number": 780,
+      "state": "open",
+      "assignees": [],
+      "reward_terms": [],
+      "disposition": "HOLD"
+    },
+    {
+      "number": 781,
+      "state": "open",
+      "assignees": [],
+      "reward_terms": [],
+      "disposition": "HOLD"
+    },
+    {
+      "number": 840,
+      "state": "open",
+      "assignees": [],
+      "opened_by": "woahwhattheheck",
+      "comments_observed": 6,
+      "competing_assignment_requests_observed": 5,
+      "reward_terms": [],
+      "disposition": "HOLD",
+      "notes": [
+        "first report owned by woahwhattheheck",
+        "fix/tests described as ready only after maintainer assignment"
+      ]
+    }
+  ],
+  "required_for_reactivation": [
+    "maintainer assignment to woahwhattheheck or explicit authorized equivalent",
+    "source-verifiable fixed reward with currency and amount",
+    "reward meets active queue floor",
+    "issue still open and unsuperseded",
+    "no selected resolving carrier makes work stale"
+  ],
+  "upstream_mutations": []
+}
