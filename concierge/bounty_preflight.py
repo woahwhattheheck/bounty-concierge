@@ -441,15 +441,12 @@ def _issue_author_association(issue: dict[str, Any]) -> str:
 def _issue_generation_marker(issue: dict[str, Any]) -> tuple[Any, ...]:
     """Return every issue field consumed by preflight authority/classification."""
     state = issue.get("state")
-    locked = issue.get("locked", False)
     title = issue.get("title")
     body = issue.get("body")
     updated_at = issue.get("updated_at")
     comments = issue.get("comments")
     if not isinstance(state, str) or not state:
         raise BountyPreflightError("GitHub issue state generation metadata was malformed")
-    if type(locked) is not bool:
-        raise BountyPreflightError("GitHub issue locked generation metadata was malformed")
     if title is None:
         title = ""
     if body is None:
@@ -462,7 +459,6 @@ def _issue_generation_marker(issue: dict[str, Any]) -> tuple[Any, ...]:
         raise BountyPreflightError("GitHub issue comment-count generation metadata was malformed")
     return (
         state.casefold(),
-        locked,
         title,
         body,
         _issue_author_association(issue),
@@ -611,19 +607,16 @@ def _canonical_generation_stable(
     return _issue_generation_marker(after) == initial_issue
 
 
-def _audit_dispatch_marker(audit: dict[str, Any]) -> tuple[str, int, bool, bool, bool]:
+def _audit_dispatch_marker(audit: dict[str, Any]) -> tuple[str, int, bool, bool]:
     """Project exactly the canonical-audit fields consumed by qualification."""
     if not isinstance(audit, dict):
         raise BountyPreflightError("canonical bounty audit did not return an object")
     issue_state = audit.get("issue_state")
-    issue_locked = audit.get("issue_locked", False)
     open_pr_count = audit.get("open_pr_count")
     stale_listing_signal = audit.get("stale_listing_signal")
     search_truncated = audit.get("search_truncated")
     if not isinstance(issue_state, str) or not issue_state:
         raise BountyPreflightError("canonical audit issue_state was malformed")
-    if type(issue_locked) is not bool:
-        raise BountyPreflightError("canonical audit issue_locked was malformed")
     if (
         isinstance(open_pr_count, bool)
         or not isinstance(open_pr_count, int)
@@ -637,7 +630,6 @@ def _audit_dispatch_marker(audit: dict[str, Any]) -> tuple[str, int, bool, bool,
     return (
         issue_state.casefold(),
         open_pr_count,
-        issue_locked,
         stale_listing_signal,
         search_truncated,
     )
