@@ -128,7 +128,7 @@ def _has_bounty_label(labels: list[str]) -> bool:
 
 
 def _policy_label_categories(labels: list[str]) -> list[str]:
-    """Reduce canonical policy labels to conservative dispatch-block categories."""
+    """Reduce explicit canonical work-policy labels to dispatch-block categories."""
     categories: set[str] = set()
     for label in labels:
         normalized = " ".join(re.findall(r"[a-z0-9]+", label.casefold()))
@@ -354,9 +354,6 @@ def qualify_dispatch(
     issue_state = audit.get("issue_state")
     if issue_state is not None and not isinstance(issue_state, str):
         raise QualificationInputError("canonical_audit.issue_state must be a string")
-    issue_locked = audit.get("issue_locked", False)
-    if type(issue_locked) is not bool:
-        raise QualificationInputError("canonical_audit.issue_locked must be boolean")
     stale_listing = audit.get("stale_listing_signal", False)
     search_truncated = audit.get("search_truncated", False)
     if not isinstance(stale_listing, bool):
@@ -389,19 +386,13 @@ def qualify_dispatch(
             "REJECT",
             "Canonical repository state says the issue is not open.",
         )
-    if issue_locked:
-        add(
-            "CANONICAL_ISSUE_LOCKED",
-            "HOLD",
-            "Canonical GitHub issue is locked; require maintainer clearance before dispatch.",
-        )
     if policy_label_categories:
         add(
             "CANONICAL_POLICY_BLOCKS_COMMUNITY_WORK",
             "HOLD",
             (
-                "Canonical issue labels reserve, pause, or block implementation; "
-                "require explicit maintainer clearance before dispatch."
+                "Canonical issue labels explicitly reserve, pause, or block implementation; "
+                "require maintainer clearance before dispatch."
             ),
         )
 
@@ -515,7 +506,6 @@ def qualify_dispatch(
             "search_truncated": search_truncated,
             "canonical_audit_complete": audit_complete,
             "issue_state": issue_state,
-            "issue_locked": issue_locked,
             "saturation_threshold": saturation_threshold,
         },
     }
