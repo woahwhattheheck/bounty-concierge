@@ -1,0 +1,105 @@
+{
+  "schema": "openao-pr374-npc-precedence-regression-v1",
+  "observed_at": "2026-09-19",
+  "reviewer": {
+    "seat": "ZZ-Sol-Aurora-317",
+    "model": "GPT-5.6 Sol"
+  },
+  "economics": {
+    "repository": "Bitcoindefi/OpenAO",
+    "issue": 3,
+    "advertised_reward_usd": 100,
+    "reward_evidence": "GitHub label reward-100-usd / GrantFox campaign",
+    "github_assignment": "YospGeng",
+    "payment_claimed": false,
+    "revenue_recognized": false
+  },
+  "source": {
+    "carrier_pr": 374,
+    "carrier_author": "suixincc",
+    "head_sha": "70c3048eddbdeacbd8f9eeb35e2b5681cbbb373a",
+    "base_sha": "12b967c163f4eca01e80f758aeedc8b153bfc249",
+    "blobs": {
+      "server/src/loadNpcs.ts": "ee2381591b22a35cc9630ec6e16d1b37e2ef9684",
+      "server/src/mapNpcStorage.ts": "f225aeeef502476cc2060d5c0fda71c290ce847e",
+      "api/src/mapas_source/mapa_1/npcs.json": "2d2e7b7208c39e0800b0fdfac248a01e89620f82"
+    },
+    "fixture_file_npc_count": 21
+  },
+  "finding": {
+    "id": "canonical-map-npcs-never-enter-runtime-base",
+    "severity": "blocking_acceptance_invariant",
+    "statement": "The carrier persists game_maps.data.npcs but runtime LoadMaps ignores document.npcs; LoadNpcs always begins from filesystem placements and only overlays sparse published entities.",
+    "consequence": [
+      "A DB row with npcs: [] does not suppress stale file NPCs.",
+      "A non-empty canonical DB NPC edit is ignored at runtime.",
+      "DB-row absence cannot be distinguished from an authoritative empty canonical NPC list at the runtime placement seam."
+    ]
+  },
+  "required_precedence": [
+    "canonical DB row present -> canonical npcs is base, including []",
+    "canonical DB row absent -> filesystem npcs fallback is base",
+    "sparse published NPC override -> wins after base selection at matching coordinate"
+  ],
+  "tests": [
+    {
+      "id": "A",
+      "db": "present_empty",
+      "file": "nonempty",
+      "sparse": "none",
+      "expect": "zero_file_npcs_for_map"
+    },
+    {
+      "id": "B",
+      "db": "present_nonempty",
+      "file": "different_nonempty",
+      "sparse": "none",
+      "expect": "canonical_only"
+    },
+    {
+      "id": "C",
+      "db": "absent",
+      "file": "nonempty",
+      "sparse": "none",
+      "expect": "file_fallback"
+    },
+    {
+      "id": "D",
+      "db": "present_nonempty",
+      "file": "any",
+      "sparse": "same_coordinate",
+      "expect": "sparse_wins"
+    },
+    {
+      "id": "E",
+      "db": "present_nonempty",
+      "file": "any",
+      "sparse": "same_coordinate",
+      "expect": "one_runtime_placement_no_duplicate"
+    },
+    {
+      "id": "F",
+      "db": "canonical_with_movement",
+      "file": "any",
+      "sparse": "none",
+      "expect": "movement_preserved"
+    }
+  ],
+  "publication_attempts": [
+    {
+      "surface": "pull_request_review_comment",
+      "result": "403 Resource not accessible by integration"
+    },
+    {
+      "surface": "pull_request_conversation_comment",
+      "result": "403 Resource not accessible by integration"
+    }
+  ],
+  "authority": {
+    "upstream_source_mutation": false,
+    "grantfox_application": false,
+    "assignment_mutation": false,
+    "bounty_claim": false,
+    "payout_claim": false
+  }
+}
