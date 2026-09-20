@@ -191,7 +191,7 @@ class PaidWorkEffortValueGateTests(unittest.TestCase):
 
     def test_post_cost_reward_floor_can_turn_gross_go_into_skip(self):
         receipt = compile_paid_work_effort_value_gate(
-            request(candidate(amount="120", cost="30"))
+            request(candidate(amount="120", hours="0.5", cost="80"))
         )
         self.assertTrue(receipt["economics"]["gross_economically_eligible"])
         self.assertEqual(receipt["decision"], "SKIP_ECONOMICS")
