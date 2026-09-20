@@ -36,6 +36,7 @@ def observation(**overrides):
         "integration_access": "resource_not_accessible",
         "installed_fork_repo": None,
         "installed_fork_push_access": None,
+        "installed_fork_parent_repo": None,
         "publication_primitives": PRIMITIVES,
         "existing_pr_url": None,
         "existing_pr_state": None,
@@ -77,6 +78,7 @@ class PublicationRouteGateTests(unittest.TestCase):
             observation(
                 installed_fork_repo="woahwhattheheck/GrantFox",
                 installed_fork_push_access=True,
+                installed_fork_parent_repo="GrantChain/GrantFox",
             )
         )
         self.assertEqual(receipt["disposition"], "OWNED_FORK_PR")
@@ -86,12 +88,40 @@ class PublicationRouteGateTests(unittest.TestCase):
             receipt["reason_codes"],
         )
 
+    def test_actor_owned_repo_without_parent_binding_holds(self):
+        receipt = compile_publication_route(
+            observation(
+                installed_fork_repo="woahwhattheheck/GrantFox",
+                installed_fork_push_access=True,
+            )
+        )
+        self.assertEqual(receipt["disposition"], "HANDOFF_REQUIRED")
+        self.assertIn("INSTALLED_FORK_PARENT_NOT_OBSERVED", receipt["reason_codes"])
+        self.assertIsNone(
+            receipt["observed_publication_path"]["installed_fork_parent_matches_upstream"]
+        )
+
+    def test_actor_owned_unrelated_repo_cannot_masquerade_as_fork(self):
+        receipt = compile_publication_route(
+            observation(
+                installed_fork_repo="woahwhattheheck/GrantFox",
+                installed_fork_push_access=True,
+                installed_fork_parent_repo="other-owner/other-repo",
+            )
+        )
+        self.assertEqual(receipt["disposition"], "HANDOFF_REQUIRED")
+        self.assertIn("INSTALLED_FORK_PARENT_MISMATCH", receipt["reason_codes"])
+        self.assertFalse(
+            receipt["observed_publication_path"]["installed_fork_parent_matches_upstream"]
+        )
+
     def test_read_only_upstream_plus_fork_routes_via_fork(self):
         receipt = compile_publication_route(
             observation(
                 integration_access="read",
                 installed_fork_repo="woahwhattheheck/GrantFox",
                 installed_fork_push_access=True,
+                installed_fork_parent_repo="GrantChain/GrantFox",
             )
         )
         self.assertEqual(receipt["disposition"], "OWNED_FORK_PR")
@@ -101,6 +131,7 @@ class PublicationRouteGateTests(unittest.TestCase):
             observation(
                 installed_fork_repo="someone-else/GrantFox",
                 installed_fork_push_access=True,
+                installed_fork_parent_repo="GrantChain/GrantFox",
             )
         )
         self.assertEqual(receipt["disposition"], "HANDOFF_REQUIRED")
@@ -174,6 +205,7 @@ class PublicationRouteGateTests(unittest.TestCase):
                 actor_applied=True,
                 installed_fork_repo="woahwhattheheck/GrantFox",
                 installed_fork_push_access=True,
+                installed_fork_parent_repo="GrantChain/GrantFox",
             )
         )
         self.assertEqual(receipt["disposition"], "OWNED_FORK_PR")
@@ -306,6 +338,12 @@ class PublicationRouteGateTests(unittest.TestCase):
     def test_fork_push_without_fork_is_contradictory(self):
         with self.assertRaisesRegex(PublicationRouteInputError, "must be null"):
             compile_publication_route(observation(installed_fork_push_access=True))
+
+    def test_fork_parent_without_fork_is_contradictory(self):
+        with self.assertRaisesRegex(PublicationRouteInputError, "must be null"):
+            compile_publication_route(
+                observation(installed_fork_parent_repo="GrantChain/GrantFox")
+            )
 
     def test_duplicate_or_unknown_primitives_fail_closed(self):
         for primitives in (
