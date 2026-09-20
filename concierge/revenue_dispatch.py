@@ -65,6 +65,7 @@ _EXPECTED_LIVE_CASH_AUTHORITY = {
     "outbound_contact_authority": False,
     "payment_or_wallet_authority": False,
 }
+_LIVE_CASH_EVALUATOR = evaluate_live_cash_admission
 
 
 class RevenueDispatchError(RuntimeError):
@@ -473,6 +474,8 @@ def _apply_live_cash_gate(
         raise RevenueDispatchError("live cash admission target binding mismatch")
     if source.get("kind") != "LIVE_GITHUB_PREFLIGHT":
         raise RevenueDispatchError("live cash admission source kind is unsupported")
+    for field in ("issue_generation_sha256", "preflight_sha256"):
+        _require_sha256(source.get(field), f"live cash source {field}")
     if authority != _EXPECTED_LIVE_CASH_AUTHORITY:
         raise RevenueDispatchError("live cash admission authority ceiling is invalid")
     if (
@@ -769,7 +772,7 @@ def qualify_available_live_revenue_intake(
         return economic_result
 
     try:
-        live_cash = evaluate_live_cash_admission(
+        live_cash = _LIVE_CASH_EVALUATOR(
             repo,
             number,
             token,
