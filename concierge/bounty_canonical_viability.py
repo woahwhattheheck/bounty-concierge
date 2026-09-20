@@ -8,8 +8,10 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-SCHEMA = "bounty-canonical-viability/v1"
-RECEIPT = "bounty-canonical-viability-receipt/v1"
+from concierge.bounty_value_router import verify_receipt as verify_value_receipt
+
+SCHEMA = "bounty-canonical-viability/v2"
+RECEIPT = "bounty-canonical-viability-receipt/v2"
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 LOGIN = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")
 ISSUE = re.compile(r"^/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)/?$")
@@ -62,7 +64,7 @@ def _url(v: Any, name: str) -> tuple[str, str, str]:
         raise BountyCanonicalViabilityInputError(f"{name} must be an unencoded HTTPS URL")
     try: p = urlsplit(s); port = p.port
     except ValueError as e: raise BountyCanonicalViabilityInputError(f"{name} is invalid") from e
-    if p.scheme.lower() != "https" or not p.hostname or p.username or p.password or port is not None or p.fragment:
+    if p.scheme.lower() != "https" or not p.hostname or p.username or p.password or port is not None or p.query or p.fragment:
         raise BountyCanonicalViabilityInputError(f"{name} must be canonical HTTPS")
     return s, p.hostname.casefold(), p.path
 
@@ -94,10 +96,25 @@ def compile_bounty_canonical_viability(request: dict[str, Any]) -> dict[str, Any
     actor = _login(r["actor_login"], "actor_login")
     owner, repo, number, issue_url = _gh(r["canonical_issue_url"], "canonical_issue_url", ISSUE)
 
-    vg = _obj(r["value_gate"], "value_gate"); _exact(vg, {"work_id","disposition","receipt_sha256"}, "value_gate")
+    vg = _obj(r["value_gate"], "value_gate"); _exact(vg, {"work_id","receipt"}, "value_gate")
     work_id = _txt(vg["work_id"], "value_gate.work_id", 200)
-    if vg["disposition"] != "VALUE_50_PLUS" or not HEX64.fullmatch(_txt(vg["receipt_sha256"], "value_gate.receipt_sha256", 64)):
-        raise BountyCanonicalViabilityInputError("value_gate must bind a VALUE_50_PLUS receipt")
+    value_receipt = _obj(vg["receipt"], "value_gate.receipt")
+    if not verify_value_receipt(value_receipt):
+        raise BountyCanonicalViabilityInputError("value_gate.receipt must be a valid bounty_value_router receipt")
+    matches = [c for c in value_receipt["candidates"] if c["work_id"] == work_id]
+    if len(matches) != 1:
+        raise BountyCanonicalViabilityInputError("value_gate.work_id must select exactly one routed candidate")
+    value_candidate = matches[0]
+    value_owner, value_repo, value_number, value_url = _gh(
+        value_candidate["canonical_source_url"], "value_gate.receipt candidate canonical_source_url", ISSUE
+    )
+    if (value_owner, value_repo, value_number) != (owner, repo, number):
+        raise BountyCanonicalViabilityInputError(
+            "verified value candidate canonical_source_url must match canonical issue"
+        )
+    if value_candidate["disposition"] != "VALUE_50_PLUS":
+        raise BountyCanonicalViabilityInputError("verified value candidate must be VALUE_50_PLUS")
+    value_receipt_sha256 = value_receipt["receipt_sha256"]
 
     listing = _obj(r["listing"], "listing"); _exact(listing,{"url","state","observed_at"},"listing")
     listing_url, _, _ = _url(listing["url"], "listing.url")
@@ -128,7 +145,8 @@ def compile_bounty_canonical_viability(request: dict[str, Any]) -> dict[str, Any
     if type(reward["assignment_required"]) is not bool or type(reward["actor_applied"]) is not bool: raise BountyCanonicalViabilityInputError("reward booleans are invalid")
     wo, wa, wf = _age(reward["observed_at"], "reward.observed_at", now, max_age)
 
-    col = _obj(r["collisions"],"collisions"); _exact(col,{"open_prs","active_claim_count","maintainer_confirmed_residual"},"collisions")
+    col = _obj(r["collisions"],"collisions"); _exact(col,{"open_prs","active_claim_count","maintainer_confirmed_residual","observed_at"},"collisions")
+    co, ca, cf = _age(col["observed_at"], "collisions.observed_at", now, max_age)
     if type(col["open_prs"]) is not list or len(col["open_prs"]) > 100: raise BountyCanonicalViabilityInputError("collisions.open_prs is invalid")
     if isinstance(col["active_claim_count"],bool) or not isinstance(col["active_claim_count"],int) or not 0 <= col["active_claim_count"] <= 500: raise BountyCanonicalViabilityInputError("active_claim_count is invalid")
     if type(col["maintainer_confirmed_residual"]) is not bool: raise BountyCanonicalViabilityInputError("maintainer_confirmed_residual must be bool")
@@ -144,8 +162,10 @@ def compile_bounty_canonical_viability(request: dict[str, Any]) -> dict[str, Any
         prs.append({"url":pu,"author_login":author,"overlap":overlap,"observed_at":obs,"actor_owned":author==actor})
 
     reasons=[]
-    if not all((lf,rf,inf,wf)): reasons.append("SNAPSHOT_STALE")
+    if not all((lf,rf,inf,wf,cf)): reasons.append("SNAPSHOT_STALE")
     if stale_pr: reasons.append("COLLISION_SNAPSHOT_STALE")
+    if ls=="CLOSED": reasons.append("LISTING_NOT_OPEN")
+    elif ls=="UNKNOWN": reasons.append("LISTING_STATE_UNKNOWN")
     if ls=="OPEN" and state=="CLOSED": reasons.append("LISTING_CANONICAL_STATE_MISMATCH")
     if repository["archived"]: reasons.append("CANONICAL_REPOSITORY_ARCHIVED")
     if state!="OPEN": reasons.append("CANONICAL_ISSUE_NOT_OPEN")
@@ -160,7 +180,7 @@ def compile_bounty_canonical_viability(request: dict[str, Any]) -> dict[str, Any
     elif pay=="SELECTION_GATED" and not actor_assigned: reasons.append("SELECTION_GATE_NOT_SATISFIED")
     elif pay=="REPORT_ONLY": reasons.append("REPORT_ONLY_NOT_IMPLEMENTATION_BOUNTY")
 
-    terminal={"LISTING_CANONICAL_STATE_MISMATCH","CANONICAL_REPOSITORY_ARCHIVED","CANONICAL_ISSUE_NOT_OPEN","REPORT_ONLY_NOT_IMPLEMENTATION_BOUNTY"}
+    terminal={"LISTING_NOT_OPEN","LISTING_CANONICAL_STATE_MISMATCH","CANONICAL_REPOSITORY_ARCHIVED","CANONICAL_ISSUE_NOT_OPEN","REPORT_ONLY_NOT_IMPLEMENTATION_BOUNTY"}
     if terminal.intersection(reasons): disp,nexta="PRUNE","REMOVE_FROM_ACTIVE_BUILD_QUEUE"
     elif reasons: disp,nexta="HOLD","REFRESH_OR_RESOLVE_CANONICAL_BLOCKERS"
     elif reward["assignment_required"] and not actor_assigned:
@@ -168,16 +188,16 @@ def compile_bounty_canonical_viability(request: dict[str, Any]) -> dict[str, Any
     elif actor_assigned: disp,nexta="READY_FOR_IMPLEMENTATION_REVIEW","REVIEW_ASSIGNED_SCOPE_BEFORE_IMPLEMENTATION"
     else: disp,nexta="READY_FOR_CLAIM_REVIEW","REVIEW_CLAIM_OR_APPLICATION_ROUTE"
 
-    normalized={"schema":SCHEMA,"value_gate":{"work_id":work_id,"disposition":"VALUE_50_PLUS","receipt_sha256":vg["receipt_sha256"]},"actor_login":actor,"canonical_issue_url":issue_url,
+    normalized={"schema":SCHEMA,"value_gate":{"work_id":work_id,"receipt":value_receipt},"actor_login":actor,"canonical_issue_url":issue_url,
       "listing":{"url":listing_url,"state":ls,"observed_at":lo},"repository":{"full_name":full,"archived":repository["archived"],"observed_at":ro},
       "issue":{"state":state,"state_reason":reason,"acceptance":acceptance,"assignees":assignees,"observed_at":io},
       "reward":{"payment_path":pay,"assignment_required":reward["assignment_required"],"actor_applied":reward["actor_applied"],"observed_at":wo},
-      "collisions":{"open_prs":[{k:p[k] for k in ("url","author_login","overlap","observed_at")} for p in prs],"active_claim_count":col["active_claim_count"],"maintainer_confirmed_residual":residual},
+      "collisions":{"open_prs":[{k:p[k] for k in ("url","author_login","overlap","observed_at")} for p in prs],"active_claim_count":col["active_claim_count"],"maintainer_confirmed_residual":residual,"observed_at":co},
       "evaluated_at":now_s,"max_snapshot_age_seconds":max_age,"claim_pressure_threshold":pressure}
-    body={"schema":RECEIPT,"input":normalized,"identity":{"owner":owner,"repo":repo,"issue_number":number,"work_id":work_id},"disposition":disp,"advisory_next_action":nexta,"reason_codes":reasons,
+    body={"schema":RECEIPT,"input":normalized,"identity":{"owner":owner,"repo":repo,"issue_number":number,"work_id":work_id,"value_receipt_sha256":value_receipt_sha256},"disposition":disp,"advisory_next_action":nexta,"reason_codes":reasons,
           "state":{"canonical_state_mismatch":ls=="OPEN" and state=="CLOSED","actor_assigned":actor_assigned,"blocking_pr_count":len(blocking),"active_claim_count":col["active_claim_count"],"payment_path":pay},
-          "freshness":{"listing_age_seconds":la,"repository_age_seconds":ra,"issue_age_seconds":ia,"reward_age_seconds":wa,"max_snapshot_age_seconds":max_age},"authority":AUTHORITY,
-          "composition_rule":"verify bounty_value_router receipt first; this receipt binds its work_id/disposition/digest"}
+          "freshness":{"listing_age_seconds":la,"repository_age_seconds":ra,"issue_age_seconds":ia,"reward_age_seconds":wa,"collisions_age_seconds":ca,"max_snapshot_age_seconds":max_age},"authority":AUTHORITY,
+          "composition_rule":"semantically verify the embedded bounty_value_router receipt; select work_id from its verified candidates; bind that candidate canonical_source_url and VALUE_50_PLUS disposition to this canonical issue"}
     return {**body,"receipt_sha256":hashlib.sha256(json.dumps(body,sort_keys=True,separators=(",",":"),ensure_ascii=True).encode()).hexdigest()}
 
 
