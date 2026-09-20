@@ -162,6 +162,7 @@ def verify_source_provenance(snapshot: dict[str, Any]) -> dict[str, Any]:
                 "canonical_source_verified": False,
                 "canonical_repo": None,
                 "issue_number": None,
+                "issue_locked": None,
                 "open_pr_count": None,
                 "canonical_reward_evidence_count": 0,
                 "ignored_reward_evidence_count": 0,
@@ -199,6 +200,7 @@ def verify_source_provenance(snapshot: dict[str, Any]) -> dict[str, Any]:
                 "canonical_source_verified": False,
                 "canonical_repo": None,
                 "issue_number": None,
+                "issue_locked": None,
                 "open_pr_count": None,
                 "canonical_reward_evidence_count": 0,
                 "ignored_reward_evidence_count": 0,
@@ -212,6 +214,10 @@ def verify_source_provenance(snapshot: dict[str, Any]) -> dict[str, Any]:
     number = _positive_issue_number(audit.get("number"))
 
     state = _exact_string(audit.get("issue_state"), "canonical_audit.issue_state")
+    issue_locked = _boolean(
+        audit.get("issue_locked", False),
+        "canonical_audit.issue_locked",
+    )
     open_pr_count = _nonnegative_integer(
         audit.get("open_pr_count"),
         "canonical_audit.open_pr_count",
@@ -242,6 +248,12 @@ def verify_source_provenance(snapshot: dict[str, Any]) -> dict[str, Any]:
             "CANONICAL_ISSUE_NOT_OPEN",
             "REJECT",
             "Canonical GitHub state says the issue is not open.",
+        )
+    if issue_locked:
+        add(
+            "CANONICAL_ISSUE_LOCKED",
+            "HOLD",
+            "Canonical GitHub issue is locked; require maintainer clearance before dispatch.",
         )
     if stale:
         add(
@@ -286,6 +298,7 @@ def verify_source_provenance(snapshot: dict[str, Any]) -> dict[str, Any]:
             "canonical_source_verified": True,
             "canonical_repo": repo,
             "issue_number": number,
+            "issue_locked": issue_locked,
             "open_pr_count": open_pr_count,
             "canonical_reward_evidence_count": canonical_evidence_count,
             "ignored_reward_evidence_count": ignored_evidence_count,
