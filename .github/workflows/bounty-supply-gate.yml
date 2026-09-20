@@ -1,0 +1,40 @@
+name: Bounty Supply Gate
+
+on:
+  pull_request:
+    paths:
+      - "concierge/bounty_supply_gate.py"
+      - "concierge/bounty_value_router.py"
+      - "tests/test_bounty_supply_gate.py"
+      - "docs/BOUNTY_SUPPLY_GATE.md"
+      - ".github/workflows/bounty-supply-gate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "concierge/bounty_supply_gate.py"
+      - "concierge/bounty_value_router.py"
+      - "tests/test_bounty_supply_gate.py"
+      - "docs/BOUNTY_SUPPLY_GATE.md"
+      - ".github/workflows/bounty-supply-gate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile
+        run: python -m py_compile concierge/bounty_supply_gate.py tests/test_bounty_supply_gate.py
+      - name: Hostile tests
+        run: python -m unittest tests.test_bounty_supply_gate -v
+      - name: Optimized hostile tests
+        run: python -O -m unittest tests.test_bounty_supply_gate -v
