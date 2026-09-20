@@ -78,9 +78,21 @@ class BountyValueRouterTests(unittest.TestCase):
 
     def test_pile_does_not_auto_promote_as_batch(self):
         receipt = compile_bounty_value_routing(request(
-            candidate("w1", [evidence("20")], source="https://github.com/acme/a/issues/1"),
-            candidate("w2", [evidence("20")], source="https://github.com/acme/a/issues/2"),
-            candidate("w3", [evidence("20")], source="https://github.com/acme/a/issues/3"),
+            candidate(
+                "w1",
+                [evidence("20", url="https://github.com/acme/a/issues/1")],
+                source="https://github.com/acme/a/issues/1",
+            ),
+            candidate(
+                "w2",
+                [evidence("20", url="https://github.com/acme/a/issues/2")],
+                source="https://github.com/acme/a/issues/2",
+            ),
+            candidate(
+                "w3",
+                [evidence("20", url="https://github.com/acme/a/issues/3")],
+                source="https://github.com/acme/a/issues/3",
+            ),
         ))
         self.assertEqual(receipt["counts"]["PILE_10_49"], 3)
         self.assertEqual(receipt["counts"]["VALUE_50_PLUS"], 0)
