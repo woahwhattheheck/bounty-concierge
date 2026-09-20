@@ -46,9 +46,17 @@ def _cash(
     route="main_bounty_queue",
     reasons=(),
     amount="50",
+    repo="acme/widget",
+    issue=42,
 ):
     return {
         "schema": "bounty-live-cash-admission-receipt/v1",
+        "identity": {
+            "repo": repo,
+            "issue_number": issue,
+            "canonical_issue_url": f"https://github.com/{repo}/issues/{issue}",
+        },
+        "source": {"kind": "LIVE_GITHUB_PREFLIGHT"},
         "economics": {
             "currency": "USD" if amount is not None else None,
             "fixed_amount": amount,
@@ -91,7 +99,7 @@ def _argv(*, repo="acme/widget", json_out=False, dry=False):
 
 def _override_economic_verifier(monkeypatch, verifier, cash=None):
     if cash is None:
-        cash = lambda *_args, **_kwargs: _cash()
+        cash = lambda repo, issue: _cash(repo=repo, issue=issue)
     monkeypatch.setattr(e, "verify_claim_economic_receipt", verifier)
     monkeypatch.setattr(e, "evaluate_live_cash_admission", cash)
     monkeypatch.setattr(
@@ -100,6 +108,7 @@ def _override_economic_verifier(monkeypatch, verifier, cash=None):
         e._build_preflight_claim(
             verifier,
             cash,
+            e._cash_admission_block,
             now=datetime.now,
             utc=timezone.utc,
         ),
@@ -144,7 +153,7 @@ def _allow(monkeypatch, seen=None):
     def cash(repo, issue):
         if seen is not None:
             seen.append(("live_cash", repo, issue))
-        return _cash()
+        return _cash(repo=repo, issue=issue)
 
     monkeypatch.setattr(e, "verify_claim_payoff_bundle", payoff)
     _override_economic_verifier(monkeypatch, economics, cash)
@@ -224,6 +233,7 @@ def test_live_preflight_uses_process_owned_utc_clock(monkeypatch):
         e._build_preflight_claim(
             e.verify_claim_economic_receipt,
             e.evaluate_live_cash_admission,
+            e._cash_admission_block,
             now=lambda tz: trusted_now.astimezone(tz),
             utc=timezone.utc,
         ),
@@ -249,6 +259,11 @@ def test_live_cash_evaluator_is_generation_bound_after_builder(monkeypatch):
         "evaluate_live_cash_admission",
         lambda *_args, **_kwargs: pytest.fail("rebound live cash evaluator"),
     )
+    monkeypatch.setattr(
+        e,
+        "_cash_admission_block",
+        lambda *_args, **_kwargs: pytest.fail("rebound live cash reducer"),
+    )
     bound(_argv())
     assert [item[0] for item in seen][-2:] == ["availability", "live_cash"]
 
@@ -269,7 +284,13 @@ def test_live_cash_nonactive_routes_block_claim_instructions(
 
     def cash(repo, issue):
         seen.append(("live_cash", repo, issue))
-        return _cash(disposition, route=route, amount=amount)
+        return _cash(
+            disposition,
+            route=route,
+            amount=amount,
+            repo=repo,
+            issue=issue,
+        )
 
     _override_economic_verifier(monkeypatch, e.verify_claim_economic_receipt, cash)
     monkeypatch.setattr(e, "_cli_main", lambda: pytest.fail("cli"))
@@ -291,8 +312,8 @@ def test_live_cash_nonactive_routes_block_claim_instructions(
 def test_live_cash_malformed_authority_fails_closed(monkeypatch, capsys):
     _allow(monkeypatch)
 
-    def cash(*_args, **_kwargs):
-        receipt = _cash()
+    def cash(repo, issue):
+        receipt = _cash(repo=repo, issue=issue)
         receipt["authority"]["claim_authority"] = True
         return receipt
 
