@@ -35,11 +35,11 @@ A concrete fleet failure case on 2026-09-19 was a pair of automatically synced O
 }
 ```
 
-All source bytes are gathered outside this module. The gate makes no network calls. `source_content_sha256` fields bind the receipt to the exact frozen observations supplied by the caller.
+All source bytes are gathered outside this module. The gate makes no network calls. `source_content_sha256` fields bind the receipt to the exact frozen observations supplied by the caller. The authority enum is likewise an observed provenance classification, not a signature: orchestration must obtain it from a trusted connector/source collector and must not let untrusted candidate JSON self-assert `REPO_OWNER`, `REPO_MEMBER`, or `OFFICIAL_PROVIDER`.
 
 ### Deadline precision
 
-- `DATE` uses canonical `YYYY-MM-DD`. If evaluation is on a later UTC date, the deadline is definitely elapsed. If it is on the same UTC date, the gate HOLDs with `DATE_BOUNDARY_CLOCK_AMBIGUOUS`; it refuses to invent a sponsor timezone or cutoff time.
+- `DATE` uses canonical `YYYY-MM-DD`, but a civil date has neither a sponsor timezone nor a clock cutoff. The gate therefore HOLDs with `DATE_BOUNDARY_CLOCK_AMBIGUOUS` within one UTC calendar day on either side of the named date. Only a deadline at least two calendar days ahead is unambiguously current; only one at least two calendar days behind is unambiguously elapsed. This conservative window avoids inventing timezone/cutoff semantics.
 - `INSTANT` uses exact UTC RFC3339 ending in `Z` and can be evaluated exactly, including the boundary instant.
 
 An extension must use the **same precision** as the base deadline. Cross-precision comparison would require time-zone assumptions and is therefore rejected.
