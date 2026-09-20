@@ -137,6 +137,51 @@ class GrantFoxCarrierActivationTests(unittest.TestCase):
         self.assertEqual(receipt["carrier"]["current_disposition"], "HOLD")
         self.assertIn("CARRIER_CENSUS_STALE", receipt["reason_codes"])
 
+    def test_carrier_snapshot_age_policy_accepts_exact_hard_ceiling(self):
+        census = compile_grantfox_carrier_census(
+            census_request(max_snapshot_age_seconds=900)
+        )
+        receipt = self.compile(census)
+        self.assertEqual(receipt["disposition"], "APPLY_ELIGIBLE")
+        self.assertEqual(receipt["carrier"]["max_snapshot_age_seconds"], 900)
+        self.assertEqual(
+            receipt["evaluation"]["max_carrier_snapshot_age_seconds"], 900
+        )
+
+    def test_policy_widened_carrier_census_holds_before_dispatch(self):
+        census = compile_grantfox_carrier_census(
+            census_request(max_snapshot_age_seconds=901)
+        )
+        receipt = self.compile(census)
+        self.assertEqual(receipt["disposition"], "HOLD_CARRIER_CENSUS_POLICY")
+        self.assertIn(
+            "CARRIER_CENSUS_MAX_AGE_EXCEEDS_POLICY", receipt["reason_codes"]
+        )
+        self.assertEqual(
+            receipt["advisory_next_action"],
+            "REFRESH_CARRIER_CENSUS_WITH_BOUNDED_MAX_AGE",
+        )
+        self.assertEqual(
+            receipt["carrier"]["current_disposition"], "CLEAR_FOR_QUEUE_EVALUATION"
+        )
+
+    def test_23_hour_empty_census_cannot_mint_fresh_activation(self):
+        census = compile_grantfox_carrier_census(
+            census_request(
+                observed_at="2026-09-19T02:45:00Z",
+                evaluated_at="2026-09-19T02:45:30Z",
+                max_snapshot_age_seconds=86400,
+            )
+        )
+        receipt = self.compile(census, now=BASE_NOW)
+        self.assertEqual(
+            receipt["carrier"]["current_disposition"], "CLEAR_FOR_QUEUE_EVALUATION"
+        )
+        self.assertEqual(receipt["disposition"], "HOLD_CARRIER_CENSUS_POLICY")
+        self.assertIn(
+            "CARRIER_CENSUS_MAX_AGE_EXCEEDS_POLICY", receipt["reason_codes"]
+        )
+
     def test_mismatched_issue_identity_fails_closed(self):
         census = compile_grantfox_carrier_census(
             census_request(
@@ -166,6 +211,12 @@ class GrantFoxCarrierActivationTests(unittest.TestCase):
         changed = deepcopy(receipt)
         changed["carrier"]["active_or_merged_count"] = 99
         self.assertFalse(verify_carrier_activation_receipt(changed, now=BASE_NOW))
+
+        policy_changed = deepcopy(receipt)
+        policy_changed["evaluation"]["max_carrier_snapshot_age_seconds"] = 86400
+        self.assertFalse(
+            verify_carrier_activation_receipt(policy_changed, now=BASE_NOW)
+        )
 
     def test_verifier_rejects_actionable_receipt_after_census_ages_out(self):
         census = compile_grantfox_carrier_census(
