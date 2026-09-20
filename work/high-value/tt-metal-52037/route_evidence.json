@@ -1,0 +1,82 @@
+{
+  "lane": "HVQ-TT-METAL-52037/route-completeness-corrective",
+  "captured_utc_date": "2026-09-20",
+  "upstream": {
+    "repository": "tenstorrent/tt-metal",
+    "issue": 52037,
+    "advertised_usd": 1500,
+    "issue_state": "open",
+    "implementation_owner": "EazyHood",
+    "implementation_pr": 52856,
+    "implementation_head": "74999c9a6fdaf75bf6a23be32abd1dead7b35946",
+    "source_blobs": {
+      "ttnn/cpp/ttnn/operations/eltwise/binary_ng/device/binary_ng_utils.cpp": "effba6ba9034a1b53052d93fad7e6ae2198a497f",
+      "ttnn/cpp/ttnn/operations/eltwise/binary/common/binary_op_utils.cpp": "9a9ca5eae81a730a2561dbac92489ceb0fd18c50"
+    }
+  },
+  "criterion": {
+    "issue_success_criterion": 4,
+    "required_sites": [
+      "binary_ng",
+      "common_fpu",
+      "common_sfpu"
+    ],
+    "required_variants": [
+      "LOGADDEXP",
+      "LOGADDEXP2"
+    ],
+    "observed_static_status": "INCOMPLETE"
+  },
+  "routes": [
+    {
+      "site": "binary_ng",
+      "op": "LOGADDEXP",
+      "status": "LEGACY_FPU_FALLBACK_PRESENT",
+      "evidence": "SFPU branch selects SfpuBinaryOp::LOGADDEXP, else branch still EXP + EnumT::ADD + LOG"
+    },
+    {
+      "site": "binary_ng",
+      "op": "LOGADDEXP2",
+      "status": "LEGACY_FPU_FALLBACK_PRESENT",
+      "evidence": "SFPU branch selects SfpuBinaryOp::LOGADDEXP2, else branch still EXP2 + EnumT::ADD + LOG2"
+    },
+    {
+      "site": "common_fpu",
+      "op": "LOGADDEXP",
+      "status": "LEGACY_COMPOSITION_PRESENT",
+      "evidence": "PRE_IN0/PRE_IN1 EXP + add_tiles + LOG"
+    },
+    {
+      "site": "common_fpu",
+      "op": "LOGADDEXP2",
+      "status": "LEGACY_COMPOSITION_PRESENT",
+      "evidence": "PRE_IN0/PRE_IN1 EXP2 + add_tiles + LOG2"
+    },
+    {
+      "site": "common_sfpu",
+      "op": "LOGADDEXP",
+      "status": "LEGACY_COMPOSITION_PRESENT",
+      "evidence": "EXP predefines + add_binary_tile + LOG"
+    },
+    {
+      "site": "common_sfpu",
+      "op": "LOGADDEXP2",
+      "status": "LEGACY_COMPOSITION_PRESENT",
+      "evidence": "EXP2 predefines + add_binary_tile + LOG2"
+    }
+  ],
+  "artifact": {
+    "scanner": "work/high-value/tt-metal-52037/route_audit.py",
+    "tests": "tests/test_tt_metal_52037_route_audit.py",
+    "scope": "static legacy-route completeness only",
+    "hardware_or_device_claim": false,
+    "accuracy_claim": false,
+    "performance_claim": false
+  },
+  "authority": {
+    "competing_upstream_pr_opened": false,
+    "upstream_issue_or_assignment_mutated": false,
+    "bounty_entitlement_claimed": false,
+    "payment_action": false
+  }
+}
