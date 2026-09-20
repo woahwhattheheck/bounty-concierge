@@ -133,6 +133,29 @@ def test_preflight_folds_comment_truncation_into_canonical_hold(monkeypatch):
     assert result["qualification"]["disposition"] == "HOLD"
 
 
+def test_preflight_holds_on_canonical_policy_label(monkeypatch):
+    issue = {
+        "body": "/bounty $800",
+        "labels": [{"name": "$800"}, {"name": "👥 Core Team Only"}],
+    }
+    session = Session(issue, [[]])
+    monkeypatch.setattr(
+        bp,
+        "audit_bounty",
+        lambda *args, **kwargs: {
+            "issue_state": "open",
+            "open_pr_count": 0,
+            "stale_listing_signal": False,
+            "search_truncated": False,
+        },
+    )
+    result = bp.preflight_bounty("acme/repo", 24, session=session)
+    assert result["qualification"]["disposition"] == "HOLD"
+    assert result["qualification"]["dispatch"] is False
+    assert "CANONICAL_POLICY_BLOCKS_COMMUNITY_WORK" in result["qualification"]["reason_codes"]
+    assert result["qualification"]["signals"]["canonical_policy_block_categories"] == ["CORE_TEAM_ONLY"]
+
+
 def test_preflight_passes_attempt_count_without_raw_comment_text(monkeypatch):
     issue = {"body": "/bounty $100", "labels": ["$100"]}
     session = Session(
