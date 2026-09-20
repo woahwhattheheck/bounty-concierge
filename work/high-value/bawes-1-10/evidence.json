@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "lane": "HV-BAWES-1-10/CICD-RECOVERY",
+  "owner": "ZZ-Sol-Peregrine",
+  "model": "GPT-5.6 Sol",
+  "observed_at": "2026-09-19",
+  "upstream": {
+    "repo": "BAWES-Universe/workadventure-universe",
+    "branch": "universe",
+    "commit": "274bbd77dd736589e70aec32d81a6ba8dca69d60"
+  },
+  "economics": {
+    "parent_issue": 1,
+    "parent_state": "open",
+    "parent_assignees": [],
+    "parent_labels": [
+      "epic",
+      "💎 Bounty",
+      "$150"
+    ],
+    "scope_issue": 10,
+    "scope_state": "open",
+    "scope_assignees": [],
+    "classification": "PARENT_FIXED_CASH_SCOPE_ELIGIBILITY_UNCONFIRMED",
+    "payout_claimed": false,
+    "application_sent": false
+  },
+  "blobs": {
+    "build_universe_images": "9aa0ba4c0f4ec287110cb750c566df911868d735",
+    "test_universe_images": "99a52e3b67f7aae8828c4d6a847ad395aa7cc176",
+    "build_test_and_deploy": "acba35b0adfcb98cf2eedea2a699e7309e0002b7",
+    "continuous_integration": "bbd136b25090e8968c57abd5b90ca4fbc0e6b509",
+    "mobile_ci": "13269fd4c4a807d3bae89899e98b3855089f7d01",
+    "universe_workflow_readme": "8285f0cf82ac335d93b1dd30d36739aaeb26fadf",
+    "cd_readme": "dd1459048668791ae599322cd17310e920af4c2f"
+  },
+  "source_facts": {
+    "pusher_path_present": false,
+    "pusher_code_search_matches": 0,
+    "api_health_code_search_matches": 0,
+    "rollback_code_search_matches": 0,
+    "universe_latest_code_search_matches": 0,
+    "mobile_ci_present": true,
+    "active_custom_build_services": [
+      "play",
+      "back",
+      "map-storage",
+      "uploader",
+      "discord-bot",
+      "bot-server"
+    ],
+    "deploy_errors_swallowed": true,
+    "github_deployment_success_written_after_swallowed_errors": true,
+    "image_test_uses_branch_or_latest_tag": true,
+    "production_deploy_waits_for_image_test": false
+  },
+  "stale_branch": {
+    "name": "feat/cicd-universe-pipeline",
+    "head": "a2dc627edf06f86a2a80557da3de4ca7ceeddcdd",
+    "ahead_by": 2,
+    "behind_by": 873,
+    "usable_as_current_carrier": false
+  },
+  "publication_constraints": {
+    "upstream_push_permission": false,
+    "installed_owner_fork": false,
+    "connector_fork_primitive": false,
+    "tinyfish_used": false
+  }
+}
