@@ -173,3 +173,45 @@ def test_missing_implementation_owned_feature_set_is_rejected(tmp_path):
     path.write_text(content, encoding="utf-8")
     failures, _ = oracle.check(root)
     assert "MISSING INVARIANT: service declares implementation-owned Cast FEATURES" in failures
+
+def test_undeclared_feature_alias_is_rejected(tmp_path):
+    oracle = load_oracle()
+    root = passing_tree(tmp_path, oracle)
+    path = root / oracle.FILES["service"]
+    content = path.read_text(encoding="utf-8").replace(
+        "info.features = CAST_FEATURES;",
+        "info.features = COMPUTED_FEATURES;",
+    )
+    path.write_text(content, encoding="utf-8")
+    failures, _ = oracle.check(root)
+    assert (
+        "FEATURE CONTRACT: advertised Cast FEATURES must be one of the implementation-owned declarations"
+        in failures
+    )
+
+
+def test_commented_feature_declaration_does_not_count_as_owned(tmp_path):
+    oracle = load_oracle()
+    root = passing_tree(tmp_path, oracle)
+    path = root / oracle.FILES["service"]
+    content = path.read_text(encoding="utf-8").replace(
+        '  static final Feature[] CAST_FEATURES = new Feature[]{new Feature("cast_cxless", 1L)};',
+        '  // static final Feature[] CAST_FEATURES = new Feature[]{new Feature("cast_cxless", 1L)};',
+    )
+    path.write_text(content, encoding="utf-8")
+    failures, _ = oracle.check(root)
+    assert "MISSING INVARIANT: service declares implementation-owned Cast FEATURES" in failures
+
+
+def test_commented_caller_reflection_text_does_not_false_reject(tmp_path):
+    oracle = load_oracle()
+    root = passing_tree(tmp_path, oracle)
+    path = root / oracle.FILES["service"]
+    content = path.read_text(encoding="utf-8").replace(
+        "info.features = CAST_FEATURES;",
+        "// info.features = request.apiFeatures;\n    info.features = CAST_FEATURES;",
+    )
+    path.write_text(content, encoding="utf-8")
+    failures, _ = oracle.check(root)
+    assert not any("caller-controlled apiFeatures/defaultFeatures" in failure for failure in failures)
+
