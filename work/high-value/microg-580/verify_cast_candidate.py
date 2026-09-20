@@ -77,22 +77,25 @@ def check(root: Path) -> tuple[list[str], list[str]]:
             "service returns ConnectionInfo", failures)
     service = src["service"]
     info_match = re.search(
-        r"\bConnectionInfo\s+(\w+)\s*=\s*new\s+ConnectionInfo\s*\(\s*\)\s*;",
+        r"(?m)^[ \t]*ConnectionInfo\s+(\w+)\s*=\s*new\s+ConnectionInfo\s*\(\s*\)\s*;",
         service,
     )
-    feature_decl = re.search(
-        r"\b(?:public\s+)?(?:static\s+final|final\s+static)\s+Feature\[\]\s+([A-Z][A-Z0-9_]*FEATURES)\s*=",
-        service,
+    feature_names = set(
+        re.findall(
+            r"(?m)^[ \t]*(?:(?:public|private|protected)\s+)?"
+            r"(?:static\s+final|final\s+static)\s+Feature\[\]\s+"
+            r"([A-Z][A-Z0-9_]*FEATURES)\s*=",
+            service,
+        )
     )
     if info_match is None:
         failures.append("FEATURE CONTRACT: service must construct ConnectionInfo explicitly")
-    if feature_decl is None:
+    if not feature_names:
         failures.append("MISSING INVARIANT: service declares implementation-owned Cast FEATURES")
-    if info_match is not None and feature_decl is not None:
+    if info_match is not None and feature_names:
         info_name = info_match.group(1)
-        feature_name = feature_decl.group(1)
         assignments = re.findall(
-            rf"\b{re.escape(info_name)}\.features\s*=\s*([^;]+);",
+            rf"(?m)^[ \t]*{re.escape(info_name)}\.features\s*=\s*([^;]+);",
             service,
         )
         if not assignments:
@@ -103,7 +106,11 @@ def check(root: Path) -> tuple[list[str], list[str]]:
                 failures.append(
                     "FEATURE CONTRACT: caller-controlled apiFeatures/defaultFeatures must not be advertised directly"
                 )
-            elif rhs != feature_name:
+            elif re.fullmatch(r"[A-Z][A-Z0-9_]*FEATURES", rhs) and rhs not in feature_names:
+                failures.append(
+                    "FEATURE CONTRACT: advertised Cast FEATURES must be one of the implementation-owned declarations"
+                )
+            elif rhs not in feature_names:
                 failures.append(
                     "FEATURE CONTRACT: ConnectionInfo features must come from the implementation-owned feature set"
                 )
