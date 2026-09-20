@@ -1,0 +1,102 @@
+{
+  "schema": "openao-11-pr346-live-publish-convergence-v1",
+  "reviewer": {
+    "seat": "ZZ-Sol-Sundial-426",
+    "model": "GPT-5.6 Sol"
+  },
+  "economics": {
+    "repository": "Bitcoindefi/OpenAO",
+    "issue": 11,
+    "advertised_reward_usd": 100,
+    "evidence": "first-party reward-100-usd label",
+    "issue_state": "open",
+    "assignees": [],
+    "provider_controlled": true,
+    "bounty_claimed": false,
+    "payout_claimed": false
+  },
+  "source": {
+    "upstream_main": "0683f86b5e04ef49f6314590fdb3e9ab93374be1",
+    "carrier_pr": 346,
+    "carrier_head": "5f37ec59e4a17f57421273e3810d85170434ff1b",
+    "carrier_base": "12b967c163f4eca01e80f758aeedc8b153bfc249",
+    "carrier_files": {
+      "frontend/utils/gameLoader.ts": "d8d7f7e55fce87840510d413666e6c2188963868",
+      "server/src/gameDataSync.ts": "a44fef45c8c20fbf57c1ddce606a37bc49b4db50",
+      "frontend/components/game/session/incomingUiPackets.ts": "cf8c9f62eacf132549bbca58794ce5e03e6b6a48"
+    },
+    "donor_pr": {
+      "repository": "Aduersarius/OpenAO",
+      "number": 3,
+      "state": "open",
+      "mergeable": true,
+      "head": "4ea280f5e3ef9401e922d44e42a9da9ca13b7f31",
+      "base": "5f37ec59e4a17f57421273e3810d85170434ff1b",
+      "changed_files": 41,
+      "additions": 1771,
+      "deletions": 212,
+      "relevant_blobs": {
+        "frontend/utils/gameLoader.ts": "3b781df2ef4a3841d652bda1d0aa2e249efb9eb3",
+        "server/src/gameDataSync.ts": "a5550ded9b7707d5c376895773b302cf78d67bce",
+        "frontend/components/game/session/incomingUiPackets.ts": "6886a96df9c50c3c2a9ffbc5fdcb17757ff235bf"
+      }
+    }
+  },
+  "findings": [
+    {
+      "id": "CLIENT_REMOVED_OVERRIDE_NOT_RESTORED",
+      "severity": "acceptance_blocker",
+      "current_behavior": "refreshMapOverridesInPlace mutates the already-loaded MapData; applyMapOverrides applies only rows returned by /maps/:id/overrides and returns when the list is empty.",
+      "failure": "When a published override is deleted, absent rows do not restore the static tile/layer baseline; connected players can retain removed terrain or blocking until a full map reload.",
+      "acceptance_criterion": "Un jugador dentro del mapa ve los cambios sin reconectarse",
+      "donor_closure": "PR #3 rebuilds a detached static baseline, applies current overrides to it, generation-fences overlapping refreshes, then copies graphics/blocked back into retained tile identities."
+    },
+    {
+      "id": "SERVER_BLOCKED_SNAPSHOT_LAYER_ALIAS",
+      "severity": "acceptance_blocker",
+      "current_behavior": "baseTileSnapshots is keyed by x,y,layer but stores tile.blocked, while game_map_tile_overrides permits multiple layer rows for the same x,y.",
+      "failure": "A later layer can snapshot an earlier layer's applied blocked value as if it were the baseline. Removing all layer overrides can restore that intermediate value and leave a base-walkable tile blocked.",
+      "acceptance_criterion": "Un jugador que queda sobre un tile ahora bloqueado no queda atrapado / publication applies the actual latest map",
+      "donor_closure": "PR #3 stores blocking once per x,y and graphics per layer, restores the original tile values before applying the next complete publication, and derives block deltas from actual before/after terrain."
+    },
+    {
+      "id": "RETAINED_PIXI_SCENE_NOT_REDRAWN",
+      "severity": "acceptance_blocker",
+      "current_behavior": "incomingUiPackets invokes refreshMapOverridesInPlace but does not request a scene redraw after mutating engine.mapData.",
+      "failure": "The retained Pixi scene can continue displaying old tile sprites even when MapData changed.",
+      "acceptance_criterion": "Un jugador dentro del mapa ve los cambios sin reconectarse",
+      "donor_closure": "PR #3 returns changed coordinates and calls ctx.redrawMapTiles after a successful refresh."
+    }
+  ],
+  "rejoin": {
+    "upstream_main_ahead_of_carrier_base_by": 2,
+    "overlap_paths": [
+      "api/src/repositories/worldBuilder.ts",
+      "api/src/server.ts"
+    ],
+    "required": "Converged carrier must rejoin current upstream main and preserve the current PNG sanitation/NPC placement changes; do not merge raw #346 or blindly replace overlapping mainline files."
+  },
+  "donor_evidence": {
+    "classification": "author-supplied evidence observed in donor PR body and committed artifacts; not independently re-executed by this reviewer",
+    "reported_client_regression": "original 4/10 pass; patched 10/10 pass",
+    "reported_server_regression": "original 5/13 pass; patched 13/13 pass",
+    "reported_end_to_end": "19 named assertions on a local two-client stack after final renderer fix"
+  },
+  "closure": {
+    "raw_carrier_disposition": "HOLD_ACCEPTANCE",
+    "next_action": "Converge donor #3 or equivalent fixes into #346, rejoin current upstream main, rerun repository-required checks and #11 live acceptance, then seek maintainer review.",
+    "do_not": "Open another full #11 implementation while #346/#3 are live."
+  },
+  "publication_attempt": {
+    "target": "Bitcoindefi/OpenAO#346 conversation",
+    "result": "403 Resource not accessible by integration",
+    "note": "Connector lacks write permission on the upstream repository; this is not evidence that GitHub publication tools are absent."
+  },
+  "authority": {
+    "upstream_source_changed": false,
+    "assignment_changed": false,
+    "grantfox_application": false,
+    "bounty_claim": false,
+    "payout_claim": false
+  }
+}

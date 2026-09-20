@@ -1,0 +1,79 @@
+{
+  "schema": "openao-11-pr346-reproduction-v1",
+  "carrier_head": "5f37ec59e4a17f57421273e3810d85170434ff1b",
+  "vectors": [
+    {
+      "id": "client-remove-last-override",
+      "base": {
+        "graphics": {
+          "1": 101
+        },
+        "blocked": 0
+      },
+      "published_then_live": {
+        "graphics": {
+          "1": 202
+        },
+        "blocked": 1
+      },
+      "next_api_overrides": [],
+      "current_head_result": {
+        "graphics": {
+          "1": 202
+        },
+        "blocked": 1
+      },
+      "required_result": {
+        "graphics": {
+          "1": 101
+        },
+        "blocked": 0
+      },
+      "explanation": "Current refresh reuses the mutated MapData and applyMapOverrides returns immediately on an empty override list."
+    },
+    {
+      "id": "server-multilayer-blocked-baseline",
+      "base": {
+        "blocked": null
+      },
+      "publication": [
+        {
+          "x": 10,
+          "y": 10,
+          "layer": 1,
+          "grhIndex": 201,
+          "blocked": true
+        },
+        {
+          "x": 10,
+          "y": 10,
+          "layer": 2,
+          "grhIndex": 301,
+          "blocked": null
+        }
+      ],
+      "next_publication": [],
+      "current_head_trace": [
+        "layer 1 snapshot captures blocked=undefined; layer 1 applies blocked=1",
+        "layer 2 snapshot captures blocked=1 because snapshot key includes layer",
+        "removing layer 1 deletes blocked",
+        "removing layer 2 restores blocked=1 from its polluted snapshot"
+      ],
+      "current_head_result": {
+        "blocked": 1
+      },
+      "required_result": {
+        "blocked": null
+      },
+      "explanation": "Blocking is tile-level state but the current snapshot key is x,y,layer."
+    },
+    {
+      "id": "retained-scene-redraw",
+      "event": "[MAP_LIVE_RELOAD] map=N version=V",
+      "current_head_path": "invalidate cache -> void refreshMapOverridesInPlace(engine.mapData, N) -> no scene redraw",
+      "required_path": "await refresh -> collect changed tile coordinates -> redraw retained scene tiles",
+      "donor_fix": "Aduersarius/OpenAO#3 head 4ea280f5e3ef9401e922d44e42a9da9ca13b7f31"
+    }
+  ],
+  "use": "These are closure vectors for the existing carrier/donor. They are not a competing bounty submission."
+}
