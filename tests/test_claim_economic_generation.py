@@ -239,7 +239,11 @@ def test_entrypoint_rejects_forged_rate_receipt_before_provider_reads(monkeypatc
     monkeypatch.setattr(e, "inspect_bounty_availability", lambda *_: seen.append("availability"))
     now = datetime(2026, 9, 17, 20, 30, tzinfo=timezone.utc)
     preflight = e._build_preflight_claim(
-        gate.verify_claim_economic_receipt, now=lambda _tz: now, utc=timezone.utc,
+        gate.verify_claim_economic_receipt,
+        lambda *_args, **_kwargs: seen.append("live_cash"),
+        e._cash_admission_block,
+        now=lambda _tz: now,
+        utc=timezone.utc,
     )
     argv = ["claim", "--repo", "acme/widget", "--issue", "42", "--wallet", "alice",
             "--payoff-bundle", str(tmp_path / "unused-payoff"),
