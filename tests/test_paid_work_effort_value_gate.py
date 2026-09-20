@@ -25,7 +25,7 @@ POLICY = {
         "max_batch_items": 200,
         "currencies": {
             "USD": {
-                "min_single_reward": "100",
+                "min_single_reward": "50",
                 "min_batch_reward": "500",
                 "min_reward_per_agent_hour": "100",
             },
@@ -124,6 +124,23 @@ class PaidWorkEffortValueGateTests(unittest.TestCase):
             receipt["authority"]["payment_cash_or_revenue_authority"]
         )
 
+    def test_50_dollar_fast_job_clears_single_and_rate_floors(self):
+        receipt = compile_paid_work_effort_value_gate(
+            request(candidate(amount="50", hours="0.5", cost="0"))
+        )
+        self.assertEqual(receipt["decision"], "GO")
+        self.assertEqual(receipt["reason_codes"], ["ALL_GATES_CLEAR"])
+        self.assertEqual(
+            receipt["economics"]["net_reward_after_model_tool_cost"],
+            "50",
+        )
+        nested = receipt["economics"]["fleet_economic_receipt"]
+        self.assertIsNotNone(nested)
+        row = nested["candidates"][0]
+        self.assertEqual(row["disposition"], "SINGLE_ELIGIBLE")
+        self.assertEqual(row["reward_per_agent_hour"], "100")
+        self.assertTrue(row["economically_eligible"])
+
     def test_frantic_one_dollar_seed_skips_economics(self):
         receipt = compile_paid_work_effort_value_gate(
             request(candidate(amount="1", cost="0"))
@@ -174,7 +191,7 @@ class PaidWorkEffortValueGateTests(unittest.TestCase):
 
     def test_post_cost_reward_floor_can_turn_gross_go_into_skip(self):
         receipt = compile_paid_work_effort_value_gate(
-            request(candidate(amount="120", cost="30"))
+            request(candidate(amount="120", hours="0.5", cost="80"))
         )
         self.assertTrue(receipt["economics"]["gross_economically_eligible"])
         self.assertEqual(receipt["decision"], "SKIP_ECONOMICS")

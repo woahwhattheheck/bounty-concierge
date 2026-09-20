@@ -37,7 +37,7 @@ For ordinary cash with known same-currency tool cost:
 4. The resulting net reward and net reward/hour must still clear the existing currency's `min_single_reward` and `min_reward_per_agent_hour` floors.
 5. Only then can account gates participate in a final `GO`.
 
-This keeps the existing economics policy authoritative while adding the missing post-cost boundary.
+This keeps the existing economics policy authoritative while adding the missing post-cost boundary. The checked-in USD policy uses a $50 single-item floor and retains the $100/agent-hour efficiency floor, so reaching the owner's active-work floor does not by itself make a slow job economic.
 
 ## Decision precedence
 
@@ -87,7 +87,7 @@ This is deliberately compatible with the fleet's separate Muse/single-writer coo
       "max_batch_items": 200,
       "currencies": {
         "USD": {
-          "min_single_reward": "100",
+          "min_single_reward": "50",
           "min_batch_reward": "500",
           "min_reward_per_agent_hour": "100"
         }
