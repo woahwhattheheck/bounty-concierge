@@ -1,0 +1,63 @@
+{
+  "schema": "openao-25-pr368-regression-v1",
+  "carrier_head": "8b32f063b515c725d0b1ec9b7a862eb7f724250f",
+  "vectors": [
+    {
+      "id": "preview-assets",
+      "map_owner_has_uploaded_graphic": {
+        "grhIndex": 9001,
+        "checksum": "example",
+        "byteSize": 4096
+      },
+      "raw_368_queue_shape": ["mapData", "reportsCount"],
+      "required": "Moderator preview includes uploaded asset metadata sufficient to inspect the author's graphics without entering gameplay.",
+      "source_donor": "PR #350 getModeratorPreview preview.assets"
+    },
+    {
+      "id": "report-second-query-fails",
+      "initial": {
+        "mapState": "published",
+        "reportExists": false
+      },
+      "operation": [
+        "INSERT/UPSERT report succeeds",
+        "UPDATE map state to in_review fails"
+      ],
+      "raw_possible_result": {
+        "mapState": "published",
+        "reportExists": true,
+        "api": "error"
+      },
+      "required": {
+        "atomic": true,
+        "allowed_results": [
+          "report exists and map is in_review",
+          "neither change commits"
+        ]
+      }
+    },
+    {
+      "id": "approve-audit-insert-fails",
+      "initial": {
+        "mapState": "in_review",
+        "reviewEvent": false
+      },
+      "operation": [
+        "UPDATE map state to published succeeds",
+        "INSERT approved review event fails"
+      ],
+      "raw_possible_result": {
+        "mapState": "published",
+        "reviewEvent": false,
+        "api": "error"
+      },
+      "required": {
+        "atomic": true,
+        "allowed_results": [
+          "published plus approved audit event",
+          "state remains in_review and no approved event"
+        ]
+      }
+    }
+  ]
+}

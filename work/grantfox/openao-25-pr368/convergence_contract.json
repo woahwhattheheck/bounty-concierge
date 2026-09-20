@@ -1,0 +1,84 @@
+{
+  "schema": "openao-25-pr368-convergence-v1",
+  "reviewer": {
+    "seat": "ZZ-Sol-Sundial-426",
+    "model": "GPT-5.6 Sol"
+  },
+  "economics": {
+    "repository": "Bitcoindefi/OpenAO",
+    "issue": 25,
+    "advertised_reward_usd": 100,
+    "evidence": "first-party reward-100-usd label",
+    "issue_state": "open",
+    "assignees": [],
+    "bounty_claimed": false,
+    "payout_claimed": false
+  },
+  "carrier": {
+    "pr": 368,
+    "head": "8b32f063b515c725d0b1ec9b7a862eb7f724250f",
+    "relevant_blobs": {
+      "api/src/repositories/userMaps.ts": "b17dd8153141071f43420d5b65853575170a7e5a",
+      "api/src/server.ts": "3e51a9da7131a5443f5ebce14dc14a108fabf83e",
+      "api/src/tests/userMaps.test.ts": "b4bc80aaf5629f7d6fffbf4097a0e51c09d247ea"
+    }
+  },
+  "live_carriers": [59, 350, 368],
+  "findings": [
+    {
+      "id": "MODERATOR_ASSET_PREVIEW_MISSING",
+      "severity": "acceptance_blocker",
+      "acceptance": "Reviewer can view the map and its assets without playing it.",
+      "raw_368": "UserMapResponse/getModerationQueue can include mapData and reportsCount but contain no uploaded-asset field/query.",
+      "required": "Expose author-uploaded graphics/assets with the moderation preview."
+    },
+    {
+      "id": "REPORT_REQUEUE_NOT_ATOMIC",
+      "severity": "acceptance_blocker",
+      "raw_368": "reportMap writes user_map_reports and then separately updates user_maps.state to in_review with no transaction.",
+      "failure": "Second-query failure can leave a stored report while the map remains published.",
+      "required": "Report persistence and requeue state transition commit or roll back together."
+    },
+    {
+      "id": "REVIEW_TRANSITION_AUDIT_NOT_ATOMIC",
+      "severity": "workflow_blocker",
+      "raw_368": "approve/reject/unpublish update user_maps and then separately insert user_map_reviews with no transaction.",
+      "failure": "Audit insertion failure can surface an API error after the map state has already changed.",
+      "required": "State transition and review event commit or roll back together."
+    }
+  ],
+  "convergence_donor": {
+    "pr": 350,
+    "head": "df4de3dd5a307b700399166b384f3787bec65fc9",
+    "relevant_blob": "469f5ba25f5c8f1f1d1d20bb5a7960b388260cf2",
+    "useful_behavior": "getModeratorPreview queries game_uploaded_graphics by owner_account_id and exposes preview.assets.",
+    "classification": "source donor only; not an overall endorsement of PR #350"
+  },
+  "hosted_checks": [
+    {
+      "workflow": "Secret Scan",
+      "run_id": 34395752549,
+      "conclusion": "action_required",
+      "jobs": 0,
+      "classification": "not executed"
+    },
+    {
+      "workflow": "CI",
+      "run_id": 34395752552,
+      "conclusion": "action_required",
+      "jobs": 0,
+      "classification": "not executed"
+    }
+  ],
+  "closure": {
+    "disposition": "HOLD_ACCEPTANCE_AND_CONVERGE",
+    "next_action": "Converge asset-preview behavior and transactional moderation transitions into the chosen #25 carrier, rejoin current main, run real database concurrency/failure tests and hosted CI."
+  },
+  "authority": {
+    "upstream_source_changed": false,
+    "assignment_changed": false,
+    "grantfox_application": false,
+    "bounty_claim": false,
+    "payout_claim": false
+  }
+}
