@@ -142,6 +142,50 @@ def test_stale_or_truncated_canonical_state_holds():
     ]
 
 
+@pytest.mark.parametrize(
+    ("policy_label", "expected_category"),
+    [
+        ("👥 Core Team Only", "CORE_TEAM_ONLY"),
+        ("Maintainers Only", "CORE_TEAM_ONLY"),
+        ("⏸️ Hold", "CONTRIBUTION_HOLD"),
+        ("status: on_hold", "CONTRIBUTION_HOLD"),
+        ("status: blocked by upstream", "BLOCKED"),
+    ],
+)
+def test_canonical_policy_labels_hold_paid_work(policy_label, expected_category):
+    result = bq.qualify_dispatch(
+        {
+            "body": "/bounty $100",
+            "labels": ["$100", policy_label],
+            "canonical_audit": _audit(),
+        }
+    )
+
+    assert result["disposition"] == "HOLD"
+    assert result["dispatch"] is False
+    assert result["reason_codes"] == ["CANONICAL_POLICY_BLOCKS_COMMUNITY_WORK"]
+    assert result["signals"]["canonical_policy_block_categories"] == [
+        expected_category
+    ]
+
+
+@pytest.mark.parametrize(
+    "near_miss",
+    ["Core Team", "Holdings", "Unblocked", "Blocker", "Community Ready"],
+)
+def test_policy_label_near_misses_do_not_block_dispatch(near_miss):
+    result = bq.qualify_dispatch(
+        {
+            "body": "/bounty $100",
+            "labels": ["$100", near_miss],
+            "canonical_audit": _audit(),
+        }
+    )
+
+    assert result["disposition"] == "ACTIONABLE"
+    assert result["signals"]["canonical_policy_block_categories"] == []
+
+
 def test_clean_listing_is_actionable():
     result = bq.qualify_dispatch(
         {
@@ -155,6 +199,7 @@ def test_clean_listing_is_actionable():
     assert result["disposition"] == "ACTIONABLE"
     assert result["dispatch"] is True
     assert result["reason_codes"] == []
+    assert result["signals"]["canonical_policy_block_categories"] == []
     assert bq.format_summary(result) == (
         "disposition=ACTIONABLE dispatch=true reasons=none"
     )
