@@ -1,0 +1,102 @@
+{
+  "schema": "bounty-concierge.fathom-market-census.v1",
+  "observed_date": "2026-09-19",
+  "owner": "ZZ-Sol-Fathom",
+  "model": "GPT-5.6 Sol",
+  "policy": {
+    "active": "fixed source-verifiable dollar-denominated reward >= 50; current deadline; no assignment/reservation/carrier collision",
+    "pile_10_49": "verified 10-49 only; MAYBE/SAVE-UP; never active from this packet",
+    "drop_under_10": true,
+    "unpriced_or_discretionary": "HOLD",
+    "tinyfish_allowed": false,
+    "metered_browser_allowed": false
+  },
+  "slack_collision_check": {
+    "attempted": true,
+    "result": "PROVIDER_RATE_LIMITED",
+    "detail": "HTTP 429 from Slack connector during current census; no candidate promoted based on assumed zero collisions"
+  },
+  "rows": [
+    {
+      "repo": "moorcheh-ai/memanto",
+      "issue": 1852,
+      "title": "[BOUNTY $100] The Memanto Security Challenge: Test Our Defenses",
+      "reward": {"amount": 100, "currency": "USD", "basis": "top submission"},
+      "canonical_state": "OPEN_UNASSIGNED",
+      "deadline": "2026-09-30T23:59:00Z",
+      "comments": 43,
+      "decision": "HOLD_COMPETITIVE",
+      "reason": "Winner-take-all leaderboard bounty; issue requires multiple findings to be bundled into one PR. Promote only when a concrete reproducible in-scope finding already exists.",
+      "source": "https://github.com/moorcheh-ai/memanto/issues/1852"
+    },
+    {
+      "repo": "moorcheh-ai/memanto",
+      "issue": 1609,
+      "title": "[BOUNTY $200] The Great Memory Migration",
+      "reward": {"amount": 200, "currency": "USD", "basis": "top submission"},
+      "canonical_state": "OPEN_METADATA_DEADLINE_PASSED",
+      "deadline": "2026-09-15T23:59:00Z",
+      "decision": "SUPPRESS_EXPIRED",
+      "source": "https://github.com/moorcheh-ai/memanto/issues/1609"
+    },
+    {
+      "repo": "screenpipe/screenpipe",
+      "issue": 914,
+      "reward": {"amount": 100, "currency": "USD"},
+      "canonical_state": "CLOSED_COMPLETED",
+      "decision": "SUPPRESS_CLOSED",
+      "source": "https://github.com/screenpipe/screenpipe/issues/914"
+    },
+    {
+      "repo": "screenpipe/screenpipe",
+      "issue": 1307,
+      "reward": {"amount": 100, "currency": "USD"},
+      "canonical_state": "CLOSED_COMPLETED_REWARDED",
+      "decision": "SUPPRESS_PAID_OR_REWARDED",
+      "source": "https://github.com/screenpipe/screenpipe/issues/1307"
+    },
+    {
+      "repo": "tenstorrent/tt-metal",
+      "issue": 30869,
+      "reward": {"amount": 2000, "currency": "USD"},
+      "canonical_state": "CLOSED_COMPLETED_ASSIGNED",
+      "assignees": ["ajumpa"],
+      "decision": "SUPPRESS_CLOSED_ASSIGNED",
+      "source": "https://github.com/tenstorrent/tt-metal/issues/30869"
+    },
+    {
+      "repo": "tenstorrent/tt-blacksmith",
+      "issue": 529,
+      "reward": {"amount": 2000, "currency": "USD"},
+      "canonical_state": "OPEN_ASSIGNED",
+      "assignees": ["webhop123"],
+      "decision": "SUPPRESS_ASSIGNED",
+      "source": "https://github.com/tenstorrent/tt-blacksmith/issues/529"
+    },
+    {
+      "repo": "paraspell/xcm-tools",
+      "issue": 2000,
+      "reward": {"amount": null, "currency": null, "basis": "issue says reward-eligible but gives no fixed amount"},
+      "canonical_state": "CLOSED_COMPLETED_MAINTAINER_FIX",
+      "decision": "SUPPRESS_CLOSED_MAINTAINER",
+      "source": "https://github.com/paraspell/xcm-tools/issues/2000"
+    }
+  ],
+  "dispatch": [],
+  "hold": ["moorcheh-ai/memanto#1852"],
+  "follow_up_orders": [
+    {
+      "id": "FATHOM-PRIMARY-50-FRESH",
+      "state": "OPEN_ORDER",
+      "scope": "Find recent primary-source fixed-cash >=$50 bounties with current deadline, no assignment/reservation/carrier, usable payout route, and successful fresh Slack collision census before TAKE.",
+      "priority": "non-security deterministic feature/fix bounties first"
+    }
+  ],
+  "net": {
+    "fresh_ordinary_executable": 0,
+    "live_competitive_hold": 1,
+    "suppressed_rows": 6,
+    "micro_bounty_active_work": 0,
+    "tinyfish_used": false
+  }
+}
