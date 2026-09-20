@@ -170,7 +170,7 @@ def verify_batch_receipt(receipt: dict[str, Any]) -> bool:
     possible_discretionary = 0
 
     for child in children:
-        if not verify_receipt(child):
+        if not verify_receipt(child, semantic=True):
             return False
         key = _canonical_key(child)
         if key in seen:
