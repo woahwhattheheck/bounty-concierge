@@ -1,0 +1,106 @@
+{
+  "authority": {
+    "claims_device_execution": false,
+    "claims_issue_assignment": false,
+    "claims_payout": false,
+    "claims_performance": false,
+    "claims_upstream_implementation": false,
+    "kind": "independent-host-acceptance-artifact"
+  },
+  "captured_utc": "2026-09-20",
+  "derived": {
+    "center_trim_samples_each_side": 8,
+    "concurrent_window_count": 4,
+    "configured_chunk_mel_frames": 50,
+    "configured_chunk_output_samples": 24000,
+    "configured_chunk_seconds": 1.0,
+    "decoder_fusion_lengths_formula": [
+      "8*T",
+      "40*T",
+      "120*T+1"
+    ],
+    "mel_frame_rate_hz": 50,
+    "output_samples_formula": "480*T",
+    "overlap_samples": 12,
+    "prior_spectral_frames_lower_bound": 3,
+    "samples_per_mel_frame": 480,
+    "source_downsample_strides": [
+      15,
+      3,
+      1
+    ],
+    "source_stft_frames_formula": "120*T+1"
+  },
+  "issue": {
+    "advertised_usd": 2000,
+    "assignee": "Sedherthe",
+    "number": 54104,
+    "repo": "tenstorrent/tt-metal",
+    "state": "open",
+    "title": "[Bounty $2000] CosyVoice2 (HiFT Vocoder + iSTFT + Streaming Pipeline) bring up using TTNN APIs"
+  },
+  "local_proof": {
+    "commands": [
+      "python3 test_streaming_contract.py",
+      "python3 -O test_streaming_contract.py",
+      "python3 streaming_contract.py"
+    ],
+    "interpreter": "/usr/bin/python3",
+    "oracle_exit_code": 0,
+    "tests_normal": {
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 9
+    },
+    "tests_optimized": {
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 9
+    }
+  },
+  "reference": {
+    "contract": {
+      "chunk_tokens": 25,
+      "hop_len": 4,
+      "n_fft": 16,
+      "sample_rate": 24000,
+      "spectral_bins": 9,
+      "synthesis_head_channels": 18,
+      "token_frame_rate": 25,
+      "token_mel_ratio": 2,
+      "upsample_kernel_sizes": [
+        16,
+        11,
+        7
+      ],
+      "upsample_rates": [
+        8,
+        5,
+        3
+      ]
+    },
+    "main": "074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc",
+    "repo": "QwenAudio/CosyVoice",
+    "sources": {
+      "cosyvoice/hifigan/generator.py": "bbc2a2112bfd260963765af33760c95c3161fe14",
+      "examples/libritts/cosyvoice2/conf/cosyvoice2.yaml": "8a4db63b1e3a9be36d001df61109074f002813a3"
+    }
+  },
+  "schema": "tt-metal-54104-acceptance-evidence/v1",
+  "tt_metal": {
+    "current_source_correction": {
+      "current_istft_precedent_proven": false,
+      "forward_stft_location": "models/tt_dit/models/audio_vae/bwe_ltx.py::_STFTFn",
+      "inverse_basis_dropped": true,
+      "issue_text_location_is_stale": "models/tt_dit/models/audio_vae/vocoder_ltx.py",
+      "phase_dropped": true
+    },
+    "main": "708e7f58aef9d089f0e5097d4a772c7c8ee129ea",
+    "sources": {
+      "models/experimental/pi0/tt/ttnn_pi0_model.py": "f07660b78a378b3f5fd97227a388a49376f689a9",
+      "models/tt_dit/models/audio_vae/bwe_ltx.py": "776f4dae4c934e46ad449ee17cb83b1e9da3dd21",
+      "models/tt_dit/models/audio_vae/vocoder_ltx.py": "bdfdc58fb8363932a169d03854c5289cf6aac9ec",
+      "models/tt_transformers/tt/model_config.py": "33f196f5f8479000c158bc6d01378bbc3b37789b"
+    }
+  }
+}
