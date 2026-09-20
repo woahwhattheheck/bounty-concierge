@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-19T20:40:00-04:00",
+  "upstream": {
+    "repository": "microg/GmsCore",
+    "default_branch": "master",
+    "source_sha": "4c74e5acb79479004428be755547432294639878",
+    "issue": 580,
+    "issue_state": "open",
+    "issue_assigned": false
+  },
+  "posted_bounties_usd": [
+    {
+      "provider": "BountyHub",
+      "id": "27c3cfe0-da9e-4192-848a-b676402de81c",
+      "amount": 250
+    },
+    {
+      "provider": "BountyHub",
+      "id": "ef91cb1e-dd69-4a33-bd90-21c9679c9247",
+      "amount": 150
+    }
+  ],
+  "posted_total_usd": 400,
+  "award_guaranteed": false,
+  "current_master_gaps": {
+    "connectionless_controller_calls_present": false,
+    "connectionless_listener_readiness_present": false,
+    "cast_api_161_service_admitted": false,
+    "cxless_features_advertised": false,
+    "framework_route_callback_registered": false,
+    "reconnection_delegate_non_null": false
+  },
+  "preferred_carriers": [
+    {
+      "pr": 3567,
+      "head_sha": "3da2c730bbba316035b202ee92302e9c947d0036",
+      "role": "framework-session-start"
+    },
+    {
+      "pr": 3570,
+      "head_sha": "da96e2e1880f437a7f349fec9ffbe2f8f82fad98",
+      "role": "connectionless-controller-service-aidl"
+    },
+    {
+      "pr": 3577,
+      "head_sha": "e2f880857b7fe92db4f06da42ae7ca64a40da001",
+      "role": "reconnection-service-crash-closure"
+    },
+    {
+      "pr": 3554,
+      "head_sha": "5523643fd229c0cd2c1b3cde7611d79d7f629aab",
+      "role": "dynamite-module-descriptor"
+    }
+  ],
+  "do_not_compose_as_written": [
+    {
+      "pr": 3802,
+      "head_sha": "fc69d36e8fd69f25b8cd1c42cad02c8aa21662b9",
+      "reason": "renumbers existing Binder/AIDL contract and removes sendMessage ordinal while misreading ordinal-vs-transaction offset"
+    }
+  ],
+  "recommended_next_action": "maintainer-approved current-master consolidation of #3567 + #3570 + #3577 + #3554, selectively reconciling #3470 lifecycle pieces, with explicit Binder ABI and modern-app hardware regressions",
+  "external_claim_submitted": false,
+  "external_pr_submitted": false,
+  "sponsor_contacted": false
+}
