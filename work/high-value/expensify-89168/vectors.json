@@ -1,0 +1,91 @@
+{
+  "source_issue": "Expensify/App#89168",
+  "source_pin": "dd0e8b65546b6e2e8914e74c535da26cd85dacc5",
+  "cases": [
+    {
+      "input": "group-by: reports",
+      "expected": "\"group-by: reports\"",
+      "class": "whitespace-after-operator"
+    },
+    {
+      "input": "group-by:reports",
+      "expected": "\"group-by:reports\"",
+      "class": "existing-no-space"
+    },
+    {
+      "input": "group-by : reports",
+      "expected": "\"group-by : reports\"",
+      "class": "whitespace-both-sides"
+    },
+    {
+      "input": "amount > 100",
+      "expected": "\"amount > 100\"",
+      "class": "comparison-whitespace"
+    },
+    {
+      "input": "from: bob",
+      "expected": "\"from: bob\"",
+      "class": "filter-whitespace"
+    },
+    {
+      "input": "category : travel",
+      "expected": "\"category : travel\"",
+      "class": "filter-whitespace"
+    },
+    {
+      "input": "group-by:",
+      "expected": "\"group-by:\"",
+      "class": "bare-key-operator"
+    },
+    {
+      "input": "coffee group-by: card",
+      "expected": "coffee \"group-by: card\"",
+      "class": "mixed-plain-syntax"
+    },
+    {
+      "input": "from: bob category:x",
+      "expected": "\"from: bob\" \"category:x\"",
+      "class": "adjacent-syntax"
+    },
+    {
+      "input": "\"group-by: reports\"",
+      "expected": "\"group-by: reports\"",
+      "class": "already-quoted"
+    },
+    {
+      "input": "hello world",
+      "expected": "hello world",
+      "class": "plain"
+    },
+    {
+      "input": "foo:bar",
+      "expected": "foo:bar",
+      "class": "unknown-key"
+    },
+    {
+      "input": "TYPE:expense",
+      "expected": "\"TYPE:expense\"",
+      "class": "case-insensitive"
+    },
+    {
+      "input": "-type:expense",
+      "expected": "\"-type:expense\"",
+      "class": "negated"
+    },
+    {
+      "input": "report-field-trip-id: 42",
+      "expected": "\"report-field-trip-id: 42\"",
+      "class": "dynamic-report-field"
+    }
+  ],
+  "context_case": {
+    "current_query": "type:expense from:21462841",
+    "typed_input": "group-by: reports",
+    "must_contain": [
+      "type:expense",
+      "from:21462841",
+      "\"group-by: reports\""
+    ],
+    "must_not_materialize": "groupBy=reports"
+  }
+}

@@ -1,0 +1,37 @@
+diff --git a/tests/unit/Search/SearchQueryUtilsTest.ts b/tests/unit/Search/SearchQueryUtilsTest.ts
+--- a/tests/unit/Search/SearchQueryUtilsTest.ts
++++ b/tests/unit/Search/SearchQueryUtilsTest.ts
+@@
+     describe('getKeywordQueryWithCurrentSearchContext', () => {
++        it.each([
++            ['group-by: reports', '"group-by: reports"'],
++            ['group-by : reports', '"group-by : reports"'],
++            ['amount > 100', '"amount > 100"'],
++            ['from: bob', '"from: bob"'],
++            ['category : travel', '"category : travel"'],
++            ['group-by:', '"group-by:"'],
++            ['coffee group-by: card', 'coffee "group-by: card"'],
++        ])('should keep whitespace-separated search syntax as keyword text: %s', (input, expected) => {
++            const currentQueryJSON = buildSearchQueryJSON('type:trip status:all');
++
++            const result = currentQueryJSON ? getKeywordQueryWithCurrentSearchContext(input, currentQueryJSON) : '';
++            expect(result).toContain(expected);
++        });
++
++        it('should preserve the current from filter while escaping the reported group-by keyword shape', () => {
++            const currentQueryJSON = buildSearchQueryJSON('type:expense from:21462841');
++
++            const result = currentQueryJSON ? getKeywordQueryWithCurrentSearchContext('group-by: reports', currentQueryJSON) : '';
++            expect(result).toContain('type:expense');
++            expect(result).toContain('from:21462841');
++            expect(result).toContain('"group-by: reports"');
++        });
++
++        it('should escape adjacent syntax-shaped keywords independently', () => {
++            const currentQueryJSON = buildSearchQueryJSON('type:expense status:all');
++
++            const result = currentQueryJSON ? getKeywordQueryWithCurrentSearchContext('from: bob category:x', currentQueryJSON) : '';
++            expect(result).toContain('"from: bob" "category:x"');
++        });
++
+         it('should prepend current search context to keyword-only input', () => {
