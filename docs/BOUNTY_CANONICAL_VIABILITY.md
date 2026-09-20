@@ -8,12 +8,12 @@ It runs downstream of bounty_value_router. The value router answers whether the 
 
 Bounty boards can lag canonical repositories. A row can remain open after the GitHub issue was closed as not planned, after the repository was archived, after another contributor was assigned, or after overlapping pull requests appeared. Starting from the board alone wastes swarm capacity and can create duplicate public work.
 
-The gate requires fresh observations for listing state, repository archive state, issue state and acceptance, assignees, payment or selection route, open-PR overlap, and claim pressure. Every output is deterministic, tamper-evident, and advisory-only.
+The gate requires fresh observations for listing state, repository archive state, issue state and acceptance, assignees, payment or selection route, open-PR overlap, and the whole collision/claim-pressure snapshot. Every output is deterministic, tamper-evident, and advisory-only.
 
 ## Dispositions
 
-- PRUNE: canonical work is closed or archived, the listing contradicts canonical closure, or the advertised route pays for reports rather than implementation.
-- HOLD: evidence is stale, the feature is still an unaccepted proposal, another contributor owns it, scope is collision-heavy, or payment/selection evidence is insufficient.
+- PRUNE: canonical work is closed or archived, the provider/listing is closed, an open listing contradicts canonical closure, or the advertised route pays for reports rather than implementation.
+- HOLD: evidence is stale, listing state is unknown, the feature is still an unaccepted proposal, another contributor owns it, scope is collision-heavy, or payment/selection evidence is insufficient.
 - WAIT_ASSIGNMENT: assignment is required and this actor has already applied. Do not implement yet.
 - READY_FOR_CLAIM_REVIEW: no blocker was found; review the claim or application route. This grants no claim authority.
 - READY_FOR_IMPLEMENTATION_REVIEW: this actor is already assigned and no blocker was found. This still grants no write or submission authority.
@@ -26,7 +26,7 @@ A confirmed residual only overrides collision and pressure reasons. It never ove
 
 ## Value binding
 
-Input must carry VALUE_50_PLUS plus the work ID and SHA-256 of the earlier value-routing receipt. This gate binds those fields into its receipt but intentionally does not independently re-verify the earlier receipt. Callers must verify the bounty_value_router receipt before composition.
+Schema v2 input must carry VALUE_50_PLUS plus the work ID, the upstream candidate canonical_source_url, and SHA-256 of the earlier value-routing receipt. The canonical source must resolve to the same GitHub owner/repo/issue as canonical_issue_url, preventing a valid high-value receipt for one candidate from being replayed onto another. This gate still does not independently re-verify the earlier receipt; callers must verify the bounty_value_router receipt before composition.
 
 ## Payment routes
 
