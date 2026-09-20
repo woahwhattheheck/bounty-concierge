@@ -265,9 +265,10 @@ def _trusted_utc_now() -> datetime:
 
 
 def _format_utc_timestamp(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat(timespec="seconds").replace(
-        "+00:00", "Z"
-    )
+    # Preserve subsecond precision when present.  Receipt verification replays
+    # semantics at this exact bound generation time, so truncation would make
+    # age_seconds non-replayable for fractional observations.
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _normalize_for_scan(text: str) -> str:
@@ -357,10 +358,15 @@ def _compile_bounty_acceptance_safety_gate_at(
         )
 
     observed = _parse_timestamp(request["observed_at"], "observed_at")
-    # v1 keeps evaluated_at as a syntactically validated compatibility field, but
-    # it is untrusted caller input and MUST NOT control freshness.
-    _parse_timestamp(request["evaluated_at"], "evaluated_at")
+    # v1 keeps evaluated_at as a compatibility assertion only.  Freshness comes
+    # from the trusted process clock, but impossible future assertions still
+    # fail closed instead of being silently accepted.
+    claimed_evaluated = _parse_timestamp(request["evaluated_at"], "evaluated_at")
     evaluated = _require_utc_datetime(evaluated, "evaluation time")
+    if claimed_evaluated > evaluated:
+        raise BountyAcceptanceSafetyInputError(
+            "evaluated_at must not be after trusted evaluation time"
+        )
     if observed > evaluated:
         raise BountyAcceptanceSafetyInputError(
             "observed_at must not be after trusted evaluation time"

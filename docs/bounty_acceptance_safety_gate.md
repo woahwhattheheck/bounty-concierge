@@ -38,7 +38,7 @@ A clear result is **not** a safety guarantee and does not make the bounty valid,
 }
 ```
 
-`source_content_sha256` must match the exact UTF-8 bytes. Source observations older than 24 hours fail closed. Future-dated observations are rejected. The v1 `evaluated_at` request field is retained only for input compatibility and syntax checking; it is **not** trusted for freshness. Compilation uses process-owned current UTC time and records that trusted time in the receipt; there is no public caller-supplied clock override.
+`source_content_sha256` must match the exact UTF-8 bytes. Source observations older than 24 hours fail closed. Future-dated observations are rejected. The v1 `evaluated_at` request field is retained only as a compatibility assertion; it is **not** trusted for freshness. Compilation uses process-owned current UTC time, rejects a claimed evaluation time in the trusted clock’s future, and records the trusted time at its full available precision so receipt semantics replay exactly; there is no public caller-supplied clock override.
 
 ## CLI
 
