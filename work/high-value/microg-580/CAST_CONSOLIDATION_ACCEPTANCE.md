@@ -38,7 +38,7 @@ State: OPEN. Compare against current master: ahead 5 / behind 87. Six changed su
 
 Why it is the primary source:
 - Implements Cast.API_CXLESS service binding via GmsService.CAST_API (161).
-- Echoes requested API features through ConnectionInfo so modern clients do not reject microG as too old.
+- Returns ConnectionInfo for modern clients, but the current #3570 head echoes caller-requested API features. That echo is a merge blocker: the corrected carrier must advertise only an implementation-owned supported Feature set.
 - Adds the connectionless binder contract: connect transaction 16, setListener transaction 17, unregisterListener transaction 18, and listener onConnectedWithResult(int) transaction 13.
 - Registers the route-selection callback and repairs default session-provider lookup for suffixed Cast categories.
 - Separates outbound send completion from inbound text delivery.
@@ -90,7 +90,7 @@ This targets MediaRouteProvider control operations (select/play/pause/seek/stop/
 ## Minimal current-master merge sequence
 
 1. Start from exact current upstream master (re-read immediately before work; 4c74e5ac... was the observation in this packet).
-2. Replay/rebase the #3570 connectionless stack, including the incorporated listener-lifecycle commit. Preserve author history/credit.
+2. Replay/rebase the #3570 connectionless stack, including the incorporated listener-lifecycle commit, then replace caller-controlled feature echo with an implementation-owned supported Feature set. Preserve author history/credit.
 3. Compile play-services-cast-core and play-services-cast-framework-core in debug and release variants.
 4. Add/rebase #3554 ModuleDescriptor as an independent additive commit.
 5. Port only compatible #3470 lifecycle/threading improvements that survive review after #3570; do not overwrite the connectionless controller semantics.
@@ -105,7 +105,7 @@ This targets MediaRouteProvider control operations (select/play/pause/seek/stop/
 - ICastDeviceController: connect = 16, setListener(ICastDeviceControllerListener) = 17, unregisterListener = 18.
 - ICastDeviceControllerListener: onConnectedWithResult(int) = 13.
 - CastDeviceControllerService accepts GmsService.CAST_API in addition to GmsService.CAST.
-- Service returns ConnectionInfo with the requested/default API features rather than the old bare onPostInitComplete path.
+- Service returns ConnectionInfo with an implementation-owned supported Feature[] rather than echoing caller-controlled request.apiFeatures/defaultFeatures. An unsupported request sentinel must never be advertised as server-supported.
 
 ### Session/route contract
 
@@ -142,7 +142,7 @@ At minimum, the consolidation should add or retain tests for:
 4. outbound send success uses the outbound requestId exactly once;
 5. inbound text/binary frames never complete an unrelated outbound task;
 6. CAST_API service-id 161 binds to the device controller;
-7. requested apiFeatures are reflected in ConnectionInfo;
+7. caller-supplied `Feature(\"cast_definitely_unsupported\", 1)` is NOT reflected in ConnectionInfo, while the exact supported cxless feature tuples remain advertised from an implementation-owned set;
 8. route-selection callback drives session start with a suffixed default Cast category;
 9. null provider / wrong session wrapper / missing route info fail closed without NPE;
 10. session failure/end lifecycle does not dereference a cleared castContext and emits terminal session state once;
