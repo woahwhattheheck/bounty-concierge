@@ -1,0 +1,103 @@
+{
+  "schema": "microg-580-pr3570-feature-contract-v1",
+  "reviewed_at": "2026-09-19T21:25:00-04:00",
+  "canonical_issue": {
+    "repo": "microg/GmsCore",
+    "number": 580,
+    "state": "open",
+    "assignees": [],
+    "url": "https://github.com/microg/GmsCore/issues/580"
+  },
+  "economics": {
+    "bountyhub": [
+      {
+        "amount_usd": 250,
+        "comment_id": 3781699331,
+        "creator": "emeitner",
+        "bounty_id": "27c3cfe0-da9e-4192-848a-b676402de81c"
+      },
+      {
+        "amount_usd": 150,
+        "comment_ids": [
+          3787508716,
+          3823364297
+        ],
+        "creators": [
+          "Tthecreator",
+          "olofmogren"
+        ],
+        "bounty_id": "ef91cb1e-dd69-4a33-bd90-21c9679c9247"
+      }
+    ],
+    "separate_personal_offer": {
+      "amount_usd": 500,
+      "creator": "ehem",
+      "original_comment_id": 2479755158,
+      "extended_through": "2026-12-31",
+      "extension_comment_id": 4284695071
+    },
+    "warning": "Independent award paths; do not describe as one guaranteed combined payout."
+  },
+  "upstream": {
+    "master": "4c74e5acb79479004428be755547432294639878",
+    "preferred_pr": {
+      "number": 3570,
+      "head": "da96e2e1880f437a7f349fec9ffbe2f8f82fad98",
+      "merge_base": "046c00b0d160f7a355c718acc9ee595ccefe2948",
+      "behind_master": 87,
+      "owned_path_drift_since_merge_base": 0,
+      "service_blob": "e312e22f33af07eedc2624ee20b58e60cf527a64",
+      "hardware_evidence": [
+        "Prime Video",
+        "Netflix",
+        "Disney+",
+        "minimal Cast sender"
+      ]
+    },
+    "corroborating_prs": {
+      "3377": "b6b63ce37b617c07b1a6491fb5833787d41ac6f0",
+      "3554": "5523643fd229c0cd2c1b3cde7611d79d7f629aab",
+      "3567": "3da2c730bbba316035b202ee92302e9c947d0036",
+      "3668": "c50e8e994dde1a1c40832e702ee0e608e181dacb"
+    }
+  },
+  "novel_finding": {
+    "id": "CLIENT_FEATURE_REFLECTION",
+    "severity": "merge-blocking correctness / forward-compatibility risk",
+    "carrier_pr": 3570,
+    "file": "play-services-cast/core/src/main/java/org/microg/gms/cast/CastDeviceControllerService.java",
+    "file_blob": "e312e22f33af07eedc2624ee20b58e60cf527a64",
+    "behavior": "ConnectionInfo.features is copied directly from caller-controlled request.apiFeatures/defaultFeatures.",
+    "contradiction": "PR #3570 also states no additional CAST_API-specific surface is implemented and registerNamespace/unregisterNamespace remain no-ops.",
+    "regression_negative": "Feature(\"cast_definitely_unsupported\", 1) must not be returned as server-supported.",
+    "positive_control": "Observed real cxless feature names/versions must remain advertised from an implementation-owned feature set."
+  },
+  "current_master_reference_patterns": [
+    {
+      "path": "play-services-core/src/main/java/org/microg/gms/wallet/PaymentService.java",
+      "blob": "2bdcfa4f7f0787b9571382e03d676da7040f7140",
+      "pattern": "ConnectionInfo.features = implementation-owned FEATURES"
+    },
+    {
+      "path": "play-services-core/src/main/kotlin/org/microg/gms/usagereporting/UsageReportingService.kt",
+      "blob": "334fe104787e2e03b45d072ab9d7f9c1e08e6c5a",
+      "pattern": "ConnectionInfo.features = explicit implementation-owned Feature array"
+    }
+  ],
+  "publication": [
+    {
+      "surface": "pull-request review",
+      "result": "403 Resource not accessible by integration"
+    },
+    {
+      "surface": "PR issue-comment fallback",
+      "result": "403 Resource not accessible by integration"
+    }
+  ],
+  "routing": {
+    "whole_feature_dogpile": false,
+    "next_action": "Patch exact supported feature advertisement on #3570, rejoin to current master, rebuild, rerun hardware matrix.",
+    "bounty_claimed": false,
+    "payment_claimed": false
+  }
+}
