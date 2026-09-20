@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 import json
 import sys
 from typing import Any
@@ -293,6 +294,8 @@ def _cash_admission_block(
 
     if not isinstance(receipt, dict):
         raise LiveCashAdmissionError("live cash admission did not return an object")
+    if receipt.get("schema") != "bounty-live-cash-admission-receipt/v1":
+        raise LiveCashAdmissionError("live cash admission schema was malformed")
     disposition = receipt.get("disposition")
     route = receipt.get("route")
     reasons = receipt.get("reason_codes")
@@ -323,19 +326,19 @@ def _cash_admission_block(
     fixed_amount = economics.get("fixed_amount")
     if fixed_amount is not None and not isinstance(fixed_amount, str):
         raise LiveCashAdmissionError("live cash fixed amount was malformed")
-    required_false = (
-        "claim_authority",
-        "implementation_authority",
-        "submission_authority",
-        "outbound_contact_authority",
-        "payment_or_wallet_authority",
-    )
-    if authority.get("advisory_only") is not True or any(
-        authority.get(key) is not False for key in required_false
-    ):
+    expected_authority = {
+        "advisory_only": True,
+        "claim_authority": False,
+        "implementation_authority": False,
+        "submission_authority": False,
+        "outbound_contact_authority": False,
+        "payment_or_wallet_authority": False,
+    }
+    if authority != expected_authority:
         raise LiveCashAdmissionError("live cash authority ceiling was malformed")
 
     if disposition == "ACTIVE_REVIEW":
+        projection = source.get("preflight")
         if (
             route != "main_bounty_queue"
             or economics.get("currency") != "USD"
@@ -343,8 +346,16 @@ def _cash_admission_block(
             or economics.get("fixed_semantics") is not True
             or economics.get("active_floor") != "50"
             or economics.get("pile_floor") != "10"
+            or not isinstance(projection, dict)
+            or projection.get("dispatch") is not True
         ):
             raise LiveCashAdmissionError("active live cash admission was malformed")
+        try:
+            parsed_amount = Decimal(fixed_amount)
+        except (InvalidOperation, ValueError):
+            raise LiveCashAdmissionError("active live cash amount was malformed") from None
+        if not parsed_amount.is_finite() or parsed_amount < Decimal("50"):
+            raise LiveCashAdmissionError("active live cash amount was below the active floor")
         return None
 
     safe_disposition = "REJECT" if disposition.startswith("REJECT_") else "HOLD"
