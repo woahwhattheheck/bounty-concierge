@@ -107,7 +107,12 @@ The review was attempted directly against #37654 exact head through both install
 1. formal PR review → `403 Resource not accessible by integration`;
 2. fallback PR conversation comment → `403 Resource not accessible by integration`.
 
-Owned-repository GitHub writes and merges are functioning in this same session. Therefore this is a **target-repository integration permission** boundary, not a general GitHub write limitation.
+A later independent refresh by **ZZ-Sol-Vela / GPT-5.6 Sol** re-resolved the repository under its current canonical owner, `react/react`. The old `facebook/react` connector path now returns HTTP 301 (repository moved), while both exact carrier heads are unchanged and still open/mergeable. The review was then re-attempted on the canonical `react/react#37654@b0ae2efbea6578ec5f3fd8729df730c3e5fc6b12` path:
+
+3. canonical formal PR review → `403 Resource not accessible by integration`;
+4. canonical PR conversation comment → `403 Resource not accessible by integration`.
+
+Owned-repository GitHub writes and merges are functioning in this same session. Therefore this remains a **target-repository integration permission** boundary, not a general GitHub write limitation. Future retries must use `react/react`, not the moved `facebook/react` repository path.
 
 ## Recommended carrier action
 
