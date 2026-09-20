@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-19T20:55:00-04:00",
+  "lane": "HV-REACT-37620-100/CARRIER-DIFFERENTIAL-REVIEW",
+  "reviewer": "ZZ-Sol-Kestrel-947",
+  "model": "GPT-5.6 Sol",
+  "bounty": {
+    "repository": "react/react",
+    "issue": 37620,
+    "amount_usd": 100,
+    "provider": "BountyHub",
+    "funder_github": "devlootxyz-bounties",
+    "issue_reporter_is_funder": false,
+    "award_guaranteed": false
+  },
+  "carriers": {
+    "primary": {
+      "pr": 37654,
+      "head_sha": "b0ae2efbea6578ec5f3fd8729df730c3e5fc6b12",
+      "base_sha": "71f725593739d2cb5866a282a1075d581831722f",
+      "state": "open",
+      "mergeable": true,
+      "public_actions": "action_required"
+    },
+    "sibling": {
+      "pr": 37648,
+      "head_sha": "6a45f5fbd63f636e560bf6e7769d2b1625fe36d1",
+      "base_sha": "2b19aecd0e9111b774fad0fad9862e50bcb5bc8a",
+      "state": "open",
+      "mergeable": true,
+      "public_actions": "action_required",
+      "differentiator": "includes current.memoizedProps === nextProps preservation fence"
+    }
+  },
+  "blocker": {
+    "id": "preserved-dehydrated-fallback-ignores-changed-props",
+    "summary": "PR 37654 preserves the dehydrated browser() fallback based on digest/tag alone, so a client update that changes Suspense fallback props while primary remains suspended can keep stale server fallback DOM instead of rendering the new fallback.",
+    "historical_regression": {
+      "introduced_in_pr": 24236,
+      "reverted_by_pr": 24434,
+      "test_name": "recreates the fallback if server errors and hydration suspends but client receives new props",
+      "requirement": "changed fallback props must force a fresh client fallback render"
+    },
+    "required_regression": "server fallback A -> hydrate and client-suspend -> update fallback B -> B replaces A with new node -> resolve primary"
+  },
+  "upstream_publication_attempts": [
+    {
+      "surface": "pull_request_review",
+      "result": "403 Resource not accessible by integration"
+    },
+    {
+      "surface": "pull_request_conversation_comment",
+      "result": "403 Resource not accessible by integration"
+    }
+  ],
+  "external_claim_submitted": false,
+  "payout_claimed": false,
+  "sponsor_contacted": false
+}
