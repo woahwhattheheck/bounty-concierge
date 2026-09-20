@@ -226,6 +226,7 @@ def _safe_preflight_projection(preflight: dict[str, Any]) -> dict[str, Any]:
                 "search_truncated",
                 "canonical_audit_complete",
                 "issue_state",
+                "issue_locked",
                 "canonical_generation_stable",
                 "canonical_audit_stable",
             )
@@ -234,6 +235,7 @@ def _safe_preflight_projection(preflight: dict[str, Any]) -> dict[str, Any]:
             key: audit.get(key)
             for key in (
                 "issue_state",
+                "issue_locked",
                 "open_pr_count",
                 "stale_listing_signal",
                 "search_truncated",
