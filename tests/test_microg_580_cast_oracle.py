@@ -37,10 +37,14 @@ interface ICastDeviceControllerListener {
 """)
     write(tmp_path, oracle.FILES["service"], """
 class CastDeviceControllerService {
+  static final Feature[] FEATURES = new Feature[] {
+    new Feature("cast_cxless", 1L)
+  };
   void f() {
     Object x = GmsService.CAST, GmsService.CAST_API;
-    Object f = request.apiFeatures;
-    callback.onPostInitCompleteWithConnectionInfo(0, null, null);
+    ConnectionInfo info = new ConnectionInfo();
+    info.features = FEATURES;
+    callback.onPostInitCompleteWithConnectionInfo(0, null, info);
   }
 }
 """)
@@ -117,3 +121,32 @@ def test_disconnect_clear_before_transport_teardown_is_rejected(tmp_path):
     path.write_text(content, encoding="utf-8")
     failures, _ = oracle.check(root)
     assert "ORDERING: disconnect must tear down Cast before clearing listener" in failures
+
+
+def test_caller_controlled_feature_echo_is_rejected(tmp_path):
+    oracle = load_oracle()
+    root = passing_tree(tmp_path, oracle)
+    path = root / oracle.FILES["service"]
+    content = path.read_text(encoding="utf-8").replace(
+        "info.features = FEATURES;",
+        "info.features = request.apiFeatures;",
+    )
+    path.write_text(content, encoding="utf-8")
+    failures, _ = oracle.check(root)
+    assert "FEATURE CONTRACT: service must not echo caller-controlled feature claims" in failures
+
+
+def test_non_owned_feature_source_is_rejected(tmp_path):
+    oracle = load_oracle()
+    root = passing_tree(tmp_path, oracle)
+    path = root / oracle.FILES["service"]
+    content = path.read_text(encoding="utf-8").replace(
+        "info.features = FEATURES;",
+        "info.features = computedFeatures;",
+    )
+    path.write_text(content, encoding="utf-8")
+    failures, _ = oracle.check(root)
+    assert (
+        "FEATURE CONTRACT: ConnectionInfo features must come from the implementation-owned feature set"
+        in failures
+    )
