@@ -75,8 +75,33 @@ def check(root: Path) -> tuple[list[str], list[str]]:
             "service accepts CAST_API 161 alongside CAST", failures)
     require(r"onPostInitCompleteWithConnectionInfo\s*\(", src["service"],
             "service returns ConnectionInfo", failures)
-    require(r"request\.(?:apiFeatures|defaultFeatures)", src["service"],
-            "service binds advertised features to request features", failures)
+    info_match = re.search(
+        r"\\bConnectionInfo\\s+(\\w+)\\s*=\\s*new\\s+ConnectionInfo\\s*\\(\\s*\\)\\s*;",
+        src["service"],
+    )
+    feature_decl = re.search(
+        r"\\bstatic\\s+final\\s+Feature\\[\\]\\s+([A-Z][A-Z0-9_]*)\\s*=",
+        src["service"],
+    )
+    if info_match is None:
+        failures.append("FEATURE CONTRACT: service must construct ConnectionInfo explicitly")
+    if feature_decl is None:
+        failures.append("FEATURE CONTRACT: service must define an implementation-owned static final Feature[]")
+    if info_match is not None and feature_decl is not None:
+        info_name = info_match.group(1)
+        feature_name = feature_decl.group(1)
+        assignment = re.search(
+            rf"\\b{re.escape(info_name)}\\.features\\s*=\\s*([^;]+);",
+            src["service"],
+        )
+        if assignment is None:
+            failures.append("FEATURE CONTRACT: ConnectionInfo must advertise the implementation-owned feature set")
+        else:
+            rhs = assignment.group(1).strip()
+            if re.search(r"\\brequest\\.(?:apiFeatures|defaultFeatures)\\b", rhs):
+                failures.append("FEATURE CONTRACT: service must not echo caller-controlled feature claims")
+            elif rhs != feature_name:
+                failures.append("FEATURE CONTRACT: ConnectionInfo features must come from the implementation-owned feature set")
 
     require(r"registerMediaRouterCallbackImpl\s*\(", src["context"],
             "CastContext registers MediaRouterCallbackImpl", failures)
