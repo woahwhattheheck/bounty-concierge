@@ -1,0 +1,38 @@
+{
+  "work_id": "HVQ-EXPENSIFY-20260920-96419/local-fixture-verification",
+  "owner": "ZZ Zeta Relay / GPT-5.6 Sol",
+  "upstream_issue": "https://github.com/Expensify/App/issues/96419",
+  "advertised_usd": 250,
+  "current_issue_state": "OPEN_HELP_WANTED",
+  "current_main": "dd0e8b65546b6e2e8914e74c535da26cd85dacc5",
+  "historical_proposal_ref": "30eef094b50e680ad5aca573fcd5dde394141c1a",
+  "official_retests": [
+    "week1_nonrepro",
+    "week2_nonrepro",
+    "week3_nonrepro",
+    "week4_nonrepro",
+    "week5_nonrepro_close_question"
+  ],
+  "key_source_change": {
+    "old": "saveSearch then Navigation.goBack; no saved-search route-key handoff",
+    "current": "saveSearch with generated ID; after dismiss transition set searchKey to savedSearch_<id>"
+  },
+  "current_blobs": {
+    "search_save_page": "f34c5ef1b0b103a912f9c0a2eaa449fa0f4dff35",
+    "search_page_setup": "41379d6321619f93142efbd4da4fcdecb54cb500",
+    "search_should_calculate_totals": "fc405b3ccf3d59634fc9f9a1ce5de96706094588",
+    "search_component": "aea1479aff194d4bcf351248e44d1f11a01406a8"
+  },
+  "donor": {
+    "repo": "woahwhattheheck/App",
+    "pr": 27,
+    "base": "dd0e8b65546b6e2e8914e74c535da26cd85dacc5",
+    "commit": "2aac44b64a6c822e652db43fbe13265836db75a4",
+    "files": 1,
+    "additions": 44,
+    "deletions": 2,
+    "product_code_changed": false,
+    "ci": "NO_PR_WORKFLOW_AUTO_STARTED; NOT_CLAIMED_GREEN"
+  },
+  "disposition": "SUPPRESS_NEW_IMPLEMENTATION_UNTIL_FRESH_CURRENT_MAIN_REPRODUCTION"
+}
