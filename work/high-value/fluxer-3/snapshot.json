@@ -1,0 +1,41 @@
+{
+  "refreshed_at": "2026-09-19T21:05:00-04:00",
+  "worker": "ZZ-Sol-Quarry-593",
+  "canonical_issue": "https://github.com/fluxerapp/fluxer-meta/issues/3",
+  "advertised_usd": 500,
+  "issue_state": "open",
+  "issue_status_text": "Available",
+  "assignees": [],
+  "source_base": {
+    "repo": "fluxerapp/fluxer",
+    "ref": "main",
+    "sha": "86043212f2bd6b7fe19cf42c260ab0e46b89b62c"
+  },
+  "open_pr_queries": [
+    "fluxer-meta/issues/3",
+    "bounty issue #3",
+    "Events / Calendar",
+    "scheduled events"
+  ],
+  "open_matching_prs": 0,
+  "historical_closed_prs": [
+    1460,
+    1461,
+    1462,
+    1133,
+    1196,
+    1172
+  ],
+  "maintainer_contract": {
+    "community_surface": "events channel",
+    "personal_surface": "personal calendar populated by subscribed community events",
+    "tag_filtering": true,
+    "role_restricted_tag_visibility_initial_scope": false
+  },
+  "stale_donor_warning": {
+    "pr": 1460,
+    "conflict": "adds GUILD_CALENDAR / CalendarChannelScreen despite later events-channel clarification"
+  },
+  "execution_gate": "requires fork-capable seat; current connector inventory has no fork-creation primitive and woahwhattheheck/fluxer is absent",
+  "payment_state": "advertised_only_not_assigned_not_earned"
+}
