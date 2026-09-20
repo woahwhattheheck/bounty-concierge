@@ -1,0 +1,228 @@
+{
+  "schema_version": 1,
+  "captured_on": "2026-09-19",
+  "captured_timezone": "America/New_York",
+  "repository": "Bitcoindefi/OpenAO",
+  "source_authority": "first-party GitHub issue state, labels, and assignees",
+  "economics_policy": {
+    "active_floor_usd": 50,
+    "pile_floor_usd": 10,
+    "fixed_reward_labels": {
+      "reward-20-usd": 20,
+      "reward-50-usd": 50,
+      "reward-100-usd": 100
+    }
+  },
+  "summary": {
+    "fixed_reward_total_usd": 1240,
+    "assigned_fixed_reward_usd": 800,
+    "unassigned_fixed_reward_usd": 440,
+    "unassigned_active_floor_usd": 400,
+    "unassigned_pile_usd": 40,
+    "immediately_executable_active_cards": 0
+  },
+  "issues": [
+    {
+      "issue": 1,
+      "reward_usd": 20,
+      "reward_label": "reward-20-usd",
+      "assignees": [],
+      "routing": "PILE",
+      "reason": "under active floor"
+    },
+    {
+      "issue": 2,
+      "reward_usd": null,
+      "reward_label": null,
+      "assignees": [],
+      "routing": "HOLD_UNPRICED",
+      "reason": "parent epic; GrantFox-family labels but no fixed reward label captured"
+    },
+    {
+      "issue": 3,
+      "reward_usd": 100,
+      "reward_label": "reward-100-usd",
+      "assignees": [
+        "YospGeng"
+      ],
+      "routing": "BUSY",
+      "reason": "assigned foundational persistence"
+    },
+    {
+      "issue": 4,
+      "reward_usd": 50,
+      "reward_label": "reward-50-usd",
+      "assignees": [
+        "alidonghao118-commits"
+      ],
+      "routing": "BUSY",
+      "reason": "assigned; depends on persistence"
+    },
+    {
+      "issue": 6,
+      "reward_usd": 50,
+      "reward_label": "reward-50-usd",
+      "assignees": [
+        "Rodrigoue9"
+      ],
+      "routing": "BUSY",
+      "reason": "assigned"
+    },
+    {
+      "issue": 7,
+      "reward_usd": 50,
+      "reward_label": "reward-50-usd",
+      "assignees": [
+        "JemimahEkong"
+      ],
+      "routing": "BUSY",
+      "reason": "assigned; depends on persistence and graphics registration"
+    },
+    {
+      "issue": 9,
+      "reward_usd": 50,
+      "reward_label": "reward-50-usd",
+      "assignees": [
+        "nazasnow"
+      ],
+      "routing": "BUSY",
+      "reason": "assigned; depends on persistence"
+    },
+    {
+      "issue": 10,
+      "reward_usd": 50,
+      "reward_label": "reward-50-usd",
+      "assignees": [
+        "Rodrigoue9"
+      ],
+      "routing": "BUSY",
+      "reason": "assigned; depends on persistence"
+    },
+    {
+      "issue": 11,
+      "reward_usd": 100,
+      "reward_label": "reward-100-usd",
+      "assignees": [],
+      "routing": "HOLD_DEPENDENCY",
+      "reason": "issue explicitly depends on all mutation issues"
+    },
+    {
+      "issue": 12,
+      "reward_usd": 100,
+      "reward_label": "reward-100-usd",
+      "assignees": [
+        "ardaerturk"
+      ],
+      "routing": "BUSY",
+      "reason": "assigned; depends on persistence"
+    },
+    {
+      "issue": 13,
+      "reward_usd": 100,
+      "reward_label": "reward-100-usd",
+      "assignees": [],
+      "routing": "HOLD_DEPENDENCY",
+      "reason": "issue explicitly depends on all API work"
+    },
+    {
+      "issue": 14,
+      "reward_usd": 20,
+      "reward_label": "reward-20-usd",
+      "assignees": [],
+      "routing": "PILE",
+      "reason": "under active floor"
+    },
+    {
+      "issue": 18,
+      "reward_usd": 50,
+      "reward_label": "reward-50-usd",
+      "assignees": [
+        "ghzhost"
+      ],
+      "routing": "BUSY",
+      "reason": "assigned"
+    },
+    {
+      "issue": 19,
+      "reward_usd": 50,
+      "reward_label": "reward-50-usd",
+      "assignees": [
+        "WilliamKwanProgramming"
+      ],
+      "routing": "BUSY",
+      "reason": "assigned"
+    },
+    {
+      "issue": 20,
+      "reward_usd": 50,
+      "reward_label": "reward-50-usd",
+      "assignees": [
+        "atiqur-rahman-pro"
+      ],
+      "routing": "BUSY",
+      "reason": "assigned"
+    },
+    {
+      "issue": 21,
+      "reward_usd": 100,
+      "reward_label": "reward-100-usd",
+      "assignees": [
+        "waterWang"
+      ],
+      "routing": "BUSY",
+      "reason": "assigned"
+    },
+    {
+      "issue": 23,
+      "reward_usd": 100,
+      "reward_label": "reward-100-usd",
+      "assignees": [
+        "atiqur-rahman-pro"
+      ],
+      "routing": "BUSY",
+      "reason": "assigned; depends on persistence"
+    },
+    {
+      "issue": 24,
+      "reward_usd": 100,
+      "reward_label": "reward-100-usd",
+      "assignees": [],
+      "routing": "HOLD_DEPENDENCY",
+      "reason": "issue explicitly depends on persistence"
+    },
+    {
+      "issue": 25,
+      "reward_usd": 100,
+      "reward_label": "reward-100-usd",
+      "assignees": [],
+      "routing": "HOLD_DEPENDENCY",
+      "reason": "issue explicitly depends on #24"
+    },
+    {
+      "issue": 371,
+      "reward_usd": null,
+      "reward_label": null,
+      "assignees": [],
+      "routing": "CONTEXT_ONLY",
+      "reason": "implementation proposal; no GrantFox/reward labels"
+    }
+  ],
+  "activation_contract": {
+    "before_take": [
+      "refetch canonical issue",
+      "confirm state=open",
+      "confirm fixed reward label still present and >= active floor",
+      "confirm assignees empty or owner explicitly authorizes takeover",
+      "inspect current linked development and open PR collisions",
+      "re-evaluate explicit dependency statement against current prerequisite state",
+      "search Slack for exact repo+issue and materially-same lane",
+      "publish TAKE receipt before source mutation"
+    ],
+    "forbidden_shortcuts": [
+      "GrantFox-family label alone does not mint a fixed reward",
+      "unassigned does not override an explicit dependency",
+      "old census data does not authorize a new claim",
+      "assigned cards are not takeover targets without a fresh maintainer/owner event"
+    ]
+  }
+}
