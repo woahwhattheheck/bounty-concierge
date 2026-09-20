@@ -12,15 +12,46 @@ from concierge.bounty_canonical_viability import (
     compile_bounty_canonical_viability,
     verify_receipt,
 )
+from concierge.bounty_value_router import compile_bounty_value_routing
+
+
+VALUE_POLICY = {
+    "schema": "bounty-value-routing-policy/v1",
+    "max_evidence_age_seconds": 86400,
+    "routes": {"main_queue": "bug-bounty", "pile_10_49": "bounty-pile-10-49"},
+    "assets": {
+        "USD": {"active_floor": "50", "pile_floor": "10"},
+        "USDC": {"active_floor": "50", "pile_floor": "10"},
+    },
+}
+
+
+def value_receipt(*, source="https://github.com/acme/widget/issues/42", work_id="algora-acme-42", amount="50"):
+    return compile_bounty_value_routing({
+        "schema": "bounty-value-routing/v1",
+        "policy": deepcopy(VALUE_POLICY),
+        "evaluated_at": "2026-09-19T23:00:00Z",
+        "candidates": [{
+            "work_id": work_id,
+            "canonical_source_url": source,
+            "reward_evidence": [{
+                "scope": "ISSUE_SPECIFIC",
+                "authority": "FIRST_PARTY",
+                "amount": amount,
+                "asset": "USD",
+                "evidence_url": source,
+                "observed_at": "2026-09-19T22:00:00Z",
+            }],
+        }],
+    })
 
 
 def snapshot(**overrides):
     base = {
-        "schema": "bounty-canonical-viability/v1",
+        "schema": "bounty-canonical-viability/v2",
         "value_gate": {
             "work_id": "algora-acme-42",
-            "disposition": "VALUE_50_PLUS",
-            "receipt_sha256": "a" * 64,
+            "receipt": value_receipt(),
         },
         "actor_login": "woahwhattheheck",
         "canonical_issue_url": "https://github.com/acme/widget/issues/42",
@@ -51,6 +82,7 @@ def snapshot(**overrides):
             "open_prs": [],
             "active_claim_count": 0,
             "maintainer_confirmed_residual": False,
+            "observed_at": "2026-09-19T23:52:00Z",
         },
         "evaluated_at": "2026-09-19T23:55:00Z",
         "max_snapshot_age_seconds": 900,
@@ -75,6 +107,19 @@ class BountyCanonicalViabilityTests(unittest.TestCase):
         self.assertIn("LISTING_CANONICAL_STATE_MISMATCH", receipt["reason_codes"])
         self.assertIn("CANONICAL_ISSUE_NOT_OPEN", receipt["reason_codes"])
         self.assertTrue(receipt["state"]["canonical_state_mismatch"])
+
+    def test_closed_or_unknown_listing_never_routes_ready(self):
+        closed = deepcopy(snapshot()["listing"])
+        closed["state"] = "CLOSED"
+        receipt = compile_bounty_canonical_viability(snapshot(listing=closed))
+        self.assertEqual(receipt["disposition"], "PRUNE")
+        self.assertIn("LISTING_NOT_OPEN", receipt["reason_codes"])
+
+        unknown = deepcopy(snapshot()["listing"])
+        unknown["state"] = "UNKNOWN"
+        receipt = compile_bounty_canonical_viability(snapshot(listing=unknown))
+        self.assertEqual(receipt["disposition"], "HOLD")
+        self.assertIn("LISTING_STATE_UNKNOWN", receipt["reason_codes"])
 
     def test_archived_repository_is_pruned_even_if_issue_says_open(self):
         repo = deepcopy(snapshot()["repository"])
@@ -212,9 +257,31 @@ class BountyCanonicalViabilityTests(unittest.TestCase):
         self.assertEqual(receipt["disposition"], "HOLD")
         self.assertIn("COLLISION_SNAPSHOT_STALE", receipt["reason_codes"])
 
-    def test_non_50_plus_value_binding_is_rejected(self):
+    def test_verified_value_receipt_candidate_must_match_canonical_issue(self):
+        value = {"work_id": "algora-other-42", "receipt": value_receipt(
+            source="https://github.com/other/widget/issues/42", work_id="algora-other-42"
+        )}
+        with self.assertRaisesRegex(BountyCanonicalViabilityInputError, "canonical issue"):
+            compile_bounty_canonical_viability(snapshot(value_gate=value))
+
+    def test_tampered_value_receipt_is_rejected(self):
         value = deepcopy(snapshot()["value_gate"])
-        value["disposition"] = "PILE_10_49"
+        value["receipt"]["candidates"][0]["canonical_source_url"] = "https://github.com/acme/widget/issues/43"
+        with self.assertRaisesRegex(BountyCanonicalViabilityInputError, "valid bounty_value_router receipt"):
+            compile_bounty_canonical_viability(snapshot(value_gate=value))
+
+    def test_stale_claim_pressure_snapshot_holds_without_open_prs(self):
+        collisions = deepcopy(snapshot()["collisions"])
+        collisions["observed_at"] = "2026-09-19T23:00:00Z"
+        receipt = compile_bounty_canonical_viability(snapshot(collisions=collisions))
+        self.assertEqual(receipt["disposition"], "HOLD")
+        self.assertIn("SNAPSHOT_STALE", receipt["reason_codes"])
+
+    def test_non_50_plus_value_binding_is_rejected(self):
+        value = {
+            "work_id": "algora-acme-42",
+            "receipt": value_receipt(amount="49"),
+        }
         with self.assertRaisesRegex(BountyCanonicalViabilityInputError, "VALUE_50_PLUS"):
             compile_bounty_canonical_viability(snapshot(value_gate=value))
 
