@@ -196,9 +196,19 @@ def compile_publication_route(request: dict[str, Any]) -> dict[str, Any]:
     fork_push_access = _optional_bool(
         request.get("installed_fork_push_access"), "installed_fork_push_access"
     )
+    fork_parent_raw = request.get("installed_fork_parent_repo")
+    fork_parent = (
+        None
+        if fork_parent_raw is None
+        else _repo(fork_parent_raw, "installed_fork_parent_repo")
+    )
     if installed_fork is None and fork_push_access is not None:
         raise PublicationRouteInputError(
             "installed_fork_push_access must be null without installed_fork_repo"
+        )
+    if installed_fork is None and fork_parent is not None:
+        raise PublicationRouteInputError(
+            "installed_fork_parent_repo must be null without installed_fork_repo"
         )
     if installed_fork is not None and fork_push_access is None:
         raise PublicationRouteInputError(
@@ -206,6 +216,11 @@ def compile_publication_route(request: dict[str, Any]) -> dict[str, Any]:
         )
     if installed_fork is not None and installed_fork.casefold() == upstream_repo.casefold():
         raise PublicationRouteInputError("installed_fork_repo must differ from upstream_repo")
+    fork_parent_matches_upstream = (
+        None
+        if installed_fork is None or fork_parent is None
+        else fork_parent.casefold() == upstream_repo.casefold()
+    )
 
     primitives = _primitives(request.get("publication_primitives"))
     primitive_set = frozenset(primitives)
@@ -303,12 +318,14 @@ def compile_publication_route(request: dict[str, Any]) -> dict[str, Any]:
         installed_fork is not None
         and fork_actor_owned is True
         and fork_push_access is True
+        and fork_parent_matches_upstream is True
         and _MIN_BRANCH_PR <= primitive_set
         and _has_content_write_path(primitive_set)
     ):
         disposition = "OWNED_FORK_PR"
         next_action = "PUBLISH_TO_INSTALLED_FORK_THEN_OPEN_UPSTREAM_PR"
         reasons.append("INSTALLED_FORK_PUSH_OBSERVED")
+        reasons.append("INSTALLED_FORK_PARENT_MATCHES_UPSTREAM")
         if integration_access == "resource_not_accessible":
             reasons.append("UPSTREAM_CONNECTOR_ACCESS_UNKNOWN_NOT_PERMISSION_DENIAL")
     else:
@@ -328,6 +345,11 @@ def compile_publication_route(request: dict[str, Any]) -> dict[str, Any]:
             reasons.append("INSTALLED_FORK_NOT_ACTOR_OWNED")
         elif fork_push_access is not True:
             reasons.append("INSTALLED_FORK_PUSH_NOT_OBSERVED")
+        if installed_fork is not None:
+            if fork_parent is None:
+                reasons.append("INSTALLED_FORK_PARENT_NOT_OBSERVED")
+            elif fork_parent_matches_upstream is not True:
+                reasons.append("INSTALLED_FORK_PARENT_MISMATCH")
         if not _MIN_BRANCH_PR <= primitive_set or not _has_content_write_path(primitive_set):
             reasons.append("PUBLICATION_PRIMITIVES_INSUFFICIENT")
         reasons = list(dict.fromkeys(reasons))
@@ -351,6 +373,8 @@ def compile_publication_route(request: dict[str, Any]) -> dict[str, Any]:
             "installed_fork_repo": installed_fork,
             "installed_fork_actor_owned": fork_actor_owned,
             "installed_fork_push_access": fork_push_access,
+            "installed_fork_parent_repo": fork_parent,
+            "installed_fork_parent_matches_upstream": fork_parent_matches_upstream,
             "publication_primitives": primitives,
         },
         "provider_gate": {
