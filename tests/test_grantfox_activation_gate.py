@@ -361,7 +361,14 @@ class ActivationGateTests(unittest.TestCase):
     def test_real_queue_actor_location_is_used(self):
         payload = request()
         self.assertNotIn("actor_login", payload["queue_receipt"]["identity"])
-        payload["queue_receipt"]["provider_snapshot"]["actor_login"] = "WOAHWHATTHEHECK"
+        queue = payload["queue_receipt"]
+        source_queue = payload["source_receipt"]["queue_receipt"]
+        dependency_queue = payload["dependency_receipt"]["source_receipt"]["queue_receipt"]
+        fulfillment_queue = (
+            payload["fulfillment_receipt"]["dependency_receipt"]["source_receipt"]["queue_receipt"]
+        )
+        for embedded_queue in (queue, source_queue, dependency_queue, fulfillment_queue):
+            embedded_queue["provider_snapshot"]["actor_login"] = "WOAHWHATTHEHECK"
         receipt = self.compile(payload)
         self.assertEqual(receipt["identity"]["actor_login"], "woahwhattheheck")
 
