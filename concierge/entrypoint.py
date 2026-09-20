@@ -13,6 +13,10 @@ from concierge.bounty_availability import (
     BountyAvailabilityError,
     inspect_bounty_availability,
 )
+from concierge.bounty_live_cash_admission import (
+    LiveCashAdmissionError,
+    evaluate_live_cash_admission,
+)
 from concierge.bounty_preflight import BountyPreflightError, preflight_bounty
 from concierge.bounty_qualification import QualificationInputError
 from concierge.claim_economic_admission import (
@@ -222,6 +226,151 @@ def _claim_counts(result: dict[str, Any]) -> tuple[int | None, int | None]:
     return attempt_count, open_pr_count
 
 
+
+_LIVE_CASH_AUTHORITY = {
+    "advisory_only": True,
+    "claim_authority": False,
+    "implementation_authority": False,
+    "submission_authority": False,
+    "outbound_contact_authority": False,
+    "payment_or_wallet_authority": False,
+}
+_LIVE_CASH_DISPOSITIONS = {
+    "ACTIVE_REVIEW",
+    "PILE_SAVE_UP",
+    "PRUNE_BELOW_DOLLAR_FLOOR",
+    "HOLD_SOURCE_GENERATION_CHANGED",
+    "REJECT_CANONICAL_PREFLIGHT",
+    "HOLD_CANONICAL_PREFLIGHT",
+    "HOLD_NON_FIXED_USD_REWARD",
+    "HOLD_MIXED_REWARD_CURRENCY",
+    "HOLD_NO_FIXED_USD_REWARD",
+}
+
+
+def _live_cash_block(
+    receipt: dict[str, Any],
+    *,
+    repo: str,
+    issue: int,
+) -> tuple[dict[str, Any] | None, int | None, int | None]:
+    """Reduce source-bound 10/50 cash admission to safe claim authority."""
+    if not isinstance(receipt, dict) or receipt.get("schema") != "bounty-live-cash-admission-receipt/v1":
+        raise LiveCashAdmissionError("live cash admission returned malformed schema")
+    identity = receipt.get("identity")
+    if identity != {
+        "repo": repo,
+        "issue_number": issue,
+        "canonical_issue_url": f"https://github.com/{repo}/issues/{issue}",
+    }:
+        raise LiveCashAdmissionError("live cash admission target identity mismatch")
+    if receipt.get("authority") != _LIVE_CASH_AUTHORITY:
+        raise LiveCashAdmissionError("live cash admission authority mismatch")
+
+    disposition = receipt.get("disposition")
+    reason_codes = receipt.get("reason_codes")
+    if disposition not in _LIVE_CASH_DISPOSITIONS:
+        raise LiveCashAdmissionError("live cash admission disposition is unsupported")
+    if not isinstance(reason_codes, list) or not all(
+        isinstance(code, str) and code for code in reason_codes
+    ):
+        raise LiveCashAdmissionError("live cash admission reason codes are malformed")
+
+    source = receipt.get("source")
+    projection = source.get("preflight") if isinstance(source, dict) else None
+    if not isinstance(projection, dict):
+        raise LiveCashAdmissionError("live cash admission preflight projection is malformed")
+    signals = projection.get("signals")
+    if not isinstance(signals, dict):
+        raise LiveCashAdmissionError("live cash admission preflight signals are malformed")
+
+    attempt_count = signals.get("attempt_count")
+    if isinstance(attempt_count, bool) or not isinstance(attempt_count, int):
+        attempt_count = None
+    open_pr_count = signals.get("open_pr_count")
+    if isinstance(open_pr_count, bool) or not isinstance(open_pr_count, int):
+        open_pr_count = None
+
+    route = receipt.get("route")
+    economics = receipt.get("economics")
+    if not isinstance(economics, dict):
+        raise LiveCashAdmissionError("live cash admission economics are malformed")
+    if economics.get("active_floor") != "50" or economics.get("pile_floor") != "10":
+        raise LiveCashAdmissionError("live cash admission dollar-floor generation mismatch")
+
+    expected_route = (
+        "main_bounty_queue"
+        if disposition == "ACTIVE_REVIEW"
+        else "bounty_pile_10_49"
+        if disposition == "PILE_SAVE_UP"
+        else None
+    )
+    if route != expected_route:
+        raise LiveCashAdmissionError("live cash admission route mismatch")
+
+    if disposition == "ACTIVE_REVIEW":
+        if (
+            projection.get("dispatch") is not True
+            or economics.get("currency") != "USD"
+            or economics.get("fixed_semantics") is not True
+            or not isinstance(economics.get("fixed_amount"), str)
+            or not economics["fixed_amount"]
+        ):
+            raise LiveCashAdmissionError("active live cash admission is malformed")
+        return None, attempt_count, open_pr_count
+
+    if disposition in {"REJECT_CANONICAL_PREFLIGHT", "HOLD_CANONICAL_PREFLIGHT"}:
+        canonical_disposition = projection.get("disposition")
+        canonical_codes = projection.get("reason_codes")
+        if (
+            canonical_disposition not in {"REJECT", "HOLD"}
+            or projection.get("dispatch") is not False
+            or not isinstance(canonical_codes, list)
+            or not all(isinstance(code, str) and code for code in canonical_codes)
+        ):
+            raise LiveCashAdmissionError("blocked canonical preflight projection is malformed")
+        return (
+            {
+                "disposition": canonical_disposition,
+                "dispatch": False,
+                "reason_codes": list(canonical_codes),
+                "reasons": [
+                    {
+                        "code": code,
+                        "severity": canonical_disposition,
+                        "message": "Canonical live source evidence blocks claim dispatch.",
+                    }
+                    for code in canonical_codes
+                ],
+                "signals": {},
+            },
+            attempt_count,
+            open_pr_count,
+        )
+
+    qualified = [f"LIVE_CASH:{disposition}"] + [
+        f"LIVE_CASH:{code}" for code in reason_codes
+    ]
+    return (
+        {
+            "disposition": "HOLD",
+            "dispatch": False,
+            "reason_codes": qualified,
+            "reasons": [
+                {
+                    "code": code,
+                    "severity": "HOLD",
+                    "message": "Source-bound live cash admission blocks claim dispatch.",
+                }
+                for code in qualified
+            ],
+            "signals": {"live_cash_disposition": disposition},
+        },
+        attempt_count,
+        open_pr_count,
+    )
+
+
 def _availability_block(
     availability: dict[str, Any],
 ) -> dict[str, Any] | None:
@@ -282,7 +431,7 @@ def _availability_block(
     }
 
 
-def _build_preflight_claim(verify_economic, *, now, utc):
+def _build_preflight_claim(verify_economic, evaluate_cash, *, now, utc):
     """Bind verifier and time source into live preflight."""
 
     def _preflight_claim(argv: list[str]) -> None:
@@ -314,7 +463,24 @@ def _build_preflight_claim(verify_economic, *, now, utc):
             economic["--economic-receipt"],
             decision_as_of=decision_as_of,
         )
-    
+
+        # The source-bound 10/50 live-cash compiler is the front door for new
+        # GitHub bounty work. Callers never supply reward amount or authority.
+        cash_receipt = evaluate_cash(repo, issue)
+        cash_block, cash_attempt_count, cash_open_pr_count = _live_cash_block(
+            cash_receipt,
+            repo=repo,
+            issue=issue,
+        )
+        if cash_block is not None:
+            raise ClaimPreflightBlocked(
+                repo=repo,
+                issue=issue,
+                qualification=cash_block,
+                attempt_count=cash_attempt_count,
+                open_pr_count=cash_open_pr_count,
+            )
+
         result = preflight_bounty(repo, issue)
         if not isinstance(result, dict):
             raise BountyPreflightError("canonical bounty preflight did not return an object")
@@ -355,6 +521,7 @@ def _build_preflight_claim(verify_economic, *, now, utc):
 
 _preflight_claim = _build_preflight_claim(
     verify_claim_economic_receipt,
+    evaluate_live_cash_admission,
     now=datetime.now,
     utc=timezone.utc,
 )
@@ -417,6 +584,7 @@ def main() -> None:
             print(f"Error: claim blocked: {exc}", file=sys.stderr)
         raise SystemExit(exc.exit_code) from None
     except (
+        LiveCashAdmissionError,
         BountyAvailabilityError,
         BountyPreflightError,
         BountyAuditError,
