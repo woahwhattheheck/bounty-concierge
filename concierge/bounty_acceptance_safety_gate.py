@@ -17,7 +17,7 @@ import hashlib
 import json
 import re
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import urlsplit
@@ -265,10 +265,52 @@ def _classify_text(text: str) -> tuple[list[str], dict[str, int]]:
     # sentinel is restored before action/target matching, so requirements such
     # as "upload the .env file" remain detectable without joining unrelated
     # ordinary sentences.
-    normalized = normalized.replace(".env", "__bounty_dot_env__")
+    sentinel = "__bounty_dot_env__"
+    normalized = normalized.replace(".env", sentinel)
+    scan_segments = list(_SEGMENT_SPLIT_RE.split(normalized))
+
+    # Acceptance criteria commonly express a disclosure action as a Markdown
+    # header and put the sensitive object on the next list line:
+    #
+    #   Upload:
+    #   - API key used by the test account
+    #
+    # Newline splitting keeps unrelated bullets isolated, so add only bounded
+    # directive continuations.  Blank spacer lines are tolerated, but no more
+    # than the next three physical lines are considered.
+    lines = normalized.splitlines()
+    for index, raw_header in enumerate(lines):
+        header = " ".join(raw_header.split())
+        if not header:
+            continue
+        restored_header = header.replace(sentinel, ".env")
+        if not _action_positions(restored_header):
+            continue
+
+        directive = re.sub(
+            r"^(?:[-*+]\s+)?(?:please\s+)?",
+            "",
+            restored_header,
+        ).strip()
+        continuation_header = (
+            directive.endswith(":")
+            or re.search(r"\b(?:following|below)\s*:?\s*$", directive) is not None
+            or _ACTION_RE.fullmatch(directive.rstrip(":").strip()) is not None
+        )
+        if not continuation_header:
+            continue
+
+        following = ""
+        for raw_following in lines[index + 1 : index + 4]:
+            following = " ".join(raw_following.split())
+            if following:
+                break
+        if following:
+            scan_segments.append(f"{header} {following}")
+
     counts: dict[str, int] = {category: 0 for category, _ in _CATEGORY_PATTERNS}
-    for segment in _SEGMENT_SPLIT_RE.split(normalized):
-        segment = segment.replace("__bounty_dot_env__", ".env")
+    for segment in scan_segments:
+        segment = segment.replace(sentinel, ".env")
         segment = " ".join(segment.split())
         if not segment:
             continue
@@ -287,7 +329,6 @@ def _classify_text(text: str) -> tuple[list[str], dict[str, int]]:
                     break
     reasons = [category for category, _ in _CATEGORY_PATTERNS if counts[category] > 0]
     return reasons, counts
-
 
 def compile_bounty_acceptance_safety_gate(request: dict[str, Any]) -> dict[str, Any]:
     """Compile frozen acceptance text into an advisory-only safety receipt."""
@@ -331,10 +372,11 @@ def compile_bounty_acceptance_safety_gate(request: dict[str, Any]) -> dict[str, 
         raise BountyAcceptanceSafetyInputError(
             "observed_at must not be after evaluated_at"
         )
-    age_seconds = int((evaluated - observed).total_seconds())
+    source_age = evaluated - observed
+    age_seconds = int(source_age.total_seconds())
 
     reasons, counts = _classify_text(source_text)
-    if age_seconds > _MAX_SOURCE_AGE_SECONDS:
+    if source_age > timedelta(seconds=_MAX_SOURCE_AGE_SECONDS):
         reasons = ["SOURCE_OBSERVATION_STALE", *reasons]
 
     if reasons:
@@ -373,10 +415,14 @@ def compile_bounty_acceptance_safety_gate(request: dict[str, Any]) -> dict[str, 
 
 
 def verify_bounty_acceptance_safety_receipt(
-    receipt: dict[str, Any], source_text: str
+    receipt: dict[str, Any], source_text: str, *, verified_at: str
 ) -> bool:
-    """Verify receipt integrity and recompile semantics from the original source text."""
-    if type(receipt) is not dict or type(source_text) is not str:
+    """Verify receipt integrity, semantics, and source freshness at verification time."""
+    if (
+        type(receipt) is not dict
+        or type(source_text) is not str
+        or type(verified_at) is not str
+    ):
         return False
     if receipt.get("schema") != RECEIPT_SCHEMA or receipt.get("authority") != _AUTHORITY:
         return False
@@ -390,6 +436,14 @@ def verify_bounty_acceptance_safety_receipt(
             return False
         source = _require_object(receipt.get("source"), "receipt.source")
         identity = _require_object(receipt.get("identity"), "receipt.identity")
+        observed = _parse_timestamp(source["observed_at"], "receipt.source.observed_at")
+        evaluated = _parse_timestamp(source["evaluated_at"], "receipt.source.evaluated_at")
+        verification_time = _parse_timestamp(verified_at, "verified_at")
+        if verification_time < evaluated:
+            return False
+        if verification_time - observed > timedelta(seconds=_MAX_SOURCE_AGE_SECONDS):
+            return False
+
         request = {
             "schema": SCHEMA,
             "issue_url": identity["issue_url"],
@@ -403,7 +457,6 @@ def verify_bounty_acceptance_safety_receipt(
     except (BountyAcceptanceSafetyInputError, KeyError, TypeError, ValueError):
         return False
     return expected == receipt
-
 
 def format_summary(receipt: dict[str, Any]) -> str:
     identity = receipt["identity"]
