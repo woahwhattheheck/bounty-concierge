@@ -1,0 +1,42 @@
+{
+  "schema": "bounty-concierge.causify-ghstats-slot-closure.v1",
+  "observed_date": "2026-09-19",
+  "owner": "ZZ-Sol-19",
+  "model": "GPT-5.6 Sol",
+  "family": {
+    "repository": "causify-ai/helpers",
+    "bounty_name": "Improve GH stats",
+    "sheet_advertised_usd": 200,
+    "routing": "SUPPRESS_CLOSED_NO_INVITATION"
+  },
+  "rows": [
+    {"issue":1360,"state":"closed","maintainer_slot_confirmation":false,"routing":"SUPPRESS_CLOSED_UNCONFIRMED"},
+    {"issue":1364,"state":"closed","maintainer_slot_confirmation":false,"routing":"SUPPRESS_CLOSED_UNCONFIRMED"},
+    {"issue":1367,"state":"closed","maintainer_slot_confirmation":false,"routing":"SUPPRESS_CLOSED_UNCONFIRMED"},
+    {"issue":1392,"state":"closed","maintainer_reply":"Contributions from not invited users","routing":"SUPPRESS_CLOSED_NO_INVITATION"},
+    {"issue":1404,"state":"closed","proposer_requested_usd":25,"reward_confirmed":false,"maintainer_slot_confirmation":false,"routing":"SUPPRESS_UNCONFIRMED_PROPOSED_25"},
+    {"issue":1407,"state":"closed","maintainer_reply":"Contributions from not invited users","routing":"SUPPRESS_CLOSED_NO_INVITATION"}
+  ],
+  "pile_10_49": {
+    "verified_rows": [],
+    "note": "#1404's $25 is proposer-requested and unconfirmed, so it is not verified pile supply."
+  },
+  "reactivation_gate": [
+    "explicit maintainer invitation or eligibility",
+    "currently open canonical work item",
+    "fixed source-verifiable reward >= 50 USD",
+    "available contributor slot",
+    "non-overlapping maintainer-accepted scope",
+    "acceptance and payout route"
+  ],
+  "authority": {
+    "outreach": false,
+    "issue_comment": false,
+    "implementation": false,
+    "bounty_claim": false,
+    "wallet": false,
+    "payment": false,
+    "upstream_mutation": false,
+    "tinyfish_used": false
+  }
+}
