@@ -4,7 +4,7 @@
 Bounty and provider text is untrusted input. A reward must never become authority
 for a contributor to disclose hidden instructions, private reasoning, secrets,
 auth/session material, or private runtime configuration. This module scans frozen
-acceptance text and emits a deterministic advisory receipt without echoing the raw
+acceptance text and emits a time-bound advisory receipt without echoing the raw
 text into the receipt.
 
 The gate performs no network access and grants no provider, repository-write,
@@ -251,15 +251,17 @@ def _parse_timestamp(value: Any, field: str) -> datetime:
     return parsed
 
 
-def _trusted_utc_now(trusted_now: datetime | None) -> datetime:
-    if trusted_now is None:
-        return datetime.now(timezone.utc)
-    if type(trusted_now) is not datetime:
-        raise BountyAcceptanceSafetyInputError("trusted_now must be a datetime")
-    offset = trusted_now.utcoffset()
-    if trusted_now.tzinfo is None or offset is None or offset.total_seconds() != 0:
-        raise BountyAcceptanceSafetyInputError("trusted_now must be UTC")
-    return trusted_now.astimezone(timezone.utc)
+def _require_utc_datetime(value: datetime, field: str) -> datetime:
+    if type(value) is not datetime:
+        raise BountyAcceptanceSafetyInputError(f"{field} must be a datetime")
+    offset = value.utcoffset()
+    if value.tzinfo is None or offset is None or offset.total_seconds() != 0:
+        raise BountyAcceptanceSafetyInputError(f"{field} must be UTC")
+    return value.astimezone(timezone.utc)
+
+
+def _trusted_utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def _format_utc_timestamp(value: datetime) -> str:
@@ -316,10 +318,10 @@ def _classify_text(text: str) -> tuple[list[str], dict[str, int]]:
     return reasons, counts
 
 
-def compile_bounty_acceptance_safety_gate(
-    request: dict[str, Any], *, trusted_now: datetime | None = None
+def _compile_bounty_acceptance_safety_gate_at(
+    request: dict[str, Any], evaluated: datetime
 ) -> dict[str, Any]:
-    """Compile frozen acceptance text using verifier-owned UTC freshness time."""
+    """Compile at an already trusted UTC time; private replay/testing primitive."""
     request = _require_object(request, "request")
     _require_exact_keys(
         request,
@@ -358,7 +360,7 @@ def compile_bounty_acceptance_safety_gate(
     # v1 keeps evaluated_at as a syntactically validated compatibility field, but
     # it is untrusted caller input and MUST NOT control freshness.
     _parse_timestamp(request["evaluated_at"], "evaluated_at")
-    evaluated = _trusted_utc_now(trusted_now)
+    evaluated = _require_utc_datetime(evaluated, "evaluation time")
     if observed > evaluated:
         raise BountyAcceptanceSafetyInputError(
             "observed_at must not be after trusted evaluation time"
@@ -404,13 +406,15 @@ def compile_bounty_acceptance_safety_gate(
     return {**body, "receipt_sha256": _sha256_json(body)}
 
 
+def compile_bounty_acceptance_safety_gate(request: dict[str, Any]) -> dict[str, Any]:
+    """Compile frozen acceptance text using process-owned current UTC time."""
+    return _compile_bounty_acceptance_safety_gate_at(request, _trusted_utc_now())
+
+
 def verify_bounty_acceptance_safety_receipt(
-    receipt: dict[str, Any],
-    source_text: str,
-    *,
-    trusted_now: datetime | None = None,
+    receipt: dict[str, Any], source_text: str
 ) -> bool:
-    """Verify receipt integrity, semantics, and freshness at verifier-owned UTC time."""
+    """Verify receipt integrity, semantics, and freshness at process-owned UTC time."""
     if type(receipt) is not dict or type(source_text) is not str:
         return False
     if receipt.get("schema") != RECEIPT_SCHEMA or receipt.get("authority") != _AUTHORITY:
@@ -425,7 +429,7 @@ def verify_bounty_acceptance_safety_receipt(
             return False
         source = _require_object(receipt.get("source"), "receipt.source")
         identity = _require_object(receipt.get("identity"), "receipt.identity")
-        now = _trusted_utc_now(trusted_now)
+        now = _trusted_utc_now()
         observed = _parse_timestamp(source["observed_at"], "receipt.source.observed_at")
         generated = _parse_timestamp(source["evaluated_at"], "receipt.source.evaluated_at")
         if observed > now or generated > now:
@@ -441,9 +445,7 @@ def verify_bounty_acceptance_safety_receipt(
             "observed_at": source["observed_at"],
             "evaluated_at": source["evaluated_at"],
         }
-        expected = compile_bounty_acceptance_safety_gate(
-            request, trusted_now=generated
-        )
+        expected = _compile_bounty_acceptance_safety_gate_at(request, generated)
     except (BountyAcceptanceSafetyInputError, KeyError, TypeError, ValueError):
         return False
     return expected == receipt

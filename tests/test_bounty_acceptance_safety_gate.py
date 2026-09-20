@@ -5,6 +5,7 @@ import copy
 import hashlib
 import unittest
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 from concierge.bounty_acceptance_safety_gate import (
     BountyAcceptanceSafetyInputError,
@@ -29,13 +30,19 @@ def _request(text: str, *, observed_at: str = "2026-09-20T01:30:00Z", evaluated_
 
 
 def _compile(request: dict, *, trusted_now: datetime = TRUSTED_NOW) -> dict:
-    return compile_bounty_acceptance_safety_gate(request, trusted_now=trusted_now)
+    with patch(
+        "concierge.bounty_acceptance_safety_gate._trusted_utc_now",
+        return_value=trusted_now,
+    ):
+        return compile_bounty_acceptance_safety_gate(request)
 
 
 def _verify(receipt: dict, text: str, *, trusted_now: datetime = TRUSTED_NOW) -> bool:
-    return verify_bounty_acceptance_safety_receipt(
-        receipt, text, trusted_now=trusted_now
-    )
+    with patch(
+        "concierge.bounty_acceptance_safety_gate._trusted_utc_now",
+        return_value=trusted_now,
+    ):
+        return verify_bounty_acceptance_safety_receipt(receipt, text)
 
 
 class BountyAcceptanceSafetyGateTests(unittest.TestCase):
