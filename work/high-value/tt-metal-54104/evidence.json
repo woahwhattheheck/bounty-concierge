@@ -1,0 +1,81 @@
+{
+  "authority": {
+    "bounty_entitlement": false,
+    "device_correctness": false,
+    "hardware_pcc": false,
+    "payment": false,
+    "performance": false
+  },
+  "canonical_issue": {
+    "advertised_usd": 2000,
+    "assignee": "Sedherthe",
+    "number": 54104,
+    "repo": "tenstorrent/tt-metal",
+    "state": "open"
+  },
+  "execution": {
+    "commands": [
+      {
+        "argv": [
+          "/opt/pyvenv/bin/python3",
+          "-m",
+          "py_compile",
+          "/tmp/tt54104/repo/work/high-value/tt-metal-54104/istft_oracle.py",
+          "/tmp/tt54104/repo/tests/test_tt_metal_54104_istft_oracle.py"
+        ],
+        "returncode": 0,
+        "stderr_tail": "",
+        "stdout_tail": ""
+      },
+      {
+        "argv": [
+          "/opt/pyvenv/bin/python3",
+          "-m",
+          "unittest",
+          "-v",
+          "tests.test_tt_metal_54104_istft_oracle"
+        ],
+        "returncode": 0,
+        "stderr_tail": "test_basis_shape_mismatch_fails (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_basis_shape_mismatch_fails) ... ok\ntest_causal_hann_overlap_add_round_trip (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_causal_hann_overlap_add_round_trip) ... ok\ntest_hop_larger_than_window_is_rejected (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_hop_larger_than_window_is_rejected) ... ok\ntest_inverse_basis_round_trip_rectangular (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_inverse_basis_round_trip_rectangular) ... ok\ntest_length_trim_is_exact (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_length_trim_is_exact) ... ok\ntest_odd_fft_inverse_basis_round_trip (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_odd_fft_inverse_basis_round_trip) ... ok\ntest_push_after_flush_is_rejected_and_second_flush_idempotent (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_push_after_flush_is_rejected_and_second_flush_idempotent) ... ok\ntest_stream_frame_shape_mismatch_is_rejected (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_stream_frame_shape_mismatch_is_rejected) ... ok\ntest_streaming_chunk_partitions_match_full (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_streaming_chunk_partitions_match_full) ... ok\ntest_streaming_single_frame_chunks_match_bulk (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_streaming_single_frame_chunks_match_bulk) ... ok\ntest_unpadded_hann_tail_fails_closed (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_unpadded_hann_tail_fails_closed) ... ok\ntest_zero_denominator_fails_closed (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_zero_denominator_fails_closed) ... ok\n\n----------------------------------------------------------------------\nRan 12 tests in 0.010s\n\nOK\n",
+        "stdout_tail": ""
+      },
+      {
+        "argv": [
+          "/opt/pyvenv/bin/python3",
+          "-O",
+          "-m",
+          "unittest",
+          "-v",
+          "tests.test_tt_metal_54104_istft_oracle"
+        ],
+        "returncode": 0,
+        "stderr_tail": "test_basis_shape_mismatch_fails (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_basis_shape_mismatch_fails) ... ok\ntest_causal_hann_overlap_add_round_trip (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_causal_hann_overlap_add_round_trip) ... ok\ntest_hop_larger_than_window_is_rejected (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_hop_larger_than_window_is_rejected) ... ok\ntest_inverse_basis_round_trip_rectangular (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_inverse_basis_round_trip_rectangular) ... ok\ntest_length_trim_is_exact (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_length_trim_is_exact) ... ok\ntest_odd_fft_inverse_basis_round_trip (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_odd_fft_inverse_basis_round_trip) ... ok\ntest_push_after_flush_is_rejected_and_second_flush_idempotent (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_push_after_flush_is_rejected_and_second_flush_idempotent) ... ok\ntest_stream_frame_shape_mismatch_is_rejected (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_stream_frame_shape_mismatch_is_rejected) ... ok\ntest_streaming_chunk_partitions_match_full (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_streaming_chunk_partitions_match_full) ... ok\ntest_streaming_single_frame_chunks_match_bulk (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_streaming_single_frame_chunks_match_bulk) ... ok\ntest_unpadded_hann_tail_fails_closed (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_unpadded_hann_tail_fails_closed) ... ok\ntest_zero_denominator_fails_closed (tests.test_tt_metal_54104_istft_oracle.ISTFTOracleTests.test_zero_denominator_fails_closed) ... ok\n\n----------------------------------------------------------------------\nRan 12 tests in 0.014s\n\nOK\n",
+        "stdout_tail": ""
+      }
+    ],
+    "normal_tests": 12,
+    "optimized_tests": 12,
+    "python": "3.13.5"
+  },
+  "generated_at": "2026-09-19T21:45:00-04:00",
+  "host_contract": {
+    "coefficient_order": "real[0:n_freq] + imag[0:n_freq]",
+    "denominator": "fail closed at <=1e-12",
+    "normalization": "sum(windowed frames) / sum(window**2)",
+    "streaming": "emit only before next future frame start",
+    "tail_boundary": "explicit right flush coverage required for causal Hann endpoint"
+  },
+  "lane": "ZZ-Sol-Capstan-907",
+  "schema": "tt-metal-54104-istft-host-oracle-v1",
+  "sha256": {
+    "acceptance": "56d7cba569188437968d2bba50ef0b514d1479c2623cb0d95151657f6274acd3",
+    "evidence": "5e1eb206cb1aaae8ae37fc0533d95e009d1860914b1c19d0018bff1801badd9c",
+    "oracle": "3e9c671a0a4283dd9ae4c16f597f59dfd8eb9efacb3e3f72dc3b793c19e52b7d",
+    "tests": "84f341dbf210f70d413222d4e39fae94a49e204119178123595aee8a7263c7bd"
+  },
+  "source_pins": {
+    "bwe_ltx_blob": "776f4dae4c934e46ad449ee17cb83b1e9da3dd21",
+    "ltx_test_blob": "efa66a87662b4f384277f2e852d5402d05e8a639",
+    "tt_metal_main": "708e7f58aef9d089f0e5097d4a772c7c8ee129ea"
+  }
+}
