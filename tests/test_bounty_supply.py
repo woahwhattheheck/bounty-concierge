@@ -196,6 +196,18 @@ def test_newer_identical_generation_supersedes_stale_duplicate():
     assert row["source_row_count"] == 2
 
 
+def test_fractional_second_newer_generation_wins_chronologically():
+    exact = _snapshot("75", observed_at="2026-09-20T00:59:00Z")
+    fractional = _snapshot("75", observed_at="2026-09-20T00:59:00.500000Z")
+
+    result = _route_supply([fractional, exact])
+
+    row = result["rows"][0]
+    assert row["route"] == "ACTIVE"
+    assert row["observed_at"] == "2026-09-20T00:59:00.500000Z"
+    assert row["evidence_age_seconds"] == "59.5"
+
+
 def test_future_newest_generation_fails_closed_instead_of_using_older_fresh_row():
     fresh = _snapshot("75", observed_at="2026-09-20T00:59:00Z")
     future = _snapshot("75", observed_at="2026-09-20T01:00:01Z")
