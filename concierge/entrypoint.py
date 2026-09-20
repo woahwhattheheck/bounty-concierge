@@ -13,6 +13,10 @@ from concierge.bounty_availability import (
     BountyAvailabilityError,
     inspect_bounty_availability,
 )
+from concierge.bounty_live_cash_admission import (
+    LiveCashAdmissionError,
+    evaluate_live_cash_admission,
+)
 from concierge.bounty_preflight import BountyPreflightError, preflight_bounty
 from concierge.bounty_qualification import QualificationInputError
 from concierge.claim_economic_admission import (
@@ -282,8 +286,80 @@ def _availability_block(
     }
 
 
-def _build_preflight_claim(verify_economic, *, now, utc):
-    """Bind verifier and time source into live preflight."""
+def _cash_admission_block(receipt: dict[str, Any]) -> dict[str, Any] | None:
+    """Reduce live cash admission to a safe claim-block signal."""
+
+    if not isinstance(receipt, dict):
+        raise LiveCashAdmissionError("live cash admission did not return an object")
+    disposition = receipt.get("disposition")
+    route = receipt.get("route")
+    reasons = receipt.get("reason_codes")
+    economics = receipt.get("economics")
+    authority = receipt.get("authority")
+    if (
+        not isinstance(disposition, str)
+        or (route is not None and not isinstance(route, str))
+        or not isinstance(reasons, list)
+        or not all(isinstance(code, str) and code for code in reasons)
+        or not isinstance(economics, dict)
+        or not isinstance(authority, dict)
+    ):
+        raise LiveCashAdmissionError("live cash admission receipt was malformed")
+
+    fixed_amount = economics.get("fixed_amount")
+    if fixed_amount is not None and not isinstance(fixed_amount, str):
+        raise LiveCashAdmissionError("live cash fixed amount was malformed")
+    required_false = (
+        "claim_authority",
+        "implementation_authority",
+        "submission_authority",
+        "outbound_contact_authority",
+        "payment_or_wallet_authority",
+    )
+    if authority.get("advisory_only") is not True or any(
+        authority.get(key) is not False for key in required_false
+    ):
+        raise LiveCashAdmissionError("live cash authority ceiling was malformed")
+
+    if disposition == "ACTIVE_REVIEW":
+        if (
+            route != "main_bounty_queue"
+            or economics.get("currency") != "USD"
+            or fixed_amount is None
+            or economics.get("fixed_semantics") is not True
+            or economics.get("active_floor") != "50"
+            or economics.get("pile_floor") != "10"
+        ):
+            raise LiveCashAdmissionError("active live cash admission was malformed")
+        return None
+
+    safe_disposition = "REJECT" if disposition.startswith("REJECT_") else "HOLD"
+    safe_codes = [f"LIVE_CASH:{disposition}"]
+    safe_codes.extend(f"LIVE_CASH_SOURCE:{code}" for code in reasons)
+    return {
+        "disposition": safe_disposition,
+        "dispatch": False,
+        "reason_codes": safe_codes,
+        "reasons": [
+            {
+                "code": safe_codes[0],
+                "severity": safe_disposition,
+                "message": (
+                    "Live source-bound cash admission did not clear the owner's "
+                    "$50 active-work floor."
+                ),
+            }
+        ],
+        "signals": {
+            "live_cash_disposition": disposition,
+            "live_cash_route": route,
+            "fixed_amount_usd": fixed_amount,
+        },
+    }
+
+
+def _build_preflight_claim(verify_economic, evaluate_cash, *, now, utc):
+    """Bind retained economics, live cash admission, and time into claim preflight."""
 
     def _preflight_claim(argv: list[str]) -> None:
         """Require payoff, economics GO, canonical ACTIONABLE, and availability."""
@@ -338,13 +414,27 @@ def _build_preflight_claim(verify_economic, *, now, utc):
     
         availability = inspect_bounty_availability(repo, issue)
         availability_block = _availability_block(availability)
-        if availability_block is None:
+        if availability_block is not None:
+            raise ClaimPreflightBlocked(
+                repo=repo,
+                issue=issue,
+                qualification=availability_block,
+                attempt_count=attempt_count,
+                open_pr_count=open_pr_count,
+            )
+
+        # Source-bound cash admission is deliberately the final provider gate.
+        # Its evaluator rereads the canonical issue around its own preflight and
+        # derives amount/semantics itself; caller-authored reward fields cannot
+        # promote a claim into the active queue.
+        live_cash = evaluate_cash(repo, issue)
+        cash_block = _cash_admission_block(live_cash)
+        if cash_block is None:
             return
-    
         raise ClaimPreflightBlocked(
             repo=repo,
             issue=issue,
-            qualification=availability_block,
+            qualification=cash_block,
             attempt_count=attempt_count,
             open_pr_count=open_pr_count,
         )
@@ -355,6 +445,7 @@ def _build_preflight_claim(verify_economic, *, now, utc):
 
 _preflight_claim = _build_preflight_claim(
     verify_claim_economic_receipt,
+    evaluate_live_cash_admission,
     now=datetime.now,
     utc=timezone.utc,
 )
@@ -418,6 +509,7 @@ def main() -> None:
         raise SystemExit(exc.exit_code) from None
     except (
         BountyAvailabilityError,
+        LiveCashAdmissionError,
         BountyPreflightError,
         BountyAuditError,
         QualificationInputError,
