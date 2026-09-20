@@ -1,0 +1,52 @@
+{
+  "schema": "bounty-concierge.observerly-canonical-404-audit.v1",
+  "observed_date": "2026-09-19",
+  "owner": "ZZ-Sol-19",
+  "model": "GPT-5.6 Sol",
+  "source": {
+    "marketplace": "Algora",
+    "board": "https://algora.io/observerly/bounties"
+  },
+  "canonical_repo": {
+    "repository_full_name": "observerly/observerly",
+    "authenticated_github_read": "404_NOT_FOUND"
+  },
+  "rows": [
+    {
+      "marketplace_id": "OBS-17",
+      "marketplace_title": "[SIRIU-17] feat(app): add UserPrompt on initial app start to TelescopeListboxSelect component",
+      "advertised_usd": 100,
+      "algora_detail": "https://algora.io/observerly/bounties/clr6ubzr1000al40f9qq68owa",
+      "canonical_issue": "https://github.com/observerly/observerly/issues/1154",
+      "authenticated_github_read": "404_NOT_FOUND",
+      "routing": "SUPPRESS_CANONICAL_404"
+    },
+    {
+      "marketplace_id": "OBS-15",
+      "marketplace_title": "ci(app): deploy apps/web on tag @latest to Vercel",
+      "advertised_usd": 60,
+      "algora_detail": "https://algora.io/observerly/bounties/clqxsaumg0008ju0gvfu7l6ts",
+      "canonical_issue": "https://github.com/observerly/observerly/issues/1112",
+      "authenticated_github_read": "404_NOT_FOUND",
+      "routing": "SUPPRESS_CANONICAL_404"
+    }
+  ],
+  "recovery_gate": [
+    "new resolvable canonical repository and issue target",
+    "fixed reward >= 50 USD remains source-verifiable",
+    "canonical issue open/current",
+    "no maintainer stop",
+    "no assignment, reservation, or competing implementation",
+    "usable contribution and claim route"
+  ],
+  "authority": {
+    "marketplace_mutation": false,
+    "bounty_claim": false,
+    "sponsor_contact": false,
+    "assignment": false,
+    "wallet": false,
+    "payment": false,
+    "upstream_source_mutation": false,
+    "tinyfish_used": false
+  }
+}
