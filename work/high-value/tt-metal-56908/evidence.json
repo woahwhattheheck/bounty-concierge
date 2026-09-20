@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "issue": "tenstorrent/tt-metal#56908",
+  "advertised_reward_usd": 3000,
+  "upstream_assignee": "Adraca",
+  "tt_metal_main": "708e7f58aef9d089f0e5097d4a772c7c8ee129ea",
+  "source_blobs": {
+    "pre_factory": "f3792b73baafafc69f46181a97bbb6d936e87084",
+    "post_factory": "d742534049b8daa8729479803dead802c28c5b0b",
+    "welford_factory": "3c03d4f4404bed739864984eadb7a42e580cd38c",
+    "pre_reader": "2c1dfefcb0ddae83fe7634f3c01db063ee0f94e0",
+    "post_reader": "bb08640b6709887671f66897769179c19f667485",
+    "post_writer": "4e7b6424165da5b2b7a20e2de31cbf56b0fc9b1d"
+  },
+  "reviewed_prs": {
+    "56983": {
+      "head": "e2e2e3a822a007870b4f69976a59369b382a5308",
+      "author": "onlymrneo"
+    },
+    "57039": {
+      "head": "f20fe66791c5a12e0222c3e815fa26b72f6921fe",
+      "author": "knowaguy4u-cell"
+    },
+    "57084": {
+      "head": "758857511117c78c334cf1a96d4710d2507ed050",
+      "author": "Tinmc189623"
+    }
+  },
+  "oracle_census": {
+    "single_row_single_col": {
+      "original_wrong": 0,
+      "total": 64
+    },
+    "multirow_single_col": {
+      "original_wrong": 96,
+      "base_only_wrong": 0,
+      "stride_only_wrong": 96,
+      "total": 128
+    },
+    "multirow_two_col": {
+      "original_wrong": 240,
+      "base_only_wrong": 192,
+      "stride_only_wrong": 192,
+      "full_fixed_wrong": 0,
+      "total": 256
+    },
+    "multirow_four_col": {
+      "original_wrong": 992,
+      "base_only_wrong": 896,
+      "stride_only_wrong": 768,
+      "full_fixed_wrong": 0,
+      "total": 1024
+    },
+    "welford_case_c_foreign_requests": 40
+  },
+  "local_tests": {
+    "command": "python -m pytest -q tests/test_tt_metal_56908_oracle.py",
+    "passed": 13,
+    "failed": 0
+  },
+  "authority": {
+    "hardware_run": false,
+    "upstream_mutation": false,
+    "assignment_changed": false,
+    "payment_claimed": false
+  }
+}
