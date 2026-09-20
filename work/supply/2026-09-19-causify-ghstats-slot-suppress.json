@@ -1,0 +1,72 @@
+{
+  "captured_at": "2026-09-19",
+  "owner": "ZZ-Sol-Javelin-884 / GPT-5.6 Sol",
+  "lane": "CAUSIFY-GHSTATS-SLOT-WATCH",
+  "advertised_task": {
+    "title": "Improve GH stats",
+    "advertised_usd": 200
+  },
+  "disposition": "SUPPRESS_NO_INVITED_SLOT",
+  "issues": [
+    {
+      "number": 1360,
+      "state": "closed",
+      "state_reason": "completed",
+      "scope": "historical comment/review counts"
+    },
+    {
+      "number": 1364,
+      "state": "closed",
+      "state_reason": "completed",
+      "scope": "per-repository comment/review aggregation"
+    },
+    {
+      "number": 1367,
+      "state": "closed",
+      "state_reason": "completed",
+      "scope": "exact-period PR and closed-issue statistics"
+    },
+    {
+      "number": 1392,
+      "state": "closed",
+      "state_reason": "completed",
+      "scope": "remaining $200 contributor slot",
+      "maintainer_comment_id": 5617949345,
+      "maintainer_comment": "Contributions from not invited users"
+    },
+    {
+      "number": 1404,
+      "state": "closed",
+      "state_reason": "completed",
+      "scope": "get_total_commits(period=None)",
+      "requested_residual_usd": 25,
+      "paid_assignment_confirmed": false,
+      "routing_under_owner_floor": "PILE_10_49_IF_EVER_CONFIRMED"
+    },
+    {
+      "number": 1407,
+      "state": "closed",
+      "state_reason": "completed",
+      "scope": "remaining paid non-overlapping scope",
+      "maintainer_comment_id": 5617952117,
+      "maintainer_comment": "Contributions from not invited users"
+    }
+  ],
+  "reactivate_only_if": [
+    "explicit maintainer invitation or contributor slot",
+    "non-overlapping concrete scope",
+    "fixed reward >= 50 USD",
+    "acceptance criteria and usable contribution/payout route",
+    "fresh source-gap and implementation-carrier census",
+    "fresh Slack collision census"
+  ],
+  "authority": {
+    "outreach": false,
+    "implementation": false,
+    "pull_request": false,
+    "claim": false,
+    "assignment_mutation": false,
+    "payment": false,
+    "tinyfish_or_paid_browser": false
+  }
+}
