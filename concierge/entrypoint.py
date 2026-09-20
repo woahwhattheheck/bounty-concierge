@@ -286,7 +286,9 @@ def _availability_block(
     }
 
 
-def _cash_admission_block(receipt: dict[str, Any]) -> dict[str, Any] | None:
+def _cash_admission_block(
+    receipt: dict[str, Any], *, repo: str, issue: int
+) -> dict[str, Any] | None:
     """Reduce live cash admission to a safe claim-block signal."""
 
     if not isinstance(receipt, dict):
@@ -294,6 +296,8 @@ def _cash_admission_block(receipt: dict[str, Any]) -> dict[str, Any] | None:
     disposition = receipt.get("disposition")
     route = receipt.get("route")
     reasons = receipt.get("reason_codes")
+    identity = receipt.get("identity")
+    source = receipt.get("source")
     economics = receipt.get("economics")
     authority = receipt.get("authority")
     if (
@@ -301,10 +305,20 @@ def _cash_admission_block(receipt: dict[str, Any]) -> dict[str, Any] | None:
         or (route is not None and not isinstance(route, str))
         or not isinstance(reasons, list)
         or not all(isinstance(code, str) and code for code in reasons)
+        or not isinstance(identity, dict)
+        or not isinstance(source, dict)
         or not isinstance(economics, dict)
         or not isinstance(authority, dict)
     ):
         raise LiveCashAdmissionError("live cash admission receipt was malformed")
+    if (
+        identity.get("repo") != repo
+        or identity.get("issue_number") != issue
+        or identity.get("canonical_issue_url")
+        != f"https://github.com/{repo}/issues/{issue}"
+        or source.get("kind") != "LIVE_GITHUB_PREFLIGHT"
+    ):
+        raise LiveCashAdmissionError("live cash admission target binding was malformed")
 
     fixed_amount = economics.get("fixed_amount")
     if fixed_amount is not None and not isinstance(fixed_amount, str):
@@ -358,7 +372,7 @@ def _cash_admission_block(receipt: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def _build_preflight_claim(verify_economic, evaluate_cash, *, now, utc):
+def _build_preflight_claim(verify_economic, evaluate_cash, reduce_cash, *, now, utc):
     """Bind retained economics, live cash admission, and time into claim preflight."""
 
     def _preflight_claim(argv: list[str]) -> None:
@@ -428,7 +442,7 @@ def _build_preflight_claim(verify_economic, evaluate_cash, *, now, utc):
         # derives amount/semantics itself; caller-authored reward fields cannot
         # promote a claim into the active queue.
         live_cash = evaluate_cash(repo, issue)
-        cash_block = _cash_admission_block(live_cash)
+        cash_block = reduce_cash(live_cash, repo=repo, issue=issue)
         if cash_block is None:
             return
         raise ClaimPreflightBlocked(
@@ -446,6 +460,7 @@ def _build_preflight_claim(verify_economic, evaluate_cash, *, now, utc):
 _preflight_claim = _build_preflight_claim(
     verify_claim_economic_receipt,
     evaluate_live_cash_admission,
+    _cash_admission_block,
     now=datetime.now,
     utc=timezone.utc,
 )
