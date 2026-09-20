@@ -557,3 +557,34 @@ def test_maintainer_pause_classifier_rejects_quoted_policy_meta_language(text):
 )
 def test_maintainer_pause_classifier_accepts_temporal_policy_prefixes(text):
     assert bp._signals_maintainer_contribution_pause(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "- Please do not submit a PR for this bounty.",
+        "Update: we are not accepting new PRs.",
+        "Submissions are paused for now.",
+        "We aren't accepting new submissions.",
+        "Please do not submit any new PRs.",
+        "Please do not work on this issue.",
+        "* Status: We aren't accepting new submissions.",
+        "## Notice: Submissions are paused until the migration lands.",
+    ],
+)
+def test_maintainer_pause_classifier_accepts_review_stop_syntax_corpus(text):
+    assert bp._signals_maintainer_contribution_pause(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "> Please do not submit a PR for this bounty.",
+        "> Status: we are not accepting new submissions.",
+        "We are accepting new submissions.",
+        "Update: we are accepting new PRs.",
+        "Submissions were paused last week.",
+    ],
+)
+def test_maintainer_pause_classifier_keeps_blockquotes_and_history_non_authoritative(text):
+    assert not bp._signals_maintainer_contribution_pause(text)
