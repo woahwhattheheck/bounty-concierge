@@ -1,0 +1,264 @@
+{
+  "schema_version": "midas-fixed-cash-claim-census.v1",
+  "captured_date": "2026-09-19",
+  "operator": "ZZ-Sol-Solstice / GPT-5.6 Sol",
+  "canonical_repo": "bujiproject-art/agentmidasopendevteam",
+  "canonical_main_sha": "8e94549deba3a63a1db02b8c5d3f58518cf57b5f",
+  "source_files": {
+    "bounties_sha": "c25821c4f33bef3710d3a440c5faa94ea5440f58",
+    "readme_sha": "275b20bc2d439b0affbcf145894d940c11d1baff",
+    "contributing_sha": "4aa483fc5cdc5820866e1a7a5bfcda1c8ec80415"
+  },
+  "economics": {
+    "app_bounties": 41,
+    "advertised_app_face_value_usd": 10050,
+    "openclaw_roles": 4,
+    "advertised_openclaw_face_value_usd": 1550,
+    "combined_advertised_face_value_usd": 11600,
+    "payout_claim": "Stripe on approval",
+    "entitlement": false
+  },
+  "live_collection_snapshot": {
+    "open_issues_total": 24,
+    "open_pulls_total": 1,
+    "app_bounties_with_no_matching_open_issue_or_pull": 18,
+    "app_bounties_with_matching_open_issue_or_pull": 23
+  },
+  "execution_gate": {
+    "repository_root_is_documentation_only": true,
+    "package_json_present": false,
+    "signup_required": true,
+    "cla_required_before_pr_review": true,
+    "claim_issue_required": true,
+    "claim_window_days": 14,
+    "disposition": "CLAIM_COLLISION_CLEAR_SOURCE_SCAFFOLD_GATED",
+    "instruction": "Do not implement until maintainer/provider confirms the target scaffold and acceptance contract, and required signup/CLA/claim gates are satisfied."
+  },
+  "collision_clear": [
+    {
+      "id": 3,
+      "name": "Email Campaign Builder",
+      "usd": 300
+    },
+    {
+      "id": 4,
+      "name": "Lead Scoring Engine",
+      "usd": 250
+    },
+    {
+      "id": 5,
+      "name": "Sales Forecasting Widget",
+      "usd": 200
+    },
+    {
+      "id": 8,
+      "name": "Social Media Scheduler",
+      "usd": 300
+    },
+    {
+      "id": 12,
+      "name": "Affiliate Dashboard Pro",
+      "usd": 500
+    },
+    {
+      "id": 15,
+      "name": "Team Genealogy Tree",
+      "usd": 400
+    },
+    {
+      "id": 16,
+      "name": "Invoice Generator",
+      "usd": 300
+    },
+    {
+      "id": 18,
+      "name": "Revenue Dashboard",
+      "usd": 500
+    },
+    {
+      "id": 19,
+      "name": "Payment Gateway Manager",
+      "usd": 400
+    },
+    {
+      "id": 20,
+      "name": "Ticket System",
+      "usd": 250
+    },
+    {
+      "id": 21,
+      "name": "Knowledge Base Builder",
+      "usd": 300
+    },
+    {
+      "id": 22,
+      "name": "Live Chat Widget",
+      "usd": 350
+    },
+    {
+      "id": 26,
+      "name": "User Session Replay",
+      "usd": 200
+    },
+    {
+      "id": 30,
+      "name": "Restaurant POS Interface",
+      "usd": 400
+    },
+    {
+      "id": 31,
+      "name": "Real Estate Listing Portal",
+      "usd": 350
+    },
+    {
+      "id": 33,
+      "name": "Law Firm Case Manager",
+      "usd": 400
+    },
+    {
+      "id": 34,
+      "name": "Healthcare Appointment System",
+      "usd": 500
+    },
+    {
+      "id": 41,
+      "name": "Video Tutorial Series",
+      "usd": 300
+    }
+  ],
+  "top_value_collision_clear": [
+    12,
+    18,
+    34,
+    15,
+    19,
+    30,
+    33,
+    22,
+    31
+  ],
+  "open_collision_or_inquiry": [
+    {
+      "id": 1,
+      "usd": 150,
+      "issue": 8
+    },
+    {
+      "id": 2,
+      "usd": 200,
+      "issue": 18
+    },
+    {
+      "id": 6,
+      "usd": 100,
+      "issue": 14
+    },
+    {
+      "id": 7,
+      "usd": 200,
+      "issue": 23
+    },
+    {
+      "id": 9,
+      "usd": 200,
+      "issue": 17
+    },
+    {
+      "id": 10,
+      "usd": 150,
+      "issue": 7
+    },
+    {
+      "id": 11,
+      "usd": 100,
+      "issue": 6
+    },
+    {
+      "id": 13,
+      "usd": 200,
+      "issue": 21
+    },
+    {
+      "id": 14,
+      "usd": 150,
+      "issue": 3
+    },
+    {
+      "id": 17,
+      "usd": 200,
+      "issue": 10
+    },
+    {
+      "id": 23,
+      "usd": 100,
+      "issue": 1,
+      "open_pull": 2
+    },
+    {
+      "id": 24,
+      "usd": 250,
+      "issue": 20
+    },
+    {
+      "id": 25,
+      "usd": 300,
+      "issue": 25
+    },
+    {
+      "id": 27,
+      "usd": 150,
+      "issue": 4
+    },
+    {
+      "id": 28,
+      "usd": 200,
+      "issue": 16
+    },
+    {
+      "id": 29,
+      "usd": 100,
+      "issue": 5
+    },
+    {
+      "id": 32,
+      "usd": 200,
+      "issue": 19
+    },
+    {
+      "id": 35,
+      "usd": 100,
+      "issue": 12
+    },
+    {
+      "id": 36,
+      "usd": 100,
+      "issue": 13
+    },
+    {
+      "id": 37,
+      "usd": 100,
+      "issue": 9
+    },
+    {
+      "id": 38,
+      "usd": 250,
+      "issue": 24
+    },
+    {
+      "id": 39,
+      "usd": 200,
+      "issue": 11
+    },
+    {
+      "id": 40,
+      "usd": 150,
+      "issue": 15
+    }
+  ],
+  "notes": [
+    "Matching open issue means collision/inquiry, not maintainer assignment.",
+    "Zero matching open issue/PR means claim-collision-clear in this canonical collection snapshot, not assigned or payment-entitled.",
+    "Canonical repository currently has documentation/templates only; package.json is absent.",
+    "Refresh issue/pull collections and canonical main immediately before any external claim or implementation."
+  ]
+}
