@@ -263,3 +263,54 @@ def test_commented_caller_reflection_text_does_not_false_reject(tmp_path):
     path.write_text(content, encoding="utf-8")
     failures, _ = oracle.check(root)
     assert not any("caller-controlled apiFeatures/defaultFeatures" in failure for failure in failures)
+
+def test_executable_decoy_connection_info_does_not_hide_returned_unsafe_info(tmp_path):
+    oracle = load_oracle()
+    root = passing_tree(tmp_path, oracle)
+    path = root / oracle.FILES["service"]
+    content = path.read_text(encoding="utf-8").replace(
+        "ConnectionInfo info = new ConnectionInfo();\n    info.features = CAST_FEATURES;",
+        "ConnectionInfo decoy = new ConnectionInfo();\n"
+        "    decoy.features = CAST_FEATURES;\n"
+        "    ConnectionInfo info = new ConnectionInfo();\n"
+        "    info.features = request.defaultFeatures;",
+    )
+    path.write_text(content, encoding="utf-8")
+    failures, _ = oracle.check(root)
+    assert (
+        "FEATURE CONTRACT: caller-controlled apiFeatures/defaultFeatures must not be advertised directly"
+        in failures
+    )
+
+
+def test_callback_connection_info_must_be_explicitly_constructed(tmp_path):
+    oracle = load_oracle()
+    root = passing_tree(tmp_path, oracle)
+    path = root / oracle.FILES["service"]
+    content = path.read_text(encoding="utf-8").replace(
+        "callback.onPostInitCompleteWithConnectionInfo(0, null, info);",
+        "callback.onPostInitCompleteWithConnectionInfo(0, null, returnedInfo);",
+    )
+    path.write_text(content, encoding="utf-8")
+    failures, _ = oracle.check(root)
+    assert "FEATURE CONTRACT: returned ConnectionInfo must be constructed explicitly" in failures
+
+
+def test_every_returned_connection_info_is_checked(tmp_path):
+    oracle = load_oracle()
+    root = passing_tree(tmp_path, oracle)
+    path = root / oracle.FILES["service"]
+    content = path.read_text(encoding="utf-8").replace(
+        "callback.onPostInitCompleteWithConnectionInfo(0, null, info);",
+        "callback.onPostInitCompleteWithConnectionInfo(0, null, info);\n"
+        "    ConnectionInfo fallback = new ConnectionInfo();\n"
+        "    fallback.features = request.apiFeatures;\n"
+        "    callback.onPostInitCompleteWithConnectionInfo(1, null, fallback);",
+    )
+    path.write_text(content, encoding="utf-8")
+    failures, _ = oracle.check(root)
+    assert (
+        "FEATURE CONTRACT: caller-controlled apiFeatures/defaultFeatures must not be advertised directly"
+        in failures
+    )
+
