@@ -70,10 +70,10 @@ The byte-exact original v1 economics implementation is preserved privately as `c
 
 | Currency | Single floor | Compatible-batch floor | Native reward / agent-hour floor |
 | --- | ---: | ---: | ---: |
-| USD | 100 USD | 500 USD | 100 USD/hour |
+| USD | 50 USD | 500 USD | 100 USD/hour |
 | RTC | 200 RTC | 500 RTC | 300 RTC/hour |
 
-The RTC shape is intentional: a 1-RTC one-hour task is held, while sufficiently large compatible batches can still make small repeated items worth processing together. The policy is content-addressed in every receipt; changing the thresholds requires changing the policy input rather than silently changing code.
+The USD single-item floor aligns with the owner's $50 active-work threshold while the unchanged $100/hour floor still rejects slow or expensive work. The RTC shape is intentional: a 1-RTC one-hour task is held, while sufficiently large compatible batches can still make small repeated items worth processing together. The policy is content-addressed in every receipt; changing the thresholds requires changing the policy input rather than silently changing code.
 
 These numbers are dispatch-planning thresholds. They are **not** claims about fair wages, token value, market value, guaranteed bounty acceptance, expected payout, or realized revenue.
 
