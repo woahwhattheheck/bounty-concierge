@@ -1,0 +1,58 @@
+{
+  "lane": "HVQ-TT-METAL-20260920-53787/reference-sweep+branch-vectors+acceptance",
+  "captured_utc_date": "2026-09-20",
+  "upstream": {
+    "repository": "tenstorrent/tt-metal",
+    "issue": 53787,
+    "issue_title": "[Bounty $5k] ttnn.log_sigmoid: 0.91% peak fp32 error and a missing x <= -4 branch",
+    "issue_state": "open",
+    "issue_assignees": [
+      "kanapitsas"
+    ],
+    "bounty_labels": [
+      "bounty",
+      "bounty_difficulty/hard"
+    ],
+    "advertised_usd": 5000,
+    "main": "708e7f58aef9d089f0e5097d4a772c7c8ee129ea",
+    "source_blobs": {
+      "tt_metal/hw/ckernels/wormhole_b0/metal/llk_api/llk_sfpu/ckernel_sfpu_logsigmoid.h": "cdc5ad762c24219187ad8e6babe57a2d261474ff",
+      "tt_metal/hw/ckernels/blackhole/metal/llk_api/llk_sfpu/ckernel_sfpu_logsigmoid.h": "e2ca2e3e875ffcd78f1031df5cfdf4de59b9e0a9",
+      "ttnn/cpp/ttnn/operations/eltwise/unary/device/kernels/compute/logsigmoid_kernel.cpp": "5e6522f035fc2856e805997a678dbfa63a7735f4",
+      "tests/sweep_framework/sweeps/eltwise/unary/log_sigmoid/log_sigmoid.py": "4653c5028a3df72684b11d87cbcd3b29bd4e9285"
+    }
+  },
+  "artifact": {
+    "oracle": "work/high-value/tt-metal-53787/logsigmoid_oracle.py",
+    "acceptance": "work/high-value/tt-metal-53787/ACCEPTANCE.md",
+    "test": "tests/test_tt_metal_53787_logsigmoid_oracle.py",
+    "current_model": "checked-in branch partition + checked-in polynomial coefficients + accurate host exp in positive tail",
+    "stable_reference": "min(x,0)-log1p(exp(-abs(x)))",
+    "hardware_or_device_simulator": false
+  },
+  "required_host_checks": [
+    "python work/high-value/tt-metal-53787/logsigmoid_oracle.py",
+    "python -m pytest -q tests/test_tt_metal_53787_logsigmoid_oracle.py",
+    "python -O -m pytest -q tests/test_tt_metal_53787_logsigmoid_oracle.py",
+    "python -m py_compile work/high-value/tt-metal-53787/logsigmoid_oracle.py tests/test_tt_metal_53787_logsigmoid_oracle.py"
+  ],
+  "hosted_validation": {
+    "workflow": "Unit Tests",
+    "python_versions": [
+      "3.9",
+      "3.13"
+    ],
+    "state": "PENDING_EXACT_HEAD_CI_AT_PUBLICATION",
+    "success_claimed_in_this_file": false
+  },
+  "authority": {
+    "implementation_owner_preserved": "kanapitsas",
+    "upstream_issue_or_pr_mutated": false,
+    "competing_upstream_pr_opened": false,
+    "issue_assignment_mutated": false,
+    "bounty_entitlement_claimed": false,
+    "payment_action": false,
+    "hardware_claim": false,
+    "performance_claim": false
+  }
+}
