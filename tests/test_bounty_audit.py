@@ -133,6 +133,30 @@ def test_audit_counts_canonical_pr_states_and_flags_open_issue_with_merged_pr():
     assert [pr["number"] for pr in result["linked_prs"]] == [10, 11, 12]
 
 
+def test_audit_surfaces_locked_open_issue():
+    session = FakeSession(
+        issue={"state": "open", "locked": True},
+        search_pages={1: []},
+        pull_details={},
+    )
+
+    result = bounty_audit.audit_bounty("acme/widget", 42, session=session)
+
+    assert result["issue_locked"] is True
+    assert "locked=true" in bounty_audit.format_summary(result)
+
+
+def test_malformed_locked_state_fails_closed():
+    session = FakeSession(
+        issue={"state": "open", "locked": "yes"},
+        search_pages={1: []},
+        pull_details={},
+    )
+
+    with pytest.raises(bounty_audit.BountyAuditError, match="locked state was malformed"):
+        bounty_audit.audit_bounty("acme/widget", 42, session=session)
+
+
 def test_closed_issue_with_merged_pr_is_not_stale_listing_signal():
     session = FakeSession(
         issue={"state": "closed"},
