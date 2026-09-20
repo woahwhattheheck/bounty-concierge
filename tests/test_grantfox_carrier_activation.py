@@ -161,7 +161,9 @@ class GrantFoxCarrierActivationTests(unittest.TestCase):
             receipt["advisory_next_action"],
             "REFRESH_CARRIER_CENSUS_WITH_BOUNDED_MAX_AGE",
         )
-        self.assertEqual(receipt["carrier"]["current_disposition"], "CLEAR_FOR_QUEUE_EVALUATION")
+        self.assertEqual(
+            receipt["carrier"]["current_disposition"], "CLEAR_FOR_QUEUE_EVALUATION"
+        )
 
     def test_23_hour_empty_census_cannot_mint_fresh_activation(self):
         census = compile_grantfox_carrier_census(
@@ -172,7 +174,9 @@ class GrantFoxCarrierActivationTests(unittest.TestCase):
             )
         )
         receipt = self.compile(census, now=BASE_NOW)
-        self.assertEqual(receipt["carrier"]["current_disposition"], "CLEAR_FOR_QUEUE_EVALUATION")
+        self.assertEqual(
+            receipt["carrier"]["current_disposition"], "CLEAR_FOR_QUEUE_EVALUATION"
+        )
         self.assertEqual(receipt["disposition"], "HOLD_CARRIER_CENSUS_POLICY")
         self.assertIn(
             "CARRIER_CENSUS_MAX_AGE_EXCEEDS_POLICY", receipt["reason_codes"]
