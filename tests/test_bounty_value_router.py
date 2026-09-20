@@ -78,9 +78,21 @@ class BountyValueRouterTests(unittest.TestCase):
 
     def test_pile_does_not_auto_promote_as_batch(self):
         receipt = compile_bounty_value_routing(request(
-            candidate("w1", [evidence("20")], source="https://github.com/acme/a/issues/1"),
-            candidate("w2", [evidence("20")], source="https://github.com/acme/a/issues/2"),
-            candidate("w3", [evidence("20")], source="https://github.com/acme/a/issues/3"),
+            candidate(
+                "w1",
+                [evidence("20", url="https://github.com/acme/a/issues/1")],
+                source="https://github.com/acme/a/issues/1",
+            ),
+            candidate(
+                "w2",
+                [evidence("20", url="https://github.com/acme/a/issues/2")],
+                source="https://github.com/acme/a/issues/2",
+            ),
+            candidate(
+                "w3",
+                [evidence("20", url="https://github.com/acme/a/issues/3")],
+                source="https://github.com/acme/a/issues/3",
+            ),
         ))
         self.assertEqual(receipt["counts"]["PILE_10_49"], 3)
         self.assertEqual(receipt["counts"]["VALUE_50_PLUS"], 0)
@@ -98,11 +110,69 @@ class BountyValueRouterTests(unittest.TestCase):
         row = compile_bounty_value_routing(request(
             candidate(evidence_items=[
                 evidence("50", scope="PROGRAM_GENERIC", url="https://example.com/bounty-policy"),
-                evidence("20", authority="MAINTAINER", url="https://github.com/acme/widget/pull/2"),
+                evidence(
+                    "20",
+                    authority="MAINTAINER",
+                    url="https://github.com/acme/widget/issues/1#issuecomment-2",
+                ),
             ])
         ))["candidates"][0]
         self.assertEqual(row["disposition"], "PILE_10_49")
         self.assertEqual(row["selected_amount"]["amount"], "20")
+
+    def test_external_provider_amount_cannot_self_promote(self):
+        row = compile_bounty_value_routing(request(
+            candidate(evidence_items=[
+                evidence(
+                    "500",
+                    authority="PROVIDER",
+                    url="https://provider.example/bounties/acme-widget-1",
+                )
+            ])
+        ))["candidates"][0]
+        self.assertEqual(row["disposition"], "HOLD_ISSUE_AMOUNT_UNVERIFIED")
+        self.assertIn("NO_FRESH_SOURCE_BOUND_ISSUE_AMOUNT", row["reason_codes"])
+
+    def test_first_party_amount_for_different_issue_cannot_promote(self):
+        row = compile_bounty_value_routing(request(
+            candidate(evidence_items=[
+                evidence("500", url="https://github.com/acme/widget/issues/2")
+            ])
+        ))["candidates"][0]
+        self.assertEqual(row["disposition"], "HOLD_ISSUE_AMOUNT_UNVERIFIED")
+
+    def test_milestone_specific_amount_does_not_promote_issue_in_v1(self):
+        row = compile_bounty_value_routing(request(
+            candidate(evidence_items=[
+                evidence("500", scope="MILESTONE_SPECIFIC")
+            ])
+        ))["candidates"][0]
+        self.assertEqual(row["disposition"], "HOLD_ISSUE_AMOUNT_UNVERIFIED")
+
+    def test_maintainer_comment_on_exact_issue_is_source_bound(self):
+        row = compile_bounty_value_routing(request(
+            candidate(evidence_items=[
+                evidence(
+                    "75",
+                    authority="MAINTAINER",
+                    url="https://github.com/acme/widget/issues/1#issuecomment-123",
+                )
+            ])
+        ))["candidates"][0]
+        self.assertEqual(row["disposition"], "VALUE_50_PLUS")
+        self.assertEqual(row["selected_amount"]["amount"], "75")
+
+    def test_maintainer_comment_on_different_issue_cannot_promote(self):
+        row = compile_bounty_value_routing(request(
+            candidate(evidence_items=[
+                evidence(
+                    "500",
+                    authority="MAINTAINER",
+                    url="https://github.com/acme/widget/issues/2#issuecomment-123",
+                )
+            ])
+        ))["candidates"][0]
+        self.assertEqual(row["disposition"], "HOLD_ISSUE_AMOUNT_UNVERIFIED")
 
     def test_aggregator_only_amount_cannot_promote(self):
         row = compile_bounty_value_routing(request(
@@ -114,7 +184,11 @@ class BountyValueRouterTests(unittest.TestCase):
         row = compile_bounty_value_routing(request(
             candidate(evidence_items=[
                 evidence("100"),
-                evidence("80", authority="PROVIDER", url="https://provider.example/issue/1"),
+                evidence(
+                    "80",
+                    authority="MAINTAINER",
+                    url="https://github.com/acme/widget/issues/1#issuecomment-80",
+                ),
             ])
         ))["candidates"][0]
         self.assertEqual(row["disposition"], "HOLD_CONFLICTING_SPECIFIC_AMOUNTS")

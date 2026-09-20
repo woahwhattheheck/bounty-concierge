@@ -23,8 +23,10 @@ _RECEIPT_SCHEMA = "bounty-value-routing-receipt/v1"
 _MAX_CANDIDATES = 2000
 _MAX_EVIDENCE = 20
 _ASSET_RE = re.compile(r"^[A-Z][A-Z0-9]{2,11}$")
-_TRUSTED_AUTHORITIES = frozenset({"FIRST_PARTY", "PROVIDER", "MAINTAINER"})
-_SPECIFIC_SCOPES = frozenset({"ISSUE_SPECIFIC", "MILESTONE_SPECIFIC"})
+_GITHUB_ISSUE_PATH_RE = re.compile(
+    r"^/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)/?$"
+)
+_GITHUB_ISSUE_COMMENT_RE = re.compile(r"^issuecomment-([1-9][0-9]*)$")
 _AUTHORITY = {
     "advisory_only": True,
     "claim_authority": False,
@@ -106,7 +108,12 @@ def _utc(value: Any, field: str) -> datetime:
     return parsed
 
 
-def _https_url(value: Any, field: str) -> str:
+def _https_url(
+    value: Any,
+    field: str,
+    *,
+    allow_github_issue_comment_fragment: bool = False,
+) -> str:
     raw = _text(value, field)
     if any(ch.isspace() for ch in raw) or "\\" in raw:
         raise BountyValueRoutingInputError(f"{field} must be a canonical HTTPS URL")
@@ -115,6 +122,11 @@ def _https_url(value: Any, field: str) -> str:
         port = parsed.port
     except ValueError as exc:
         raise BountyValueRoutingInputError(f"{field} must be a valid URL") from exc
+    fragment_ok = (
+        allow_github_issue_comment_fragment
+        and (parsed.hostname or "").casefold() in {"github.com", "www.github.com"}
+        and _GITHUB_ISSUE_COMMENT_RE.fullmatch(parsed.fragment or "") is not None
+    )
     if (
         parsed.scheme.casefold() != "https"
         or not parsed.hostname
@@ -122,12 +134,58 @@ def _https_url(value: Any, field: str) -> str:
         or parsed.password is not None
         or port is not None
         or parsed.query
-        or parsed.fragment
+        or (parsed.fragment and not fragment_ok)
     ):
         raise BountyValueRoutingInputError(
-            f"{field} must be canonical HTTPS without userinfo/port/query/fragment"
+            f"{field} must be canonical HTTPS without userinfo/port/query"
+            " and may use only a canonical GitHub issue-comment fragment"
         )
     return raw
+
+
+def _github_issue_identity(value: str, *, allow_comment: bool) -> tuple[str, str, int] | None:
+    parsed = urlsplit(value)
+    if (
+        parsed.scheme.casefold() != "https"
+        or (parsed.hostname or "").casefold() not in {"github.com", "www.github.com"}
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.port is not None
+        or parsed.query
+    ):
+        return None
+    match = _GITHUB_ISSUE_PATH_RE.fullmatch(parsed.path)
+    if match is None:
+        return None
+    if parsed.fragment:
+        if not allow_comment or _GITHUB_ISSUE_COMMENT_RE.fullmatch(parsed.fragment) is None:
+            return None
+    return (match.group(1).casefold(), match.group(2).casefold(), int(match.group(3)))
+
+
+def _evidence_is_source_bound(evidence: dict[str, Any], canonical_source_url: str) -> bool:
+    """Return whether v1 can structurally bind amount evidence to this issue."""
+    if evidence["scope"] != "ISSUE_SPECIFIC":
+        return False
+    source_identity = _github_issue_identity(canonical_source_url, allow_comment=False)
+    if source_identity is None:
+        return False
+    authority = evidence["authority"]
+    evidence_url = evidence["evidence_url"]
+    if authority == "FIRST_PARTY":
+        return (
+            _github_issue_identity(evidence_url, allow_comment=False)
+            == source_identity
+            and not urlsplit(evidence_url).fragment
+        )
+    if authority == "MAINTAINER":
+        parsed = urlsplit(evidence_url)
+        return (
+            bool(parsed.fragment)
+            and _github_issue_identity(evidence_url, allow_comment=True)
+            == source_identity
+        )
+    return False
 
 
 def _normalize_policy(raw: Any) -> dict[str, Any]:
@@ -203,7 +261,11 @@ def _normalize_evidence(raw: Any, field: str, evaluated_at: datetime, max_age: i
     asset = _text(item["asset"], f"{field}.asset", max_chars=12).upper()
     if _ASSET_RE.fullmatch(asset) is None:
         raise BountyValueRoutingInputError(f"{field}.asset is invalid")
-    evidence_url = _https_url(item["evidence_url"], f"{field}.evidence_url")
+    evidence_url = _https_url(
+        item["evidence_url"],
+        f"{field}.evidence_url",
+        allow_github_issue_comment_fragment=True,
+    )
     observed_raw = _text(item["observed_at"], f"{field}.observed_at", max_chars=64)
     observed_at = _utc(observed_raw, f"{field}.observed_at")
     if observed_at > evaluated_at:
@@ -257,7 +319,7 @@ def _route_candidate(candidate: dict[str, Any], policy: dict[str, Any]) -> dict[
     trusted_specific = [
         e
         for e in candidate["reward_evidence"]
-        if e["scope"] in _SPECIFIC_SCOPES and e["authority"] in _TRUSTED_AUTHORITIES
+        if _evidence_is_source_bound(e, candidate["canonical_source_url"])
     ]
     fresh_specific = [e for e in trusted_specific if e["fresh"]]
     reasons: list[str] = []
@@ -268,7 +330,7 @@ def _route_candidate(candidate: dict[str, Any], policy: dict[str, Any]) -> dict[
         reasons.append("SPECIFIC_AMOUNT_EVIDENCE_STALE")
     elif not fresh_specific:
         disposition = "HOLD_ISSUE_AMOUNT_UNVERIFIED"
-        reasons.append("NO_FRESH_TRUSTED_ISSUE_OR_MILESTONE_AMOUNT")
+        reasons.append("NO_FRESH_SOURCE_BOUND_ISSUE_AMOUNT")
     else:
         amount_keys = {(e["asset"], e["amount"]) for e in fresh_specific}
         if len(amount_keys) != 1:
@@ -393,8 +455,9 @@ def compile_bounty_value_routing(request: dict[str, Any]) -> dict[str, Any]:
         "counts": counts,
         "candidates": routed,
         "routing_rule": (
-            "fresh trusted issue/milestone amount only; nominal >=active floor to main; "
-            "pile floor..<active to pile; below pile dropped; no FX or batch auto-promotion"
+            "fresh source-bound canonical issue amount only; nominal >=active floor to main; "
+            "pile floor..<active to pile; below pile dropped; provider/milestone/mirror "
+            "evidence is context-only in v1; no FX or batch auto-promotion"
         ),
         "authority": dict(_AUTHORITY),
     }

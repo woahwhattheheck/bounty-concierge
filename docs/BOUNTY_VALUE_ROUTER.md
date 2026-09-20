@@ -20,20 +20,27 @@ amount.
 
 ## Evidence precedence
 
-A value may route only from fresh amount evidence that is both:
+A value may route only from fresh amount evidence that v1 can bind
+structurally to the candidate's **exact canonical GitHub issue**:
 
-1. issue- or milestone-specific, and
-2. first-party, provider, or maintainer-authored.
+1. FIRST_PARTY evidence must use that exact issue URL; or
+2. MAINTAINER evidence must use a canonical issuecomment URL on that exact
+   issue.
 
-Program-generic tables and aggregator listings are retained as context but
-cannot by themselves promote a specific issue into the active queue.
+Caller-supplied authority labels are not enough. External provider URLs,
+aggregator rows, program-generic rows, milestone-wide rows, and evidence for a
+different issue are retained as context but cannot promote this issue into the
+active queue in v1. This prevents a mirror/provider URL plus a self-selected
+FIRST_PARTY / PROVIDER / MAINTAINER label from nominating the active amount for
+an unrelated canonical target.
 
-That rule exists to prevent exactly the class of mistake where a generic bounty
-program advertises a $50 tier while the maintainer has already classified the
-specific report at $20. The issue-specific maintainer classification controls.
+This is a **source-binding** rule, not cryptographic proof that the quoted
+amount appears in the source or that a comment author is really a maintainer.
+Live contract/provenance collectors remain responsible for those stronger
+claims before implementation or submission authority can exist.
 
-Conflicting fresh specific amounts hold fail-closed rather than choosing the
-largest number.
+Conflicting fresh source-bound issue amounts hold fail-closed rather than
+choosing the largest number.
 
 ## No automatic micro-batch promotion
 
