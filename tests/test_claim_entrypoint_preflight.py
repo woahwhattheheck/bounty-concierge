@@ -56,7 +56,10 @@ def _cash(
             "issue_number": issue,
             "canonical_issue_url": f"https://github.com/{repo}/issues/{issue}",
         },
-        "source": {"kind": "LIVE_GITHUB_PREFLIGHT"},
+        "source": {
+            "kind": "LIVE_GITHUB_PREFLIGHT",
+            "preflight": {"dispatch": True},
+        },
         "economics": {
             "currency": "USD" if amount is not None else None,
             "fixed_amount": amount,
@@ -307,6 +310,34 @@ def test_live_cash_nonactive_routes_block_claim_instructions(
         "availability",
         "live_cash",
     ]
+
+
+@pytest.mark.parametrize("bad_amount", ["49.99", "NaN", "Infinity", "not-money"])
+def test_active_live_cash_amount_must_satisfy_frozen_floor(bad_amount):
+    receipt = _cash(amount=bad_amount)
+    with pytest.raises(e.LiveCashAdmissionError):
+        e._cash_admission_block(receipt, repo="acme/widget", issue=42)
+
+
+def test_active_live_cash_schema_drift_fails_closed():
+    receipt = _cash()
+    receipt["schema"] = "bounty-live-cash-admission-receipt/v2"
+    with pytest.raises(e.LiveCashAdmissionError, match="schema"):
+        e._cash_admission_block(receipt, repo="acme/widget", issue=42)
+
+
+def test_active_live_cash_unknown_authority_capability_fails_closed():
+    receipt = _cash()
+    receipt["authority"]["future_claim_authority"] = True
+    with pytest.raises(e.LiveCashAdmissionError, match="authority"):
+        e._cash_admission_block(receipt, repo="acme/widget", issue=42)
+
+
+def test_active_live_cash_requires_dispatchable_retained_preflight():
+    receipt = _cash()
+    receipt["source"]["preflight"]["dispatch"] = False
+    with pytest.raises(e.LiveCashAdmissionError, match="active live cash admission"):
+        e._cash_admission_block(receipt, repo="acme/widget", issue=42)
 
 
 def test_live_cash_malformed_authority_fails_closed(monkeypatch, capsys):
