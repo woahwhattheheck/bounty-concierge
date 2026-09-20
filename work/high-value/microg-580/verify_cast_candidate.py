@@ -76,11 +76,11 @@ def check(root: Path) -> tuple[list[str], list[str]]:
     require(r"onPostInitCompleteWithConnectionInfo\s*\(", src["service"],
             "service returns ConnectionInfo", failures)
     info_match = re.search(
-        r"\\bConnectionInfo\\s+(\\w+)\\s*=\\s*new\\s+ConnectionInfo\\s*\\(\\s*\\)\\s*;",
+        r"\bConnectionInfo\s+(\w+)\s*=\s*new\s+ConnectionInfo\s*\(\s*\)\s*;",
         src["service"],
     )
     feature_decl = re.search(
-        r"\\bstatic\\s+final\\s+Feature\\[\\]\\s+([A-Z][A-Z0-9_]*)\\s*=",
+        r"\bstatic\s+final\s+Feature\[\]\s+([A-Z][A-Z0-9_]*)\s*=",
         src["service"],
     )
     if info_match is None:
@@ -91,14 +91,14 @@ def check(root: Path) -> tuple[list[str], list[str]]:
         info_name = info_match.group(1)
         feature_name = feature_decl.group(1)
         assignment = re.search(
-            rf"\\b{re.escape(info_name)}\\.features\\s*=\\s*([^;]+);",
+            rf"\b{re.escape(info_name)}\.features\s*=\s*([^;]+);",
             src["service"],
         )
         if assignment is None:
             failures.append("FEATURE CONTRACT: ConnectionInfo must advertise the implementation-owned feature set")
         else:
             rhs = assignment.group(1).strip()
-            if re.search(r"\\brequest\\.(?:apiFeatures|defaultFeatures)\\b", rhs):
+            if re.search(r"\brequest\.(?:apiFeatures|defaultFeatures)\b", rhs):
                 failures.append("FEATURE CONTRACT: service must not echo caller-controlled feature claims")
             elif rhs != feature_name:
                 failures.append("FEATURE CONTRACT: ConnectionInfo features must come from the implementation-owned feature set")
