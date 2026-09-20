@@ -1,0 +1,56 @@
+{
+  "lane": "HVQ-TT-METAL-20260920-56290/oracle+vectors+composite-map",
+  "captured_utc_date": "2026-09-20",
+  "upstream": {
+    "repository": "tenstorrent/tt-metal",
+    "issue": 56290,
+    "issue_state": "open",
+    "issue_assignee": "singhharsh1708",
+    "main": "708e7f58aef9d089f0e5097d4a772c7c8ee129ea",
+    "source_blobs": {
+      "quantization_cpp": "b31f5928e3986ebcf593156c1713a56274965469",
+      "test_quantization_py": "95805e96492acaa405b8204a57e72fef6af29b66"
+    }
+  },
+  "assigned_carrier": {
+    "pull_request": 56327,
+    "head": "0c4090ec15ba53369321815870e02069f7ba68d2",
+    "merge_base": "54a826b1d931cf5c70f1d933194cfc32ea96b2b6",
+    "captured_compare_to_main": {
+      "status": "diverged",
+      "ahead_by": 10,
+      "behind_by": 3
+    },
+    "implementation_owner_preserved": true
+  },
+  "host_validation": {
+    "commands": [
+      "python test_clamp_oracle.py",
+      "python -O test_clamp_oracle.py",
+      "python -m py_compile clamp_oracle.py test_clamp_oracle.py",
+      "python clamp_oracle.py"
+    ],
+    "normal_unittest": "11/11 PASS",
+    "optimized_unittest": "11/11 PASS",
+    "py_compile": "PASS",
+    "vector_count": 30,
+    "device_or_hardware_execution": false,
+    "performance_measurement": false,
+    "review_repair": {
+      "source_review_comment": 5746730189,
+      "repaired_gap": "UINT8 input -> UINT8 output requant lower clamp",
+      "hostile_vector": "u8_input_lower_hostile",
+      "input_value": 1,
+      "input_zero_point": 10,
+      "expected_output": 0
+    }
+  },
+  "authority": {
+    "upstream_write_permission": "pull-only",
+    "upstream_pr_mutated": false,
+    "issue_assignment_mutated": false,
+    "bounty_claimed": false,
+    "payment_action": false,
+    "hardware_claim": false
+  }
+}
