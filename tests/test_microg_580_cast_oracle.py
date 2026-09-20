@@ -37,10 +37,13 @@ interface ICastDeviceControllerListener {
 """)
     write(tmp_path, oracle.FILES["service"], """
 class CastDeviceControllerService {
+  static final Feature[] CAST_FEATURES = new Feature[]{new Feature("cast_cxless", 1L)};
   void f() {
     Object x = GmsService.CAST, GmsService.CAST_API;
-    Object f = request.apiFeatures;
-    callback.onPostInitCompleteWithConnectionInfo(0, null, null);
+    Object requested = request.apiFeatures;
+    ConnectionInfo info = new ConnectionInfo();
+    info.features = CAST_FEATURES;
+    callback.onPostInitCompleteWithConnectionInfo(0, null, info);
   }
 }
 """)
@@ -117,3 +120,56 @@ def test_disconnect_clear_before_transport_teardown_is_rejected(tmp_path):
     path.write_text(content, encoding="utf-8")
     failures, _ = oracle.check(root)
     assert "ORDERING: disconnect must tear down Cast before clearing listener" in failures
+
+
+def test_direct_caller_feature_reflection_is_rejected(tmp_path):
+    oracle = load_oracle()
+    root = passing_tree(tmp_path, oracle)
+    path = root / oracle.FILES["service"]
+    content = path.read_text(encoding="utf-8").replace(
+        "info.features = CAST_FEATURES;",
+        "info.features = request.apiFeatures;",
+    )
+    path.write_text(content, encoding="utf-8")
+    failures, _ = oracle.check(root)
+    assert (
+        "FEATURE CONTRACT: caller-controlled apiFeatures/defaultFeatures must not be advertised directly"
+        in failures
+    )
+
+
+def test_direct_default_feature_reflection_is_rejected(tmp_path):
+    oracle = load_oracle()
+    root = passing_tree(tmp_path, oracle)
+    path = root / oracle.FILES["service"]
+    content = path.read_text(encoding="utf-8").replace(
+        "info.features = CAST_FEATURES;",
+        "info.features = request.defaultFeatures;",
+    )
+    path.write_text(content, encoding="utf-8")
+    failures, _ = oracle.check(root)
+    assert (
+        "FEATURE CONTRACT: caller-controlled apiFeatures/defaultFeatures must not be advertised directly"
+        in failures
+    )
+
+
+def test_request_feature_inspection_is_allowed_when_advertisement_is_server_owned(tmp_path):
+    oracle = load_oracle()
+    root = passing_tree(tmp_path, oracle)
+    failures, _ = oracle.check(root)
+    assert not any("FEATURE CONTRACT" in failure for failure in failures)
+
+
+def test_missing_implementation_owned_feature_set_is_rejected(tmp_path):
+    oracle = load_oracle()
+    root = passing_tree(tmp_path, oracle)
+    path = root / oracle.FILES["service"]
+    content = path.read_text(encoding="utf-8")
+    content = content.replace(
+        '  static final Feature[] CAST_FEATURES = new Feature[]{new Feature("cast_cxless", 1L)};\n',
+        "",
+    )
+    path.write_text(content, encoding="utf-8")
+    failures, _ = oracle.check(root)
+    assert "MISSING INVARIANT: service declares implementation-owned Cast FEATURES" in failures

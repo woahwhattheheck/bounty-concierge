@@ -75,8 +75,15 @@ def check(root: Path) -> tuple[list[str], list[str]]:
             "service accepts CAST_API 161 alongside CAST", failures)
     require(r"onPostInitCompleteWithConnectionInfo\s*\(", src["service"],
             "service returns ConnectionInfo", failures)
-    require(r"request\.(?:apiFeatures|defaultFeatures)", src["service"],
-            "service binds advertised features to request features", failures)
+    service = src["service"]
+    if re.search(r"\.features\s*=\s*request\.(?:apiFeatures|defaultFeatures)\b", service):
+        failures.append(
+            "FEATURE CONTRACT: caller-controlled apiFeatures/defaultFeatures must not be advertised directly"
+        )
+    require(r"(?:static\s+final|final\s+static)\s+Feature\[\]\s+[A-Z][A-Z0-9_]*FEATURES\b",
+            service, "service declares implementation-owned Cast FEATURES", failures)
+    require(r"\.features\s*=\s*[A-Z][A-Z0-9_]*FEATURES\b",
+            service, "service advertises implementation-owned Cast FEATURES", failures)
 
     require(r"registerMediaRouterCallbackImpl\s*\(", src["context"],
             "CastContext registers MediaRouterCallbackImpl", failures)
