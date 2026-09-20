@@ -1,23 +1,7 @@
 {
-  "updated_at": "2026-09-19T10:21:48.502957+00:00",
+  "updated_at": "2026-09-20T01:39:29.383791+00:00",
   "total_count": 273,
   "bounties": [
-    {
-      "repo": "Scottcjn/rustchain-bounties",
-      "number": 16984,
-      "title": "Claim: May Flowers Star Pack \u2014 Blackcode-cmd",
-      "body": "Claiming #9017.\n\nGitHub: @Blackcode-cmd\n\nStarred:\n- Scottcjn/Rustchain\n- Scottcjn/bottube\n- Scottcjn/rustchain-bounties\n\nFlower proof:\nhttps://github.com/Scottcjn/rustchain-bounties/pull/16982#issuecomment-5722881083\n\nRTC wallet:\nRTCaefa6fef8bd9b1447320d96f997eb972ccac4863",
-      "url": "https://github.com/Scottcjn/rustchain-bounties/issues/16984",
-      "labels": [
-        "bounty"
-      ],
-      "created_at": "2026-09-18T00:06:02Z",
-      "reward_rtc": 5722881083.0,
-      "difficulty": "critical",
-      "skills": [
-        "social-media"
-      ]
-    },
     {
       "repo": "Scottcjn/rustchain-bounties",
       "number": 2451,
@@ -5015,6 +4999,22 @@
       ],
       "created_at": "2026-04-12T18:25:39Z",
       "reward_rtc": 0.01,
+      "difficulty": "micro",
+      "skills": [
+        "social-media"
+      ]
+    },
+    {
+      "repo": "Scottcjn/rustchain-bounties",
+      "number": 16984,
+      "title": "Claim: May Flowers Star Pack \u2014 Blackcode-cmd",
+      "body": "Claiming #9017.\n\nGitHub: @Blackcode-cmd\n\nStarred:\n- Scottcjn/Rustchain\n- Scottcjn/bottube\n- Scottcjn/rustchain-bounties\n\nFlower proof:\nhttps://github.com/Scottcjn/rustchain-bounties/pull/16982#issuecomment-5722881083\n\nRTC wallet:\nRTCaefa6fef8bd9b1447320d96f997eb972ccac4863",
+      "url": "https://github.com/Scottcjn/rustchain-bounties/issues/16984",
+      "labels": [
+        "bounty"
+      ],
+      "created_at": "2026-09-18T00:06:02Z",
+      "reward_rtc": 0.0,
       "difficulty": "micro",
       "skills": [
         "social-media"

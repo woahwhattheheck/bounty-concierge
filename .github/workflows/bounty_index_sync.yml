@@ -5,7 +5,13 @@ on:
     branches:
       - main
     paths:
+      # Generator inputs: changes here must refresh the published index/README
+      # immediately instead of waiting for the daily schedule.
       - ".github/workflows/bounty_index_sync.yml"
+      - "concierge/bounty_index.py"
+      - "concierge/bounty_index_publish.py"
+      - "concierge/readme_sync.py"
+      - "concierge/config.py"
   schedule:
     - cron: "0 6 * * *"   # Daily at 06:00 UTC
   workflow_dispatch:        # Allow manual trigger
