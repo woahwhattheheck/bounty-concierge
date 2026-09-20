@@ -31,7 +31,7 @@ from typing import Any
 from concierge.bounty_acceptance_safety_gate import (
     BountyAcceptanceSafetyInputError,
     SCHEMA as ACCEPTANCE_SAFETY_SCHEMA,
-    compile_bounty_acceptance_safety_gate,
+    _compile_bounty_acceptance_safety_gate_at,
 )
 from concierge.bounty_qualification import QualificationInputError, qualify_dispatch
 
@@ -206,24 +206,30 @@ def _acceptance_safety(
     *,
     repo: str,
     number: int,
-    observed_at: str,
     evaluated_at: str,
 ) -> dict[str, Any]:
-    """Run the broader acceptance-text gate and persist only safe receipt fields."""
+    """Classify sponsor-controlled acceptance text without persisting it.
+
+    Snapshot freshness is owned by this router. The composed safety gate is
+    compiled at the same trusted evaluated_at, and its observation clock is
+    bound to that instant so missing/stale/fresh/future twins of identical
+    source text keep one semantic signature.
+    """
     source_text = _acceptance_text(snapshot)
     source_digest = hashlib.sha256(source_text.encode("utf-8")).hexdigest()
     issue_url = f"https://github.com/{repo}/issues/{number}"
+    evaluated = _timestamp(evaluated_at, "evaluated_at")
     request = {
         "schema": ACCEPTANCE_SAFETY_SCHEMA,
         "issue_url": issue_url,
         "source_url": issue_url,
         "source_text": source_text,
         "source_content_sha256": source_digest,
-        "observed_at": observed_at,
+        "observed_at": evaluated_at,
         "evaluated_at": evaluated_at,
     }
     try:
-        receipt = compile_bounty_acceptance_safety_gate(request)
+        receipt = _compile_bounty_acceptance_safety_gate_at(request, evaluated)
     except BountyAcceptanceSafetyInputError:
         return {
             "disposition": "HOLD_SAFETY_GATE_INPUT_INVALID",
@@ -309,7 +315,6 @@ def route_snapshot(
             snapshot,
             repo=repo,
             number=number,
-            observed_at=observed_text,
             evaluated_at=evaluated_text,
         )
 
@@ -388,22 +393,6 @@ def route_snapshot(
     return row
 
 
-def _semantic_acceptance_reasons(row: dict[str, Any]) -> list[str]:
-    """Keep only text-derived hold reasons in the duplicate signature.
-
-    Gate input/freshness failures are time-dependent and must not turn two
-    otherwise identical generations into CONFLICT.
-    """
-    evidence = row.get("acceptance_safety_evidence") or {}
-    return sorted(
-        {
-            reason
-            for reason in evidence.get("reason_codes", [])
-            if isinstance(reason, str) and reason.startswith("REQUESTS_")
-        }
-    )
-
-
 def _semantic_signature(row: dict[str, Any]) -> str:
     """Bind source semantics while allowing newer identical observations to win."""
     return _receipt(
@@ -412,7 +401,12 @@ def _semantic_signature(row: dict[str, Any]) -> str:
             "qualification_disposition": row["qualification_disposition"],
             "qualification_reason_codes": row["qualification_reason_codes"],
             "qualification_evidence": row["qualification_evidence"],
-            "acceptance_safety_reason_codes": _semantic_acceptance_reasons(row),
+            "acceptance_safety_disposition": row["acceptance_safety_evidence"][
+                "disposition"
+            ],
+            "acceptance_safety_reason_codes": row["acceptance_safety_evidence"][
+                "reason_codes"
+            ],
         }
     )
 

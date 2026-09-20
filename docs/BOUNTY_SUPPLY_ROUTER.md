@@ -95,7 +95,9 @@ Multiple observations for the same issue are compared by their **safe normalized
 source semantics**, not by raw prose. If those semantics are identical, the
 newest observation is authoritative for freshness and `source_row_count`
 records how many generations were collapsed. This prevents an older duplicate
-from making a refreshed row stale.
+from making a refreshed row stale. Acceptance-safety classification is bound to
+the router's trusted `evaluated_at`, so missing/stale/fresh/future clocks of
+identical source text cannot mint a false `CONFLICTING_DUPLICATE_EVIDENCE`.
 
 A future-dated newest observation still fails closed rather than falling back to
 an older row.
