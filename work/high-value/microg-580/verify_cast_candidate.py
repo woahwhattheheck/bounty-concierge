@@ -76,20 +76,20 @@ def check(root: Path) -> tuple[list[str], list[str]]:
     service = src["service"]
     connection_info_names = set(
         re.findall(
-            r"(?m)^[ \\t]*ConnectionInfo\\s+(\\w+)\\s*=\\s*new\\s+ConnectionInfo\\s*\\(\\s*\\)\\s*;",
+            r"(?m)^[ \t]*ConnectionInfo\s+(\w+)\s*=\s*new\s+ConnectionInfo\s*\(\s*\)\s*;",
             service,
         )
     )
     callback_info_names = re.findall(
-        r"(?m)^[ \\t]*(?:[\\w.]+\\.)?onPostInitCompleteWithConnectionInfo\\s*\\("
-        r"\\s*[^,\\n]+\\s*,\\s*[^,\\n]+\\s*,\\s*(\\w+)\\s*\\)\\s*;",
+        r"(?m)^[ \t]*(?:[\w.]+\.)?onPostInitCompleteWithConnectionInfo\s*\("
+        r"\s*[^,\n]+\s*,\s*[^,\n]+\s*,\s*(\w+)\s*\)\s*;",
         service,
     )
     feature_names = set(
         re.findall(
-            r"(?m)^[ \\t]*(?:(?:public|private|protected)\\s+)?"
-            r"(?:static\\s+final|final\\s+static)\\s+Feature\\[\\]\\s+"
-            r"([A-Z][A-Z0-9_]*FEATURES)\\s*=",
+            r"(?m)^[ \t]*(?:(?:public|private|protected)\s+)?"
+            r"(?:static\s+final|final\s+static)\s+Feature\[\]\s+"
+            r"([A-Z][A-Z0-9_]*FEATURES)\s*=",
             service,
         )
     )
@@ -106,14 +106,14 @@ def check(root: Path) -> tuple[list[str], list[str]]:
             continue
 
         assignments = re.findall(
-            rf"(?m)^[ \\t]*{re.escape(info_name)}\\.features\\s*=\\s*([^;]+);",
+            rf"(?m)^[ \t]*{re.escape(info_name)}\.features\s*=\s*([^;]+);",
             service,
         )
         if not assignments:
             failures.append("MISSING INVARIANT: service advertises implementation-owned Cast FEATURES")
         for rhs in assignments:
             rhs = rhs.strip()
-            if re.search(r"\\brequest\\.(?:apiFeatures|defaultFeatures)\\b", rhs):
+            if re.search(r"\brequest\.(?:apiFeatures|defaultFeatures)\b", rhs):
                 failures.append(
                     "FEATURE CONTRACT: caller-controlled apiFeatures/defaultFeatures must not be advertised directly"
                 )
