@@ -1,0 +1,45 @@
+{
+  "schema": "bounty-concierge.fleet-sdk-docs-m11a-prep.v1",
+  "observed_at": "2026-09-20T01:46:08Z",
+  "lane": "ERGO-FLEET-M11A-125/SOURCE+EXAMPLE-PREP",
+  "upstream": {
+    "repo": "fleet-sdk/docs",
+    "issue": 8,
+    "default_branch": "master",
+    "docs_head": "d2d96f797a193b6826db54d6b7de5d1eab3e666c",
+    "reservation_comment_id": 5746817917,
+    "reservation_comment_url": "https://github.com/fleet-sdk/docs/issues/8#issuecomment-5746817917",
+    "issue_state": "OPEN",
+    "assignee": null,
+    "entitlement": "HOLD_PENDING_RESERVATION"
+  },
+  "economics": {
+    "advertised_amount": 125,
+    "currency": "SigUSD",
+    "basis": "per accepted Milestone 11 example",
+    "fixed_source": true,
+    "award_claimed": false,
+    "payout_claimed": false
+  },
+  "fleet_sdk": {
+    "repo": "fleet-sdk/fleet",
+    "head": "8fd834a94a7534069ed78af3538f518068ca1e2e",
+    "core_version": "0.12.0",
+    "compiler_version": "0.12.0",
+    "mock_chain_version": "0.12.0",
+    "vitest_version": "4.0.18"
+  },
+  "overlap": {
+    "pull_request": 12,
+    "head": "e0a2cf7a5b8db6e3be7efb81548fe02788b6ab41",
+    "state": "OPEN",
+    "finding": "Broad educational docs include a time-locked-box snippet but no dedicated Milestone 11 Time Lock chapter/reservation; recheck immediately before any upstream submission."
+  },
+  "authority": {
+    "internal_prep_only": true,
+    "upstream_submission": false,
+    "sponsor_followup": false,
+    "bounty_claim": false,
+    "payment_claim": false
+  }
+}
