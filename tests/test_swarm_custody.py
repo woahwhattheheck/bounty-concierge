@@ -157,6 +157,64 @@ class SwarmCustodyTests(unittest.TestCase):
                 ]
             )
 
+    def test_duplicate_json_keys_fail_closed_in_cli(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "events.ndjson"
+            path.write_text(
+                '{"version":1,"event_id":"e1","event_id":"shadow","work_key":"a","kind":"TAKE","owner":"alpha","at":"2026-09-19T17:00:00Z"}\\n',
+                encoding="utf-8",
+            )
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    "-S",
+                    str(TOOL),
+                    str(path),
+                    "--as-of",
+                    "2026-09-19T18:00:00Z",
+                    "--lease-seconds",
+                    "3600",
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(proc.returncode, 2)
+        payload = json.loads(proc.stderr)
+        self.assertEqual(payload["error"]["code"], "duplicate_json_key")
+        self.assertIn("line 1", payload["error"]["message"])
+
+    def test_nonfinite_json_constants_fail_closed_in_cli(self):
+        for constant in ("NaN", "Infinity", "-Infinity"):
+            with self.subTest(constant=constant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    path = Path(tmp) / "events.ndjson"
+                    path.write_text(
+                        '{"version":1,"event_id":"e1","work_key":"a","kind":"TAKE","owner":"alpha","at":"2026-09-19T17:00:00Z","artifact":'
+                        + constant
+                        + "}\\n",
+                        encoding="utf-8",
+                    )
+                    proc = subprocess.run(
+                        [
+                            sys.executable,
+                            "-S",
+                            str(TOOL),
+                            str(path),
+                            "--as-of",
+                            "2026-09-19T18:00:00Z",
+                            "--lease-seconds",
+                            "3600",
+                        ],
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                    )
+                self.assertEqual(proc.returncode, 2, (constant, proc.stderr))
+                payload = json.loads(proc.stderr)
+                self.assertEqual(payload["error"]["code"], "invalid_json_constant")
+                self.assertIn("line 1", payload["error"]["message"])
+
     def test_invalid_input_is_machine_readable_exit_two(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "events.ndjson"

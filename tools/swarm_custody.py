@@ -146,18 +146,47 @@ def parse_event(raw: Any, *, line_number: int | None = None) -> Event:
         raise
 
 
+def _reject_nonfinite_json_constant(raw: str) -> None:
+    raise LedgerError(
+        "invalid_json_constant",
+        f"non-finite JSON constant is not allowed: {raw}",
+    )
+
+
+def _object_without_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise LedgerError(
+                "duplicate_json_key",
+                f"duplicate JSON object key: {key}",
+            )
+        value[key] = item
+    return value
+
+
+def _strict_json_loads(line: str, *, line_number: int) -> Any:
+    try:
+        return json.loads(
+            line,
+            object_pairs_hook=_object_without_duplicate_keys,
+            parse_constant=_reject_nonfinite_json_constant,
+        )
+    except LedgerError as exc:
+        raise LedgerError(exc.code, f"line {line_number}: {exc.message}") from exc
+    except json.JSONDecodeError as exc:
+        raise LedgerError(
+            "invalid_json",
+            f"line {line_number}: invalid JSON at column {exc.colno}",
+        ) from exc
+
+
 def parse_ndjson(lines: Iterable[str]) -> list[Event]:
     events: list[Event] = []
     for line_number, line in enumerate(lines, 1):
         if not line.strip():
             continue
-        try:
-            raw = json.loads(line)
-        except json.JSONDecodeError as exc:
-            raise LedgerError(
-                "invalid_json",
-                f"line {line_number}: invalid JSON at column {exc.colno}",
-            ) from exc
+        raw = _strict_json_loads(line, line_number=line_number)
         events.append(parse_event(raw, line_number=line_number))
     return events
 

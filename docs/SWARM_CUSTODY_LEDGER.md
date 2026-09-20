@@ -19,7 +19,9 @@ custody evidence only.
 ## Input format
 
 Input is UTF-8 NDJSON. Blank lines are ignored. Every non-blank line is one version-1
-event with no undeclared fields:
+event with no undeclared fields. Parsing is strict: duplicate JSON object keys and
+non-finite constants (NaN, Infinity, and -Infinity) are rejected rather than
+silently normalized:
 
 ```json
 {"version":1,"event_id":"evt-001","work_key":"GFOX2-20260919-087/R","kind":"TAKE","owner":"ZZ-Sol-17","at":"2026-09-19T17:48:21-04:00","artifact":"slack:1789854501.851079"}
@@ -103,8 +105,8 @@ provider state, repository permissions, and the current Slack/GitHub record.
 
 The stdlib test suite covers canonical permutation invariance, collision priority,
 the exact stale boundary, `--allow-stale`, DONE versus RELEASE semantics, duplicate
-event IDs, unknown/orphan events, terminal completion, and machine-readable invalid
-input:
+event IDs, duplicate JSON object keys, non-finite JSON constants, unknown/orphan
+events, terminal completion, and machine-readable invalid input:
 
 ```bash
 python -m unittest -v tests/test_swarm_custody.py
