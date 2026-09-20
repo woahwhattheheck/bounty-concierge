@@ -113,7 +113,7 @@ def check(root: Path) -> tuple[list[str], list[str]]:
     raw = method_body(src["impl"], r"public\s+void\s+rawMessageReceived\s*\([^)]*\)")
     if not raw:
         failures.append("MISSING INVARIANT: rawMessageReceived() body")
-    elif re.search(r"\\bonSendMessageSuccess\\s*\\(", raw):
+    elif re.search(r"\bonSendMessageSuccess\s*\(", raw):
         failures.append("MESSAGE CONTRACT: inbound rawMessageReceived must not invoke send success")
 
     send = method_body(src["impl"], r"public\s+void\s+sendMessage\s*\([^)]*\)")
