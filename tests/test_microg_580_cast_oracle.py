@@ -314,3 +314,45 @@ def test_every_returned_connection_info_is_checked(tmp_path):
         in failures
     )
 
+def test_block_commented_feature_declaration_does_not_count_as_owned(tmp_path):
+    oracle = load_oracle()
+    root = passing_tree(tmp_path, oracle)
+    path = root / oracle.FILES["service"]
+    content = path.read_text(encoding="utf-8").replace(
+        '  static final Feature[] CAST_FEATURES = new Feature[]{new Feature("cast_cxless", 1L)};',
+        '  /*\n  static final Feature[] CAST_FEATURES = new Feature[]{new Feature("cast_cxless", 1L)};\n  */',
+    )
+    path.write_text(content, encoding="utf-8")
+    failures, _ = oracle.check(root)
+    assert "MISSING INVARIANT: service declares implementation-owned Cast FEATURES" in failures
+
+
+def test_block_commented_callback_cannot_hide_unconstructed_return_target(tmp_path):
+    oracle = load_oracle()
+    root = passing_tree(tmp_path, oracle)
+    path = root / oracle.FILES["service"]
+    content = path.read_text(encoding="utf-8").replace(
+        "callback.onPostInitCompleteWithConnectionInfo(0, null, info);",
+        "/*\n"
+        "callback.onPostInitCompleteWithConnectionInfo(0, null, info);\n"
+        "*/\n"
+        "callback.onPostInitCompleteWithConnectionInfo(0, null, returnedInfo);",
+    )
+    path.write_text(content, encoding="utf-8")
+    failures, _ = oracle.check(root)
+    assert "FEATURE CONTRACT: returned ConnectionInfo must be constructed explicitly" in failures
+
+
+def test_comment_markers_inside_string_literals_are_not_stripped(tmp_path):
+    oracle = load_oracle()
+    root = passing_tree(tmp_path, oracle)
+    path = root / oracle.FILES["service"]
+    content = path.read_text(encoding="utf-8").replace(
+        "Object requested = request.apiFeatures;",
+        'String marker = "https://example.invalid/a/*b*/c//d";\n'
+        "    Object requested = request.apiFeatures;",
+    )
+    path.write_text(content, encoding="utf-8")
+    failures, _ = oracle.check(root)
+    assert not any("FEATURE CONTRACT" in failure for failure in failures)
+
