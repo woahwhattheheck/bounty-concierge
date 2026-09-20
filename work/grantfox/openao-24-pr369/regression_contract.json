@@ -1,0 +1,120 @@
+{
+  "schema": "openao-pr369-isolation-regression-v1",
+  "observed_at": "2026-09-19",
+  "reviewer": {
+    "seat": "ZZ-Sol-Navigator-314",
+    "model": "GPT-5.6 Sol"
+  },
+  "economics": {
+    "repository": "Bitcoindefi/OpenAO",
+    "issue": 24,
+    "advertised_reward_usd": 100,
+    "reward_evidence": "first-party reward-100-usd / GrantFox labels",
+    "github_assignment": null,
+    "payment_claimed": false,
+    "revenue_recognized": false
+  },
+  "source": {
+    "carrier_pr": 369,
+    "carrier_author": "dev-vishalmaurya",
+    "head_sha": "22abd3a0fe8dfe5b4079e408df0ad6b54cd7c359",
+    "base_sha": "12b967c163f4eca01e80f758aeedc8b153bfc249",
+    "blobs": {
+      "api/src/repositories/userMaps.ts": "34e7b1406d4c76c146ee4464a0c3dda7c0f3896c",
+      "api/src/lib/mapValidation.ts": "ac6359b0b6e11f044c16fe736b7ae8f0b68fb434"
+    },
+    "user_map_start": 100000,
+    "user_map_end": 999999
+  },
+  "findings": [
+    {
+      "id": "account-storage-quota-per-map-bypass",
+      "requirement": "total asset/storage quota per account",
+      "candidate_behavior": "create/update compare one map byte size to maxStorageBytes",
+      "hostile": {
+        "max_storage_bytes": 5242880,
+        "existing_active_bytes": 3145728,
+        "new_map_bytes": 3145728
+      },
+      "candidate_accepts": true,
+      "expected_accepts": false
+    },
+    {
+      "id": "npc-exp-economy-bypass",
+      "requirement": "v1 user maps must not create private XP farming",
+      "hostile": {
+        "npc": {
+          "x": 10,
+          "y": 10,
+          "exp": 1
+        }
+      },
+      "candidate_accepts": true,
+      "expected_accepts": false
+    },
+    {
+      "id": "exit-above-user-range-bypass",
+      "requirement": "structural user-map namespace isolation",
+      "hostile": {
+        "exit_map": 1000000
+      },
+      "candidate_accepts": true,
+      "expected_accepts": false
+    }
+  ],
+  "boundary_vectors": {
+    "exits": [
+      {
+        "target": 99999,
+        "expected": false
+      },
+      {
+        "target": 100000,
+        "expected": true
+      },
+      {
+        "target": 999999,
+        "expected": true
+      },
+      {
+        "target": 1000000,
+        "expected": false
+      }
+    ],
+    "storage": [
+      {
+        "limit": 5242880,
+        "existing": 0,
+        "incoming": 3145728,
+        "expected": true
+      },
+      {
+        "limit": 5242880,
+        "existing": 3145728,
+        "incoming": 3145728,
+        "expected": false
+      }
+    ],
+    "npc_exp": [
+      {
+        "exp": 0,
+        "expected": true
+      },
+      {
+        "exp": 1,
+        "expected": false
+      },
+      {
+        "exp": 50,
+        "expected": false
+      }
+    ]
+  },
+  "authority": {
+    "upstream_source_mutation": false,
+    "grantfox_application": false,
+    "assignment_mutation": false,
+    "bounty_claim": false,
+    "payout_claim": false
+  }
+}
