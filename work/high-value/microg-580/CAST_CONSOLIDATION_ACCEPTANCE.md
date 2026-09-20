@@ -38,7 +38,7 @@ State: OPEN. Compare against current master: ahead 5 / behind 87. Six changed su
 
 Why it is the primary source:
 - Implements Cast.API_CXLESS service binding via GmsService.CAST_API (161).
-- Echoes requested API features through ConnectionInfo so modern clients do not reject microG as too old.
+- Currently echoes caller-requested API features through ConnectionInfo. That unblocks modern clients but is a correctness blocker: arbitrary client-supplied capability names/versions must not be reflected back as server-supported features.
 - Adds the connectionless binder contract: connect transaction 16, setListener transaction 17, unregisterListener transaction 18, and listener onConnectedWithResult(int) transaction 13.
 - Registers the route-selection callback and repairs default session-provider lookup for suffixed Cast categories.
 - Separates outbound send completion from inbound text delivery.
@@ -105,7 +105,7 @@ This targets MediaRouteProvider control operations (select/play/pause/seek/stop/
 - ICastDeviceController: connect = 16, setListener(ICastDeviceControllerListener) = 17, unregisterListener = 18.
 - ICastDeviceControllerListener: onConnectedWithResult(int) = 13.
 - CastDeviceControllerService accepts GmsService.CAST_API in addition to GmsService.CAST.
-- Service returns ConnectionInfo with the requested/default API features rather than the old bare onPostInitComplete path.
+- Service returns ConnectionInfo with an implementation-owned supported Cast feature set. Arbitrary request.apiFeatures/defaultFeatures values must not be echoed as server-supported capabilities.
 
 ### Session/route contract
 
@@ -142,7 +142,7 @@ At minimum, the consolidation should add or retain tests for:
 4. outbound send success uses the outbound requestId exactly once;
 5. inbound text/binary frames never complete an unrelated outbound task;
 6. CAST_API service-id 161 binds to the device controller;
-7. requested apiFeatures are reflected in ConnectionInfo;
+7. an unsupported sentinel apiFeature is not echoed, while the real cxless feature tuple(s) remain advertised from an implementation-owned set;
 8. route-selection callback drives session start with a suffixed default Cast category;
 9. null provider / wrong session wrapper / missing route info fail closed without NPE;
 10. session failure/end lifecycle does not dereference a cleared castContext and emits terminal session state once;
