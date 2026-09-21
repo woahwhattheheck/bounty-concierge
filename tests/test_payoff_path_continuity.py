@@ -194,9 +194,19 @@ class PayoffPathContinuityTests(unittest.TestCase):
 
     def test_legacy_production_input_cannot_yield_ready(self):
         legacy = {"schema": LEGACY_WORK_SCHEMA, "work_items": [work_item()]}
-        packet, _, _ = compile_gate(legacy, AS_OF)
+        for as_of in (None, AS_OF, "2026-09-21T00:22:00.000Z"):
+            packet, _, _ = compile_gate(legacy) if as_of is None else compile_gate(legacy, as_of)
+            self.assertEqual("MISSING_HISTORY_FAIL_CLOSED", packet["continuity"]["mode"])
+            self.assertEqual("HOLD_STALE_OR_INVALID", packet["results"][0]["state"])
+            self.assertIn("CONTINUITY_HISTORY_REQUIRED", packet["results"][0]["reasons"])
+
+    def test_legacy_missing_history_reason_survives_expired_deadline(self):
+        legacy = {"schema": LEGACY_WORK_SCHEMA, "work_items": [work_item()]}
+        packet, _, _ = compile_gate(legacy, "2026-09-21T00:22:00.000Z")
         self.assertEqual("MISSING_HISTORY_FAIL_CLOSED", packet["continuity"]["mode"])
         self.assertEqual("HOLD_STALE_OR_INVALID", packet["results"][0]["state"])
+        self.assertIn("SOURCE_EVIDENCE_STALE", packet["results"][0]["reasons"])
+        self.assertIn("CONVERSION_DEADLINE_EXPIRED", packet["results"][0]["reasons"])
         self.assertIn("CONTINUITY_HISTORY_REQUIRED", packet["results"][0]["reasons"])
 
 

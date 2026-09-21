@@ -253,6 +253,15 @@ class PayoffPathPolicyV3Tests(unittest.TestCase):
         self.assertEqual("HOLD_STALE_OR_INVALID", packet["results"][0]["state"])
         self.assertIn("CONTINUITY_HISTORY_REQUIRED", packet["results"][0]["reasons"])
 
+    def test_v1_missing_history_reason_survives_expired_deadline(self):
+        legacy = {"schema": gate.LEGACY_WORK_SCHEMA, "work_items": [work_item(budget=60, spent=0)]}
+        packet, _, _ = gate.compile_gate(legacy, "2026-09-21T00:22:00.000Z")
+        self.assertEqual("MISSING_HISTORY_FAIL_CLOSED", packet["continuity"]["mode"])
+        self.assertEqual("HOLD_STALE_OR_INVALID", packet["results"][0]["state"])
+        self.assertIn("SOURCE_EVIDENCE_STALE", packet["results"][0]["reasons"])
+        self.assertIn("CONVERSION_DEADLINE_EXPIRED", packet["results"][0]["reasons"])
+        self.assertIn("CONTINUITY_HISTORY_REQUIRED", packet["results"][0]["reasons"])
+
     def test_legacy_ready_exists_only_on_explicit_migration_surface(self):
         legacy = {"schema": gate.LEGACY_WORK_SCHEMA, "work_items": [work_item(budget=60, spent=0)]}
         packet, markdown, receipt = gate.compile_legacy_migration_gate(legacy, AS_OF)
