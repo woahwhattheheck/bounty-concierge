@@ -194,7 +194,7 @@ class PayoffPathContinuityTests(unittest.TestCase):
 
     def test_legacy_production_input_cannot_yield_ready(self):
         legacy = {"schema": LEGACY_WORK_SCHEMA, "work_items": [work_item()]}
-        packet, _, _ = compile_gate(legacy)
+        packet, _, _ = compile_gate(legacy, AS_OF)
         self.assertEqual("MISSING_HISTORY_FAIL_CLOSED", packet["continuity"]["mode"])
         self.assertEqual("HOLD_STALE_OR_INVALID", packet["results"][0]["state"])
         self.assertIn("CONTINUITY_HISTORY_REQUIRED", packet["results"][0]["reasons"])
