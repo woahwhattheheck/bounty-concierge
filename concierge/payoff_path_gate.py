@@ -155,6 +155,16 @@ def _read_regular(path: Path) -> str:
         if _generation(before) != _generation(after) or len(data) != after.st_size:
             raise PayoffPathError(f"input file changed while being read: {path}")
         try:
+            named = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        except OSError as exc:
+            raise PayoffPathError(f"input file changed while being read: {path}") from exc
+        if (
+            not stat.S_ISREG(named.st_mode)
+            or named.st_dev != after.st_dev
+            or named.st_ino != after.st_ino
+        ):
+            raise PayoffPathError(f"input file changed while being read: {path}")
+        try:
             return data.decode("utf-8", errors="strict")
         except UnicodeError as exc:
             raise PayoffPathError(f"cannot read UTF-8 input: {path}") from exc
