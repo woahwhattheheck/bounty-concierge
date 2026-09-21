@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "captured_on": "2026-09-19",
+  "lane": "ZZ-Sol-Shearwater-803 / GPT-5.6 Sol",
+  "disposition": "READY_PRECLAIM_LOCK_REQUIRED",
+  "canonical": {
+    "repo": "ivrit-ai/ivrit-py",
+    "issue": 13,
+    "issue_url": "https://github.com/ivrit-ai/ivrit-py/issues/13",
+    "issue_state_at_capture": "open",
+    "assignees_at_capture": [],
+    "default_branch": "master",
+    "head_sha": "76cac007abbf3e4ab2bea9fc28495d583d8a7926",
+    "audio_py_blob": "cc2403567f405ccbd19f4c255997226e3617cb2f",
+    "batch_test_blob": "9e062d43d15b47a16a68b922da472bf7cb9a6135"
+  },
+  "economics": {
+    "native_amount": 200,
+    "native_currency": "NIS",
+    "usd_estimate_at_capture": 65.9,
+    "usd_estimate_nonbinding": true,
+    "fleet_active_floor_usd": 50,
+    "route": "ACTIVE_IF_SPONSOR_LOCKS"
+  },
+  "sponsor_contract": {
+    "required_throughput_multiple": 4,
+    "accuracy_regression_allowed": false,
+    "maintainer_discussion_required": true,
+    "two_week_lock_before_development": true,
+    "merge_required_for_reward": true,
+    "ai_assistance_allowed": true,
+    "contributor_must_explain_code": true,
+    "live_review_may_be_required": true
+  },
+  "source_residual": {
+    "list_input_api_exists": true,
+    "local_batch_processing": "sequential",
+    "faster_whisper_uses_batched_pipeline": false,
+    "faster_whisper_forwards_transcribe_kwargs": false,
+    "existing_tests_prove_four_x_throughput": false,
+    "existing_tests_prove_no_accuracy_loss": false
+  },
+  "prior_carrier": {
+    "pr": 23,
+    "url": "https://github.com/ivrit-ai/ivrit-py/pull/23",
+    "state": "closed",
+    "merged": false,
+    "head_sha": "ecc2fc83349a7bf01e4cc2ae703d94bcd929e71f"
+  },
+  "activation_gates": [
+    "fresh canonical issue/assignee/comment read",
+    "explicit maintainer lock or assignment",
+    "reward remains 200 NIS with usable payout route",
+    "fresh applicable PR collision census",
+    "fresh Slack custody census",
+    "durable fork/publication path exists",
+    "free or owner-approved benchmark compute exists"
+  ],
+  "acceptance_evidence": [
+    "maintainer-confirmed benchmark interpretation",
+    "same corpus/model/device/precision/decoding settings baseline and candidate",
+    "fully consumed outputs",
+    "warm-up followed by at least three timed runs",
+    "measured throughput >=4x",
+    "paired no-accuracy-regression evidence",
+    "single-input/list/order/error/progress regression coverage",
+    "exact benchmark command and environment"
+  ],
+  "forbidden_shortcuts": [
+    "coding before required lock for bounty eligibility",
+    "claiming throughput without measured baseline/candidate runs",
+    "claiming no accuracy loss without paired evidence",
+    "using TinyFish or paid browser automation",
+    "using paid compute without owner approval",
+    "trapping unpublished implementation in an ephemeral session"
+  ],
+  "sibling": {
+    "issue": 12,
+    "native_amount": 100,
+    "native_currency": "NIS",
+    "usd_estimate_at_capture": 33,
+    "fleet_route": "MAYBE_SAVE_UP_10_49_ONLY"
+  }
+}

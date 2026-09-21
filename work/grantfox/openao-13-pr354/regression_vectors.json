@@ -1,0 +1,71 @@
+{
+  "schema": "openao-13-pr354-regression-v1",
+  "carrier_head": "eb1293c8724bc61f2f3cfc70ff69e6bd075b7c16",
+  "vectors": [
+    {
+      "id": "undo-persistence-reject",
+      "initial_history": {
+        "undo": ["stroke-A"],
+        "redo": []
+      },
+      "operation": "undo stroke-A",
+      "persistence": "reject",
+      "raw_carrier_logical_result": {
+        "undo": [],
+        "redo": ["stroke-A"]
+      },
+      "required_result": {
+        "undo": ["stroke-A"],
+        "redo": []
+      },
+      "invariant": "Failed persistence must not consume a retryable undo."
+    },
+    {
+      "id": "redo-persistence-reject",
+      "initial_history": {
+        "undo": [],
+        "redo": ["stroke-A"]
+      },
+      "operation": "redo stroke-A",
+      "persistence": "reject",
+      "raw_carrier_logical_result": {
+        "undo": ["stroke-A"],
+        "redo": []
+      },
+      "required_result": {
+        "undo": [],
+        "redo": ["stroke-A"]
+      },
+      "invariant": "Failed persistence must not consume a retryable redo."
+    },
+    {
+      "id": "rapid-double-undo",
+      "initial_history": {
+        "undo": ["stroke-A", "stroke-B"],
+        "redo": []
+      },
+      "operation": "two undo commands before the first persistence settles",
+      "required": "At most one history persistence operation is active; the second command is queued or ignored without moving another stroke."
+    },
+    {
+      "id": "exit-tool-scope",
+      "issue_scope": [
+        "terrain",
+        "npc",
+        "object",
+        "exit"
+      ],
+      "carrier_in_game_tabs": [
+        "terrain",
+        "objects",
+        "npcs"
+      ],
+      "carrier_declared_deferred": "exit/salida placement tool",
+      "required": "No full-issue acceptance until exit placement lands or maintainer explicitly narrows scope."
+    }
+  ],
+  "micro_bounty_note": {
+    "observed_old_proposal_usd": 30,
+    "routing": "MAYBE_SAVE_UP_ONLY_NOT_ACTIVE"
+  }
+}

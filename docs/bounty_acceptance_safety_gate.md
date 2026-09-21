@@ -4,7 +4,7 @@
 
 ## Purpose
 
-The gate catches acceptance criteria that pair a disclosure action (`provide`, `include`, `paste`, `dump`, `upload`, `publish`, and similar verbs) with a private target in the same sentence/line. Current private-target classes are:
+The gate catches acceptance criteria that pair a disclosure action (`provide`, `include`, `share`, `post`, `export`, `embed`, and similar verbs, including passive/inflected forms such as `included` or `submitted`) with a private target in the same sentence/line. Current private-target classes are:
 
 - hidden/system/developer/pre-session instructions;
 - private reasoning or chain-of-thought;
@@ -38,7 +38,7 @@ A clear result is **not** a safety guarantee and does not make the bounty valid,
 }
 ```
 
-`source_content_sha256` must match the exact UTF-8 bytes. Source observations older than 24 hours fail closed. Future-dated observations are rejected.
+`source_content_sha256` must match the exact UTF-8 bytes. Source observations older than 24 hours fail closed. Future-dated observations are rejected. The v1 `evaluated_at` request field is retained only as a compatibility assertion; it is **not** trusted for freshness. Compilation uses process-owned current UTC time, rejects a claimed evaluation time in the trusted clock’s future, and records the trusted time at its full available precision so receipt semantics replay exactly; there is no public caller-supplied clock override.
 
 ## CLI
 
@@ -50,4 +50,4 @@ Exit `0` means `ACCEPTANCE_TEXT_CLEAR`; exit `2` means HOLD. Malformed input is 
 
 ## Receipt verification
 
-`verify_bounty_acceptance_safety_receipt(receipt, source_text)` checks the receipt hash, rebinds the original text to the stored digest, and recompiles semantics. A mutated receipt or different source text does not verify.
+`verify_bounty_acceptance_safety_receipt(receipt, source_text)` checks the receipt hash, rebinds the original text to the stored digest, recompiles the original semantics, and independently checks source age against verifier-owned current UTC time. A mutated receipt, different source text, future-dated receipt, or receipt whose source observation has since aged past 24 hours does not verify.

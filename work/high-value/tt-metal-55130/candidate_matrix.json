@@ -1,0 +1,78 @@
+{
+  "schema": "tt-metal-55130.candidate-crosscheck.v1",
+  "observed_date": "2026-09-19",
+  "upstream": {
+    "repo": "tenstorrent/tt-metal",
+    "issue": 55130,
+    "reward_usd": 5000,
+    "state": "open",
+    "assignee": "AJ0070",
+    "main": "708e7f58aef9d089f0e5097d4a772c7c8ee129ea",
+    "source_blobs": {
+      "binary_composite.hpp": "401113560eb8d583c0f93925073dfcb4b4e670a9",
+      "binary_nanobind.cpp": "db757a5cae9c3c286735f12ddd21f3f7b10372aa",
+      "binary_composite_op.cpp": "10e5caf0a69738e89db904b5d91206467ac490b3",
+      "binary_ng_device_operation.cpp": "bbf64d54b15ec9ec6fa4e6aaab175a9dac435c6e",
+      "binary_ng_device_operation.hpp": "d5eda4d468b0ca9701678f3872543a5299909204",
+      "binary_ng_program_factory.cpp": "4cdd7906cd18a7457a1efa2c957daab0a4fffb6e"
+    }
+  },
+  "current_source_findings": [
+    "bias_gelu public binding still uses bind_binary_operation and exposes no fast_and_approximate_mode argument",
+    "tensor-tensor composite still passes fast_and_approximate_mode=nullopt into BinaryOpType::BIAS_GELU",
+    "bias_gelu public composite signatures still omit a fast/accurate mode parameter"
+  ],
+  "candidates": [
+    {
+      "pr": 56387,
+      "head": "955ac88fc1cd4ebfd97f0975ab47bd11a0676b66",
+      "state": "closed_unmerged",
+      "changed_files": 1,
+      "coverage": {
+        "scalar_default_flip": true,
+        "tensor_tensor_mode_propagation": false,
+        "public_binding_mode_argument": false,
+        "program_factory_gelu_parameterization": false,
+        "program_cache_mode_binding": false,
+        "regression_tests": false,
+        "hardware_evidence": false
+      },
+      "disposition": "INSUFFICIENT_DONOR_ONLY",
+      "reason": "one-line scalar-path default flip does not cover the tensor-tensor binary_ng post-activation, public API selection, cache-key semantics, or acceptance tests"
+    },
+    {
+      "pr": 56419,
+      "head": "c55ca23c0d2567fedd32638ff14a378f53e4001e",
+      "state": "closed_unmerged",
+      "changed_files": 9,
+      "coverage": {
+        "scalar_default_flip": true,
+        "tensor_tensor_mode_propagation": true,
+        "public_binding_mode_argument": true,
+        "program_factory_gelu_parameterization": true,
+        "program_cache_mode_binding": true,
+        "regression_tests": true,
+        "hardware_evidence": false,
+        "quasar_mirror": false
+      },
+      "disposition": "STRUCTURALLY_BROADER_DONOR_REVIEW_REQUIRED",
+      "reason": "covers the three-layer default/mode propagation and cache-key problem, but is closed, based on older main, explicitly unexecuted on TT hardware, and leaves Quasar parity as a documented gap"
+    }
+  ],
+  "acceptance_required": [
+    "default tensor-tensor bias_gelu matches accurate ttnn.gelu(add(a,b))",
+    "default tensor-scalar bias_gelu matches accurate reference",
+    "bias_gelu_ default follows the same accuracy policy",
+    "explicit fast mode selects the legacy fast kernel and is observably distinct on sensitive vectors",
+    "compiled program cache key changes when the mode changes",
+    "Wormhole and Blackhole device tests exercise fp32 negative-tail and midrange vectors",
+    "source rebased against current main with no stale API/signature assumptions"
+  ],
+  "authority": {
+    "implementation_owner": "AJ0070",
+    "upstream_mutation": false,
+    "bounty_claim": false,
+    "payment_claim": false,
+    "device_result": false
+  }
+}

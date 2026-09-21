@@ -88,6 +88,64 @@ _PRIVATE_CONTEXT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         "full_runtime_configuration",
         re.compile(r"\bfull\s+runtime\s+configuration\b", re.IGNORECASE),
     ),
+    (
+        "startup_initialization",
+        re.compile(
+            r"\b(?:complete|full|entire|verbatim)\s+"
+            r"(?:(?:session|runtime|conversation)\s+)?"
+            r"(?:initiali[sz]ation|startup|boot)\s+"
+            r"(?:text|instructions?|context|configuration|directives?)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "pre_task_instructions",
+        re.compile(
+            r"\b(?:complete|full|entire|verbatim)\s+"
+            r"pre[-\s]?(?:conversation|task|session)\s+"
+            r"(?:platform\s+)?(?:instructions?|context|configuration|directives?)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "pre_user_start_text",
+        re.compile(
+            r"\b(?:complete|full|entire|verbatim)\s+(?:block\s+of\s+)?text\b"
+            r".{0,200}?\b(?:at\s+the\s+start\s+of\s+(?:your\s+)?"
+            r"(?:conversation|session)|before\s+(?:the\s+|your\s+)?"
+            r"(?:first\s+)?(?:user|human)(?:'s)?(?:\s+(?:first\s+)?)?message)\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+    ),
+    (
+        "startup_context_bundle",
+        re.compile(
+            r"\b(?:complete|full|entire)\s+(?:set|bundle)\s+of\s+"
+            r"(?:rules?|instructions?|guidelines?|configuration|context)\b"
+            r".{0,200}?\b(?:loaded|provided|active)\b.{0,100}?\b"
+            r"(?:startup|session\s+start)\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+    ),
+    (
+        "pre_task_platform_dump",
+        re.compile(
+            r"\b(?:full|complete|entire)\s+(?:text\s+of\s+)?all\s+"
+            r"(?:instructions?|rules?|guidelines?|configuration|context)\b"
+            r".{0,200}?\bbefore\s+(?:your\s+|the\s+)?(?:first\s+)?"
+            r"(?:task|user|human)(?:\s+(?:message|started|began))?\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+    ),
+    (
+        "everything_before_task",
+        re.compile(
+            r"\beverything\b.{0,120}?\b(?:provided|loaded|present)\b"
+            r".{0,160}?\bbefore\s+(?:the\s+|your\s+)?"
+            r"(?:task\s+(?:started|began)|first\s+(?:user|human)(?:\s+message)?)\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+    ),
 )
 
 

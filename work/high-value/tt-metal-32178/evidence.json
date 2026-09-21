@@ -1,0 +1,69 @@
+{
+  "schema": "tt_metal_32178_cosyvoice_host_contract.v1",
+  "generated_for": "HVQ-TT-METAL-20260920-32178/COSYVOICE-INTERFACE+HOST-FIXTURE-CONTRACT",
+  "issue": {
+    "repository": "tenstorrent/tt-metal",
+    "number": 32178,
+    "state": "open",
+    "advertised_reward_usd": 3000,
+    "assignee": "ayewo",
+    "title": "[Bounty $3000] CosyVoice bring up using TTNN APIs",
+    "payout_note": "Issue states payout occurs only after all three stages are completed."
+  },
+  "pins": {
+    "tt_metal_commit": "708e7f58aef9d089f0e5097d4a772c7c8ee129ea",
+    "cosyvoice_repository": "QwenAudio/CosyVoice",
+    "cosyvoice_commit": "074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc"
+  },
+  "source_blobs": {
+    "QwenAudio/CosyVoice:cosyvoice/utils/class_utils.py": "aab83266a2644b5110aeaa64317c25b61419ba0d",
+    "QwenAudio/CosyVoice:cosyvoice/cli/model.py": "92a15d985dfbca4bb676d3fdc02732be1d07c461",
+    "QwenAudio/CosyVoice:cosyvoice/cli/frontend.py": "6d397cc99be417e98b8d9fc7a1438ec722312276",
+    "tenstorrent/tt-metal:models/common/models/qwen2_7b/generator.py": "07d3ea4cb18d5a76d35ca0eb70aae52b50ffc308",
+    "tenstorrent/tt-metal:tech_reports/ttnn/TTNN-model-bringup.md": "348bba20a98046286711f319bb1c72494997f67f"
+  },
+  "source_observations": {
+    "component_order": [
+      "frontend",
+      "llm",
+      "flow",
+      "hift"
+    ],
+    "cosyvoice_300m_family": [
+      "TransformerLM",
+      "MaskedDiffWithXvec",
+      "HiFTGenerator"
+    ],
+    "cosyvoice2_family": [
+      "Qwen2LM",
+      "CausalMaskedDiffWithXvec",
+      "HiFTGenerator"
+    ],
+    "mel_channels": 80,
+    "token_overlap_len": 20,
+    "mel_cache_len": 20,
+    "source_cache_rule": "mel_cache_len * 256",
+    "qwen2_tt_precedents": [
+      "PagedKVCacheConfig",
+      "LaneGroupExecutor",
+      "VLLMAdapter"
+    ]
+  },
+  "host_fixture_modes": [
+    "sft",
+    "zero_shot",
+    "cross_lingual",
+    "instruct",
+    "voice_conversion"
+  ],
+  "authority": {
+    "implementation_ownership": false,
+    "upstream_assignment": false,
+    "upstream_merge": false,
+    "bounty_acceptance": false,
+    "payout": false,
+    "hardware_validated": false,
+    "quality_validated": false,
+    "performance_validated": false
+  }
+}
