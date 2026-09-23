@@ -124,6 +124,10 @@ concierge claim 491 --wallet my-wallet-name --approach "I will fuzz the fleet de
 # Browse recent bounties
 concierge browse --limit 5
 
+# Inspect a partial read instead of hiding collected rows
+concierge browse --max-pages 1
+concierge browse --report
+
 # Check concierge status
 concierge status
 
@@ -133,6 +137,14 @@ concierge faq
 # Check installed version
 concierge version
 ```
+
+`browse` calls `fetch_bounties_report()` once. `--limit` only shortens the displayed rows. `--max-pages` is the collector page bound (1-1000). A finished traversal is not eligibility or payment.
+
+- Text and `--json` stay a success-shaped list only when every requested source is `COMPLETE`. Exit 0.
+- An incomplete read prints `PARTIAL` (text) or a stderr notice (`--json`) and exits 2. It never presents a bare JSON list, and zero displayed rows are not an empty queue.
+- `--report` prints one JSON object (`rows`, counts, interval, per-source status, rate-limit fields) and still exits 2 when the read is incomplete. Progress text stays out of that object.
+
+Full contract: [docs/BROWSE.md](docs/BROWSE.md).
 
 ---
 

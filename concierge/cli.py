@@ -21,7 +21,7 @@ import time
 from concierge import __version__
 from concierge import config
 from concierge import pow_miners
-from concierge.bounty_index import aggregate, fetch_bounties
+from concierge.bounty_index import aggregate, fetch_bounties, fetch_bounties_report
 from concierge.faq_engine import answer as faq_answer
 from concierge.wallet_helper import (
     check_wallet_exists,
@@ -131,16 +131,90 @@ def _print_bounty_table(bounties):
 # Subcommand handlers
 # ---------------------------------------------------------------------------
 
+def _browse_repos(args):
+    """Resolve browse --repo values the same way the existing command did."""
+    if not args.repo:
+        return None
+    repos = []
+    for name in args.repo:
+        if "/" not in name:
+            name = f"Scottcjn/{name}"
+        repos.append(name)
+    return repos
+
+
+def _filter_bounties(bounties, args):
+    """Apply the existing skill, tier, and reward filters. Order is unchanged."""
+    filtered = list(bounties)
+    if args.skill:
+        skill_lower = args.skill.lower()
+        filtered = [b for b in filtered if skill_lower in [s.lower() for s in b["skills"]]]
+    if args.tier:
+        tier_lower = args.tier.lower()
+        filtered = [b for b in filtered if b["difficulty"] == tier_lower]
+    if args.min_rtc is not None:
+        filtered = [b for b in filtered if b["reward_rtc"] >= args.min_rtc]
+    if args.max_rtc is not None:
+        filtered = [b for b in filtered if b["reward_rtc"] <= args.max_rtc]
+    filtered.sort(key=lambda b: b["reward_rtc"], reverse=True)
+    return filtered
+
+
+def _incomplete_browse_message(report):
+    """Describe an incomplete read without calling it an empty queue."""
+    failed = [row for row in report["repositories"] if row["status"] != "COMPLETE"]
+    detail = "; ".join(f"{row['repo']}: {row['status']}" for row in failed[:6])
+    if len(failed) > 6:
+        detail += f"; {len(failed) - 6} more sources incomplete"
+    return (
+        f"PARTIAL {report.get('total_count', len(report['bounties']))} collected rows. "
+        f"Source read is incomplete, so this is not an empty queue. {detail}."
+    )
+
+
+def _print_browse_sources(report):
+    """Print per-source completion. Text only; never mixed into JSON."""
+    print(f"Collection {report['started_at']} .. {report['updated_at']}")
+    if report.get("rate_limited"):
+        print(
+            "rate_limited retry_after_seconds="
+            f"{report.get('retry_after_seconds')} "
+            f"rate_limit_reset_at={report.get('rate_limit_reset_at')}"
+        )
+    for row in report["repositories"]:
+        print(
+            f"source {row['repo']} status={row['status']} "
+            f"pages={row['pages_fetched']} rows={row['bounty_count']} "
+            f"http={row['http_status']}"
+        )
+
+
+def _browse_report_payload(report, filtered, displayed, limit):
+    """Structured browse report. Row limit is display-only."""
+    return {
+        "rows": displayed,
+        "displayed_count": len(displayed),
+        "filtered_count": len(filtered),
+        "collected_count": report["total_count"],
+        "complete": report["complete"],
+        "started_at": report["started_at"],
+        "updated_at": report["updated_at"],
+        "rate_limited": report["rate_limited"],
+        "retry_after_seconds": report["retry_after_seconds"],
+        "rate_limit_reset_at": report["rate_limit_reset_at"],
+        "repositories": report["repositories"],
+        "display_limit": limit,
+        "note": (
+            "complete means every requested source finished the pagination GitHub "
+            "returned. It is not an atomic snapshot, eligibility, acceptance, or payment. "
+            "display_limit does not describe source completeness."
+        ),
+    }
+
+
 def _cmd_browse(args):
     """Handle the 'browse' subcommand."""
-    repos = None
-    if args.repo:
-        # Allow short names like 'bottube' -> 'Scottcjn/bottube'
-        repos = []
-        for r in args.repo:
-            if "/" not in r:
-                r = f"Scottcjn/{r}"
-            repos.append(r)
+    repos = _browse_repos(args)
 
     if args.dry_run:
         print("[dry-run] Would fetch bounties from GitHub API")
@@ -150,37 +224,55 @@ def _cmd_browse(args):
             print(f"[dry-run] Skill filter: {args.skill}")
         if args.tier:
             print(f"[dry-run] Tier filter: {args.tier}")
+        print(f"[dry-run] max_pages={args.max_pages} report={args.report}")
         return
 
-    all_bounties = fetch_bounties(repos=repos)
+    try:
+        report = fetch_bounties_report(repos=repos, max_pages=args.max_pages)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
 
-    # Apply filters
-    filtered = all_bounties
+    filtered = _filter_bounties(report["bounties"], args)
+    displayed = filtered[: args.limit]
+    incomplete = not report["complete"]
 
-    if args.skill:
-        skill_lower = args.skill.lower()
-        filtered = [b for b in filtered if skill_lower in [s.lower() for s in b["skills"]]]
-
-    if args.tier:
-        tier_lower = args.tier.lower()
-        filtered = [b for b in filtered if b["difficulty"] == tier_lower]
-
-    if args.min_rtc is not None:
-        filtered = [b for b in filtered if b["reward_rtc"] >= args.min_rtc]
-
-    if args.max_rtc is not None:
-        filtered = [b for b in filtered if b["reward_rtc"] <= args.max_rtc]
-
-    # Sort by RTC descending
-    filtered.sort(key=lambda b: b["reward_rtc"], reverse=True)
-
-    # Limit
-    filtered = filtered[: args.limit]
+    if args.report:
+        _print_json(_browse_report_payload(report, filtered, displayed, args.limit))
+        if incomplete:
+            sys.exit(2)
+        return
 
     if args.json:
-        _print_json(filtered)
-    else:
-        _print_bounty_table(filtered)
+        if incomplete:
+            print(_incomplete_browse_message(report), file=sys.stderr)
+            sys.exit(2)
+        _print_json(displayed)
+        return
+
+    if incomplete:
+        print("PARTIAL")
+        print(_incomplete_browse_message(report))
+        _print_browse_sources(report)
+        if displayed:
+            _print_bounty_table(displayed)
+        else:
+            print(
+                "0 displayed rows. The source read is incomplete, so this is not an empty queue."
+            )
+        print(
+            f"Showing {len(displayed)} of {len(filtered)} filtered rows "
+            f"({report['total_count']} collected). --limit is display-only."
+        )
+        sys.exit(2)
+
+    print("COMPLETE")
+    _print_bounty_table(displayed)
+    print(
+        f"Collected {report['total_count']} rows; showing {len(displayed)} of "
+        f"{len(filtered)} after filters. --limit does not describe source completeness."
+    )
+    print(f"Collection {report['started_at']} .. {report['updated_at']}")
 
 
 def _cmd_faq(args):
@@ -896,8 +988,7 @@ def _build_parser():
                           help="Filter by difficulty tier")
     p_browse.add_argument("--min-rtc", type=float, help="Minimum RTC reward")
     p_browse.add_argument("--max-rtc", type=float, help="Maximum RTC reward")
-    p_browse.add_argument("--limit", type=int, default=20, help="Max results (default: 20)")
-
+    p_browse.add_argument("--limit", type=int, default=20, help="Max displayed rows (default: 20). Does not change source completeness.")    p_browse.add_argument(        "--max-pages",        type=int,        default=100,        help="Page bound passed to the collector (1-1000, default: 100)",    )    p_browse.add_argument(        "--report",        action="store_true",        default=False,        help="Print one JSON object with rows and source-completion metadata",    )
     # --- faq ---
     p_faq = sub.add_parser("faq", help="Ask a question about RustChain or bounties")
     _add_common_flags(p_faq)
