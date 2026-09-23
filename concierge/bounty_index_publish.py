@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: MIT
 """Authoritative, fail-closed publication for the bounty index.
 
-``concierge.bounty_index.fetch_bounties`` intentionally remains a best-effort
-interactive API.  This module is the publication boundary: every configured
-repository/page must be fetched and decoded successfully before a new canonical
-index can replace the last-known-good file.
+``concierge.bounty_index.fetch_bounties_report`` exposes partial live reads with
+explicit source status. This module remains the stricter publication boundary:
+every configured repository/page and canonical issue identity must be validated
+before a new index can replace the last-known-good file.
 """
 
 from __future__ import annotations
