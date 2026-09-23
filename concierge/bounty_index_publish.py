@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
 """Authoritative, fail-closed publication for the bounty index.
 
-``concierge.bounty_index.fetch_bounties_report`` exposes partial live reads with
-explicit source status. This module remains the stricter publication boundary:
+``concierge.bounty_index.fetch_bounties_report`` owns the bounded live read and
+explicit source status. This module applies the stricter publication boundary:
 every configured repository/page and canonical issue identity must be validated
 before a new index can replace the last-known-good file.
 """
@@ -17,10 +17,7 @@ from pathlib import Path
 import sys
 import tempfile
 
-import requests
-
 from concierge import bounty_index
-from concierge.config import GITHUB_TOKEN, REPOS
 
 
 class BountyIndexIncompleteError(RuntimeError):
@@ -39,104 +36,39 @@ def _expected_issue_url(repo: str, number: int) -> str:
 
 
 def fetch_complete_bounties(repos=None, token=None):
-    """Fetch every configured bounty source, failing closed on incompleteness.
+    """Publishable rows from the shared bounded collector, never partial data.
 
-    Pull-request rows from GitHub's issues endpoint are expected and skipped.
-    Every other row must match the parser's supported issue shape and bind
-    exactly to its configured repository/issue identity. A source 404,
-    transport error, invalid JSON, unsupported top-level shape, malformed row,
-    duplicate issue identity, cross-wired URL, or later-page failure aborts the
-    authoritative build.
+    The shared collector validates source names, rejects an empty source set,
+    normalizes issue rows, traverses at most its configured default page limit,
+    closes responses and stops subsequent requests when GitHub reports a rate
+    limit. It performs no retry loop. Publication additionally binds each row
+    to its exact canonical issue URL and rejects duplicate identities.
+
+    Transport/HTTP/schema errors, quota deferrals and page-limit exhaustion
+    abort publication, retaining the previous index. A source failure is not
+    an empty queue, and a complete read is not claim or payment eligibility.
     """
-    if repos is None:
-        repos = REPOS
-    token = token or GITHUB_TOKEN
+    try:
+        report = bounty_index.fetch_bounties_report(repos=repos, token=token)
+    except (TypeError, ValueError) as exc:
+        _fail(f"invalid bounty source configuration: {exc}", exc)
 
-    headers = {"Accept": "application/vnd.github+json"}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
+    if not report["complete"]:
+        # The collector's summary contains safe source statuses and partial row
+        # counts, not raw request exception text or authenticated request data.
+        _fail(str(bounty_index.BountyFetchIncompleteError(report)))
 
-    bounties = []
+    bounties = report["bounties"]
     seen_identities = set()
-    for repo in repos:
-        api_url = f"https://api.github.com/repos/{repo}/issues"
-        params = {"labels": "bounty", "state": "open", "per_page": 100, "page": 1}
-
-        while True:
-            page = params["page"]
-            try:
-                response = requests.get(
-                    api_url,
-                    headers=headers,
-                    params=params,
-                    timeout=15,
-                )
-                if response.status_code == 404:
-                    _fail(f"configured bounty source {repo} page {page} returned 404")
-                response.raise_for_status()
-            except BountyIndexIncompleteError:
-                raise
-            except requests.RequestException as exc:
-                _fail(f"failed to fetch {repo} page {page}: {exc}", exc)
-
-            try:
-                issues = response.json()
-            except ValueError as exc:
-                _fail(f"failed to decode {repo} page {page}: {exc}", exc)
-            if not isinstance(issues, list):
-                _fail(f"unsupported payload for {repo} page {page}: expected list")
-
-            for item_index, issue in enumerate(issues):
-                if isinstance(issue, dict) and "pull_request" in issue:
-                    continue
-
-                normalized = bounty_index._normalize_issue_row(issue)
-                if normalized is None:
-                    _fail(
-                        f"unsupported bounty row for {repo} page {page} "
-                        f"item {item_index}"
-                    )
-
-                number = normalized["number"]
-                identity = (repo, number)
-                expected_url = _expected_issue_url(repo, number)
-                if normalized["url"] != expected_url:
-                    _fail(
-                        f"cross-wired bounty identity for {repo} page {page} "
-                        f"item {item_index}: expected issue {number} URL"
-                    )
-                if identity in seen_identities:
-                    _fail(
-                        f"duplicate bounty identity for {repo} issue {number} "
-                        f"at page {page} item {item_index}"
-                    )
-                seen_identities.add(identity)
-
-                title = normalized["title"]
-                body = normalized["body"]
-                labels = normalized["labels"]
-                reward = bounty_index.parse_reward(title, body)
-                bounties.append(
-                    {
-                        "repo": repo,
-                        "number": number,
-                        "title": title,
-                        "body": body,
-                        "url": normalized["url"],
-                        "labels": labels,
-                        "created_at": normalized["created_at"],
-                        "reward_rtc": reward,
-                        "difficulty": bounty_index.estimate_difficulty(
-                            title, labels, reward
-                        ),
-                        "skills": bounty_index.tag_skills(title, body),
-                    }
-                )
-
-            if not getattr(response, "links", {}).get("next"):
-                break
-            params["page"] += 1
-
+    for bounty in bounties:
+        repo = bounty["repo"]
+        number = bounty["number"]
+        identity = (repo.casefold(), number)
+        if bounty["url"] != _expected_issue_url(repo, number):
+            _fail(f"cross-wired bounty identity for {repo}: expected issue {number} URL")
+        if identity in seen_identities:
+            _fail(f"duplicate bounty identity for {repo} issue {number}")
+        seen_identities.add(identity)
     return bounties
 
 
