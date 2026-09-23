@@ -8,7 +8,7 @@ Thank you for your interest in contributing to Bounty Concierge! This guide will
 2. **Clone your fork**: `git clone https://github.com/YOUR_USERNAME/bounty-concierge.git`
 3. **Create a branch**: `git checkout -b feature/your-feature-name`
 4. **Make your changes**
-5. **Test your changes**
+5. **Inspect the diff and describe the delivered behavior**
 6. **Commit and push**: `git commit -m "feat: add your feature" && git push origin feature/your-feature-name`
 7. **Open a Pull Request**
 
@@ -34,15 +34,11 @@ pip install -r requirements.txt
 python3 -m concierge --help
 ```
 
-## 🧪 Testing
+## Delivery workflow for this fork
 
-```bash
-# Run tests
-python3 -m pytest tests/
+[Bryce's September 22, 2026 economic-value purge order](https://tokenjunkielabs.slack.com/archives/C0C3QV88526/p1790109597399409) governs this fork. The internal `tests/` tree and its verification-only Actions jobs have been removed. Do not recreate general test suites, coverage layers, mock/fixture frameworks, or mandatory peer-review/hosted-green gates.
 
-# Run with coverage
-python3 -m pytest --cov=concierge tests/
-```
+Ship production behavior and report actual outcomes and limitations. Historical module documentation and retained evidence may mention removed suite commands; those records are not current execution prerequisites. The live bounty-index publisher and the existing, separately scoped libpcap deliverable build remain intact. Upstream maintainers retain their own contribution and acceptance requirements.
 
 ## 📝 Code Style
 
@@ -72,9 +68,9 @@ This file was added as part of RustChain bounty task #1605.
 
 1. Ensure your PR description clearly describes the change
 2. Reference any related issues
-3. Make sure all tests pass
+3. Describe actual execution results and remaining limitations
 4. Update documentation if needed
-5. Wait for review from maintainers
+5. Use the authorized repository merge path
 
 ## 🤝 Questions?
 
