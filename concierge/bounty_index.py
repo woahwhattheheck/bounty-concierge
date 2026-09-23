@@ -68,81 +68,166 @@ def _normalize_issue_row(issue):
     }
 
 
-def fetch_bounties(repos=None, token=None):
-    """Fetch open bounty issues from one or more GitHub repos.
+class BountyFetchIncompleteError(RuntimeError):
+    """A live read is incomplete; ``report`` retains explicit partial results."""
 
-    Args:
-        repos:  List of 'owner/repo' strings.  Defaults to config.REPOS.
-        token:  GitHub personal-access token.  Defaults to config.GITHUB_TOKEN.
+    def __init__(self, report):
+        self.report = report
+        failed = [row for row in report["repositories"] if row["status"] != "COMPLETE"]
+        detail = "; ".join(f"{row['repo']}: {row['status']}" for row in failed[:6])
+        if len(failed) > 6:
+            detail += f"; {len(failed) - 6} more sources incomplete"
+        super().__init__(
+            f"Bounty sources incomplete ({len(report['bounties'])} partial rows, "
+            f"not a complete or empty queue). {detail}. "
+            "Use fetch_bounties_report() to inspect partial results."
+        )
 
-    Returns:
-        List of dicts, one per bounty issue, with keys:
-            repo, number, title, body, url, labels, created_at, reward_rtc,
-            difficulty, skills
+
+def _header_integer(headers, name):
+    value = str(headers.get(name, ""))
+    return int(value) if value.isascii() and value.isdigit() and len(value) <= 12 else None
+
+
+def fetch_bounties_report(repos=None, token=None, *, max_pages=100):
+    """Read live sources once, retaining completion and safe error information.
+
+    No retries or sleeps are performed. A rate-limit response, or exhausted
+    successful-response quota, defers all remaining requests. Ordinary source
+    failures do not hide successful reads from other repositories. ``complete``
+    means every requested source traversed its returned pagination; it is not
+    an atomic GitHub snapshot, bounty eligibility, or payment evidence.
     """
-    if repos is None:
-        repos = REPOS
-    token = token or GITHUB_TOKEN
+    if type(max_pages) is not int or not 1 <= max_pages <= 1000:
+        raise ValueError("max_pages must be an integer between 1 and 1000")
+    configured = REPOS if repos is None else repos
+    if isinstance(configured, (str, bytes)):
+        raise ValueError("repos must be a collection of owner/repo strings")
+    sources = []
+    seen_repos = set()
+    for repo in configured:
+        if (not isinstance(repo, str)
+                or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9_.-]+", repo) is None
+                or repo.split("/")[1] in (".", "..")):
+            raise ValueError("each source must be an owner/repo name")
+        if repo.casefold() not in seen_repos:
+            seen_repos.add(repo.casefold())
+            sources.append({"repo": repo, "status": "NOT_ATTEMPTED", "pages_fetched": 0,
+                            "bounty_count": 0, "http_status": None})
+    if not sources:
+        raise ValueError("at least one bounty source is required")
 
     headers = {"Accept": "application/vnd.github+json"}
+    token = token or GITHUB_TOKEN
     if token:
         headers["Authorization"] = f"Bearer {token}"
+    report = {"started_at": datetime.now(timezone.utc).isoformat(), "complete": False,
+              "rate_limited": False, "retry_after_seconds": None,
+              "rate_limit_reset_at": None, "repositories": sources, "bounties": []}
 
-    bounties = []
-    for repo in repos:
+    for source in sources:
+        if report["rate_limited"]:
+            source["status"] = "NOT_ATTEMPTED_RATE_LIMIT"
+            continue
+        repo = source["repo"]
+        seen_numbers = set()
         api_url = f"https://api.github.com/repos/{repo}/issues"
-        params = {"labels": "bounty", "state": "open", "per_page": 100, "page": 1}
-
-        while True:
+        for page in range(1, max_pages + 1):
+            params = {"labels": "bounty", "state": "open", "per_page": 100, "page": page}
             try:
-                resp = requests.get(api_url, headers=headers, params=params, timeout=15)
-                if resp.status_code == 404:
-                    break
-                resp.raise_for_status()
+                response = requests.get(api_url, headers=headers, params=params, timeout=15)
             except requests.RequestException as exc:
-                print(f"[warn] failed to fetch {repo}: {exc}", file=sys.stderr)
+                source["status"] = "TRANSPORT_ERROR"
+                # Exception text may contain request details. Retain only its type.
+                source["error_type"] = type(exc).__name__
                 break
 
             try:
-                issues = resp.json()
-            except ValueError as exc:
-                print(f"[warn] failed to decode {repo}: {exc}", file=sys.stderr)
-                break
-            if not isinstance(issues, list):
-                print(f"[warn] unsupported payload for {repo}: expected list", file=sys.stderr)
-                break
+                status = response.status_code
+                source["http_status"] = status
+                remaining = _header_integer(response.headers, "X-RateLimit-Remaining")
+                retry_after = _header_integer(response.headers, "Retry-After")
+                reset_at = _header_integer(response.headers, "X-RateLimit-Reset")
+                throttled = status == 429 or (status == 403 and
+                            (remaining == 0 or retry_after is not None))
+                if status == 403 and not throttled:
+                    try:
+                        error = response.json()
+                    except ValueError:
+                        error = {}
+                    message = error.get("message", "") if isinstance(error, dict) else ""
+                    throttled = isinstance(message, str) and "rate limit" in message.casefold()
+                if throttled:
+                    report.update(rate_limited=True, retry_after_seconds=retry_after,
+                                  rate_limit_reset_at=reset_at)
+                    source["status"] = "RATE_LIMITED"
+                    break
+                if status != 200:
+                    source["status"] = "HTTP_ERROR"
+                    break
+                try:
+                    issues = response.json()
+                except ValueError:
+                    source["status"] = "INVALID_JSON"
+                    break
+                if not isinstance(issues, list):
+                    source["status"] = "INVALID_PAYLOAD"
+                    break
+                source["pages_fetched"] += 1
+                source["status"] = "READING"
+                for item_index, issue in enumerate(issues):
+                    if isinstance(issue, dict) and "pull_request" in issue:
+                        continue
+                    normalized = _normalize_issue_row(issue)
+                    if normalized is None:
+                        source.update(status="INVALID_ISSUE", failed_item=item_index)
+                        break
+                    number = normalized["number"]
+                    if number in seen_numbers:
+                        source.update(status="REPEATED_ISSUE", failed_item=item_index)
+                        break
+                    seen_numbers.add(number)
+                    title, body, labels = normalized["title"], normalized["body"], normalized["labels"]
+                    reward = parse_reward(title, body)
+                    report["bounties"].append({
+                        "repo": repo, **normalized, "reward_rtc": reward,
+                        "difficulty": estimate_difficulty(title, labels, reward),
+                        "skills": tag_skills(title, body),
+                    })
+                    source["bounty_count"] += 1
+                if remaining == 0:
+                    report.update(rate_limited=True, retry_after_seconds=retry_after,
+                                  rate_limit_reset_at=reset_at)
+                if source["status"] != "READING":
+                    break
+                if not response.links.get("next"):
+                    source["status"] = "COMPLETE"
+                    break
+                if report["rate_limited"]:
+                    source["status"] = "RATE_LIMITED_BEFORE_NEXT_PAGE"
+                    break
+                if page == max_pages:
+                    source["status"] = "PAGE_LIMIT"
+            finally:
+                response.close()
 
-            for issue in issues:
-                normalized = _normalize_issue_row(issue)
-                if normalized is None:
-                    continue
+    report["updated_at"] = datetime.now(timezone.utc).isoformat()
+    report["complete"] = all(row["status"] == "COMPLETE" for row in sources)
+    report["total_count"] = len(report["bounties"])
+    return report
 
-                title = normalized["title"]
-                body = normalized["body"]
-                label_names = normalized["labels"]
 
-                reward = parse_reward(title, body)
-                difficulty = estimate_difficulty(title, label_names, reward)
-                skills = tag_skills(title, body)
+def fetch_bounties(repos=None, token=None):
+    """Return the familiar bounty list only after all sources finish.
 
-                bounties.append({
-                    "repo": repo,
-                    "number": normalized["number"],
-                    "title": title,
-                    "body": body,
-                    "url": normalized["url"],
-                    "labels": label_names,
-                    "created_at": normalized["created_at"],
-                    "reward_rtc": reward,
-                    "difficulty": difficulty,
-                    "skills": skills,
-                })
-
-            if not getattr(resp, "links", {}).get("next"):
-                break
-            params["page"] += 1
-
-    return bounties
+    Incomplete reads raise BountyFetchIncompleteError rather than impersonating
+    an empty/full queue. The existing browse CLI handles this as a nonzero exit.
+    Call fetch_bounties_report() for deliberately partial diagnostic results.
+    """
+    report = fetch_bounties_report(repos=repos, token=token)
+    if not report["complete"]:
+        raise BountyFetchIncompleteError(report)
+    return report["bounties"]
 
 
 # ---------------------------------------------------------------------------
@@ -257,22 +342,12 @@ def tag_skills(title, body):
 # ---------------------------------------------------------------------------
 
 def aggregate(repos=None, token=None):
-    """Fetch, enrich, sort, and return all bounties as a summary dict.
-
-    Returns:
-        {
-            "updated_at": ISO-8601 timestamp,
-            "total_count": int,
-            "bounties": [sorted list, highest RTC first],
-        }
-    """
-    bounties = fetch_bounties(repos, token)
-    bounties.sort(key=lambda b: b["reward_rtc"], reverse=True)
-    return {
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "total_count": len(bounties),
-        "bounties": bounties,
-    }
+    """Return a complete sorted index, with explicit source traversal metadata."""
+    report = fetch_bounties_report(repos=repos, token=token)
+    if not report["complete"]:
+        raise BountyFetchIncompleteError(report)
+    report["bounties"].sort(key=lambda b: b["reward_rtc"], reverse=True)
+    return report
 
 
 def _markdown_cell(value):
@@ -308,5 +383,9 @@ def format_markdown(bounties):
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    data = aggregate()
+    try:
+        data = aggregate()
+    except (BountyFetchIncompleteError, ValueError) as exc:
+        print(f"[error] {exc}", file=sys.stderr)
+        raise SystemExit(2)
     print(json.dumps(data, indent=2, default=str))
