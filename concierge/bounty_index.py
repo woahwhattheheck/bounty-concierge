@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 import requests
 
 from concierge.config import GITHUB_TOKEN, REPOS
+from concierge.reward_evidence import extract_reward_evidence
 
 
 # ---------------------------------------------------------------------------
@@ -189,10 +190,12 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100):
                     seen_numbers.add(number)
                     title, body, labels = normalized["title"], normalized["body"], normalized["labels"]
                     reward = parse_reward(title, body)
+                    reward_evidence = extract_reward_evidence(title, body)
                     report["bounties"].append({
                         "repo": repo, **normalized, "reward_rtc": reward,
                         "difficulty": estimate_difficulty(title, labels, reward),
                         "skills": tag_skills(title, body),
+                        "reward_evidence": reward_evidence,
                     })
                     source["bounty_count"] += 1
                 if remaining == 0:
