@@ -21,6 +21,8 @@ from decimal import Decimal
 from typing import Iterable
 from urllib.parse import quote
 
+from concierge.reward_evidence import reward_summary
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 README_PATH = REPO_ROOT / "README.md"
 INDEX_PATH = REPO_ROOT / "data" / "bounty_index.json"
@@ -43,6 +45,20 @@ def _format_int(n: int | float | Decimal | None) -> str:
         return str(value)
     text = format(value, "f")
     return text.rstrip("0").rstrip(".") if "." in text else text
+
+
+def indexed_reward_label(bounty: dict) -> str:
+    """Legacy number, or the evidence summary when a row carries it.
+
+    The summary names an indexed mention. It is not per-claim pay.
+    Rows without evidence keep the previous numeric cell exactly.
+    """
+    evidence = bounty.get("reward_evidence")
+    if evidence is None:
+        return _format_int(bounty.get("reward_rtc"))
+    if not isinstance(evidence, dict):
+        raise ValueError("reward_evidence must be an object when present")
+    return reward_summary(bounty)
 
 
 def _single_line_text(value) -> str:
@@ -166,7 +182,7 @@ def render_table(bounties: Iterable[dict], top_n: int = DEFAULT_TOP_N) -> str:
         if len(title) > 60:
             title = title[:57] + "..."
         title = _markdown_cell(title)
-        reward = _format_int(bounty.get("reward_rtc"))
+        reward = _markdown_cell(indexed_reward_label(bounty))
         difficulty = _markdown_cell(bounty.get("difficulty") or "unknown")
         skills = _markdown_cell(", ".join(bounty.get("skills") or []) or "-")
         lines.append(f"| {repo_short} | {issue} | {title} | {reward} | {difficulty} | {skills} |")
@@ -256,6 +272,8 @@ def build_section(
     )
     notice = (
         "Indexed amounts may be campaign pools, caps or estimates, not per-claim rewards. "
+        "A cell that says unconfirmed or no reward listed has no confirmed RTC figure "
+        "and is not a payable amount. "
         "A recent rebuild does not confirm an unexpired offer, available assignment, "
         "our eligibility or payment setup. Confirm live sponsor terms and our collection "
         "route before starting work; this table does not authorize a claim or submission."

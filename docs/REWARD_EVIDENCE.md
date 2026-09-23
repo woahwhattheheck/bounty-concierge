@@ -18,6 +18,10 @@ The legacy parser (`parse_reward`) extracts only the first finite numeric `RTC` 
 - `reward_summary(row)`: Generates a human-readable summary (e.g., `'150 RTC'`, `'unconfirmed ($50)'`, or `'no reward listed'`).
 - `reward_filter_value(row)`: Extracts a numeric float value for reward filtering (`--min-rtc`/`--max-rtc`), returning `None` for unconfirmed or missing amounts.
 
+## Renderers
+
+`readme_sync.render_table` and `announcer.format_announcement` print `reward_summary` when a row has `reward_evidence`. That text stays an indexed mention: matched RTC text, `unconfirmed (...)`, or `no reward listed`. It is not per-claim compensation. Rows with no evidence object keep the previous numeric `indexed N RTC` display. Sort order still uses `reward_rtc`.
+
 ## Safe Integration Contract
 
 - Legacy `reward_rtc` numerical fields and existing sorting/ranking behaviors are strictly preserved.

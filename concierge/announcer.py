@@ -15,6 +15,7 @@ from concierge.readme_sync import (
     _markdown_link_target,
     _single_line_text,
     _validated_bounty_rows,
+    indexed_reward_label,
 )
 
 SHORT_LIMIT = 280
@@ -52,11 +53,18 @@ def _normalized_bounties(bounties: List[dict]) -> List[dict]:
     return _validated_bounty_rows(normalized)
 
 
+def _announcement_amount(bounty: dict) -> str:
+    """Qualified evidence text, or the legacy 'indexed N RTC' phrase."""
+    if bounty.get("reward_evidence") is None:
+        return f"indexed {_format_int(bounty.get('reward_rtc'))} RTC"
+    return indexed_reward_label(bounty)
+
+
 def _short_announcement(bounty: dict) -> str:
     """Budget the title around whole metadata; never slice a destination URL."""
     prefix = "RustChain candidate: "
     title = _single_line_text(bounty["title"]).strip()
-    amount = f" | indexed {_format_int(bounty.get('reward_rtc'))} RTC"
+    amount = f" | {_announcement_amount(bounty)}"
     raw_url = bounty.get("url") or ""
     url = _markdown_link_target(raw_url) if raw_url else ""
     destination = f" | {url}" if url else " | source link not supplied"
@@ -95,7 +103,7 @@ def format_announcement(bounties: List[dict]) -> Dict[str, str]:
         url = _markdown_link_target(raw_url) if raw_url else "source link not supplied"
         medium_lines.append(
             f"- {_markdown_cell(bounty['title'])} | "
-            f"indexed {_format_int(bounty.get('reward_rtc'))} RTC | {url}"
+            f"{_markdown_cell(_announcement_amount(bounty))} | {url}"
         )
     if len(rows) > 5:
         medium_lines.append(f"\n+{len(rows) - 5} supplied candidates in the full preview.")
@@ -103,14 +111,14 @@ def format_announcement(bounties: List[dict]) -> Dict[str, str]:
 
     long_lines = [
         "# RustChain Bounty Candidates\n",
-        "| Title | Indexed RTC | Difficulty | Source |",
+        "| Title | Indexed amount | Difficulty | Source |",
         "|-------|-------------|------------|--------|",
     ]
     for bounty in rows:
         raw_url = bounty.get("url") or ""
         link = f"[source]({_markdown_link_target(raw_url)})" if raw_url else "not supplied"
         long_lines.append(
-            f"| {_markdown_cell(bounty['title'])} | {_format_int(bounty.get('reward_rtc'))} | "
+            f"| {_markdown_cell(bounty['title'])} | {_markdown_cell(_announcement_amount(bounty))} | "
             f"{_markdown_cell(bounty.get('difficulty') or 'unknown')} | {link} |"
         )
     long_lines.append("\n" + _DISCOVERY_NOTICE)
