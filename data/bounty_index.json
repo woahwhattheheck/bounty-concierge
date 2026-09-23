@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-09-23T10:49:17.498551+00:00",
+  "updated_at": "2026-09-23T17:48:43.056969+00:00",
   "total_count": 273,
   "bounties": [
     {
@@ -19,7 +19,21 @@
       "skills": [
         "docker",
         "documentation"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3333.0,
+        "exact_text": "3,333 RTC",
+        "excerpt": "unding 100 Antiquity Miners \u2014 3,333 RTC Program",
+        "mentions": [
+          "5,000 RTC",
+          "5,000 RTC",
+          "1 RTC",
+          "75 RTC",
+          "100 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -36,7 +50,21 @@
       "skills": [
         "documentation",
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 750.0,
+        "exact_text": "750 RTC",
+        "excerpt": "the Forge \u2014 Security Season (750 RTC Pool, 6 Weeks)",
+        "mentions": [
+          "750 RTC",
+          "200 RTC",
+          "150 RTC",
+          "100 RTC",
+          "200 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -56,7 +84,21 @@
       "skills": [
         "javascript",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 500.0,
+        "exact_text": "500 RTC",
+        "excerpt": "t with Verified Humans (Pool: 500 RTC)",
+        "mentions": [
+          "500 RTC",
+          "30 RTC",
+          "25 RTC",
+          "5 RTC",
+          "50 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -74,7 +116,19 @@
       "difficulty": "critical",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 500.0,
+        "exact_text": "500 RTC",
+        "excerpt": "iquidity Provider Incentive \u2014 500 RTC/month for Raydium LP (1,500 RTC Pilot)",
+        "mentions": [
+          "1,500 RTC",
+          "500 RTC",
+          "$50"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -93,7 +147,21 @@
       "skills": [
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 430.0,
+        "exact_text": "430 RTC",
+        "excerpt": ",000 Stars Drive \u2014 Earn Up to 430 RTC (5,000 RTC Pool)",
+        "mentions": [
+          "5,000 RTC",
+          "5,000 RTC",
+          "1 RTC",
+          "2 RTC",
+          "1.5 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -110,7 +178,20 @@
       "skills": [
         "ci/cd",
         "documentation"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 300.0,
+        "exact_text": "300 RTC",
+        "excerpt": "5 tok/s on Real N64 Hardware (300 RTC)",
+        "mentions": [
+          "300 RTC",
+          "100 RTC",
+          "300 RTC",
+          "100 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -128,7 +209,20 @@
       "skills": [
         "documentation",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 200.0,
+        "exact_text": "200 RTC",
+        "excerpt": "[BOUNTY: 50-200 RTC] YouTube video about RustChain + BoTTube (real ch",
+        "mentions": [
+          "50 RTC",
+          "100 RTC",
+          "200 RTC",
+          "BOUNTY: 50"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -146,7 +240,21 @@
       "difficulty": "critical",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 200.0,
+        "exact_text": "200 RTC",
+        "excerpt": "m Engagement Challenge (Up to 200 RTC!)",
+        "mentions": [
+          "50 RTC",
+          "78 RTC",
+          "120 RTC",
+          "200 RTC",
+          "0 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -164,7 +272,19 @@
         "javascript",
         "rust",
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 200.0,
+        "exact_text": "200 RTC",
+        "excerpt": "s \u2014 Build Your Own Thing (100-200 RTC)",
+        "mentions": [
+          "100 RTC",
+          "150 RTC",
+          "200 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -181,7 +301,21 @@
       "difficulty": "critical",
       "skills": [
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 200.0,
+        "exact_text": "200 RTC",
+        "excerpt": "Unusual Architectures (Pool: 200 RTC)",
+        "mentions": [
+          "200 RTC",
+          "25 RTC",
+          "25 RTC",
+          "30 RTC",
+          "30 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -199,7 +333,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 150.0,
+        "exact_text": "150 RTC",
+        "excerpt": "[BOUNTY: 1.5-150 RTC] Tip-to-Earn \u2014 Tip Up to 10 Creators, Get 1.5x Ba",
+        "mentions": [
+          "15 RTC",
+          "10 RTC",
+          "1 RTC",
+          "10 RTC",
+          "1 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -219,7 +367,21 @@
         "python",
         "rust",
         "translation"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 150.0,
+        "exact_text": "150 RTC",
+        "excerpt": "ive Demo + Build Bounties (25-150 RTC)",
+        "mentions": [
+          "15.75 RTC",
+          "15.0 RTC",
+          "0.75 RTC",
+          "25.0 RTC",
+          "1.25 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -242,7 +404,21 @@
         "documentation",
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 150.0,
+        "exact_text": "150 RTC",
+        "excerpt": "Sega Dreamcast (SH4 Linux) \u2014 150 RTC",
+        "mentions": [
+          "150 RTC",
+          "50 RTC",
+          "25 RTC",
+          "50 RTC",
+          "25 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -264,7 +440,19 @@
         "documentation",
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 150.0,
+        "exact_text": "150 RTC",
+        "excerpt": "ttcjn/Rustchain) ## Payout **150 RTC** Milestone payments: - Vanity wallet generation",
+        "mentions": [
+          "50 RTC",
+          "60 RTC",
+          "40 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -283,7 +471,21 @@
       "skills": [
         "documentation",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 150.0,
+        "exact_text": "150 RTC",
+        "excerpt": "Trading Pair on Spectrum DEX (150 RTC)",
+        "mentions": [
+          "1,000 RTC",
+          "1 RTC",
+          "150 RTC",
+          "50 RTC",
+          "50 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -304,7 +506,21 @@
         "javascript",
         "python",
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 133.0,
+        "exact_text": "133 RTC",
+        "excerpt": "ion \u2014 Find Bugs, Earn RTC (33-133 RTC)",
+        "mentions": [
+          "200 RTC",
+          "100 RTC",
+          "50 RTC",
+          "25 RTC",
+          "200 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -325,7 +541,21 @@
         "python",
         "security",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 133.0,
+        "exact_text": "133 RTC",
+        "excerpt": "rogram \u2014 Find Bugs, Earn RTC (133 RTC Pool)",
+        "mentions": [
+          "750 RTC",
+          "200 RTC",
+          "100 RTC",
+          "50 RTC",
+          "15 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -339,7 +569,20 @@
       "created_at": "2026-05-22T15:44:46Z",
       "reward_rtc": 100.0,
       "difficulty": "major",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 100.0,
+        "exact_text": "100 RTC",
+        "excerpt": "[GRANT: 100 RTC/mo] Maintainer-Nominated Welcome Grant",
+        "mentions": [
+          "600 RTC",
+          "150 RTC",
+          "10 RTC",
+          "GRANT: 100"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -361,7 +604,21 @@
         "python",
         "security",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 100.0,
+        "exact_text": "100 RTC",
+        "excerpt": "Atlas + Prove Commerce (Pool: 100 RTC)",
+        "mentions": [
+          "5 RTC",
+          "1 RTC",
+          "6 RTC",
+          "150 RTC",
+          "1 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -384,7 +641,21 @@
         "python",
         "social-media",
         "translation"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 100.0,
+        "exact_text": "100 RTC",
+        "excerpt": "my is LIVE \u2014 Build on it! (25-100 RTC)",
+        "mentions": [
+          "50 RTC",
+          "50 RTC",
+          "50 RTC",
+          "25 RTC",
+          "75 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -401,7 +672,18 @@
       "skills": [
         "documentation",
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 100.0,
+        "exact_text": "100 RTC",
+        "excerpt": "t game it. ### Monthly Pool: 100 RTC Distributed to the top 3-5 most impactful contri",
+        "mentions": [
+          "Pool: 100",
+          "$100"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -420,7 +702,21 @@
         "documentation",
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 100.0,
+        "exact_text": "100 RTC",
+        "excerpt": "rite About RustChain, Earn 25-100 RTC",
+        "mentions": [
+          "25 RTC",
+          "50 RTC",
+          "15 RTC",
+          "25 RTC",
+          "100 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -437,7 +733,21 @@
       "skills": [
         "documentation",
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 100.0,
+        "exact_text": "100 RTC",
+        "excerpt": "n the Chain \u2014 Security Quest, 100 RTC Total (per-claimant)",
+        "mentions": [
+          "100 RTC",
+          "10 RTC",
+          "15 RTC",
+          "75 RTC",
+          "75 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -457,7 +767,20 @@
         "documentation",
         "security",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 100.0,
+        "exact_text": "100 RTC",
+        "excerpt": "arn RTC. **Reward Range:** 2-100 RTC (impact-based, kept within normal bounty caps)",
+        "mentions": [
+          "2 RTC",
+          "10 RTC",
+          "50 RTC",
+          "100 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -477,7 +800,21 @@
       "skills": [
         "javascript",
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 100.0,
+        "exact_text": "100 RTC",
+        "excerpt": "02 Payment Protocol Exploits (100 RTC)",
+        "mentions": [
+          "100 RTC",
+          "100 RTC",
+          "50 RTC",
+          "25 RTC",
+          "100 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -497,7 +834,20 @@
       "skills": [
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 100.0,
+        "exact_text": "100 RTC",
+        "excerpt": "Earn RTC by Creating Content (100 RTC)",
+        "mentions": [
+          "100 RTC",
+          "0.001 RTC",
+          "Reward: 100",
+          "$10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -517,7 +867,20 @@
       "skills": [
         "javascript",
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 100.0,
+        "exact_text": "100 RTC",
+        "excerpt": "Cross-Node Consensus Attacks (100 RTC)",
+        "mentions": [
+          "200 RTC",
+          "200 RTC",
+          "Bounty: 200",
+          "$20"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -536,7 +899,20 @@
       "difficulty": "major",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 100.0,
+        "exact_text": "100 RTC",
+        "excerpt": "Phase 1: 2D Hardware Museum (100 RTC) ### Explorer Fixes - Fix any broken API calls o",
+        "mentions": [
+          "150 RTC",
+          "100 RTC",
+          "150 RTC",
+          "250 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -560,7 +936,17 @@
         "javascript",
         "python",
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 100.0,
+        "exact_text": "100 RTC",
+        "excerpt": "other spec pass ## Payout - `100 RTC` after 7 days of verified >95% uptime - `100 RTC`",
+        "mentions": [
+          "100 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -582,7 +968,17 @@
         "documentation",
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 80.0,
+        "exact_text": "80 RTC",
+        "excerpt": "ng Follow-up (Grok + Runway) (80 RTC)",
+        "mentions": [
+          "120 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -601,7 +997,21 @@
         "javascript",
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 75.0,
+        "exact_text": "75 RTC",
+        "excerpt": "[BOUNTY: 40-75 RTC] BoTTube MCP Server \u2014 Let Any Claude Code Instanc",
+        "mentions": [
+          "40 RTC",
+          "15 RTC",
+          "10 RTC",
+          "10 RTC",
+          "BOUNTY: 40"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -622,7 +1032,21 @@
         "ci/cd",
         "javascript",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 75.0,
+        "exact_text": "75 RTC",
+        "excerpt": "[BOUNTY: 50-75 RTC] Bounty Verification Bot \u2014 Auto-Verify Star/Follo",
+        "mentions": [
+          "30 RTC",
+          "10 RTC",
+          "10 RTC",
+          "10 RTC",
+          "15 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -642,7 +1066,15 @@
       "skills": [
         "security",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 75.0,
+        "exact_text": "75 RTC",
+        "excerpt": "O Audit Fix Pack **Reward:** 75 RTC (single winner or split by completed checklist)",
+        "mentions": [],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -664,7 +1096,19 @@
       "skills": [
         "documentation",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 75.0,
+        "exact_text": "75 RTC",
+        "excerpt": "oken Lists + Trackers + Logo (75 RTC)",
+        "mentions": [
+          "75 RTC",
+          "25 RTC",
+          "10 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -683,7 +1127,19 @@
       "difficulty": "major",
       "skills": [
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 75.0,
+        "exact_text": "75 RTC",
+        "excerpt": "yment Widget XSS & Injection (75 RTC)",
+        "mentions": [
+          "75 RTC",
+          "Reward: 75",
+          "$7.50"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -705,7 +1161,15 @@
         "documentation",
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 75.0,
+        "exact_text": "75 RTC",
+        "excerpt": "setup challenges ## Payout **75 RTC per unique vintage machine** \u2014 multi-claim up to",
+        "mentions": [],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -727,7 +1191,21 @@
         "documentation",
         "javascript",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 67.0,
+        "exact_text": "67 RTC",
+        "excerpt": "[BOUNTY: 67 RTC] AgentFolio \u2194 Beacon Integration Spec + Reference",
+        "mentions": [
+          "200 RTC",
+          "100 RTC",
+          "200 RTC",
+          "50 RTC",
+          "75 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -750,7 +1228,21 @@
         "python",
         "security",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 67.0,
+        "exact_text": "67 RTC",
+        "excerpt": "[BOUNTY: 27-67 RTC] RustChain Wallet Browser Extension + MetaMask Sn",
+        "mentions": [
+          "40 RTC",
+          "10 RTC",
+          "10 RTC",
+          "40 RTC",
+          "100 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -765,7 +1257,21 @@
       "created_at": "2026-03-21T00:27:35Z",
       "reward_rtc": 50.0,
       "difficulty": "major",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 50.0,
+        "exact_text": "50 RTC",
+        "excerpt": "AFC Video Quality Assessment (50 RTC)",
+        "mentions": [
+          "50 RTC",
+          "50 RTC",
+          "50 RTC",
+          "Bounty: 50",
+          "$0.10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -784,7 +1290,21 @@
       "skills": [
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 50.0,
+        "exact_text": "50 RTC",
+        "excerpt": "[BOUNTY: 5-50 RTC] Beacon Atlas \u2014 Build, Join, and Interact in the",
+        "mentions": [
+          "5 RTC",
+          "5 RTC",
+          "50 RTC",
+          "25 RTC",
+          "50 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -802,7 +1322,21 @@
       "skills": [
         "documentation",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 50.0,
+        "exact_text": "50 RTC",
+        "excerpt": "[BOUNTY: 10-50 RTC] YouTube Tutorial Videos \u2014 BoTTube, RustChain, Be",
+        "mentions": [
+          "50 RTC",
+          "25 RTC",
+          "50 RTC",
+          "25 RTC",
+          "20 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -819,7 +1353,21 @@
       "created_at": "2026-03-06T14:01:47Z",
       "reward_rtc": 50.0,
       "difficulty": "micro",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 50.0,
+        "exact_text": "50 RTC",
+        "excerpt": "[BOUNTY: up to 50 RTC] Micro Liquidity \u2014 Provide Liquidity, Get 1.5x Ba",
+        "mentions": [
+          "50 RTC",
+          "1 RTC",
+          "50 RTC",
+          "1 RTC",
+          "$5.00"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -845,7 +1393,21 @@
         "security",
         "social-media",
         "translation"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 50.0,
+        "exact_text": "50 RTC",
+        "excerpt": "Beacon + Grazer + RIP-302 (10-50 RTC)",
+        "mentions": [
+          "10 RTC",
+          "25 RTC",
+          "50 RTC",
+          "5 RTC",
+          "1 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -863,7 +1425,17 @@
         "javascript",
         "python",
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 50.0,
+        "exact_text": "50 RTC",
+        "excerpt": "[50 RTC] Dual-Mining Integration: Earn RTC While Mining P",
+        "mentions": [
+          "75 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -882,7 +1454,18 @@
       "difficulty": "major",
       "skills": [
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 50.0,
+        "exact_text": "50 RTC",
+        "excerpt": "to Mac OS 9 via POSIX Shim \u2014 50 RTC",
+        "mentions": [
+          "75 RTC",
+          "Bounty: 75"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -900,7 +1483,21 @@
         "documentation",
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 50.0,
+        "exact_text": "50 RTC",
+        "excerpt": "a RustChain Miner \u2014 5 Steps, 50 RTC Total",
+        "mentions": [
+          "50 RTC",
+          "5 RTC",
+          "10 RTC",
+          "10 RTC",
+          "15 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -919,7 +1516,18 @@
       "skills": [
         "documentation",
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 50.0,
+        "exact_text": "50 RTC",
+        "excerpt": "pact reproducible failure: 25-50 RTC - Medium impact (safety/integrity regression): 75",
+        "mentions": [
+          "125 RTC",
+          "300 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -939,7 +1547,20 @@
         "python",
         "security",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 50.0,
+        "exact_text": "50 RTC",
+        "excerpt": "ube Vote Manipulation & CSRF (50 RTC)",
+        "mentions": [
+          "75 RTC",
+          "25 RTC",
+          "25 RTC",
+          "25 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -958,7 +1579,19 @@
       "difficulty": "major",
       "skills": [
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 50.0,
+        "exact_text": "50 RTC",
+        "excerpt": "plorer & Dashboard Hardening (50 RTC)",
+        "mentions": [
+          "75 RTC",
+          "Reward: 75",
+          "$7.50"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -979,7 +1612,15 @@
         "documentation",
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 50.0,
+        "exact_text": "50 RTC",
+        "excerpt": "h usage examples ## Payout **50 RTC** ## Resources - Wallet crypto reference: `rustc",
+        "mentions": [],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -999,7 +1640,15 @@
       "skills": [
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 50.0,
+        "exact_text": "50 RTC",
+        "excerpt": "ttcjn/Rustchain) ## Payout **50 RTC** ## Skills Needed - Python - Understanding of C",
+        "mentions": [],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1019,7 +1668,15 @@
       "skills": [
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 40.0,
+        "exact_text": "40 RTC",
+        "excerpt": "ttcjn/Rustchain) ## Payout **40 RTC** ## Skills Needed - Python - Statistical analys",
+        "mentions": [],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1038,7 +1695,15 @@
       "difficulty": "standard",
       "skills": [
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 40.0,
+        "exact_text": "40 RTC",
+        "excerpt": "stale attestation ## Payout `40 RTC` ## Non-Goals - broad protocol redesign unrelate",
+        "mentions": [],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1059,7 +1724,19 @@
         "javascript",
         "python",
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 35.0,
+        "exact_text": "35 RTC",
+        "excerpt": "[BOUNTY: 35 RTC + 10/defect] Audit the payout pipeline for silent",
+        "mentions": [
+          "35 RTC",
+          "10 RTC",
+          "BOUNTY: 35"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1077,7 +1754,18 @@
       "skills": [
         "javascript",
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 35.0,
+        "exact_text": "35 RTC",
+        "excerpt": "[BOUNTY: 35 RTC] Harden x86 vintage-arch reward validation (anti-",
+        "mentions": [
+          "35 RTC",
+          "BOUNTY: 35"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1099,7 +1787,20 @@
       "difficulty": "standard",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 35.0,
+        "exact_text": "35 RTC",
+        "excerpt": "[BOUNTY: 15-35 RTC] Make a real YouTube video or written tutorial on",
+        "mentions": [
+          "15 RTC",
+          "25 RTC",
+          "35 RTC",
+          "BOUNTY: 15"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1120,7 +1821,19 @@
       "skills": [
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 33.0,
+        "exact_text": "33 RTC",
+        "excerpt": "How Proof of Antiquity Works (33 RTC)",
+        "mentions": [
+          "50 RTC",
+          "25 RTC",
+          "Bounty: 50"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1134,7 +1847,21 @@
       "created_at": "2026-03-08T02:36:42Z",
       "reward_rtc": 33.0,
       "difficulty": "standard",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 33.0,
+        "exact_text": "33 RTC",
+        "excerpt": "[BOUNTY: 7-33 RTC] Vintage Hardware Speed Run \u2014 Mine RTC on the Wei",
+        "mentions": [
+          "50 RTC",
+          "25 RTC",
+          "15 RTC",
+          "10 RTC",
+          "BOUNTY: 7"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1154,7 +1881,20 @@
         "ci/cd",
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 33.0,
+        "exact_text": "33 RTC",
+        "excerpt": "Tube Bot That Uploads Daily \u2014 33 RTC",
+        "mentions": [
+          "50 RTC",
+          "50 RTC",
+          "50 RTC",
+          "$5.00"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1172,7 +1912,18 @@
       "difficulty": "major",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 33.0,
+        "exact_text": "33 RTC",
+        "excerpt": "a RustChain Explainer Video \u2014 33 RTC",
+        "mentions": [
+          "33 RTC",
+          "33 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1193,7 +1944,19 @@
         "documentation",
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 33.0,
+        "exact_text": "33 RTC",
+        "excerpt": "Chain Telegram Community Bot (33 RTC)",
+        "mentions": [
+          "50 RTC",
+          "10 RTC",
+          "Reward: 50"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1210,7 +1973,21 @@
       "difficulty": "standard",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 30.0,
+        "exact_text": "30 RTC",
+        "excerpt": "[BOUNTY: 5-30 RTC] Short-Form Video Blitz \u2014 TikTok, Instagram Reels",
+        "mentions": [
+          "30 RTC",
+          "5 RTC",
+          "10 RTC",
+          "20 RTC",
+          "30 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1226,7 +2003,17 @@
       "difficulty": "standard",
       "skills": [
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 30.0,
+        "exact_text": "30 RTC",
+        "excerpt": "[30 RTC] Dual-Mining: NiceHash / MoneroOcean / Profit-Swi",
+        "mentions": [
+          "30 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1241,7 +2028,18 @@
       "created_at": "2026-02-19T01:12:27Z",
       "reward_rtc": 30.0,
       "difficulty": "standard",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 30.0,
+        "exact_text": "30 RTC",
+        "excerpt": "ck (Hooks + Shorts + Memes) \u2014 30 RTC",
+        "mentions": [
+          "45 RTC",
+          "Reward: 45"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -1259,7 +2057,21 @@
       "skills": [
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 30.0,
+        "exact_text": "30 RTC",
+        "excerpt": "[BOUNTY: 30 RTC] BoTTube PPA Verification Video \u2014 Show Your Hardw",
+        "mentions": [
+          "30 RTC",
+          "10 RTC",
+          "10 RTC",
+          "5 RTC",
+          "BOUNTY: 30"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -1273,7 +2085,15 @@
       "created_at": "2026-02-15T21:52:38Z",
       "reward_rtc": 30.0,
       "difficulty": "standard",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 30.0,
+        "exact_text": "30 RTC",
+        "excerpt": "Payout: 30 RTC\\n\\nGoal: make RustChain mining on Windows easy an",
+        "mentions": [],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1292,7 +2112,17 @@
         "docker",
         "documentation",
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 27.0,
+        "exact_text": "27 RTC",
+        "excerpt": "Exporter + Grafana Dashboard (27 RTC)",
+        "mentions": [
+          "40 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1314,7 +2144,17 @@
         "javascript",
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 25.0,
+        "exact_text": "25 RTC",
+        "excerpt": "**Reward: 25 RTC** \u00b7 Repo: https://github.com/Scottcjn/bottube-fev",
+        "mentions": [
+          "Reward: 25"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1332,7 +2172,19 @@
       "skills": [
         "documentation",
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 25.0,
+        "exact_text": "25 RTC",
+        "excerpt": "[BOUNTY: 25 RTC] Miner client port: package the RustChain miner f",
+        "mentions": [
+          "25 RTC",
+          "BOUNTY: 25",
+          "Bounty: 25"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1352,7 +2204,17 @@
         "documentation",
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 25.0,
+        "exact_text": "25 RTC",
+        "excerpt": "## Bounty: 25 RTC Create a reusable GitHub Action that any repo ca",
+        "mentions": [
+          "Bounty: 25"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1370,7 +2232,19 @@
       "difficulty": "standard",
       "skills": [
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 25.0,
+        "exact_text": "25 RTC",
+        "excerpt": "[BOUNTY: 25 RTC] Fix Beacon Atlas auto-registration + rustchain.o",
+        "mentions": [
+          "25 RTC",
+          "BOUNTY: 25",
+          "Reward: 25"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1387,7 +2261,21 @@
       "difficulty": "standard",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 25.0,
+        "exact_text": "25 RTC",
+        "excerpt": "l posts + 1 miner onboarded | 25 RTC | | **Silver** | 5 posts + 2 miners onboarded + 1",
+        "mentions": [
+          "75 RTC",
+          "150 RTC",
+          "10 RTC",
+          "5 RTC",
+          "15 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1405,7 +2293,20 @@
       "difficulty": "standard",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 25.0,
+        "exact_text": "25 RTC",
+        "excerpt": "[BOUNTY: 10-25 RTC] Show HN \u2014 Get RustChain on Hacker News Front Pag",
+        "mentions": [
+          "10 RTC",
+          "15 RTC",
+          "BOUNTY: 10",
+          "$0"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1421,7 +2322,17 @@
       "difficulty": "standard",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 25.0,
+        "exact_text": "25 RTC",
+        "excerpt": "[25 RTC] Dual-Mining: Monero (RandomX) Integration",
+        "mentions": [
+          "25 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1438,7 +2349,17 @@
       "skills": [
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 25.0,
+        "exact_text": "25 RTC",
+        "excerpt": "[25 RTC] Dual-Mining: Ergo (Autolykos2) Integration",
+        "mentions": [
+          "25 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1457,7 +2378,15 @@
       "difficulty": "standard",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 25.0,
+        "exact_text": "25 RTC",
+        "excerpt": "Press Links Pack **Reward:** 25 RTC Goal: capitalize on Elyan Labs being referenced",
+        "mentions": [],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1476,7 +2405,21 @@
       "skills": [
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 25.0,
+        "exact_text": "25 RTC",
+        "excerpt": "Miner on Real Hardware \u2014 Earn 25 RTC + Mining Rewards",
+        "mentions": [
+          "1.5 RTC",
+          "25 RTC",
+          "25 RTC",
+          "0.3 RTC",
+          "10 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1498,7 +2441,15 @@
         "documentation",
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 25.0,
+        "exact_text": "25 RTC",
+        "excerpt": "(API-only mode) ## Payout **25 RTC** ## Resources - Node API: `GET /api/miners`, `G",
+        "mentions": [],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1518,7 +2469,17 @@
         "documentation",
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 25.0,
+        "exact_text": "25 RTC",
+        "excerpt": "of setup process ## Payout **25 RTC** (one-time bounty for the port, not ongoing mini",
+        "mentions": [
+          "$5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -1537,7 +2498,21 @@
       "skills": [
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 25.0,
+        "exact_text": "25 RTC",
+        "excerpt": "Miner on Real Hardware \u2014 Earn 25 RTC + Mining Rewards",
+        "mentions": [
+          "1.5 RTC",
+          "25 RTC",
+          "25 RTC",
+          "0.3 RTC",
+          "10 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1555,7 +2530,19 @@
       "skills": [
         "security",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 20.0,
+        "exact_text": "20 RTC",
+        "excerpt": "[BOUNTY: 20 RTC] BoTTube CI jobs hang to a 15-minute timeout and",
+        "mentions": [
+          "20 RTC",
+          "5 RTC",
+          "BOUNTY: 20"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1571,7 +2558,20 @@
       "difficulty": "standard",
       "skills": [
         "documentation"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 20.0,
+        "exact_text": "20 RTC",
+        "excerpt": "[BOUNTY: 20 RTC] Design a Xonotic RustChain Arena Map (level)",
+        "mentions": [
+          "20 RTC",
+          "20 RTC",
+          "BOUNTY: 20",
+          "$0.15"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1593,7 +2593,18 @@
         "javascript",
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 20.0,
+        "exact_text": "20 RTC",
+        "excerpt": "**Reward: 20 RTC** \u00b7 Repo: https://github.com/Scottcjn/bottube-fev",
+        "mentions": [
+          "0.014 RTC",
+          "Reward: 20"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1610,7 +2621,20 @@
       "difficulty": "standard",
       "skills": [
         "documentation"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 20.0,
+        "exact_text": "20 RTC",
+        "excerpt": "[AGENT-BOUNTY: 20 RTC] Submit rustchain-mcp to 3 MCP directories + regi",
+        "mentions": [
+          "30 RTC",
+          "5 RTC",
+          "15 RTC",
+          "BOUNTY: 20"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1628,7 +2652,18 @@
       "difficulty": "standard",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 20.0,
+        "exact_text": "20 RTC",
+        "excerpt": "[BOUNTY: 20 RTC] Build a mobile wallet app (React Native/Flutter)",
+        "mentions": [
+          "20 RTC",
+          "BOUNTY: 20"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1651,7 +2686,21 @@
         "python",
         "rust",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 20.0,
+        "exact_text": "20 RTC",
+        "excerpt": "[BOUNTY: 10-20 RTC] Build Rust Crates for RustChain \u2014 Publish on cra",
+        "mentions": [
+          "10 RTC",
+          "5 RTC",
+          "5 RTC",
+          "40 RTC",
+          "100 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1668,7 +2717,17 @@
       "skills": [
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 20.0,
+        "exact_text": "20 RTC",
+        "excerpt": "[20 RTC] Dual-Mining: DERO (AstroBWT) Integration",
+        "mentions": [
+          "20 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1684,7 +2743,17 @@
       "difficulty": "standard",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 20.0,
+        "exact_text": "20 RTC",
+        "excerpt": "[20 RTC] Dual-Mining: Alephium (Blake3) Integration",
+        "mentions": [
+          "20 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1700,7 +2769,17 @@
       "difficulty": "standard",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 20.0,
+        "exact_text": "20 RTC",
+        "excerpt": "[20 RTC] Dual-Mining: Verus (VerusHash 2.2) Integration",
+        "mentions": [
+          "20 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1719,7 +2798,20 @@
       "difficulty": "standard",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 20.0,
+        "exact_text": "20 RTC",
+        "excerpt": "Tube Videos to Social Media \u2014 20 RTC",
+        "mentions": [
+          "20 RTC",
+          "20 RTC",
+          "20 RTC",
+          "$2.00"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1736,7 +2828,18 @@
       "skills": [
         "documentation",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 20.0,
+        "exact_text": "20 RTC",
+        "excerpt": "mple to your agent framework (20 RTC)",
+        "mentions": [
+          "30 RTC",
+          "Reward: 30"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1752,7 +2855,18 @@
       "difficulty": "standard",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 20.0,
+        "exact_text": "20 RTC",
+        "excerpt": "O) \u2014 RustChain + BoTTube (Max 20 RTC/person)",
+        "mentions": [
+          "5 RTC",
+          "30 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1768,7 +2882,18 @@
       "difficulty": "standard",
       "skills": [
         "documentation"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 20.0,
+        "exact_text": "20 RTC",
+        "excerpt": "a Wikipedia or Wiki Article \u2014 20 RTC",
+        "mentions": [
+          "20 RTC",
+          "Reward: 20"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -1785,7 +2910,21 @@
       "difficulty": "standard",
       "skills": [
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 20.0,
+        "exact_text": "20 RTC",
+        "excerpt": "[BOUNTY: 20 RTC] Run PPA Fingerprint on Exotic Hardware (SPARC, M",
+        "mentions": [
+          "20 RTC",
+          "20 RTC",
+          "20 RTC",
+          "20 RTC",
+          "10 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1802,7 +2941,19 @@
       "difficulty": "standard",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 17.0,
+        "exact_text": "17 RTC",
+        "excerpt": "[BOUNTY: up to 17 RTC \u00b7 67 RTC pool] Tear apart RIP-0301 \u2014 paid design",
+        "mentions": [
+          "67 RTC",
+          "100 RTC",
+          "Pool: 100"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1821,7 +2972,19 @@
         "documentation",
         "security",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 17.0,
+        "exact_text": "17 RTC",
+        "excerpt": "[BOUNTY: 17 RTC] BoTTube video explainer: 'How RustChain proves r",
+        "mentions": [
+          "25 RTC",
+          "BOUNTY: 17",
+          "Bounty: 25"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1840,7 +3003,20 @@
         "documentation",
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 17.0,
+        "exact_text": "17 RTC",
+        "excerpt": "[AGENT-BOUNTY: 17 RTC] Integrate RustChain as a native LangChain tool",
+        "mentions": [
+          "25 RTC",
+          "10 RTC",
+          "5 RTC",
+          "BOUNTY: 17"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1856,7 +3032,21 @@
       "difficulty": "standard",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 17.0,
+        "exact_text": "17 RTC",
+        "excerpt": "[BOUNTY: 17 RTC] BoTTube \u2014 Creator Collaboration Features",
+        "mentions": [
+          "25 RTC",
+          "25 RTC",
+          "BOUNTY: 17",
+          "Bounty: 25",
+          "$25.00"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1876,7 +3066,20 @@
         "docker",
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 17.0,
+        "exact_text": "17 RTC",
+        "excerpt": "[BOUNTY: 10-17 RTC] BoTTube Embed Player \u2014 Embeddable Video Widget",
+        "mentions": [
+          "15 RTC",
+          "5 RTC",
+          "5 RTC",
+          "BOUNTY: 10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1892,7 +3095,17 @@
       "difficulty": "standard",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 17.0,
+        "exact_text": "17 RTC",
+        "excerpt": "[17 RTC] Dual-Mining: Warthog (Janushash) Integration",
+        "mentions": [
+          "25 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1913,7 +3126,20 @@
         "documentation",
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 17.0,
+        "exact_text": "17 RTC",
+        "excerpt": "Original Videos to BoTTube \u2014 17 RTC",
+        "mentions": [
+          "25 RTC",
+          "25 RTC",
+          "25 RTC",
+          "$2.50"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1927,7 +3153,21 @@
       "created_at": "2026-06-11T23:03:00Z",
       "reward_rtc": 15.0,
       "difficulty": "standard",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 15.0,
+        "exact_text": "15 RTC",
+        "excerpt": "[BOUNTY: 5\u201315 RTC] Antiquity Showcase \u2014 Photo/Video of Vintage Hard",
+        "mentions": [
+          "15 RTC",
+          "15 RTC",
+          "10 RTC",
+          "5 RTC",
+          "BOUNTY: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1943,7 +3183,17 @@
       "created_at": "2026-03-21T16:38:15Z",
       "reward_rtc": 15.0,
       "difficulty": "standard",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 15.0,
+        "exact_text": "15 RTC",
+        "excerpt": "## Bounty: 15 RTC Build a web page at rustchain.org/bcos/badge-gen",
+        "mentions": [
+          "Bounty: 15"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1962,7 +3212,21 @@
       "skills": [
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 15.0,
+        "exact_text": "15 RTC",
+        "excerpt": "[BOUNTY: 10-15 RTC] Epoch Reporter Bot \u2014 Auto-Post Epoch Summaries",
+        "mentions": [
+          "10 RTC",
+          "5 RTC",
+          "1.5 RTC",
+          "0.297 RTC",
+          "BOUNTY: 10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1979,7 +3243,21 @@
       "created_at": "2026-03-06T14:03:26Z",
       "reward_rtc": 15.0,
       "difficulty": "micro",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 15.0,
+        "exact_text": "15 RTC",
+        "excerpt": "[BOUNTY: 5-15 RTC] A2A Transaction Badge \u2014 Complete Agent-to-Agent",
+        "mentions": [
+          "5 RTC",
+          "15 RTC",
+          "5 RTC",
+          "5 RTC",
+          "5 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -1995,7 +3273,17 @@
       "difficulty": "standard",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 15.0,
+        "exact_text": "15 RTC",
+        "excerpt": "[15 RTC] Dual-Mining: Raptoreum (GhostRider) Integration",
+        "mentions": [
+          "15 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2012,7 +3300,18 @@
       "difficulty": "standard",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 15.0,
+        "exact_text": "15 RTC",
+        "excerpt": "st About Proof-of-Antiquity \u2014 15 RTC",
+        "mentions": [
+          "15 RTC",
+          "Reward: 15"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2033,7 +3332,21 @@
         "documentation",
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 15.0,
+        "exact_text": "15 RTC",
+        "excerpt": "ticle on Dev.to or Hashnode \u2014 15 RTC Each",
+        "mentions": [
+          "15 RTC",
+          "75 RTC",
+          "15 RTC",
+          "75 RTC",
+          "5 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2053,7 +3366,15 @@
       "skills": [
         "documentation",
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 15.0,
+        "exact_text": "15 RTC",
+        "excerpt": "docs/` directory ## Payout **15 RTC** ## Skills Needed - Technical writing - Markdow",
+        "mentions": [],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -2071,7 +3392,21 @@
       "difficulty": "standard",
       "skills": [
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 15.0,
+        "exact_text": "15 RTC",
+        "excerpt": "Prove Sustained Mining, Earn 15 RTC (Pool: 500 RTC)",
+        "mentions": [
+          "500 RTC",
+          "15 RTC",
+          "500 RTC",
+          "15 RTC",
+          "15 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/bottube",
@@ -2088,7 +3423,21 @@
       "skills": [
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 15.0,
+        "exact_text": "15 RTC",
+        "excerpt": "[BOUNTY: 15 RTC] Record LLM Inference on Unusual Hardware",
+        "mentions": [
+          "15 RTC",
+          "10 RTC",
+          "5 RTC",
+          "BOUNTY: 15",
+          "Bounty: 15"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2107,7 +3456,19 @@
       "difficulty": "standard",
       "skills": [
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 13.0,
+        "exact_text": "13 RTC",
+        "excerpt": "Miner for 30 Days Straight \u2014 13 RTC",
+        "mentions": [
+          "10 RTC",
+          "20 RTC",
+          "10 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2126,7 +3487,18 @@
       "difficulty": "standard",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 12.0,
+        "exact_text": "12 RTC",
+        "excerpt": "[BOUNTY: 12 RTC] Windows headless miner: stop infinite retry of r",
+        "mentions": [
+          "12 RTC",
+          "BOUNTY: 12"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2143,7 +3515,18 @@
       "created_at": "2026-07-19T21:43:36Z",
       "reward_rtc": 10.0,
       "difficulty": "standard",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "[BOUNTY: 10 RTC] Fix rustchain.org install script \u2014 wrong paths +",
+        "mentions": [
+          "10 RTC",
+          "BOUNTY: 10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2166,7 +3549,18 @@
         "documentation",
         "javascript",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "[BOUNTY: 10 RTC] Refer a new active miner (1+ real epoch on genui",
+        "mentions": [
+          "10 RTC",
+          "BOUNTY: 10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2185,7 +3579,19 @@
         "documentation",
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "[BOUNTY: 10 RTC] Proof-of-Antiquity Explainer \u2014 Diagram, Infograp",
+        "mentions": [
+          "10 RTC",
+          "10 RTC",
+          "BOUNTY: 10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2205,7 +3611,21 @@
       "skills": [
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "ry Pi 4 \u2014 First Achievements (10 RTC)",
+        "mentions": [
+          "10 RTC",
+          "5 RTC",
+          "10 RTC",
+          "0.015 RTC",
+          "Bounty: 10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2224,7 +3644,17 @@
       "skills": [
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "/bcos/directory` ### Bounty: 10 RTC Verification: `/bcos/directory` returns JSON fro",
+        "mentions": [
+          "Bounty: 10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2243,7 +3673,17 @@
       "skills": [
         "python",
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "## Bounty: 10 RTC Create a Homebrew formula that installs the BCOS",
+        "mentions": [
+          "Bounty: 10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2259,7 +3699,21 @@
       "difficulty": "standard",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "[BOUNTY: 10 RTC] Write about our CVPR 2026 acceptance on any plat",
+        "mentions": [
+          "10 RTC",
+          "10 RTC",
+          "BOUNTY: 10",
+          "Bounty: 10",
+          "$12"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2275,7 +3729,21 @@
       "difficulty": "standard",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "[BOUNTY: 10 RTC] BoTTube \u2014 Video Page Customization",
+        "mentions": [
+          "15 RTC",
+          "15 RTC",
+          "BOUNTY: 10",
+          "Bounty: 15",
+          "$15.00"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2295,7 +3763,21 @@
       "skills": [
         "ci/cd",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "[FUNNEL BOUNTY: up to 10 RTC per pair] Founding Agent Onboarding Loop \u2014 Bring",
+        "mentions": [
+          "10 RTC",
+          "1 RTC",
+          "1 RTC",
+          "2 RTC",
+          "2 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2314,7 +3796,21 @@
       "difficulty": "standard",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "[FUNNEL BOUNTY: up to 10 RTC per pair] Founding Human Referral Loop \u2014 Bring a",
+        "mentions": [
+          "10 RTC",
+          "1 RTC",
+          "1 RTC",
+          "2 RTC",
+          "2 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2332,7 +3828,18 @@
       "skills": [
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "[BOUNTY: 10 RTC] Automated Backup Verification \u2014 Validate RustCha",
+        "mentions": [
+          "10 RTC",
+          "BOUNTY: 10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2352,7 +3859,19 @@
       "skills": [
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "[BOUNTY: 5-10 RTC] BoTTube OEmbed Protocol \u2014 Rich Link Previews Eve",
+        "mentions": [
+          "5 RTC",
+          "5 RTC",
+          "BOUNTY: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2372,7 +3891,21 @@
       "skills": [
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "[BOUNTY: 7-10 RTC] RustChain Testnet Faucet \u2014 Free Test RTC for Dev",
+        "mentions": [
+          "10 RTC",
+          "5 RTC",
+          "0.5 RTC",
+          "1.0 RTC",
+          "2.0 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2387,7 +3920,20 @@
       "created_at": "2026-03-06T19:15:26Z",
       "reward_rtc": 10.0,
       "difficulty": "standard",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "ost @RustchainPOA on X \u2014 Earn 10 RTC",
+        "mentions": [
+          "10 RTC",
+          "10 RTC",
+          "15 RTC",
+          "25 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2403,7 +3949,17 @@
       "difficulty": "standard",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "[10 RTC] Dual-Mining: Scala (RandomX variant) Integration",
+        "mentions": [
+          "10 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2419,7 +3975,17 @@
       "difficulty": "standard",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "[10 RTC] Dual-Mining: Conceal (CryptoNight-GPU) Integrati",
+        "mentions": [
+          "10 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2435,7 +4001,17 @@
       "difficulty": "standard",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "[10 RTC] Dual-Mining: Neoxa (KawPow) Integration",
+        "mentions": [
+          "15 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2451,7 +4027,17 @@
       "difficulty": "standard",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "[10 RTC] Dual-Mining: Zephyr (RandomX) Integration",
+        "mentions": [
+          "15 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2470,7 +4056,20 @@
       "skills": [
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "a BoTTube Integration Guide \u2014 10 RTC",
+        "mentions": [
+          "15 RTC",
+          "15 RTC",
+          "15 RTC",
+          "$1.50"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2488,7 +4087,20 @@
       "difficulty": "standard",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "culty:** Medium **Reward:** 10 RTC per completed challenge item **Pool:** 300 RTC",
+        "mentions": [
+          "300 RTC",
+          "10 RTC",
+          "10 RTC",
+          "10 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2509,7 +4121,18 @@
         "documentation",
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "al creation: any wallet with >10 RTC can create a proposal - Voting: 1 RTC = 1 vote, w",
+        "mentions": [
+          "1 RTC",
+          "100 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2529,7 +4152,20 @@
       "skills": [
         "javascript",
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "|--------|---------| | Info | 10 RTC | Timing leak, minor info disclosure | | Low | 25",
+        "mentions": [
+          "25 RTC",
+          "50 RTC",
+          "75 RTC",
+          "200 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -2548,7 +4184,21 @@
       "skills": [
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "a RustChain Tutorial Video \u2014 10 RTC",
+        "mentions": [
+          "10 RTC",
+          "10 RTC",
+          "10 RTC",
+          "100 RTC",
+          "Pool: 100"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -2569,7 +4219,21 @@
       "difficulty": "standard",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "ner Bundle win-miner-2026-02 (10 RTC each, Pool: 200 RTC)",
+        "mentions": [
+          "200 RTC",
+          "10 RTC",
+          "200 RTC",
+          "5 RTC",
+          "Pool: 200"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -2587,7 +4251,21 @@
       "difficulty": "standard",
       "skills": [
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "NTY] Bring a Friend to Mine \u2014 10 RTC per Referral (Pool: 300 RTC)",
+        "mentions": [
+          "300 RTC",
+          "10 RTC",
+          "300 RTC",
+          "10 RTC",
+          "50 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -2602,7 +4280,21 @@
       "created_at": "2026-02-03T22:25:16Z",
       "reward_rtc": 10.0,
       "difficulty": "standard",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "--| | **First Attestation** | 10 RTC | Run a miner, complete first successful hardware",
+        "mentions": [
+          "5 RTC",
+          "10 RTC",
+          "25 RTC",
+          "10 RTC",
+          "10 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/bottube",
@@ -2619,7 +4311,19 @@
       "skills": [
         "documentation",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 10.0,
+        "exact_text": "10 RTC",
+        "excerpt": "[BOUNTY: 10 RTC] Create a \"What is Proof of Physical AI?\" Explain",
+        "mentions": [
+          "10 RTC",
+          "BOUNTY: 10",
+          "Bounty: 10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2639,7 +4343,18 @@
       "difficulty": "micro",
       "skills": [
         "documentation"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 8.0,
+        "exact_text": "8 RTC",
+        "excerpt": "[BOUNTY: 8 RTC] rustchain-mcp: document + test streaming/long-ru",
+        "mentions": [
+          "8 RTC",
+          "BOUNTY: 8"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2655,7 +4370,19 @@
       "difficulty": "micro",
       "skills": [
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 8.0,
+        "exact_text": "8 RTC",
+        "excerpt": "[BOUNTY: 8 RTC] Playtest CHUNKINS \u2014 raytraced squirrel platforme",
+        "mentions": [
+          "8 RTC",
+          "BOUNTY: 8",
+          "Reward: 8"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2674,7 +4401,18 @@
         "documentation",
         "social-media",
         "translation"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 8.0,
+        "exact_text": "8 RTC",
+        "excerpt": "[BOUNTY: 5-8 RTC] CN-Language Market Framing for RustChain (\u95f2\u7f6e\u786c\u4ef6 /",
+        "mentions": [
+          "8 RTC",
+          "BOUNTY: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2694,7 +4432,19 @@
       "skills": [
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 8.0,
+        "exact_text": "8 RTC",
+        "excerpt": "ster 5 Games on One Platform (8 RTC)",
+        "mentions": [
+          "8 RTC",
+          "2 RTC",
+          "Bounty: 8"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2711,7 +4461,18 @@
       "created_at": "2026-07-19T21:43:46Z",
       "reward_rtc": 7.0,
       "difficulty": "micro",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 7.0,
+        "exact_text": "7 RTC",
+        "excerpt": "[BOUNTY: 7 RTC] Consistent error handling + exit codes in wallet",
+        "mentions": [
+          "7 RTC",
+          "BOUNTY: 7"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2728,7 +4489,21 @@
       "skills": [
         "documentation",
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 7.0,
+        "exact_text": "7 RTC",
+        "excerpt": "[BOUNTY: 7 RTC] Design Map Objects / Props for Xonotic RustChain",
+        "mentions": [
+          "7 RTC",
+          "7 RTC",
+          "7 RTC",
+          "BOUNTY: 7",
+          "$0.15"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2746,7 +4521,18 @@
       "skills": [
         "documentation",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 7.0,
+        "exact_text": "7 RTC",
+        "excerpt": "[BOUNTY: 7 RTC] Add an llms.txt + GEO entity profile to a RustCh",
+        "mentions": [
+          "10 RTC",
+          "BOUNTY: 7"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2765,7 +4551,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 7.0,
+        "exact_text": "7 RTC",
+        "excerpt": "[BOUNTY: 7 RTC] 60-Second RustChain Explainer Video",
+        "mentions": [
+          "10 RTC",
+          "BOUNTY: 7",
+          "Reward: 10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2783,7 +4581,18 @@
       "difficulty": "micro",
       "skills": [
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 7.0,
+        "exact_text": "7 RTC",
+        "excerpt": "[BOUNTY: 7 RTC] Fuzz the /attest/submit Endpoint",
+        "mentions": [
+          "10 RTC",
+          "BOUNTY: 7"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2804,7 +4613,21 @@
         "ci/cd",
         "javascript",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 7.0,
+        "exact_text": "7 RTC",
+        "excerpt": "[BOUNTY: 5-7 RTC] Write Video Generation Guides for BoTTube Agents",
+        "mentions": [
+          "5 RTC",
+          "15 RTC",
+          "2 RTC",
+          "2 RTC",
+          "BOUNTY: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2820,7 +4643,17 @@
       "difficulty": "micro",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 7.0,
+        "exact_text": "7 RTC",
+        "excerpt": "[7 RTC] Dual-Mining: Salvium (RandomX) Integration",
+        "mentions": [
+          "10 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2836,7 +4669,17 @@
       "difficulty": "micro",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 7.0,
+        "exact_text": "7 RTC",
+        "excerpt": "[7 RTC] Dual-Mining: Wownero (RandomX) Integration",
+        "mentions": [
+          "10 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2850,7 +4693,21 @@
       "created_at": "2026-02-18T00:50:13Z",
       "reward_rtc": 7.0,
       "difficulty": "micro",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 7.0,
+        "exact_text": "7 RTC",
+        "excerpt": "for Xonotic RustChain Arena (7 RTC per set)",
+        "mentions": [
+          "10 RTC",
+          "10 RTC",
+          "10 RTC",
+          "10 RTC",
+          "10 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2866,7 +4723,19 @@
       "difficulty": "micro",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 7.0,
+        "exact_text": "7 RTC",
+        "excerpt": "for Xonotic RustChain Arena (7 RTC each)",
+        "mentions": [
+          "10 RTC",
+          "100 RTC",
+          "10 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2884,7 +4753,18 @@
       "skills": [
         "documentation",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 7.0,
+        "exact_text": "7 RTC",
+        "excerpt": "ogy: Hardware Scanner Module (7 RTC)",
+        "mentions": [
+          "10 RTC",
+          "Reward: 10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2901,7 +4781,20 @@
       "skills": [
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 7.0,
+        "exact_text": "7 RTC",
+        "excerpt": "About RustChain on Facebook (7 RTC)",
+        "mentions": [
+          "10 RTC",
+          "10 RTC",
+          "10 RTC",
+          "Reward: 10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2918,7 +4811,20 @@
       "skills": [
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 7.0,
+        "exact_text": "7 RTC",
+        "excerpt": "About RustChain on Instagram (7 RTC)",
+        "mentions": [
+          "10 RTC",
+          "10 RTC",
+          "10 RTC",
+          "Reward: 10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2935,7 +4841,20 @@
       "skills": [
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 7.0,
+        "exact_text": "7 RTC",
+        "excerpt": "t About RustChain on YouTube (7 RTC)",
+        "mentions": [
+          "10 RTC",
+          "10 RTC",
+          "10 RTC",
+          "Reward: 10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2955,7 +4874,19 @@
       "skills": [
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 7.0,
+        "exact_text": "7 RTC",
+        "excerpt": "our First Mining Setup Video (7 RTC)",
+        "mentions": [
+          "10 RTC",
+          "5 RTC",
+          "Bounty: 10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2976,7 +4907,18 @@
       "difficulty": "micro",
       "skills": [
         "documentation"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "[BOUNTY: 5 RTC] Fix ALL broken README/doc links in Scottcjn/Rust",
+        "mentions": [
+          "5 RTC",
+          "BOUNTY: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -2997,7 +4939,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "[BOUNTY: 3-5 RTC] Show your real mining rig \u2014 photo/video of hardw",
+        "mentions": [
+          "3 RTC",
+          "5 RTC",
+          "BOUNTY: 3"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3019,7 +4973,19 @@
       "skills": [
         "documentation",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "[BOUNTY: 3-5 RTC] Write an honest RustChain explainer thread or de",
+        "mentions": [
+          "3 RTC",
+          "5 RTC",
+          "BOUNTY: 3"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3037,7 +5003,19 @@
         "docker",
         "javascript",
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "[BOUNTY: 5 RTC] Adversarial Miner Self-Test \u2014 Try to Fool the Fi",
+        "mentions": [
+          "5 RTC",
+          "5 RTC",
+          "BOUNTY: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3058,7 +5036,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "[BOUNTY: 5 RTC] Post RustChain to Hacker News, Reddit, or Lobste",
+        "mentions": [
+          "10 RTC",
+          "15 RTC",
+          "25 RTC",
+          "5 RTC",
+          "15 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3078,7 +5070,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "[BOTTUBE: 5 RTC] Create a 3-Video Series on Any Tech Topic",
+        "mentions": [
+          "5 RTC",
+          "2 RTC",
+          "3 RTC",
+          "5 RTC",
+          "Bounty: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3099,7 +5105,18 @@
         "javascript",
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "hia-edge-node in One Session (5 RTC)",
+        "mentions": [
+          "5 RTC",
+          "Bounty: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3116,7 +5133,20 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "[BOUNTY: 5 RTC] Create a YouTube or BoTTube video tutorial about",
+        "mentions": [
+          "5 RTC",
+          "5 RTC",
+          "BOUNTY: 5",
+          "Bounty: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3135,7 +5165,19 @@
       "skills": [
         "javascript",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "[BOUNTY: 5 RTC] Add video player keyboard shortcuts to BoTTube w",
+        "mentions": [
+          "5 RTC",
+          "BOUNTY: 5",
+          "Reward: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3151,7 +5193,20 @@
       "created_at": "2026-03-14T23:42:58Z",
       "reward_rtc": 5.0,
       "difficulty": "micro",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "[CREATIVE BOUNTY: 5 RTC] Build a RustChain Mining Rig in Minecraft",
+        "mentions": [
+          "5 RTC",
+          "3 RTC",
+          "BOUNTY: 5",
+          "Reward: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3170,7 +5225,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "[CREATIVE BOUNTY: 5 RTC] Explain RustChain to Your Grandma (Video Under 6",
+        "mentions": [
+          "5 RTC",
+          "3 RTC",
+          "3 RTC",
+          "BOUNTY: 5",
+          "Reward: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3189,7 +5258,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "[EASY BOUNTY: 5 RTC] Add a Flagship Project to an Awesome List or Pub",
+        "mentions": [
+          "5 RTC",
+          "150 RTC",
+          "BOUNTY: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3205,7 +5286,20 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "[BOUNTY: 5 RTC] 3,000 Stars Celebration \u2014 Design a Milestone Gra",
+        "mentions": [
+          "5 RTC",
+          "2 RTC",
+          "BOUNTY: 5",
+          "Reward: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3220,7 +5314,19 @@
       "created_at": "2026-03-07T18:00:34Z",
       "reward_rtc": 5.0,
       "difficulty": "micro",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "[BOUNTY: 5 RTC] RTC Token Distribution Analysis",
+        "mentions": [
+          "8 RTC",
+          "BOUNTY: 5",
+          "Reward: 8"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3240,7 +5346,19 @@
       "skills": [
         "documentation",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "[BOUNTY: 5 RTC] Write a Comparison Article \u2014 RustChain vs Other",
+        "mentions": [
+          "5 RTC",
+          "15 RTC",
+          "BOUNTY: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3257,7 +5375,17 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "rk @RustchainPOA Posts & Earn 5 RTC",
+        "mentions": [
+          "5 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3274,7 +5402,17 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "ustchainPOA Posts on X \u2014 Earn 5 RTC",
+        "mentions": [
+          "5 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3293,7 +5431,17 @@
       "skills": [
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "/test_tipping.py` ## Bounty: 5 RTC RyanD66 has a WIP PR (bottube#246) with solid se",
+        "mentions": [
+          "Bounty: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -3309,7 +5457,21 @@
       "difficulty": "micro",
       "skills": [
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "d PR or detailed bug report | 5 RTC welcome bonus | | 2 | **Miner** | 3+ merged PRs o",
+        "mentions": [
+          "25 RTC",
+          "100 RTC",
+          "250 RTC",
+          "500 RTC",
+          "10 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -3327,7 +5489,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "a Blog Post About RustChain \u2014 5 RTC",
+        "mentions": [
+          "5 RTC",
+          "5 RTC",
+          "5 RTC",
+          "10 RTC",
+          "100 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/bottube",
@@ -3343,7 +5519,20 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 5.0,
+        "exact_text": "5 RTC",
+        "excerpt": "[BOUNTY: 5 RTC/episode] Create a Tutorial Series (3+ episodes on",
+        "mentions": [
+          "5 RTC",
+          "25 RTC",
+          "BOUNTY: 5",
+          "Bounty: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3360,7 +5549,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 4.0,
+        "exact_text": "4 RTC",
+        "excerpt": "[BOUNTY: 2-4 RTC] Join the Discord + real participation (not just",
+        "mentions": [
+          "4 RTC",
+          "4 RTC",
+          "2 RTC",
+          "3 RTC",
+          "3 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3382,7 +5585,19 @@
       "skills": [
         "documentation",
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 4.0,
+        "exact_text": "4 RTC",
+        "excerpt": "[BOUNTY: 4 RTC] Document ram-coffers fallback behavior on non-PO",
+        "mentions": [
+          "4 RTC",
+          "BOUNTY: 4",
+          "3 points"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3401,7 +5616,18 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 4.0,
+        "exact_text": "4 RTC",
+        "excerpt": "+ Upvote/Like + Join BoTTube (4 RTC)",
+        "mentions": [
+          "4 RTC",
+          "200 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3423,7 +5649,19 @@
       "skills": [
         "documentation",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[BOUNTY: 2-3 RTC] Share RustChain on X, Reddit, or Hacker News (re",
+        "mentions": [
+          "2 RTC",
+          "3 RTC",
+          "BOUNTY: 2"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3439,7 +5677,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[BOUNTY: 3 RTC, repeats] Agent-to-Agent On-Chain Transaction Tes",
+        "mentions": [
+          "1 RTC",
+          "1 RTC",
+          "1 RTC",
+          "3 RTC",
+          "3 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3453,7 +5705,18 @@
       "created_at": "2026-05-27T21:56:08Z",
       "reward_rtc": 3.0,
       "difficulty": "micro",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[BOUNTY: 3 RTC] Proof of Antiquity vs Proof of Storage (Filecoin",
+        "mentions": [
+          "3 RTC",
+          "BOUNTY: 3"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3467,7 +5730,18 @@
       "created_at": "2026-05-27T21:56:06Z",
       "reward_rtc": 3.0,
       "difficulty": "micro",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[BOUNTY: 3 RTC] RustChain vs Helium / DePIN Networks Comparison",
+        "mentions": [
+          "3 RTC",
+          "BOUNTY: 3"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3487,7 +5761,20 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[BOUNTY: 3 RTC] Share elyanlabs.ai Launch on Social Media (With",
+        "mentions": [
+          "3 RTC",
+          "BOUNTY: 3",
+          "Reward: 3",
+          "$0.30"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3507,7 +5794,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[BOTTUBE: 3 RTC] Share a BoTTube Video on Social Media with Conte",
+        "mentions": [
+          "3 RTC",
+          "2 RTC",
+          "10 RTC",
+          "5 RTC",
+          "3 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3527,7 +5828,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[BOTTUBE: 3 RTC] Make a Video Response to an Existing Video",
+        "mentions": [
+          "5 RTC",
+          "3 RTC",
+          "2 RTC",
+          "5 RTC",
+          "Bounty: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3547,7 +5862,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[ONBOARD: 3 RTC] Upload Your First Video to BoTTube",
+        "mentions": [
+          "3 RTC",
+          "3 RTC",
+          "Bounty: 3"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3566,7 +5893,19 @@
       "difficulty": "micro",
       "skills": [
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[ONBOARD: 3 RTC] Test the Miner and Post Your Hardware Report",
+        "mentions": [
+          "3 RTC",
+          "3 RTC",
+          "Bounty: 3"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3586,7 +5925,19 @@
       "skills": [
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "Ever Soulbound Mastery Badge (3 RTC)",
+        "mentions": [
+          "3 RTC",
+          "3 RTC",
+          "Bounty: 3"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3602,7 +5953,21 @@
       "difficulty": "micro",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[BOUNTY: 3 RTC] Add Your Machine to the Green Tracker \u2014 Machines",
+        "mentions": [
+          "3 RTC",
+          "3 RTC",
+          "2 RTC",
+          "BOUNTY: 3",
+          "Bounty: 3"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3621,7 +5986,20 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[BOUNTY: 3 RTC each] Fix BoTTube accessibility issues (4 open bu",
+        "mentions": [
+          "3 RTC",
+          "12 RTC",
+          "BOUNTY: 3",
+          "Reward: 3"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3639,7 +6017,18 @@
       "difficulty": "micro",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[BOUNTY: 3 RTC] Build a web dashboard showing RustChain stats",
+        "mentions": [
+          "5 RTC",
+          "BOUNTY: 3"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3657,7 +6046,18 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[BOUNTY: 3 RTC] Add RustChain to any awesome-list or curated lis",
+        "mentions": [
+          "3 RTC",
+          "BOUNTY: 3"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3677,7 +6077,19 @@
       "skills": [
         "documentation",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[EASY BOUNTY: 3 RTC] Mention an Elyan Labs Project in an Existing Rep",
+        "mentions": [
+          "3 RTC",
+          "90 RTC",
+          "BOUNTY: 3"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3697,7 +6109,21 @@
         "javascript",
         "security",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "r in Ecosystem Contributors \u2014 3 RTC per registration",
+        "mentions": [
+          "5 RTC",
+          "5 RTC",
+          "5 RTC",
+          "5 RTC",
+          "Bounty: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3717,7 +6143,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[EASY BOUNTY: 3 RTC] Upvote Elyan Labs flagship packages on ClawHub",
+        "mentions": [
+          "3 RTC",
+          "150 RTC",
+          "BOUNTY: 3"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3733,7 +6171,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[EASY BOUNTY: 3 RTC] Agent Resume Reel \u2014 Showcase Your Bot on BoTTube",
+        "mentions": [
+          "3 RTC",
+          "BOUNTY: 3",
+          "Reward: 3"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3751,7 +6201,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[BOUNTY: 3 RTC] Starstruck 128 Stars Celebration Graphic",
+        "mentions": [
+          "5 RTC",
+          "BOUNTY: 3",
+          "Reward: 5"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3769,7 +6231,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[EASY BOUNTY: 2-3 RTC] Find and Report a BoTTube Bug",
+        "mentions": [
+          "5 RTC",
+          "3 RTC",
+          "5 RTC",
+          "3 RTC",
+          "5 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3790,7 +6266,19 @@
         "ci/cd",
         "documentation",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "[EASY BOUNTY: 3 RTC] Upload Your First BoTTube Video",
+        "mentions": [
+          "5 RTC",
+          "5 RTC",
+          "BOUNTY: 3"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3810,7 +6298,21 @@
         "documentation",
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "Write a Review of RustChain \u2014 3 RTC (Good First Issue)",
+        "mentions": [
+          "3 RTC",
+          "3 RTC",
+          "3 RTC",
+          "2 RTC",
+          "2 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3828,7 +6330,21 @@
       "difficulty": "micro",
       "skills": [
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "t the Miner on Your Machine \u2014 3 RTC (Good First Issue)",
+        "mentions": [
+          "3 RTC",
+          "3 RTC",
+          "3 RTC",
+          "10 RTC",
+          "10 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3846,7 +6362,20 @@
       "difficulty": "micro",
       "skills": [
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "Your Agent on Beacon Atlas - 3 RTC",
+        "mentions": [
+          "5 RTC",
+          "5 RTC",
+          "250 RTC",
+          "3 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3868,7 +6397,19 @@
       "skills": [
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "nus (Latest Miner Required) - 3 RTC",
+        "mentions": [
+          "3 RTC",
+          "3 RTC",
+          "500 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3887,7 +6428,20 @@
         "python",
         "security",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "our ClawHub-published repos (3 RTC)",
+        "mentions": [
+          "3 RTC",
+          "3 RTC",
+          "Bounty: 3",
+          "$0.10"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -3905,7 +6459,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "t RustChain on Social Media \u2014 3 RTC",
+        "mentions": [
+          "3 RTC",
+          "3 RTC",
+          "3 RTC",
+          "9 RTC",
+          "150 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -3923,7 +6491,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 3.0,
+        "exact_text": "3 RTC",
+        "excerpt": "e Why You Starred RustChain \u2014 3 RTC + Community Shoutout (Pool: 300 RTC)",
+        "mentions": [
+          "300 RTC",
+          "3 RTC",
+          "300 RTC",
+          "3 RTC",
+          "300 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3940,7 +6522,19 @@
       "difficulty": "micro",
       "skills": [
         "documentation"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "[EASY BOUNTY: 2 RTC] Add a RustChain Badge to Any Project README",
+        "mentions": [
+          "2 RTC",
+          "2 RTC",
+          "BOUNTY: 2"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3954,7 +6548,21 @@
       "created_at": "2026-05-22T15:44:41Z",
       "reward_rtc": 2.0,
       "difficulty": "micro",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "[BOUNTY: 1-2 RTC] First Light \u2014 Your First RustChain Contribution",
+        "mentions": [
+          "600 RTC",
+          "3 RTC",
+          "200 RTC",
+          "BOUNTY: 1",
+          "Pool: 200"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3970,7 +6578,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "[BOUNTY: 2 RTC] Upvote RustChain & BoTTube on SaaSCity.io",
+        "mentions": [
+          "3 RTC",
+          "3 RTC",
+          "3 RTC",
+          "3 RTC",
+          "3 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -3986,7 +6608,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "[MAY FLOWERS \ud83c\udf38 EASY BOUNTY: 2 RTC] Star 3 Elyan Labs Repos + Drop a Flower",
+        "mentions": [
+          "2 RTC",
+          "2 RTC",
+          "BOUNTY: 2"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4002,7 +6636,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "[MAY FLOWERS \ud83c\udf38 EASY BOUNTY: 2 RTC] Upvote RustChain + BoTTube on SaaSCity",
+        "mentions": [
+          "3 RTC",
+          "3 RTC",
+          "BOUNTY: 2"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4021,7 +6667,20 @@
       "difficulty": "micro",
       "skills": [
         "javascript"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "ort Bugs or Confirm It Works (2 RTC)",
+        "mentions": [
+          "2 RTC",
+          "2 RTC",
+          "1 RTC",
+          "Bounty: 2"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4039,7 +6698,21 @@
       "difficulty": "micro",
       "skills": [
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "[BOUNTY: 2 RTC] Download and test the RustChain miner (dry run)",
+        "mentions": [
+          "3 RTC",
+          "5 RTC",
+          "5 RTC",
+          "10 RTC",
+          "BOUNTY: 2"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4055,7 +6728,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "[EASY BOUNTY: 2 RTC] Write a tweet or X post about any Elyan Labs pro",
+        "mentions": [
+          "2 RTC",
+          "BOUNTY: 2",
+          "Bounty: 2"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4071,7 +6756,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "[EASY BOUNTY: 2 RTC] Leave an Honest Review of BoTTube on ToolPilot.a",
+        "mentions": [
+          "2 RTC",
+          "2 RTC",
+          "BOUNTY: 2",
+          "Bounty: 2",
+          "$0.20"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4089,7 +6788,20 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "[FUN BOUNTY: 2 RTC] Worst Mining Rig Photo Contest \u2014 Show Us Your Ja",
+        "mentions": [
+          "2 RTC",
+          "5 RTC",
+          "BOUNTY: 2",
+          "Reward: 2"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4107,7 +6819,20 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "[MEME BOUNTY: 1-2 RTC each] Retro Computing Meme Contest \u2014 Best Memes W",
+        "mentions": [
+          "1 RTC",
+          "3 RTC",
+          "BOUNTY: 1",
+          "Reward: 1"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4127,7 +6852,19 @@
       "skills": [
         "documentation",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "[EASY BOUNTY: 2 RTC] Add an Elyan Labs Link to Your Personal Site or",
+        "mentions": [
+          "2 RTC",
+          "100 RTC",
+          "BOUNTY: 2"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4146,7 +6883,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "[EASY BOUNTY: 2 RTC] Share a BoTTube Video on Social Media",
+        "mentions": [
+          "2 RTC",
+          "2 RTC",
+          "3 RTC",
+          "1 RTC",
+          "BOUNTY: 2"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4164,7 +6915,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "tChain Memes on Social Media (2 RTC each)",
+        "mentions": [
+          "2 RTC",
+          "10 RTC",
+          "544 RTC",
+          "Reward: 2",
+          "$15"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4183,7 +6948,20 @@
       "difficulty": "standard",
       "skills": [
         "documentation"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "- Improve Docs in 3+ Repos - 2 RTC",
+        "mentions": [
+          "3 RTC",
+          "3 RTC",
+          "3 RTC",
+          "$0.30"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4200,7 +6978,20 @@
       "created_at": "2026-03-01T04:13:51Z",
       "reward_rtc": 2.0,
       "difficulty": "standard",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "ug Hunter - Find a Real Bug - 2 RTC",
+        "mentions": [
+          "3 RTC",
+          "3 RTC",
+          "3 RTC",
+          "$0.30"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4217,7 +7008,20 @@
       "created_at": "2026-03-01T04:13:49Z",
       "reward_rtc": 2.0,
       "difficulty": "standard",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "Explorer - PRs to 3+ Repos - 2 RTC",
+        "mentions": [
+          "3 RTC",
+          "3 RTC",
+          "3 RTC",
+          "$0.30"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4234,7 +7038,20 @@
       "created_at": "2026-03-01T04:13:47Z",
       "reward_rtc": 2.0,
       "difficulty": "standard",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "rst Blood - First Merged PR - 2 RTC",
+        "mentions": [
+          "3 RTC",
+          "3 RTC",
+          "3 RTC",
+          "$0.30"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4254,7 +7071,20 @@
       "difficulty": "micro",
       "skills": [
         "documentation"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "Your GitHub Profile README - 2 RTC",
+        "mentions": [
+          "2 RTC",
+          "2 RTC",
+          "2 RTC",
+          "$0.20"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4273,7 +7103,21 @@
       "skills": [
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "iend Who Completes a Bounty - 2 RTC per referral (Pool: 100 RTC)",
+        "mentions": [
+          "100 RTC",
+          "3 RTC",
+          "3 RTC",
+          "30 RTC",
+          "3 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4293,7 +7137,21 @@
       "skills": [
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "ad Your First BoTTube Video - 2 RTC",
+        "mentions": [
+          "3 RTC",
+          "3 RTC",
+          "150 RTC",
+          "2 RTC",
+          "2 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4314,7 +7172,21 @@
         "documentation",
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "OUNTY] Fork a Scottcjn Repo \u2014 2 RTC (+1 RTC if you Pin it)",
+        "mentions": [
+          "1 RTC",
+          "2 RTC",
+          "3 RTC",
+          "2 RTC",
+          "1 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4334,7 +7206,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "t RustChain/BoTTube Meme Wins 2 RTC",
+        "mentions": [
+          "3 RTC",
+          "2 RTC",
+          "Bounty: 3"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4354,7 +7238,20 @@
       "skills": [
         "documentation",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 2.0,
+        "exact_text": "2 RTC",
+        "excerpt": "Medium **Starter Reward:** 2 RTC for a valid first discovery claim **PR Reward:*",
+        "mentions": [
+          "10 RTC",
+          "250 RTC",
+          "2 RTC",
+          "10 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4375,7 +7272,18 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[BOUNTY: 1 RTC] Star RustChain + 2 ecosystem repos",
+        "mentions": [
+          "1 RTC",
+          "BOUNTY: 1"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4394,7 +7302,21 @@
       "created_at": "2026-04-09T03:26:26Z",
       "reward_rtc": 1.0,
       "difficulty": "micro",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[BOUNTY: 1 RTC] Run the RustChain Miner for 24 Hours and Share Y",
+        "mentions": [
+          "1 RTC",
+          "2 RTC",
+          "3 RTC",
+          "3 RTC",
+          "2 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4413,7 +7335,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[BOTTUBE: 1 RTC] Start a Discussion Thread Under a Video",
+        "mentions": [
+          "2 RTC",
+          "2 RTC",
+          "Bounty: 2"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4432,7 +7366,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[BOTTUBE: 1 RTC] Complete Your Profile + Follow 3 Creators",
+        "mentions": [
+          "1 RTC",
+          "1 RTC",
+          "Bounty: 1"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4451,7 +7397,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[BOTTUBE: 1 RTC] Upvote 10 Videos + Pick Your Favorite",
+        "mentions": [
+          "1 RTC",
+          "1 RTC",
+          "Bounty: 1"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4470,7 +7428,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[BOTTUBE: 1 RTC] Leave Thoughtful Comments on 5 Videos",
+        "mentions": [
+          "1 RTC",
+          "1 RTC",
+          "Bounty: 1"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4488,7 +7458,19 @@
       "difficulty": "micro",
       "skills": [
         "documentation"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[ONBOARD: 1 RTC] File Your First Bug Report",
+        "mentions": [
+          "1 RTC",
+          "1 RTC",
+          "Bounty: 1"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4508,7 +7490,21 @@
       "skills": [
         "javascript",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "Share Your RPi Gaming Setup (1 RTC)",
+        "mentions": [
+          "1 RTC",
+          "1 RTC",
+          "1 RTC",
+          "1 RTC",
+          "4 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4530,7 +7526,20 @@
       "skills": [
         "documentation",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[BOUNTY: 1 RTC] Upload 3 original videos to BoTTube",
+        "mentions": [
+          "2 RTC",
+          "2 RTC",
+          "BOUNTY: 1",
+          "Reward: 2"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4549,7 +7558,18 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[EASY BOUNTY: 1 RTC] Report any accessibility issue in BoTTube UI",
+        "mentions": [
+          "1 RTC",
+          "BOUNTY: 1"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4567,7 +7587,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[BOUNTY: 1 RTC] Complete Your BoTTube Agent Profile \u2014 Bio, Avata",
+        "mentions": [
+          "1 RTC",
+          "50 RTC",
+          "0.5 RTC",
+          "BOUNTY: 1",
+          "Reward: 1"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4589,7 +7623,18 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[BOUNTY: 1 RTC] BoTTube profile setup: avatar + bio + first publ",
+        "mentions": [
+          "1 RTC",
+          "BOUNTY: 1"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4607,7 +7652,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[EASY BOUNTY: 1 RTC] BoTTube First Impression \u2014 Tell Us What You Thin",
+        "mentions": [
+          "1 RTC",
+          "1 RTC",
+          "BOUNTY: 1"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4625,7 +7682,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[EASY BOUNTY: 1 RTC] Set Up Your BoTTube Profile",
+        "mentions": [
+          "1 RTC",
+          "1 RTC",
+          "BOUNTY: 1"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4643,7 +7712,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[EASY BOUNTY: 1 RTC] Reply to 3 BoTTube Comments \u2014 Start Conversation",
+        "mentions": [
+          "1 RTC",
+          "1 RTC",
+          "BOUNTY: 1"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4661,7 +7742,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[EASY BOUNTY: 1 RTC] Follow 5 BoTTube Creators",
+        "mentions": [
+          "1 RTC",
+          "1 RTC",
+          "BOUNTY: 1"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4679,7 +7772,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[EASY BOUNTY: 1 RTC] Upvote 10 BoTTube Videos",
+        "mentions": [
+          "1 RTC",
+          "1 RTC",
+          "BOUNTY: 1"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4697,7 +7802,19 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[EASY BOUNTY: 1 RTC] Comment on 5 BoTTube Videos",
+        "mentions": [
+          "2 RTC",
+          "2 RTC",
+          "BOUNTY: 1"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4715,7 +7832,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[BOUNTY: 1 RTC] Answer Questions in GitHub Discussions (Up to 7",
+        "mentions": [
+          "7 RTC",
+          "1 RTC",
+          "10 RTC",
+          "0.5 RTC",
+          "0.5 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4734,7 +7865,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "[BOUNTY: 1 RTC] First Transaction \u2014 Send Your First RTC Transfer",
+        "mentions": [
+          "2 RTC",
+          "2 RTC",
+          "0.01 RTC",
+          "0.01 RTC",
+          "2 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4751,7 +7896,20 @@
       "created_at": "2026-03-01T04:13:33Z",
       "reward_rtc": 1.0,
       "difficulty": "micro",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "ty] Block Explorer Bug Hunt - 1 RTC",
+        "mentions": [
+          "2 RTC",
+          "2 RTC",
+          "2 RTC",
+          "$0.20"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4767,7 +7925,20 @@
       "created_at": "2026-02-26T21:21:18Z",
       "reward_rtc": 1.0,
       "difficulty": "micro",
-      "skills": []
+      "skills": [],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "Refer a Friend to Discord \u2014 1 RTC per referral (max 5)",
+        "mentions": [
+          "1 RTC",
+          "1 RTC",
+          "5 RTC",
+          "5 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4785,7 +7956,18 @@
       "difficulty": "micro",
       "skills": [
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "Join RustChain Discord \u2014 1 RTC",
+        "mentions": [
+          "2 RTC",
+          "2 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4805,7 +7987,21 @@
         "documentation",
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "e RustChain on Social Media - 1 RTC per post (Pool: 133 RTC)",
+        "mentions": [
+          "133 RTC",
+          "2 RTC",
+          "6 RTC",
+          "2 RTC",
+          "6 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4823,7 +8019,18 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "Review BoTTube on ToolPilot \u2014 1 RTC",
+        "mentions": [
+          "2 RTC",
+          "2 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4841,7 +8048,20 @@
       "skills": [
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "O-BOUNTY] Star BoTTube Repo - 1 RTC (Pool: 133 RTC)",
+        "mentions": [
+          "133 RTC",
+          "1 RTC",
+          "1 RTC",
+          "Pool: 133"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4860,7 +8080,21 @@
       "skills": [
         "documentation",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "omment on Any Scottcjn Repo \u2014 1 RTC Each",
+        "mentions": [
+          "1 RTC",
+          "5 RTC",
+          "1 RTC",
+          "1 RTC",
+          "Reward: 1"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4881,7 +8115,20 @@
         "rust",
         "security",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "55 Repos, Pick Your Favorite (1 RTC)",
+        "mentions": [
+          "1 RTC",
+          "50 RTC",
+          "Reward: 1",
+          "Pool: 50"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4900,7 +8147,17 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1 RTC",
+        "excerpt": "BoTTube Profile Avatar + Bio (1 RTC)",
+        "mentions": [
+          "1 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4922,7 +8179,21 @@
         "javascript",
         "python",
         "security"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 1.0,
+        "exact_text": "1.0 RTC",
+        "excerpt": "on amounts: 0.001, 0.01, 0.1, 1.0 RTC - Works across Discord (Sophiacord), BottTube, an",
+        "mentions": [
+          "0.01 RTC",
+          "0.001 RTC",
+          "0.01 RTC",
+          "0.005 RTC",
+          "0.1 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4942,7 +8213,21 @@
         "documentation",
         "python",
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 0.5,
+        "exact_text": "0.5 RTC",
+        "excerpt": "------|-----| | Fork 1 repo | 0.5 RTC | | Fork 2-3 repos | 1 RTC each | | Fork all 5 (f",
+        "mentions": [
+          "1 RTC",
+          "3 RTC",
+          "15 RTC",
+          "20 RTC",
+          "25 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4961,7 +8246,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 0.33,
+        "exact_text": "0.33 RTC",
+        "excerpt": "[BOUNTY: 0.33 RTC/repo] Watch Our Repos \u2014 Stay Notified, Earn RTC (",
+        "mentions": [
+          "7 RTC",
+          "0.5 RTC",
+          "5 RTC",
+          "10 RTC",
+          "2.5 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -4979,7 +8278,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 0.1,
+        "exact_text": "0.1 RTC",
+        "excerpt": "[MICRO-BOUNTY: 0.1 RTC] Why did you choose to work on an Elyan Labs repo",
+        "mentions": [
+          "0.1 RTC",
+          "0.1 RTC",
+          "25 RTC",
+          "BOUNTY: 0.1",
+          "Pool: 25"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/Rustchain",
@@ -4997,7 +8310,21 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 0.01,
+        "exact_text": "0.01 RTC",
+        "excerpt": "-------| | Post on Moltbook | 0.01 RTC | 5 posts/day | | Post on 4claw | 0.01 RTC | 5 th",
+        "mentions": [
+          "0.01 RTC",
+          "0.05 RTC",
+          "0.002 RTC",
+          "0.001 RTC",
+          "5 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -5013,7 +8340,15 @@
       "difficulty": "micro",
       "skills": [
         "social-media"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "no_match",
+        "amount_rtc": null,
+        "exact_text": "",
+        "excerpt": "Claim: May Flowers Star Pack \u2014 Blackcode-cmd",
+        "mentions": [],
+        "evidence_kind": "no_match"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -5036,7 +8371,15 @@
         "documentation",
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "no_match",
+        "amount_rtc": null,
+        "exact_text": "",
+        "excerpt": "[BOUNTY] RustChain Python SDK - pip-installable API Client",
+        "mentions": [],
+        "evidence_kind": "no_match"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -5058,7 +8401,20 @@
         "documentation",
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 0.0,
+        "exact_text": "0 RTC",
+        "excerpt": "**detected as emulator, earns 0 RTC** (MUST demonstrate this) - [ ] Running on real 6",
+        "mentions": [
+          "100 RTC",
+          "30 RTC",
+          "50 RTC",
+          "20 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -5080,7 +8436,20 @@
         "documentation",
         "javascript",
         "python"
-      ]
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 0.0,
+        "exact_text": "0 RTC",
+        "excerpt": "**detected as emulator, earns 0 RTC** (MUST demonstrate this) - [ ] Running on real A",
+        "mentions": [
+          "100 RTC",
+          "30 RTC",
+          "50 RTC",
+          "20 RTC"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
     }
   ]
 }
