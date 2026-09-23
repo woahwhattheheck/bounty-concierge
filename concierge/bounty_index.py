@@ -2,11 +2,10 @@
 """Multi-repo bounty aggregator for RustChain.
 
 Fetches open issues labelled 'bounty' from configured GitHub repositories,
-parses reward amounts, estimates difficulty, and tags required skills.
+retains unconfirmed RTC-text evidence, estimates difficulty, and tags skills.
 """
 
 import json
-import math
 import re
 import sys
 from datetime import datetime, timezone
@@ -14,6 +13,10 @@ from datetime import datetime, timezone
 import requests
 
 from concierge.config import GITHUB_TOKEN, REPOS
+from concierge.reward_evidence import (
+    _RTC_PATTERN, parse_reward, parse_reward_evidence,
+    reward_filter_value, reward_summary,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -188,10 +191,17 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100):
                         break
                     seen_numbers.add(number)
                     title, body, labels = normalized["title"], normalized["body"], normalized["labels"]
-                    reward = parse_reward(title, body)
+                    evidence = parse_reward_evidence(title, body)
+                    selected = evidence["selected"]
+                    reward = selected["value_rtc"] if selected is not None else 0.0
+                    labelled = any(label.lower() in ("critical", "major", "standard", "micro")
+                                   for label in labels)
                     report["bounties"].append({
                         "repo": repo, **normalized, "reward_rtc": reward,
+                        "reward_evidence": evidence,
                         "difficulty": estimate_difficulty(title, labels, reward),
+                        "difficulty_basis": "ISSUE_LABEL" if labelled else (
+                            "LEGACY_RTC_MENTION_HEURISTIC" if selected else "LEGACY_NO_MATCH_DEFAULT"),
                         "skills": tag_skills(title, body),
                     })
                     source["bounty_count"] += 1
@@ -233,34 +243,7 @@ def fetch_bounties(repos=None, token=None):
 # ---------------------------------------------------------------------------
 # Parsing helpers
 # ---------------------------------------------------------------------------
-
-_RTC_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9_.,])"
-    r"((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)"
-    r"[ \t]*RTC\b",
-    re.IGNORECASE,
-)
-
-
-def parse_reward(title, body):
-    """Extract the first finite RTC reward amount from title or body text.
-
-    Looks for patterns like '150 RTC', '1,000 RTC', '1,000,000 RTC',
-    '1,234.5 RTC', and '0.5 RTC'.  Amount and RTC must remain on the same
-    logical line; horizontal spaces/tabs are accepted between them.  Commas are
-    accepted only as canonical three-digit thousands separators.  Returns the amount as a finite float,
-    or 0.0 if nothing valid is found.
-    """
-    for text in (title, body):
-        for match in _RTC_PATTERN.finditer(text):
-            raw = match.group(1).replace(",", "")
-            try:
-                value = float(raw)
-            except ValueError:
-                continue
-            if math.isfinite(value):
-                return value
-    return 0.0
+# parse_reward and _RTC_PATTERN remain import-compatible via reward_evidence.
 
 
 def estimate_difficulty(title, labels, reward):
@@ -273,7 +256,8 @@ def estimate_difficulty(title, labels, reward):
         critical  --  200+ RTC
 
     Labels named 'critical', 'major', 'micro', or 'standard' override the
-    reward-based estimate.
+    reward-based estimate. This legacy heuristic is not a pay/effort assessment;
+    collected rows explicitly expose its basis in difficulty_basis.
     """
     label_lower = [lb.lower() for lb in labels]
     for tier in ("critical", "major", "standard", "micro"):
@@ -306,7 +290,7 @@ def _keyword_matches(text, keyword):
     """Return whether *keyword* occurs as a complete token or phrase.
 
     Word guards are applied only when the corresponding keyword edge is a word
-    character.  That prevents short tags such as ``rust`` and ``node`` from
+    character. That prevents short tags such as ``rust`` and ``node`` from
     matching unrelated words while preserving punctuation-leading file suffix
     keywords such as ``.py`` and punctuation-bearing labels such as ``CI/CD``.
     """
@@ -346,6 +330,7 @@ def aggregate(repos=None, token=None):
     report = fetch_bounties_report(repos=repos, token=token)
     if not report["complete"]:
         raise BountyFetchIncompleteError(report)
+    # Keep numeric compatibility. Human renderers show observation qualifiers.
     report["bounties"].sort(key=lambda b: b["reward_rtc"], reverse=True)
     return report
 
@@ -357,13 +342,10 @@ def _markdown_cell(value):
 
 
 def format_markdown(bounties):
-    """Format a list of bounty dicts as a Markdown table.
-
-    Columns: #, Repo, Title, RTC, Tier, Skills
-    """
+    """Format candidates with explicit, unconfirmed reward-text observations."""
     lines = [
-        "| # | Repo | Title | RTC | Tier | Skills |",
-        "|---|------|-------|-----|------|--------|",
+        "| # | Repo | Title | RTC text evidence | Legacy tier | Skills |",
+        "|---|------|-------|-------------------|-------------|--------|",
     ]
     for b in bounties:
         repo_short = _markdown_cell(b["repo"].split("/")[-1])
@@ -371,10 +353,13 @@ def format_markdown(bounties):
         skills = _markdown_cell(skill_text)
         difficulty = _markdown_cell(b["difficulty"])
         title_short = _markdown_cell(b["title"][:60])
+        evidence = _markdown_cell(reward_summary(b, include_excerpt=True))
         lines.append(
             f"| {b['number']} | {repo_short} | {title_short} | "
-            f"{b['reward_rtc']:.1f} | {difficulty} | {skills} |"
+            f"{evidence} | {difficulty} | {skills} |"
         )
+    lines.append("\nText mentions and legacy tiers do not confirm per-claim pay, "
+                 "cash value, availability or eligibility. See docs/REWARD_EVIDENCE.md.")
     return "\n".join(lines)
 
 
