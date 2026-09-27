@@ -36,7 +36,7 @@ RustChain is a blockchain that rewards real hardware -- especially vintage machi
 | Repo | Issue | Title | RTC | Difficulty | Skills |
 |------|-------|-------|-----|------------|--------|
 <!-- BOUNTY-TABLE-START -->
-_Showing 10 of 272 cached issue candidates, sorted by indexed RTC amount (unknown amounts last). Index rebuilt 2026-09-26T10:51:31.115135+00:00._
+_Showing 10 of 272 cached issue candidates, sorted by indexed RTC amount (unknown amounts last). Index rebuilt 2026-09-27T11:27:21.234626+00:00._
 
 | Repo | Issue | Title | Indexed RTC | Difficulty | Skills |
 |------|-------|-------|-------------|------------|--------|
