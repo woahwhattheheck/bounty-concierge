@@ -7,6 +7,7 @@ parses reward amounts, estimates difficulty, and tags required skills.
 
 import json
 import math
+import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -14,6 +15,7 @@ from datetime import datetime, timezone
 import requests
 
 from concierge.config import GITHUB_TOKEN, REPOS
+from concierge.bounty_cache import PageCache, same_validator
 from concierge.reward_evidence import extract_reward_evidence
 
 
@@ -90,7 +92,7 @@ def _header_integer(headers, name):
     return int(value) if value.isascii() and value.isdigit() and len(value) <= 12 else None
 
 
-def fetch_bounties_report(repos=None, token=None, *, max_pages=100):
+def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=None):
     """Read live sources once, retaining completion and safe error information.
 
     No retries or sleeps are performed. A rate-limit response, or exhausted
@@ -98,6 +100,10 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100):
     failures do not hide successful reads from other repositories. ``complete``
     means every requested source traversed its returned pagination; it is not
     an atomic GitHub snapshot, bounty eligibility, or payment evidence.
+
+    ``cache_dir`` (or CONCIERGE_BOUNTY_CACHE) enables conditional page reads.
+    Cached rows are used only after a matching provider 304; errors never serve
+    stale rows. Pass False to disable an environment-configured cache.
     """
     if type(max_pages) is not int or not 1 <= max_pages <= 1000:
         raise ValueError("max_pages must be an integer between 1 and 1000")
@@ -122,6 +128,15 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100):
     token = token or GITHUB_TOKEN
     if token:
         headers["Authorization"] = f"Bearer {token}"
+    if cache_dir is None:
+        cache_dir = os.environ.get("CONCIERGE_BOUNTY_CACHE")
+    cache = None
+    if cache_dir is not False and cache_dir is not None and cache_dir != "":
+        cache = PageCache(cache_dir, token)
+    if cache is not None:
+        for source in sources:
+            source["cache"] = {"conditional_requests": 0, "revalidated_pages": 0,
+                               "stored_pages": 0, "errors": 0}
     report = {"started_at": datetime.now(timezone.utc).isoformat(), "complete": False,
               "rate_limited": False, "retry_after_seconds": None,
               "rate_limit_reset_at": None, "repositories": sources, "bounties": []}
@@ -135,8 +150,16 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100):
         api_url = f"https://api.github.com/repos/{repo}/issues"
         for page in range(1, max_pages + 1):
             params = {"labels": "bounty", "state": "open", "per_page": 100, "page": page}
+            cached = None
+            request_headers = headers.copy()
+            if cache is not None:
+                cached, cache_error = cache.load(repo, page)
+                source["cache"]["errors"] += int(cache_error)
+                if cached is not None:
+                    request_headers["If-None-Match"] = cached["etag"]
+                    source["cache"]["conditional_requests"] += 1
             try:
-                response = requests.get(api_url, headers=headers, params=params, timeout=15)
+                response = requests.get(api_url, headers=request_headers, params=params, timeout=15)
             except requests.RequestException as exc:
                 source["status"] = "TRANSPORT_ERROR"
                 # Exception text may contain request details. Retain only its type.
@@ -163,21 +186,39 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100):
                                   rate_limit_reset_at=reset_at)
                     source["status"] = "RATE_LIMITED"
                     break
-                if status != 200:
+                # Exhaustion applies even when JSON or a cached validator is bad.
+                if remaining == 0:
+                    report.update(rate_limited=True, retry_after_seconds=retry_after,
+                                  rate_limit_reset_at=reset_at)
+                if status not in (200, 304):
                     source["status"] = "HTTP_ERROR"
                     break
-                try:
-                    issues = response.json()
-                except ValueError:
-                    source["status"] = "INVALID_JSON"
-                    break
+                if status == 304:
+                    if cached is None:
+                        source["status"] = "UNEXPECTED_NOT_MODIFIED"
+                        break
+                    returned_etag = response.headers.get("ETag")
+                    if returned_etag is not None and not same_validator(returned_etag, cached["etag"]):
+                        source["status"] = "INVALID_CACHE_VALIDATOR"
+                        break
+                    issues = cached["issues"]
+                    source["cache"]["revalidated_pages"] += 1
+                else:
+                    try:
+                        issues = response.json()
+                    except ValueError:
+                        source["status"] = "INVALID_JSON"
+                        break
                 if not isinstance(issues, list):
                     source["status"] = "INVALID_PAYLOAD"
                     break
                 source["pages_fetched"] += 1
                 source["status"] = "READING"
+                cache_rows = [] if cache is not None and status == 200 else None
                 for item_index, issue in enumerate(issues):
                     if isinstance(issue, dict) and "pull_request" in issue:
+                        if cache_rows is not None:
+                            cache_rows.append({"pull_request": True})
                         continue
                     normalized = _normalize_issue_row(issue)
                     if normalized is None:
@@ -188,6 +229,12 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100):
                         source.update(status="REPEATED_ISSUE", failed_item=item_index)
                         break
                     seen_numbers.add(number)
+                    # Retain only fields consumed by the parser, not profile data.
+                    if cache_rows is not None:
+                        cache_rows.append({"number": number, "title": normalized["title"],
+                                           "body": normalized["body"], "html_url": normalized["url"],
+                                           "labels": [{"name": name} for name in normalized["labels"]],
+                                           "created_at": normalized["created_at"]})
                     title, body, labels = normalized["title"], normalized["body"], normalized["labels"]
                     reward = parse_reward(title, body)
                     reward_evidence = extract_reward_evidence(title, body)
@@ -198,12 +245,18 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100):
                         "reward_evidence": reward_evidence,
                     })
                     source["bounty_count"] += 1
-                if remaining == 0:
-                    report.update(rate_limited=True, retry_after_seconds=retry_after,
-                                  rate_limit_reset_at=reset_at)
                 if source["status"] != "READING":
                     break
-                if not response.links.get("next"):
+                has_next = bool(response.links.get("next"))
+                if status == 304:
+                    # A 304 may omit Link. Revalidate past a full cached last page
+                    # rather than hiding older reopened issues newly on page 2.
+                    has_next = has_next or cached["has_next"] or len(issues) == 100
+                elif cache is not None:
+                    outcome = cache.store(repo, page, response.headers.get("ETag"), cache_rows, has_next)
+                    source["cache"]["stored_pages"] += int(outcome == "stored")
+                    source["cache"]["errors"] += int(outcome == "error")
+                if not has_next:
                     source["status"] = "COMPLETE"
                     break
                 if report["rate_limited"]:
@@ -220,14 +273,14 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100):
     return report
 
 
-def fetch_bounties(repos=None, token=None):
+def fetch_bounties(repos=None, token=None, *, cache_dir=None):
     """Return the familiar bounty list only after all sources finish.
 
     Incomplete reads raise BountyFetchIncompleteError rather than impersonating
     an empty/full queue. The existing browse CLI handles this as a nonzero exit.
     Call fetch_bounties_report() for deliberately partial diagnostic results.
     """
-    report = fetch_bounties_report(repos=repos, token=token)
+    report = fetch_bounties_report(repos=repos, token=token, cache_dir=cache_dir)
     if not report["complete"]:
         raise BountyFetchIncompleteError(report)
     return report["bounties"]
@@ -344,9 +397,9 @@ def tag_skills(title, body):
 # Aggregation & formatting
 # ---------------------------------------------------------------------------
 
-def aggregate(repos=None, token=None):
+def aggregate(repos=None, token=None, *, cache_dir=None):
     """Return a complete sorted index, with explicit source traversal metadata."""
-    report = fetch_bounties_report(repos=repos, token=token)
+    report = fetch_bounties_report(repos=repos, token=token, cache_dir=cache_dir)
     if not report["complete"]:
         raise BountyFetchIncompleteError(report)
     report["bounties"].sort(key=lambda b: b["reward_rtc"], reverse=True)
