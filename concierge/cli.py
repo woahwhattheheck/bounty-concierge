@@ -84,6 +84,21 @@ def _print_json(obj):
     print(json.dumps(obj, indent=2, default=str))
 
 
+def _print_dry_run_plan(args, action, inputs, steps, unknown):
+    """Render an argument-only plan, never a fabricated provider observation."""
+    plan = {
+        "mode": "dry-run",
+        "action": action,
+        "inputs": inputs,
+        "steps": steps,
+        "unknown": {name: None for name in unknown},
+        "note": "Local plan only. No handler reads or actions performed; live checks remain required.",
+    }
+    if not args.json:
+        print(f"[dry-run] {action}; null values are unknown, not zero or success.")
+    _print_json(plan)
+
+
 def _truncate(text, width):
     """Truncate text to width, adding '...' if needed."""
     if len(text) <= width:
@@ -472,6 +487,40 @@ def _cmd_wallet_migrate(args):
     """Handle the 'wallet migrate' subcommand."""
     from concierge import config as _cfg
 
+    # Select the same mode as the live handler, before any retained or remote read.
+    if args.dry_run:
+        if args.history:
+            _print_dry_run_plan(args, "wallet.migrate.history", {},
+                                ["Read retained migration history"], ["history"])
+        elif getattr(args, "list", False):
+            minimum = getattr(args, "min_balance", 0.1)
+            if not math.isfinite(minimum) or minimum < 0:
+                raise ValueError("--min-balance must be finite and non-negative")
+            _print_dry_run_plan(
+                args, "wallet.migrate.list", {"min_balance_rtc": minimum},
+                ["Query Discord holders", "Read prior migration records"],
+                ["holders", "prior_migrations"],
+            )
+        else:
+            if not args.user or not args.to_wallet:
+                raise ValueError("--user and --to are required for migration")
+            valid, msg = validate_wallet_name(args.to_wallet)
+            if not valid:
+                raise ValueError("Invalid target wallet name: " + msg)
+            steps = [] if args.force else ["Check the prior migration record"]
+            steps += [
+                "Read Discord balance and require at least 0.1 RTC",
+                "Request on-chain credit before any Discord debit",
+                "Handle the credit response, debit Discord, and record the outcome",
+            ]
+            _print_dry_run_plan(
+                args, "wallet.migrate.user",
+                {"user": args.user, "to_wallet": args.to_wallet,
+                 "source_wallet": _cfg.MIGRATION_SOURCE_WALLET, "force": args.force},
+                steps, ["prior_migration", "balance_rtc", "amount_rtc", "outcome"],
+            )
+        return
+
     # --- history ---
     if args.history:
         history = get_migration_history()
@@ -492,9 +541,6 @@ def _cmd_wallet_migrate(args):
     # --- list ---
     if getattr(args, "list", False):
         min_bal = getattr(args, "min_balance", 0.1)
-        if args.dry_run:
-            print("[dry-run] Would query Discord economy DB on NAS for holders >= %.2f RTC" % min_bal)
-            return
         holders = list_discord_holders(min_balance=min_bal)
         if isinstance(holders, dict) and "error" in holders:
             print("Error: %s" % holders["error"], file=sys.stderr)
@@ -566,12 +612,6 @@ def _cmd_wallet_migrate(args):
     print("  Source wallet:   %s" % source_wallet)
     print("  Amount:          %.4f RTC" % balance)
     print()
-
-    if args.dry_run:
-        print("[dry-run] Would transfer %.4f RTC from %s to %s" % (
-            balance, source_wallet, to_wallet))
-        print("[dry-run] Then debit Discord user %s by %.4f RTC" % (user_id, balance))
-        return
 
     # Step 1: On-chain credit (BEFORE Discord debit -- safety first)
     print("Step 1/3: Transferring %.4f RTC on-chain (%s -> %s)..." % (
@@ -756,6 +796,43 @@ def _cmd_mine(args):
         print("Error: only --pow warthog is supported at this time.", file=sys.stderr)
         sys.exit(1)
 
+    if args.dry_run:
+        if args.detect_only:
+            _print_dry_run_plan(
+                args, "mine.detect", {"pow": args.pow},
+                ["Inspect processes, services, and screen sessions"],
+                ["detection", "bonus"],
+            )
+            return
+        if not args.wallet:
+            raise ValueError("--wallet is required unless --detect-only is used")
+        # These helpers only resolve static configuration and build argv. Their
+        # 'verified' flag is not evidence that a pool or account was contacted.
+        pool = pow_miners.resolve_pool_endpoint(args.pool, args.pool_url)
+        if not pool.get("verified"):
+            raise ValueError(pool.get("error", "Failed to resolve pool"))
+        if args.miner == "bzminer":
+            command = pow_miners.build_bzminer_command(
+                wallet=args.wallet, pool_url=pool["endpoint"],
+                miner_path=args.miner_path or "bzminer",
+            )
+        else:
+            command = pow_miners.build_janusminer_command(
+                wallet=args.wallet, miner_path=args.miner_path or "janusminer-ubuntu22",
+            )
+        _print_dry_run_plan(
+            args, "mine.start",
+            {"pow": args.pow, "miner": args.miner, "wallet": args.wallet,
+             "command": command, "log_file": args.log_file,
+             "pool": {"name": pool["pool"], "endpoint": pool["endpoint"],
+                      "source": pool["source"]}},
+            ["Detect existing miners", "Validate pool configuration and query node RPC",
+             "Start the selected miner and capture logs"],
+            ["detection", "pool_account_verification", "node_rpc_verification",
+             "bonus", "executable_available"],
+        )
+        return
+
     detection = pow_miners.detect_pow_processes()
 
     if args.detect_only:
@@ -797,31 +874,6 @@ def _cmd_mine(args):
             wallet=args.wallet,
             miner_path=args.miner_path or "janusminer-ubuntu22",
         )
-
-    if args.dry_run:
-        bonus = pow_miners.calculate_bonus_multiplier(
-            managed_subprocess_running=False,
-            external_miner_detected=detection.get("external_miner_detected", False),
-            pool_account_verified=pool_proof.get("verified", False),
-            node_rpc_verified=node_proof.get("verified", False),
-        )
-        payload = {
-            "mode": "dry-run",
-            "pow": args.pow,
-            "miner": args.miner,
-            "command": command,
-            "pool": pool_result,
-            "detection": detection,
-            "pool_proof": pool_proof,
-            "node_rpc_proof": node_proof,
-            "bonus": bonus,
-        }
-        if args.json:
-            _print_json(payload)
-        else:
-            print("[dry-run] PoW mining plan:")
-            print(pow_miners.summarize_for_console(payload))
-        return
 
     managed = None
     try:
@@ -884,16 +936,21 @@ def _cmd_mine(args):
 
 def _cmd_announce(args):
     """Handle the 'announce' subcommand."""
+    if args.dry_run:
+        _print_dry_run_plan(
+            args, "announce.preview", {"repos": list(config.REPOS)},
+            ["Fetch bounty candidates", "Sort retained reward evidence",
+             "Format short, medium, and long previews; this handler does not post",
+             "For saved content use: python -m concierge.announcer --index PATH --format long"],
+            ["bounties", "source_completeness", "announcement_content"],
+        )
+        return
     if format_announcement is None:
         print(
             "Error: announcer module is not available.",
             file=sys.stderr,
         )
         sys.exit(1)
-
-    if args.dry_run:
-        print("[dry-run] Announcement preview (fetching bounties)...")
-        print()
 
     bounties = fetch_bounties()
     bounties.sort(key=reward_sort_key, reverse=True)
@@ -905,9 +962,6 @@ def _cmd_announce(args):
     if args.json:
         _print_json(content)
     else:
-        if args.dry_run:
-            print("[dry-run] Announcement preview (not posted):")
-            print()
         print("--- Short (Twitter) ---")
         print(content.get("short", ""))
         print()
@@ -978,7 +1032,7 @@ def _add_common_flags(parser):
         "--dry-run",
         action="store_true",
         default=argparse.SUPPRESS,
-        help="Preview actions without making network calls",
+        help="Preview actions without making network calls (plan details: docs/DRY_RUN.md)",
     )
     parser.add_argument(
         "--json",
