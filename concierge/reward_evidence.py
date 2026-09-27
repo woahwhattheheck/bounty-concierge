@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 import re
+from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
 
 # Standard RTC regex pattern matching finite numeric amounts
@@ -32,10 +33,11 @@ _MAX_MENTIONS = 5
 
 
 def _sanitize_single_line(text: str) -> str:
-    """Flatten whitespace and linebreaks into clean single-line text."""
+    """Flatten whitespace and make other control characters visible."""
     if not text:
         return ""
-    return re.sub(r"\s+", " ", str(text)).strip()
+    clean = re.sub(r"\s+", " ", str(text)).strip()
+    return "".join(char if char.isprintable() else ascii(char)[1:-1] for char in clean)
 
 
 def _make_excerpt(text: str, match_start: int, match_end: int, max_len: int = _MAX_EXCERPT_LENGTH) -> str:
@@ -48,19 +50,14 @@ def _make_excerpt(text: str, match_start: int, match_end: int, max_len: int = _M
 
 
 def extract_reward_evidence(title: str, body: str) -> Dict[str, Any]:
-    """Extract reward evidence, classifications, and exact text from title and body.
+    """Extract text mentions, not confirmed per-claim compensation.
 
-    Returns a dictionary with:
-      - status: 'matched' (valid finite RTC amount), 'unconfirmed_text' (other amounts/currencies), or 'no_match'
-      - amount_rtc: float value if matched, else None
-      - exact_text: the exact string matched (e.g. '150 RTC', '$50', or '')
-      - excerpt: bounded single-line context excerpt around the primary match
-      - mentions: list of additional amount/token mentions found (bounded to 5)
-      - evidence_kind: 'rtc_exact', 'unconfirmed_text', or 'no_match'
+    ``matched`` describes a finite RTC text match only. ``amount_rtc`` keeps
+    the existing float API; ``exact_text`` retains the original precision.
     """
     safe_title = title or ""
     safe_body = body or ""
-    
+
     # Pass 1: Look for primary RTC pattern in title first, then body
     rtc_matches: List[Dict[str, Any]] = []
     for source_name, text in [("title", safe_title), ("body", safe_body)]:
@@ -85,7 +82,7 @@ def extract_reward_evidence(title: str, body: str) -> Dict[str, Any]:
         additional_mentions = [
             m["exact"] for m in rtc_matches[1:1 + _MAX_MENTIONS]
         ]
-        
+
         # Also collect other non-RTC currency mentions if room permits
         if len(additional_mentions) < _MAX_MENTIONS:
             combined = f"{safe_title} {safe_body}"
@@ -147,10 +144,30 @@ def extract_reward_evidence(title: str, body: str) -> Dict[str, Any]:
     }
 
 
-def reward_summary(row: Dict[str, Any]) -> str:
-    """Format a human-readable reward summary string for CLI and table displays.
+def _finite_amount(value: Any) -> Optional[Decimal]:
+    """Accept numeric JSON values, including the README's Decimal reader."""
+    if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
+        return None
+    try:
+        amount = value if isinstance(value, Decimal) else Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
+    return amount if amount.is_finite() and amount >= 0 else None
 
-    Handles explicit RTC amounts, unconfirmed mentions, and unknown/no-match cases.
+
+def _amount_label(amount: Decimal) -> str:
+    """Format without rounding or expanding extreme exponents."""
+    if amount and abs(amount.adjusted()) > 32:
+        return str(amount)
+    text = format(amount, "f")
+    return text.rstrip("0").rstrip(".") if "." in text else text
+
+
+def reward_summary(row: Dict[str, Any]) -> str:
+    """Describe a source mention without making it sound like promised pay.
+
+    Exact RTC text takes precedence over float formatting. A pattern miss is
+    not evidence that the sponsor offers nothing. Legacy zero is ambiguous.
     """
     if not isinstance(row, dict):
         return "unknown"
@@ -159,40 +176,74 @@ def reward_summary(row: Dict[str, Any]) -> str:
     if isinstance(evidence, dict):
         status = evidence.get("status")
         if status == "matched":
-            amt = evidence.get("amount_rtc")
-            if amt is not None and isinstance(amt, (int, float)) and math.isfinite(amt):
-                return f"{amt:,.1f} RTC" if amt != int(amt) else f"{int(amt):,} RTC"
+            amount = _finite_amount(evidence.get("amount_rtc"))
+            if amount is None:
+                return "unknown (invalid RTC evidence)"
             exact = evidence.get("exact_text")
-            return str(exact) if exact else "RTC"
-        elif status == "unconfirmed_text":
-            exact = evidence.get("exact_text") or "unconfirmed"
-            return f"unconfirmed ({exact})"
-        elif status == "no_match":
-            return "no reward listed"
+            if isinstance(exact, str) and _RTC_PATTERN.fullmatch(exact.strip()):
+                return "unconfirmed " + _sanitize_single_line(exact)
+            return f"unconfirmed {_amount_label(amount)} RTC"
+        if status == "unconfirmed_text":
+            exact = evidence.get("exact_text")
+            return "unconfirmed " + (_sanitize_single_line(exact) if isinstance(exact, str) and exact else "amount")
+        if status == "no_match":
+            return "unknown (no amount match)"
+        return "unknown (unrecognized evidence)"
+    if evidence is not None:
+        return "unknown (invalid evidence)"
 
-    # Fallback to legacy reward_rtc field
-    reward_rtc = row.get("reward_rtc")
-    if reward_rtc is not None and isinstance(reward_rtc, (int, float)) and math.isfinite(reward_rtc) and reward_rtc > 0:
-        return f"{reward_rtc:,.1f} RTC" if reward_rtc != int(reward_rtc) else f"{int(reward_rtc):,} RTC"
-
-    return "unknown"
+    amount = _finite_amount(row.get("reward_rtc"))
+    if amount is not None and amount > 0:
+        return f"indexed {_amount_label(amount)} RTC (unconfirmed)"
+    return "unknown (legacy amount)"
 
 
 def reward_filter_value(row: Dict[str, Any]) -> Optional[float]:
-    """Extract a numeric float for reward filtering (--min-rtc/--max-rtc), or None."""
+    """Return a finite RTC mention for numeric filters, never a payment claim.
+
+    Keep the existing float return type. Explicit matched zero is filterable;
+    legacy zero, invalid evidence and non-RTC/no-match evidence are unknown.
+    Presence of evidence prevents falling back to a misleading legacy number.
+    """
     if not isinstance(row, dict):
         return None
-
     evidence = row.get("reward_evidence")
-    if isinstance(evidence, dict):
-        if evidence.get("status") == "matched":
-            amt = evidence.get("amount_rtc")
-            if amt is not None and isinstance(amt, (int, float)) and math.isfinite(amt):
-                return float(amt)
+    if evidence is not None:
+        if not isinstance(evidence, dict) or evidence.get("status") != "matched":
+            return None
+        amount = _finite_amount(evidence.get("amount_rtc"))
+    else:
+        amount = _finite_amount(row.get("reward_rtc"))
+        if amount is not None and amount == 0:
+            return None
+    if amount is None:
         return None
+    try:
+        value = float(amount)
+    except (OverflowError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
 
-    reward_rtc = row.get("reward_rtc")
-    if reward_rtc is not None and isinstance(reward_rtc, (int, float)) and math.isfinite(reward_rtc) and reward_rtc > 0:
-        return float(reward_rtc)
 
-    return None
+def reward_sort_key(row: Dict[str, Any]) -> tuple:
+    """Stable descending numeric-mention ordering, with unknown rows last."""
+    value = reward_filter_value(row)
+    return (value is not None, value if value is not None else 0.0)
+
+
+def reward_context(row: Dict[str, Any]) -> str:
+    """Bounded single-line source context for the existing browse command."""
+    evidence = row.get("reward_evidence") if isinstance(row, dict) else None
+    if not isinstance(evidence, dict):
+        return "No retained reward excerpt; legacy numeric data is not payout evidence."
+    parts = []
+    excerpt = evidence.get("excerpt")
+    if isinstance(excerpt, str) and excerpt:
+        parts.append("Excerpt: " + _sanitize_single_line(excerpt)[:_MAX_EXCERPT_LENGTH])
+    mentions = evidence.get("mentions")
+    if isinstance(mentions, list):
+        shown = [_sanitize_single_line(item)[:_MAX_EXCERPT_LENGTH]
+                 for item in mentions[:_MAX_MENTIONS] if isinstance(item, str)]
+        if shown:
+            parts.append("Other mentions: " + "; ".join(shown))
+    return " | ".join(parts) if parts else "No retained excerpt. Inspect the source issue."
