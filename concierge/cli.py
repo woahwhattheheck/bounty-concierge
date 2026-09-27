@@ -416,7 +416,7 @@ def _cmd_wallet(args):
             print("=== RustChain Wallet Statistics ===")
             print()
             print("Total wallets:        %d" % stats["total_wallets"])
-            print("With balance:         %d" % stats["with_balance"])
+            print("With balance:         %d" % stats["wallets_with_balance"])
             print("Empty:                %d" % stats["empty_wallets"])
             print("Total RTC:            {:,.2f}".format(stats["total_rtc"]))
             print()
