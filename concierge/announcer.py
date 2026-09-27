@@ -3,22 +3,32 @@
 
 Formatting is local and does not post, reserve work, or establish eligibility.
 The existing dispatcher remains explicitly separate from preview generation.
+Run ``python -m concierge.announcer --index PATH`` for offline snapshot previews.
 """
 from __future__ import annotations
 
+import argparse
+import json
+import os
+import stat
+import sys
 from decimal import Decimal
 from typing import Dict, List
 
 from concierge.readme_sync import (
     _format_int,
+    _index_object,
+    _invalid_constant,
     _markdown_cell,
     _markdown_link_target,
+    _parse_index_timestamp,
     _single_line_text,
     _validated_bounty_rows,
     indexed_reward_label,
 )
 
 SHORT_LIMIT = 280
+MAX_SNAPSHOT_BYTES = 16 * 1024 * 1024
 _DISCOVERY_NOTICE = (
     "Indexed RTC figures may describe pools, caps or estimates, not per-claim pay. "
     "Confirm live sponsor terms, assignment, our eligibility and payment route "
@@ -125,6 +135,137 @@ def format_announcement(bounties: List[dict]) -> Dict[str, str]:
     return {"short": short, "medium": "\n".join(medium_lines), "long": "\n".join(long_lines)}
 
 
+def _snapshot_count(payload: dict, key: str) -> int:
+    value = payload.get(key)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"snapshot {key} must be a non-negative integer")
+    return value
+
+
+def _read_snapshot(path: str) -> dict:
+    """Read one bounded ordinary file, with no collector or provider call."""
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NONBLOCK", 0)
+    fd = os.open(path, flags)
+    try:
+        metadata = os.fstat(fd)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise ValueError("snapshot must be an ordinary file")
+        if metadata.st_size > MAX_SNAPSHOT_BYTES:
+            raise ValueError("snapshot exceeds the 16 MiB input limit")
+        with os.fdopen(fd, "rb") as handle:
+            fd = None
+            raw = handle.read(MAX_SNAPSHOT_BYTES + 1)
+        if len(raw) > MAX_SNAPSHOT_BYTES:
+            raise ValueError("snapshot exceeds the 16 MiB input limit")
+    finally:
+        if fd is not None:
+            os.close(fd)
+    return json.loads(
+        raw.decode("utf-8-sig"),
+        parse_float=Decimal,
+        parse_constant=_invalid_constant,
+        object_pairs_hook=_index_object,
+    )
+
+
+def format_snapshot(payload: dict, limit: int = 10) -> dict:
+    """Preview an existing index or browse report without upgrading its claims.
+
+    A complete collection and a display subset are separate facts. All coverage
+    and timestamps are declarations in the supplied file, not authentication.
+    Input ordering and the existing formatter's return shape remain unchanged.
+    """
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 0 <= limit <= 1000:
+        raise ValueError("preview limit must be between 0 and 1000")
+    if not isinstance(payload, dict):
+        raise ValueError("supply an index object or browse --report, not a bare row list")
+    if ("bounties" in payload) == ("rows" in payload):
+        raise ValueError("snapshot must contain exactly one of bounties or rows")
+    is_report = "rows" in payload
+    rows = payload["rows" if is_report else "bounties"]
+    if not isinstance(rows, list):
+        raise ValueError("snapshot rows must be a list")
+    # Validate the whole supplied set, not merely the rows selected for preview.
+    rows = _normalized_bounties(rows)
+    if is_report:
+        collected = _snapshot_count(payload, "collected_count")
+        filtered = _snapshot_count(payload, "filtered_count")
+        displayed = _snapshot_count(payload, "displayed_count")
+        if displayed != len(rows) or not collected >= filtered >= displayed:
+            raise ValueError("browse snapshot row counts are inconsistent")
+        if not isinstance(payload.get("complete"), bool):
+            raise ValueError("browse snapshot complete must be a boolean")
+    else:
+        collected = _snapshot_count(payload, "total_count")
+        if collected != len(rows):
+            raise ValueError("index total_count must match its row list")
+        filtered = displayed = len(rows)
+
+    complete = payload.get("complete")
+    if complete is not None and not isinstance(complete, bool):
+        raise ValueError("snapshot complete must be a boolean when supplied")
+    updated_at = payload.get("updated_at")
+    _parse_index_timestamp(updated_at)
+    started_at = payload.get("started_at")
+    if started_at is not None:
+        started = _parse_index_timestamp(started_at)
+        if started > _parse_index_timestamp(updated_at):
+            raise ValueError("snapshot collection interval ends before it starts")
+    selected = rows[:limit]
+    coverage = "reported_complete" if complete is True else "partial" if complete is False else "unspecified"
+    return {
+        "source": {
+            "kind": "browse_report" if is_report else "cached_index",
+            "coverage": coverage,
+            "complete": complete,
+            "started_at": started_at,
+            "updated_at": updated_at,
+            "collected_count": collected,
+            "filtered_count": filtered,
+            "rows_in_snapshot": displayed,
+            "rows_selected": len(selected),
+            "omitted_from_snapshot": filtered - displayed,
+            "preview_limit": limit,
+            "note": (
+                "Retained file only; no live read, freshness check, source authentication, "
+                "claim, payment or posting. Reported collection coverage is not display "
+                "coverage. Zero selected rows do not establish an empty live queue."
+            ),
+        },
+        "previews": format_announcement(selected),
+    }
+
+
+def main(argv=None) -> int:
+    """Offline preview entrypoint. Never invokes the publication dispatcher."""
+    parser = argparse.ArgumentParser(description="Preview one retained bounty snapshot without network access")
+    parser.add_argument("--index", required=True, help="Saved index JSON or concierge browse --report JSON")
+    parser.add_argument("--format", choices=("json", "short", "medium", "long"), default="json")
+    parser.add_argument("--limit", type=int, default=10, help="Select the first 0-1000 rows in retained order (default: 10)")
+    args = parser.parse_args(argv)
+    if not 0 <= args.limit <= 1000:
+        parser.error("--limit must be between 0 and 1000")
+    try:
+        result = format_snapshot(_read_snapshot(args.index), limit=args.limit)
+    except (OSError, UnicodeError, ValueError, TypeError, RecursionError) as exc:
+        print("error: " + _single_line_text(exc), file=sys.stderr)
+        return 1
+    source = result["source"]
+    if args.format == "json":
+        print(json.dumps(result, indent=2, ensure_ascii=True))
+    else:
+        print(f"Retained snapshot: {source['kind']}; collection coverage: {source['coverage']}")
+        print(f"Updated: {source['updated_at']}; started: {source['started_at'] or 'not supplied'}")
+        print(
+            f"Collected: {source['collected_count']}; filtered: {source['filtered_count']}; "
+            f"rows in file: {source['rows_in_snapshot']}; selected: {source['rows_selected']}"
+        )
+        print(source["note"])
+        print()
+        print(result["previews"][args.format] or "No candidate rows selected.")
+    return 2 if source["complete"] is False else 0
+
+
 def post_announcement(platform: str, content: str, platform_config: dict) -> dict:
     """Post content through an explicitly requested existing platform handler.
 
@@ -169,3 +310,7 @@ _PLATFORM_HANDLERS = {
     "devto": _post_stub,
     "twitter": _post_stub,
 }
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
