@@ -15,6 +15,7 @@ Subcommands:
 
 import argparse
 import json
+import math
 import sys
 import time
 
@@ -22,6 +23,13 @@ from concierge import __version__
 from concierge import config
 from concierge import pow_miners
 from concierge.bounty_index import aggregate, fetch_bounties, fetch_bounties_report
+from concierge.reward_evidence import (
+    _sanitize_single_line,
+    reward_context,
+    reward_filter_value,
+    reward_sort_key,
+    reward_summary,
+)
 from concierge.faq_engine import answer as faq_answer
 from concierge.wallet_helper import (
     check_wallet_exists,
@@ -83,17 +91,17 @@ def _truncate(text, width):
     return text[: width - 3] + "..."
 
 
-def _print_bounty_table(bounties):
-    """Print a formatted ASCII table of bounties."""
+def _print_bounty_table(bounties, show_evidence=False):
+    """Print source mentions without rounding them or calling unknown zero."""
     if not bounties:
-        print("No bounties found matching your filters.")
+        print("No bounty rows displayed for these filters and display limit.")
         return
 
-    # Column widths
+    # Amounts may exceed their minimum width; do not truncate exact evidence.
     w_num = 5
     w_repo = 22
     w_title = 42
-    w_rtc = 8
+    w_rtc = 32
     w_tier = 10
     w_skills = 28
 
@@ -101,7 +109,7 @@ def _print_bounty_table(bounties):
         f"{'#':<{w_num}} "
         f"{'Repo':<{w_repo}} "
         f"{'Title':<{w_title}} "
-        f"{'RTC':>{w_rtc}} "
+        f"{'Indexed amount':<{w_rtc}} "
         f"{'Tier':<{w_tier}} "
         f"{'Skills':<{w_skills}}"
     )
@@ -112,19 +120,28 @@ def _print_bounty_table(bounties):
     print(sep)
 
     for b in bounties:
-        repo_short = b["repo"].split("/")[-1]
-        skills_str = ", ".join(b["skills"]) if b["skills"] else "-"
+        repo_short = _sanitize_single_line(b["repo"].split("/")[-1])
+        title = _sanitize_single_line(b["title"])
+        skills_str = _sanitize_single_line(", ".join(b["skills"])) if b["skills"] else "-"
+        tier = _sanitize_single_line(b["difficulty"])
         print(
             f"{b['number']:<{w_num}} "
             f"{_truncate(repo_short, w_repo):<{w_repo}} "
-            f"{_truncate(b['title'], w_title):<{w_title}} "
-            f"{b['reward_rtc']:>{w_rtc}.1f} "
-            f"{b['difficulty']:<{w_tier}} "
+            f"{_truncate(title, w_title):<{w_title}} "
+            f"{reward_summary(b):<{w_rtc}} "
+            f"{tier:<{w_tier}} "
             f"{_truncate(skills_str, w_skills):<{w_skills}}"
         )
+        if show_evidence:
+            print("  Source: " + _sanitize_single_line(b.get("url") or "not supplied"))
+            print("  " + reward_context(b))
 
     print(sep)
-    print(f"Total: {len(bounties)} bounties")
+    print(f"Total: {len(bounties)} displayed bounty candidates")
+    print(
+        "Amounts are unconfirmed source mentions, possibly pools or caps, not per-claim pay. "
+        "Unknown amounts are not zero. Use --evidence for excerpts and source links."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -144,7 +161,7 @@ def _browse_repos(args):
 
 
 def _filter_bounties(bounties, args):
-    """Apply the existing skill, tier, and reward filters. Order is unchanged."""
+    """Filter numeric RTC mentions, keeping unknown distinct from explicit zero."""
     filtered = list(bounties)
     if args.skill:
         skill_lower = args.skill.lower()
@@ -152,11 +169,19 @@ def _filter_bounties(bounties, args):
     if args.tier:
         tier_lower = args.tier.lower()
         filtered = [b for b in filtered if b["difficulty"] == tier_lower]
-    if args.min_rtc is not None:
-        filtered = [b for b in filtered if b["reward_rtc"] >= args.min_rtc]
-    if args.max_rtc is not None:
-        filtered = [b for b in filtered if b["reward_rtc"] <= args.max_rtc]
-    filtered.sort(key=lambda b: b["reward_rtc"], reverse=True)
+    if args.min_rtc is not None or args.max_rtc is not None:
+        bounded = []
+        for bounty in filtered:
+            amount = reward_filter_value(bounty)
+            if amount is None:
+                continue
+            if args.min_rtc is not None and amount < args.min_rtc:
+                continue
+            if args.max_rtc is not None and amount > args.max_rtc:
+                continue
+            bounded.append(bounty)
+        filtered = bounded
+    filtered.sort(key=reward_sort_key, reverse=True)
     return filtered
 
 
@@ -207,7 +232,8 @@ def _browse_report_payload(report, filtered, displayed, limit):
         "note": (
             "complete means every requested source finished the pagination GitHub "
             "returned. It is not an atomic snapshot, eligibility, acceptance, or payment. "
-            "display_limit does not describe source completeness."
+            "display_limit does not describe source completeness. reward_evidence "
+            "describes unconfirmed text mentions; legacy reward_rtc zero may mean unknown."
         ),
     }
 
@@ -215,6 +241,10 @@ def _browse_report_payload(report, filtered, displayed, limit):
 def _cmd_browse(args):
     """Handle the 'browse' subcommand."""
     repos = _browse_repos(args)
+    if args.limit < 0:
+        raise ValueError("--limit must be non-negative")
+    if args.min_rtc is not None and args.max_rtc is not None and args.min_rtc > args.max_rtc:
+        raise ValueError("--min-rtc must not exceed --max-rtc")
 
     if args.dry_run:
         print("[dry-run] Would fetch bounties from GitHub API")
@@ -255,7 +285,7 @@ def _cmd_browse(args):
         print(_incomplete_browse_message(report))
         _print_browse_sources(report)
         if displayed:
-            _print_bounty_table(displayed)
+            _print_bounty_table(displayed, show_evidence=getattr(args, "evidence", False))
         else:
             print(
                 "0 displayed rows. The source read is incomplete, so this is not an empty queue."
@@ -267,7 +297,7 @@ def _cmd_browse(args):
         sys.exit(2)
 
     print("COMPLETE")
-    _print_bounty_table(displayed)
+    _print_bounty_table(displayed, show_evidence=getattr(args, "evidence", False))
     print(
         f"Collected {report['total_count']} rows; showing {len(displayed)} of "
         f"{len(filtered)} after filters. --limit does not describe source completeness."
@@ -386,7 +416,7 @@ def _cmd_wallet(args):
             print("=== RustChain Wallet Statistics ===")
             print()
             print("Total wallets:        %d" % stats["total_wallets"])
-            print("With balance:         %d" % stats["wallets_with_balance"])
+            print("With balance:         %d" % stats["with_balance"])
             print("Empty:                %d" % stats["empty_wallets"])
             print("Total RTC:            {:,.2f}".format(stats["total_rtc"]))
             print()
@@ -866,20 +896,11 @@ def _cmd_announce(args):
         print()
 
     bounties = fetch_bounties()
-    bounties.sort(key=lambda b: b["reward_rtc"], reverse=True)
+    bounties.sort(key=reward_sort_key, reverse=True)
 
-    # Map to the format expected by format_announcement
-    formatted_bounties = []
-    for b in bounties:
-        formatted_bounties.append({
-            "title": b["title"],
-            "rtc": b["reward_rtc"],
-            "url": b["url"],
-            "difficulty": b["difficulty"],
-            "labels": b["labels"],
-        })
-
-    content = format_announcement(formatted_bounties)
+    # The formatter accepts native index rows. Keep evidence, excerpts and
+    # additional mentions rather than dropping them in a legacy rtc adapter.
+    content = format_announcement(bounties)
 
     if args.json:
         _print_json(content)
@@ -967,6 +988,17 @@ def _add_common_flags(parser):
     )
 
 
+def _rtc_filter_bound(text):
+    """Parse a finite non-negative bound before starting a live source read."""
+    try:
+        value = float(text)
+    except (TypeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError("RTC bound must be a finite non-negative number") from exc
+    if not math.isfinite(value) or value < 0:
+        raise argparse.ArgumentTypeError("RTC bound must be a finite non-negative number")
+    return value
+
+
 def _build_parser():
     """Build and return the top-level argument parser."""
     parser = argparse.ArgumentParser(
@@ -986,9 +1018,24 @@ def _build_parser():
     p_browse.add_argument("--skill", help="Filter by required skill")
     p_browse.add_argument("--tier", choices=["micro", "standard", "major", "critical"],
                           help="Filter by difficulty tier")
-    p_browse.add_argument("--min-rtc", type=float, help="Minimum RTC reward")
-    p_browse.add_argument("--max-rtc", type=float, help="Maximum RTC reward")
-    p_browse.add_argument("--limit", type=int, default=20, help="Max displayed rows (default: 20). Does not change source completeness.")    p_browse.add_argument(        "--max-pages",        type=int,        default=100,        help="Page bound passed to the collector (1-1000, default: 100)",    )    p_browse.add_argument(        "--report",        action="store_true",        default=False,        help="Print one JSON object with rows and source-completion metadata",    )
+    p_browse.add_argument("--min-rtc", type=_rtc_filter_bound, help="Minimum indexed RTC mention; excludes unknown amounts, not a payment filter")
+    p_browse.add_argument("--max-rtc", type=_rtc_filter_bound, help="Maximum indexed RTC mention; excludes unknown amounts, not a payment filter")
+    p_browse.add_argument("--evidence", action="store_true", default=False,
+                          help="Show retained reward excerpts, other mentions and source links in text output")
+    p_browse.add_argument("--limit", type=int, default=20, help="Max displayed rows (default: 20). Does not change source completeness.")
+    p_browse.add_argument(
+        "--max-pages",
+        type=int,
+        default=100,
+        help="Page bound passed to the collector (1-1000, default: 100)",
+    )
+    p_browse.add_argument(
+        "--report",
+        action="store_true",
+        default=False,
+        help="Print one JSON object with rows and source-completion metadata",
+    )
+
     # --- faq ---
     p_faq = sub.add_parser("faq", help="Ask a question about RustChain or bounties")
     _add_common_flags(p_faq)
