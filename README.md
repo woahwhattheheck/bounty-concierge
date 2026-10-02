@@ -36,13 +36,12 @@ RustChain is a blockchain that rewards real hardware -- especially vintage machi
 | Repo | Issue | Title | RTC | Difficulty | Skills |
 |------|-------|-------|-----|------------|--------|
 <!-- BOUNTY-TABLE-START -->
-_Showing 10 of 270 cached issue candidates, sorted by indexed RTC amount (unknown amounts last). Index rebuilt 2026-10-01T12:29:46.338806+00:00._
+_Showing 10 of 266 cached issue candidates, sorted by indexed RTC amount (unknown amounts last). Index rebuilt 2026-10-02T11:55:53.695630+00:00._
 
 | Repo | Issue | Title | Indexed RTC | Difficulty | Skills |
 |------|-------|-------|-------------|------------|--------|
 | rustchain-bounties | [#2451](https://github.com/Scottcjn/rustchain-bounties/issues/2451) | Founding 100 Antiquity Miners — 3,333 RTC Program | unconfirmed 3,333 RTC | critical | docker, documentation |
 | rustchain-bounties | [#400](https://github.com/Scottcjn/rustchain-bounties/issues/400) | \[SEASON 1\] Harden the Forge — Security Season (750 RTC Po... | unconfirmed 750 RTC | critical | documentation, security |
-| Rustchain | [#130](https://github.com/Scottcjn/Rustchain/issues/130) | \[BOUNTY\] wRTC Liquidity Provider Incentive — 500 RTC/mont... | unconfirmed 500 RTC | critical | social-media |
 | Rustchain | [#2634](https://github.com/Scottcjn/Rustchain/issues/2634) | \[BOUNTY CAMPAIGN\] Bring Your Human to Work Day — Match Ag... | unconfirmed 500 RTC | critical | javascript, social-media |
 | Rustchain | [#425](https://github.com/Scottcjn/Rustchain/issues/425) | \[CAMPAIGN\] 5,000 Stars Drive — Earn Up to 430 RTC (5,000 ... | unconfirmed 430 RTC | critical | python, social-media |
 | Rustchain | [#1876](https://github.com/Scottcjn/Rustchain/issues/1876) | \[BOUNTY\] N64 LLM Speedrun — 5 tok/s on Real N64 Hardware ... | unconfirmed 300 RTC | critical | ci/cd, documentation |
@@ -50,6 +49,7 @@ _Showing 10 of 270 cached issue candidates, sorted by indexed RTC amount (unknow
 | rustchain-bounties | [#402](https://github.com/Scottcjn/rustchain-bounties/issues/402) | \[GRANTS\] RustChain Micro-Grants — Build Your Own Thing (1... | unconfirmed 200 RTC | critical | javascript, rust, security |
 | rustchain-bounties | [#681](https://github.com/Scottcjn/rustchain-bounties/issues/681) | 🏆 March Madness: Multi-Platform Engagement Challenge (Up ... | unconfirmed 200 RTC | critical | social-media |
 | rustchain-bounties | [#14089](https://github.com/Scottcjn/rustchain-bounties/issues/14089) | \[BOUNTY: 50-200 RTC\] YouTube video about RustChain + BoTT... | unconfirmed 200 RTC | critical | documentation, social-media |
+| rustchain-bounties | [#30](https://github.com/Scottcjn/rustchain-bounties/issues/30) | \[BOUNTY\] AI Agent Wallets - Vanity Addresses &amp; Agent-Hard... | unconfirmed 150 RTC | major | documentation, javascript, python |
 
 Indexed amounts may be campaign pools, caps or estimates, not per-claim rewards. A cell that says unconfirmed or no reward listed has no confirmed RTC figure and is not a payable amount. A recent rebuild does not confirm an unexpired offer, available assignment, our eligibility or payment setup. Confirm live sponsor terms and our collection route before starting work; this table does not authorize a claim or submission.
 <!-- BOUNTY-TABLE-END -->

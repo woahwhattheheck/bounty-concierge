@@ -1,6 +1,6 @@
 {
-  "updated_at": "2026-10-01T12:29:46.338806+00:00",
-  "total_count": 270,
+  "updated_at": "2026-10-02T11:55:53.695630+00:00",
+  "total_count": 266,
   "bounties": [
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -96,36 +96,6 @@
           "25 RTC",
           "5 RTC",
           "50 RTC"
-        ],
-        "evidence_kind": "rtc_exact"
-      }
-    },
-    {
-      "repo": "Scottcjn/Rustchain",
-      "number": 130,
-      "title": "[BOUNTY] wRTC Liquidity Provider Incentive \u2014 500 RTC/month for Raydium LP (1,500 RTC Pilot)",
-      "body": "## wRTC Liquidity Provider Incentive\n\nCross-posted from BoTTube #97. Full details there.\n\n**TL;DR**: Add liquidity to the wRTC/SOL pool on Raydium, hold 30 days, earn RTC proportional to your LP share.\n\n- **Budget**: 500 RTC/month, 3-month pilot\n- **Pool**: `8CF2Q8nSCxRacDShbtF86XTSrYjueBMKmfdR3MLdnYzb`\n- **Min position**: $50 equivalent\n- **Swap**: https://raydium.io/swap/?inputMint=sol&outputMint=12TAdKXxcGf6oCv4rqDz2NkgxjyHq6HQKoxKZYGf5i4X\n- **Add LP**: https://raydium.io/liquidity/increase/?mode=add&pool_id=8CF2Q8nSCxRacDShbtF86XTSrYjueBMKmfdR3MLdnYzb\n\nSee Scottcjn/bottube#97 for full terms, reward tiers, and claim process.",
-      "url": "https://github.com/Scottcjn/Rustchain/issues/130",
-      "labels": [
-        "help wanted",
-        "bounty",
-        "wrtc"
-      ],
-      "created_at": "2026-02-12T23:05:09Z",
-      "reward_rtc": 500.0,
-      "difficulty": "critical",
-      "skills": [
-        "social-media"
-      ],
-      "reward_evidence": {
-        "status": "matched",
-        "amount_rtc": 500.0,
-        "exact_text": "500 RTC",
-        "excerpt": "iquidity Provider Incentive \u2014 500 RTC/month for Raydium LP (1,500 RTC Pilot)",
-        "mentions": [
-          "1,500 RTC",
-          "500 RTC",
-          "$50"
         ],
         "evidence_kind": "rtc_exact"
       }
@@ -450,39 +420,6 @@
           "50 RTC",
           "60 RTC",
           "40 RTC"
-        ],
-        "evidence_kind": "rtc_exact"
-      }
-    },
-    {
-      "repo": "Scottcjn/Rustchain",
-      "number": 32,
-      "title": "\u26a1 Bounty: RTC/ERG Trading Pair on Spectrum DEX (150 RTC)",
-      "body": "## RTC/ERG Trading Pair \u2014 Spectrum DEX Integration\n\nEnable real price discovery for RTC by creating a trading pair with ERG on Spectrum Finance (Ergo DEX).\n\n### Background\n\nRustChain already has Ergo integration:\n- Private Ergo chain running at 50.28.86.131\n- Miner attestations anchored to Ergo blocks\n- ERG has real USD value (~$1.50)\n\n### Requirements\n\n**1. Token Issuance on Ergo**\n- Issue RTC as an Ergo native token\n- 1:1 backing with RustChain RTC\n- Mint contract that verifies RustChain balance\n\n**2. Bridge Contract**\n- Lock RTC on RustChain \u2192 Mint eRTC on Ergo\n- Burn eRTC on Ergo \u2192 Unlock RTC on RustChain\n- Simple 2-of-3 multisig or threshold signature\n\n**3. Spectrum DEX Pool**\n- Create RTC/ERG liquidity pool on https://app.spectrum.fi\n- Initial liquidity: ~1,000 RTC + equivalent ERG\n- Set initial price: 1 RTC = 0.067 ERG (~$0.10 at $1.50/ERG)\n\n**4. Documentation**\n- How to bridge RTC \u2194 eRTC\n- How to trade on Spectrum\n- Liquidity provider guide\n\n### Technical Notes\n\nErgo token issuance uses EIP-4 standard:\n```json\n{\n  \"name\": \"RustChain Token\",\n  \"symbol\": \"RTC\",\n  \"decimals\": 6,\n  \"description\": \"Bridged RTC from RustChain PoA network\"\n}\n```\n\nSpectrum pool creation requires:\n- Token ID for RTC\n- Initial ERG deposit\n- Pool creation transaction\n\n### Bounty: 150 RTC (~$15)\n\n**Milestones:**\n1. Token issuance contract (50 RTC)\n2. Bridge contract + UI (50 RTC)\n3. Spectrum pool live + docs (50 RTC)\n\n### Resources\n- Spectrum Finance: https://spectrum.fi\n- Ergo Token Minting: https://docs.ergoplatform.com/dev/tokens/\n- RustChain Ergo Anchor: See `/root/rustchain/ergo_miner_anchor.py`\n\n---\n*Real liquidity for real hardware mining* \ud83e\udd80\ud83d\udcb1",
-      "url": "https://github.com/Scottcjn/Rustchain/issues/32",
-      "labels": [
-        "enhancement",
-        "bounty",
-        "wrtc"
-      ],
-      "created_at": "2026-02-03T23:50:59Z",
-      "reward_rtc": 150.0,
-      "difficulty": "major",
-      "skills": [
-        "documentation",
-        "python"
-      ],
-      "reward_evidence": {
-        "status": "matched",
-        "amount_rtc": 150.0,
-        "exact_text": "150 RTC",
-        "excerpt": "Trading Pair on Spectrum DEX (150 RTC)",
-        "mentions": [
-          "1,000 RTC",
-          "1 RTC",
-          "150 RTC",
-          "50 RTC",
-          "50 RTC"
         ],
         "evidence_kind": "rtc_exact"
       }
@@ -1078,40 +1015,6 @@
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
-      "number": 89,
-      "title": "[BOUNTY] wRTC Visibility Pack \u2014 Token Lists + Trackers + Logo (75 RTC)",
-      "body": "## Goal\nMake **wRTC** easy to find and hard to spoof by getting it listed/verified across major Solana token lists + explorers.\n\n## Canonical wRTC Info (for verification)\n- Mint: `12TAdKXxcGf6oCv4rqDz2NkgxjyHq6HQKoxKZYGf5i4X`\n- Decimals: `6`\n- Raydium pool ID: `8CF2Q8nSCxRacDShbtF86XTSrYjueBMKmfdR3MLdnYzb`\n- Raydium swap: `https://raydium.io/swap/?inputMint=sol&outputMint=12TAdKXxcGf6oCv4rqDz2NkgxjyHq6HQKoxKZYGf5i4X`\n- Official bridge (wRTC -> BoTTube credits for tipping): `https://bottube.ai/bridge/wrtc`\n\n## Scope\nDo legitimate submissions/PRs to official lists and trackers (no spam, no fake \u201cverification\u201d, no paid listing services).\n\nPick **any 2+** targets:\n- Jupiter token visibility (token list / metadata)\n- DexScreener token + pair display\n- Birdeye token display\n- Solscan token profile / metadata\n- Any other reputable Solana explorer/token registry\n\n## Acceptance Criteria\n- [ ] Links to merged PRs and/or public token pages showing the correct mint + metadata.\n- [ ] Name/symbol/logo present and consistent (or clearly documented if a platform doesn\u2019t support one).\n- [ ] Short writeup in the PR or this issue: what changed and how to verify.\n\n## Payout\n**75 RTC total**\n- `25 RTC` per accepted/merged listing/update (max 3)\n- Partial payout (`10 RTC`) possible for high-quality PRs submitted but not merged within 14 days (at maintainer discretion)\n\n## Notes\nWe will reject anything that looks like spam, misrepresentation, or unsafe \u201cshilling\u201d. The goal is safe discovery.",
-      "url": "https://github.com/Scottcjn/rustchain-bounties/issues/89",
-      "labels": [
-        "bounty",
-        "open",
-        "standard",
-        "propagation",
-        "ecosystem",
-        "wrtc"
-      ],
-      "created_at": "2026-02-09T23:58:20Z",
-      "reward_rtc": 75.0,
-      "difficulty": "standard",
-      "skills": [
-        "documentation",
-        "social-media"
-      ],
-      "reward_evidence": {
-        "status": "matched",
-        "amount_rtc": 75.0,
-        "exact_text": "75 RTC",
-        "excerpt": "oken Lists + Trackers + Logo (75 RTC)",
-        "mentions": [
-          "75 RTC",
-          "25 RTC",
-          "10 RTC"
-        ],
-        "evidence_kind": "rtc_exact"
-      }
-    },
-    {
-      "repo": "Scottcjn/rustchain-bounties",
       "number": 67,
       "title": "[BOUNTY] \ud83d\udd34 Red Team: Payment Widget XSS & Injection (75 RTC)",
       "body": "## Red Team Bounty: Payment Widget Security\n\n**Reward: 75 RTC** (~$7.50 at reference rate)\n\n### Target\nThe RTC Payment Widget (embeddable checkout button) merged in Rustchain PR #13 by @erdogan98.\n\n**Code location:** Widget files in Rustchain repo (1486 lines added)\n\n### What to Attack\n\n1. **XSS via Widget Parameters:** Can you inject scripts through widget config (amount, recipient, memo fields)?\n2. **Clickjacking:** Can the widget be embedded in a malicious iframe to trick users?\n3. **CSRF:** Can you trigger a payment from another site without user intent?\n4. **Wallet Address Injection:** Can you modify the recipient address mid-transaction?\n5. **Amount Overflow:** What happens with extremely large/negative/float amounts?\n6. **Origin Validation:** Does the widget properly validate the embedding domain?\n\n### Rules\n- Test locally only \u2014 do NOT attack production\n- Document with reproduction steps and severity\n- Suggest fixes\n\n### Deliverables\n- Security report\n- PoC HTML pages demonstrating each vulnerability\n- Suggested CSP headers and sanitization patches\n\n### Claiming\nComment with web security experience.",
@@ -1334,37 +1237,6 @@
           "50 RTC",
           "25 RTC",
           "20 RTC"
-        ],
-        "evidence_kind": "rtc_exact"
-      }
-    },
-    {
-      "repo": "Scottcjn/rustchain-bounties",
-      "number": 692,
-      "title": "[BOUNTY: up to 50 RTC] Micro Liquidity \u2014 Provide Liquidity, Get 1.5x Back",
-      "body": "## Micro Liquidity Bounty \u2014 Provide Liquidity, Get 1.5x RTC\n\n**Reward: Up to 50 RTC (1.5x your contribution, max $5.00 equivalent)**\n\n### How it works\n\n1. Provide micro liquidity to one of:\n   - **wRTC** (Wrapped RustChain Token) on any DEX\n   - **ETH gas** for RustChain bridge operations\n   - **ERG** for Ergo anchor transactions\n2. Post proof here with transaction hash and amount\n3. We verify the liquidity was provided\n4. You receive **1.5x the RTC equivalent** back\n\n### Eligible Actions\n\n| Action | What You Provide | Max Amount | You Get Back |\n|--------|-----------------|------------|-------------|\n| wRTC LP | wRTC + pair token on DEX | $5.00 worth | 1.5x in RTC |\n| ETH gas | ETH for bridge relay fees | $5.00 worth | 1.5x in RTC |\n| ERG deposit | ERG for anchor TX boxes | $5.00 worth | 1.5x in RTC |\n\n### Rules\n\n- **$5.00 USD equivalent maximum** per claim (at current market rates)\n- At reference rate of 1 RTC = $0.10, max payout = **50 RTC** (for $5 contribution yielding $7.50 equivalent)\n- One claim per person per liquidity type\n- Liquidity must remain for at least 7 days (no flash deposits)\n- Transaction must be verifiable on-chain (ETH/ERG explorer link required)\n\n### Why?\n\nRustChain needs real liquidity to function as a currency, not just a mining reward. Even $5 of liquidity proves the economic loop works: mine RTC -> wrap -> trade -> unwrap -> spend. We're subsidizing early liquidity providers at 1.5x to bootstrap this cycle.\n\n### To Claim\n\nComment below with:\n- Your RTC wallet name/address\n- Chain you provided liquidity on (ETH/ERG/DEX)\n- Transaction hash\n- USD equivalent at time of deposit\n- Date of deposit (must be 7+ days ago)\n\n**Reference rate: 1 RTC = $0.10 USD**\n",
-      "url": "https://github.com/Scottcjn/rustchain-bounties/issues/692",
-      "labels": [
-        "bounty",
-        "micro",
-        "defi",
-        "liquidity"
-      ],
-      "created_at": "2026-03-06T14:01:47Z",
-      "reward_rtc": 50.0,
-      "difficulty": "micro",
-      "skills": [],
-      "reward_evidence": {
-        "status": "matched",
-        "amount_rtc": 50.0,
-        "exact_text": "50 RTC",
-        "excerpt": "[BOUNTY: up to 50 RTC] Micro Liquidity \u2014 Provide Liquidity, Get 1.5x Ba",
-        "mentions": [
-          "50 RTC",
-          "1 RTC",
-          "50 RTC",
-          "1 RTC",
-          "$5.00"
         ],
         "evidence_kind": "rtc_exact"
       }
@@ -1712,7 +1584,8 @@
       "body": "## The problem\n\nFour separate defects were found in the bounty payout pipeline on 2026-08-07/08, and all four shared one shape: **something reported success while doing nothing.** None raised an error. None turned a workflow red.\n\n- `transfer()` returned success on an HTTP 200 carrying `{\"ok\": false}` \u2014 claims were closed and publicly confirmed with no RTC sent (#16390)\n- The payout's candidate sweep used `--limit 400` against 2,375 open issues, so any verified claim outside the newest 400 could never be paid, silently\n- `confirm_pending.sh` had no execute bit for ~3 months. Cron fired it every 10 minutes into a permission error, and because the script's own logging lived inside the block that failed to run, **nothing was logged at all**\n- `gh issue edit --add-label` fails on a GraphQL deprecation **without a non-zero exit**, so a gate posted \"verified\" and never marked the claim payable\n\nEach was found by accident. There is no reason to think they were the last four.\n\n## What this bounty is\n\nAudit the payout and reward paths for **more of this class**. Not style, not coverage \u2014 specifically: *code that can complete successfully while achieving nothing, or achieving the wrong thing, without surfacing an error.*\n\nIn scope:\n- `scripts/bounty_payout.py`, `scripts/docstring_gate.py`, `scripts/pr_review_gate.py`, `scripts/pr_review_gate_backfill.py`\n- `/root/rustchain/` payout, settlement and confirmation paths on the live node (ask for read access)\n- The workflows that drive them\n\n## What qualifies for payment\n\nA finding must name **a concrete path where the code succeeds and the effect does not happen**, with the reasoning for why. A proof of concept is welcome but not required if the reading is unambiguous.\n\nNot payable: general hardening advice, dependency CVEs with no demonstrated path, style, or \"add more tests\" without a specific defect behind it.\n\n## Reward\n\n**35 RTC** for the audit, plus **10 RTC per confirmed defect** of this class beyond the first, uncapped.\n\nPaid on the finding, not on a fix. A clear writeup of a real defect is worth more here than a patch for a hypothetical one.\n",
       "url": "https://github.com/Scottcjn/rustchain-bounties/issues/16471",
       "labels": [
-        "bounty"
+        "bounty",
+        "claimed"
       ],
       "created_at": "2026-08-10T17:31:52Z",
       "reward_rtc": 35.0,
@@ -6124,8 +5997,7 @@
       "labels": [
         "bounty",
         "easy",
-        "bottube",
-        "claimed"
+        "bottube"
       ],
       "created_at": "2026-03-07T16:17:32Z",
       "reward_rtc": 3.0,
@@ -6415,8 +6287,7 @@
       "body": "## Earn 2 RTC \u2014 add a badge, takes 2 minutes\n\nAdd a RustChain / clawrtc badge to the README of **any public GitHub repo you own** (your project, a fork, a demo \u2014 anything real). It spreads the word and gives your project a machine-verifiable link to the network.\n\n### Badge markdown\n```markdown\n[![Powered by RustChain](https://img.shields.io/badge/Powered%20by-RustChain-orange)](https://rustchain.org)\n```\n(Or roll your own as long as it links to https://rustchain.org or https://github.com/Scottcjn/Rustchain.)\n\n### How to claim\nComment below with:\n1. Link to the repo + the README showing the badge\n2. Your **GitHub username**\n3. Your **RTC wallet** (native `RTC` + 40 hex \u2014 or just your GitHub handle, we can pay to that)\n\n### Rules\n- One claim per person. The repo must be real and yours (not a throwaway).\n- **2 RTC**, paid as a 24h-voidable pending transfer.\n\nWhy: every badge is a discoverable link agents and crawlers follow back to the network.\n\n<!-- machine-readable bounty spec -->\n```bounty-spec\n# auto-backfilled; maintainer may refine\npaid: true\nreward_rtc: 2\nper: per-item\ncap: 1\nsubmit: [pr, email]\nnot_in_repo: true\n```\n",
       "url": "https://github.com/Scottcjn/rustchain-bounties/issues/13949",
       "labels": [
-        "bounty",
-        "claimed"
+        "bounty"
       ],
       "created_at": "2026-06-11T23:02:38Z",
       "reward_rtc": 2.0,
