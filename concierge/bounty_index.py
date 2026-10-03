@@ -11,6 +11,7 @@ import os
 import re
 import sys
 from datetime import datetime, timezone
+from functools import lru_cache
 
 import requests
 
@@ -358,24 +359,32 @@ _SKILL_KEYWORDS = {
 }
 
 
-def _keyword_matches(text, keyword):
-    """Return whether *keyword* occurs as a complete token or phrase.
-
-    Word guards are applied only when the corresponding keyword edge is a word
-    character.  That prevents short tags such as ``rust`` and ``node`` from
-    matching unrelated words while preserving punctuation-leading file suffix
-    keywords such as ``.py`` and punctuation-bearing labels such as ``CI/CD``.
-    """
-    if not isinstance(keyword, str) or not keyword.strip():
-        return False
-
+@lru_cache(maxsize=256)
+def _keyword_pattern(keyword):
+    """Reuse the bounded set of token/phrase patterns across bounty rows."""
     keyword = keyword.casefold()
     pattern = re.escape(keyword)
     if re.match(r"\w", keyword[0]):
         pattern = rf"(?<!\w){pattern}"
     if re.match(r"\w", keyword[-1]):
         pattern = rf"{pattern}(?!\w)"
-    return re.search(pattern, text.casefold()) is not None
+    return re.compile(pattern)
+
+
+def _keyword_matches(text, keyword, *, casefolded=False):
+    """Return whether *keyword* occurs as a complete token or phrase.
+
+    Word guards are applied only when the corresponding keyword edge is a word
+    character.  That prevents short tags such as ``rust`` and ``node`` from
+    matching unrelated words while preserving punctuation-leading file suffix
+    keywords such as ``.py`` and punctuation-bearing labels such as ``CI/CD``.
+    ``casefolded`` lets a tagging pass share one normalized issue body.
+    """
+    if not isinstance(keyword, str) or not keyword.strip():
+        return False
+
+    normalized = text if casefolded else text.casefold()
+    return _keyword_pattern(keyword).search(normalized) is not None
 
 
 def tag_skills(title, body):
@@ -383,11 +392,11 @@ def tag_skills(title, body):
 
     Scans title and body for complete keyword/phrase matches.
     """
-    combined = f"{title} {body}"
+    combined = f"{title} {body}".casefold()
     matched = []
     for skill, keywords in _SKILL_KEYWORDS.items():
         for kw in keywords:
-            if _keyword_matches(combined, kw):
+            if _keyword_matches(combined, kw, casefolded=True):
                 matched.append(skill)
                 break
     return sorted(matched)
