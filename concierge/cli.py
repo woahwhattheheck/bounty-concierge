@@ -372,7 +372,11 @@ def _cmd_wallet(args):
             print(f"Error: {msg}", file=sys.stderr)
             sys.exit(1)
         if args.dry_run:
-            print(f"[dry-run] Would show registration guide for wallet: {name}")
+            _print_dry_run_plan(
+                args, "wallet.register.instructions", {"wallet_name": name},
+                ["Show local wallet registration instructions"],
+                ["registration_status"],
+            )
             return
         guide = register_wallet_guide(name)
         if args.json:
@@ -383,7 +387,10 @@ def _cmd_wallet(args):
     elif action == "balance":
         name = args.name
         if args.dry_run:
-            print(f"[dry-run] Would check balance for: {name}")
+            _print_dry_run_plan(
+                args, "wallet.balance", {"wallet": name},
+                ["Read the wallet balance from the node"], ["balance_rtc"],
+            )
             return
         result = get_balance(name)
         if isinstance(result, dict) and "error" in result:
@@ -405,7 +412,17 @@ def _cmd_wallet(args):
 
     elif action == "holders":
         if args.dry_run:
-            print("[dry-run] Would fetch all wallet holders (requires RC_ADMIN_KEY)")
+            minimum = getattr(args, "min_balance", None)
+            if minimum is not None and not math.isfinite(minimum):
+                raise ValueError("--min-balance must be finite")
+            _print_dry_run_plan(
+                args, "wallet.holders",
+                {"category": getattr(args, "category", None),
+                 "min_balance_rtc": minimum, "limit": getattr(args, "limit", 50)},
+                ["Read wallet holders from the node (requires RC_ADMIN_KEY)",
+                 "Apply holder filters and display limit"],
+                ["holders"],
+            )
             return
         holders = get_all_holders()
         if isinstance(holders, dict) and "error" in holders:
@@ -433,7 +450,12 @@ def _cmd_wallet(args):
 
     elif action == "stats":
         if args.dry_run:
-            print("[dry-run] Would compute wallet statistics (requires RC_ADMIN_KEY)")
+            _print_dry_run_plan(
+                args, "wallet.stats", {},
+                ["Read wallet holders from the node (requires RC_ADMIN_KEY)",
+                 "Compute wallet statistics"],
+                ["stats"],
+            )
             return
         stats = get_holder_stats()
         if isinstance(stats, dict) and "error" in stats:
@@ -463,7 +485,11 @@ def _cmd_wallet(args):
 
     elif action == "miners":
         if args.dry_run:
-            print("[dry-run] Would fetch active miners list")
+            _print_dry_run_plan(
+                args, "wallet.miners", {},
+                ["Read active miners and epoch information from the node"],
+                ["miners", "epoch"],
+            )
             return
         miners = get_active_miners()
         if isinstance(miners, dict) and "error" in miners:
