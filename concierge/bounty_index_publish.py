@@ -30,9 +30,16 @@ def _fail(message: str, cause: Exception | None = None) -> None:
     raise BountyIndexIncompleteError(message) from cause
 
 
-def _expected_issue_url(repo: str, number: int) -> str:
-    """Return the only GitHub issue URL authorized for one canonical identity."""
-    return f"https://github.com/{repo}/issues/{number}"
+def _matches_issue_url(url: str, repo: str, number: int) -> bool:
+    """Bind a GitHub issue URL while allowing owner/repository case variants."""
+    prefix = "https://github.com/"
+    suffix = f"/issues/{number}"
+    return (
+        url.isascii()
+        and url.startswith(prefix)
+        and url.endswith(suffix)
+        and url[len(prefix):-len(suffix)].casefold() == repo.casefold()
+    )
 
 
 def fetch_complete_bounties(repos=None, token=None):
@@ -42,7 +49,8 @@ def fetch_complete_bounties(repos=None, token=None):
     normalizes issue rows, traverses at most its configured default page limit,
     closes responses and stops subsequent requests when GitHub reports a rate
     limit. It performs no retry loop. Publication additionally binds each row
-    to its exact canonical issue URL and rejects duplicate identities.
+    to its canonical issue URL (owner/repo case-insensitive) and rejects
+    duplicate identities.
 
     Transport/HTTP/schema errors, quota deferrals and page-limit exhaustion
     abort publication, retaining the previous index. A source failure is not
@@ -64,7 +72,7 @@ def fetch_complete_bounties(repos=None, token=None):
         repo = bounty["repo"]
         number = bounty["number"]
         identity = (repo.casefold(), number)
-        if bounty["url"] != _expected_issue_url(repo, number):
+        if not _matches_issue_url(bounty["url"], repo, number):
             _fail(f"cross-wired bounty identity for {repo}: expected issue {number} URL")
         if identity in seen_identities:
             _fail(f"duplicate bounty identity for {repo} issue {number}")
