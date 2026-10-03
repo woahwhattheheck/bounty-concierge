@@ -55,4 +55,10 @@ MIGRATION_SOURCE_WALLET = _env("MIGRATION_SOURCE_WALLET", "founder_team_bounty")
 
 # --- Docs directory (for FAQ doc search) ---
 
-DOCS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "docs")
+# Source checkouts retain their editable docs; wheels carry the same files
+# inside the package so FAQ search also works outside the repository.
+_checkout_docs = os.path.join(os.path.dirname(os.path.dirname(__file__)), "docs")
+DOCS_DIR = (
+    _checkout_docs if os.path.isdir(_checkout_docs)
+    else os.path.join(os.path.dirname(__file__), "docs")
+)
