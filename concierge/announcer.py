@@ -39,6 +39,7 @@ _DISCOVERY_NOTICE = (
 def _normalized_bounties(bounties: List[dict]) -> List[dict]:
     """Accept both the existing CLI rtc shape and the index reward_rtc shape."""
     normalized = []
+    aliases = []
     for index, bounty in enumerate(bounties):
         if not isinstance(bounty, dict):
             raise ValueError(f"bounties[{index}] must be an object")
@@ -49,18 +50,20 @@ def _normalized_bounties(bounties: List[dict]) -> List[dict]:
             row["reward_rtc"] = row.get("rtc")
         # Use the same literal-text and numeric contract as the README, without
         # fetching or rewriting its index. Input order is deliberately retained.
-        _validated_bounty_rows([row])
-        if "rtc" in row and "reward_rtc" in bounty:
-            legacy = dict(row, reward_rtc=row["rtc"])
-            _validated_bounty_rows([legacy])
-            left, right = row["rtc"], row["reward_rtc"]
-            unequal = (left is None) != (right is None)
-            if left is not None and right is not None:
-                unequal = Decimal(str(left)) != Decimal(str(right))
-            if unequal:
-                raise ValueError(f"bounties[{index}] has conflicting rtc and reward_rtc values")
         normalized.append(row)
-    return _validated_bounty_rows(normalized)
+        if "rtc" in row and "reward_rtc" in bounty:
+            aliases.append((index, row))
+    rows = _validated_bounty_rows(normalized)
+    for index, row in aliases:
+        legacy = dict(row, reward_rtc=row["rtc"])
+        _validated_bounty_rows([legacy])
+        left, right = row["rtc"], row["reward_rtc"]
+        unequal = (left is None) != (right is None)
+        if left is not None and right is not None:
+            unequal = Decimal(str(left)) != Decimal(str(right))
+        if unequal:
+            raise ValueError(f"bounties[{index}] has conflicting rtc and reward_rtc values")
+    return rows
 
 
 def _announcement_amount(bounty: dict) -> str:
@@ -102,7 +105,11 @@ def format_announcement(bounties: List[dict]) -> Dict[str, str]:
     provider's weighted-length policy. Oversized links are explicitly omitted
     from that format, never silently truncated; complete links remain in long.
     """
-    rows = _normalized_bounties(bounties)
+    return _format_validated_announcement(_normalized_bounties(bounties))
+
+
+def _format_validated_announcement(rows: List[dict]) -> Dict[str, str]:
+    """Render rows already checked by this module's public input boundary."""
     if not rows:
         return {"short": "", "medium": "", "long": ""}
 
@@ -232,7 +239,7 @@ def format_snapshot(payload: dict, limit: int = 10) -> dict:
                 "coverage. Zero selected rows do not establish an empty live queue."
             ),
         },
-        "previews": format_announcement(selected),
+        "previews": _format_validated_announcement(selected),
     }
 
 
