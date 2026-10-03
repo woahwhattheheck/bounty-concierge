@@ -160,6 +160,14 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
     if max_pages <= 0:
         raise ValueError("max_pages must be positive")
 
+    # requests.get creates and closes a Session for every call. Keep one pool
+    # for this traversal without changing ownership of caller-supplied sessions.
+    if session is requests:
+        with requests.Session() as owned_session:
+            return audit_bounty(
+                repo, number, token, session=owned_session, max_pages=max_pages
+            )
+
     token = token or GITHUB_TOKEN
     headers = _headers(token)
     issue_url = f"https://api.github.com/repos/{repo}/issues/{number}"
@@ -265,6 +273,12 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
 
 def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, session: Any = requests, max_pages: int = 10) -> list[dict[str, Any]]:
     """Return bounty records enriched with a nested ``canonical_audit`` field."""
+    if session is requests:
+        with requests.Session() as owned_session:
+            return audit_bounties(
+                bounties, token, session=owned_session, max_pages=max_pages
+            )
+
     audited = []
     for bounty in bounties:
         row = dict(bounty)
