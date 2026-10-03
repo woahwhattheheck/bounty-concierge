@@ -138,28 +138,21 @@ def get_balance(name):
 
 
 def get_pending_transfers(name):
-    """Check the /wallet/pending endpoint for pending transfers.
+    """Return pending transfers from the canonical wallet-history endpoint.
 
     Args:
         name: The wallet / miner identifier string.
 
     Returns:
-        A list of pending transfer dicts, or an empty list on error.
+        A list of pending transfer dicts.
+
+    Raises:
+        concierge.payout_tracker.PayoutLookupError: If payout state cannot be
+            determined reliably.
     """
-    result = _get("/wallet/pending", params={"miner_id": name})
-    if isinstance(result, list):
-        pending = result
-    elif isinstance(result, dict):
-        if "error" in result:
-            return []
-        pending = result.get("pending", [])
-        if not isinstance(pending, list):
-            return []
-    else:
-        return []
-    if any(not isinstance(item, dict) for item in pending):
-        return []
-    return pending
+    from concierge.payout_tracker import check_pending
+
+    return check_pending(name, node_url=RUSTCHAIN_NODE_URL)
 
 
 def register_wallet_guide(name):
