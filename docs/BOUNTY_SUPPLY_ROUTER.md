@@ -76,7 +76,13 @@ Canonical audit fields should include:
 ```
 
 The CLI accepts one snapshot, a list of snapshots, or
-`{"candidates": [...]}`.
+`{"candidates": [...]}`. It also accepts the retained bounty index export
+`{"bounties": [...]}` directly, including `data/bounty_index.json`.
+
+Index exports contribute their rows only. Their top-level `updated_at` and
+`total_count` do not supply a row's `observed_at`, canonical audit, or coverage.
+Discovery rows with missing evidence therefore retain the existing HOLD result;
+the loader does not promote the export into fresh canonical evidence.
 
 ```bash
 python -m concierge.bounty_supply supply.json \
@@ -84,6 +90,9 @@ python -m concierge.bounty_supply supply.json \
 
 python -m concierge.bounty_supply supply.json \
   --evaluated-at 2026-09-20T01:00:00Z --max-age-seconds 900
+
+python -m concierge.bounty_supply data/bounty_index.json \
+  --evaluated-at 2026-10-03T07:00:00Z --json
 ```
 
 ## Deduplication and receipts
