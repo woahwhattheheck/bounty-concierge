@@ -161,7 +161,11 @@ def _read_snapshot(path: str) -> dict:
             raise ValueError("snapshot exceeds the 16 MiB input limit")
         with os.fdopen(fd, "rb") as handle:
             fd = None
-            raw = handle.read(MAX_SNAPSHOT_BYTES + 1)
+            # Read one byte beyond the observed length to detect growth without
+            # reserving the entire input cap for an unchanged small snapshot.
+            raw = handle.read(metadata.st_size + 1)
+            if len(raw) > metadata.st_size:
+                raw += handle.read(MAX_SNAPSHOT_BYTES + 1 - len(raw))
         if len(raw) > MAX_SNAPSHOT_BYTES:
             raise ValueError("snapshot exceeds the 16 MiB input limit")
     finally:
