@@ -57,7 +57,9 @@ class ClaimPreflightBlocked(RuntimeError):
 
 
 def _json_requested() -> bool:
-    return "--json" in sys.argv[1:]
+    """Use the CLI parser's accepted common flags for boundary errors too."""
+    args = _build_parser().parse_args(_strip_claim_wrapper_options(sys.argv[1:]))
+    return bool(args.json)
 
 
 def _option_values(args: list[str], name: str) -> list[str | None]:
