@@ -132,26 +132,31 @@ def detect_pow_processes() -> Dict:
         "errors": [],
     }
 
-    rc, stdout, stderr = _run_command(["ps", "-eo", "args"])
+    rc, stdout, stderr = _run_command(["ps", "-eo", "comm=,args="])
     if rc != 0:
         result["errors"].append(f"Process listing failed: {stderr or stdout}")
         lines = []
     else:
         lines = stdout.splitlines()
 
-    bz_re = re.compile(r"\bbzminer\b.*(?:-a\s+warthog|-a=warthog)", re.IGNORECASE)
-    janus_re = re.compile(r"\bjanusminer(?:-ubuntu\S*)?\b", re.IGNORECASE)
-    node_re = re.compile(r"\bwart-node(?:-linux)?\b", re.IGNORECASE)
+    bz_re = re.compile(r"(?:^|\s)-a(?:\s+|=)warthog(?:\s|$)", re.IGNORECASE)
+    janus_re = re.compile(r"janusminer(?:-ubuntu\S*)?", re.IGNORECASE)
+    node_re = re.compile(r"wart-node(?:-linux)?", re.IGNORECASE)
 
     for line in lines:
-        cmd = line.strip()
-        if not cmd:
+        parts = line.strip().split(None, 1)
+        if len(parts) != 2:
             continue
-        if bz_re.search(cmd):
+        executable, cmd = parts
+        # Match the process name, not a miner name passed to this CLI or a
+        # launcher as an argument. comm also handles executable paths with spaces.
+        executable = os.path.basename(executable)
+        if executable.casefold() == "bzminer" and bz_re.search(cmd):
             result["processes"].append({"type": "bzminer", "source": "ps", "cmd": cmd})
-        elif janus_re.search(cmd):
+        # Linux may truncate janusminer-ubuntu22 to its 15-byte comm prefix.
+        elif janus_re.fullmatch(executable) or executable.casefold() == "janusminer-ubun":
             result["processes"].append({"type": "janusminer", "source": "ps", "cmd": cmd})
-        elif node_re.search(cmd):
+        elif node_re.fullmatch(executable):
             result["processes"].append({"type": "wart-node", "source": "ps", "cmd": cmd})
 
     for service in ("rustchain-miner", "wart-node"):
