@@ -96,8 +96,12 @@ def _bounty_text(bounty: dict) -> str:
     """Combine all searchable text fields from a bounty into one string."""
     labels = bounty.get("labels", [])
     if isinstance(labels, (list, tuple)):
+        names = (
+            label.get("name") if isinstance(label, dict) else label
+            for label in labels
+        )
         label_text = " ".join(
-            label for label in labels if isinstance(label, str)
+            name for name in names if isinstance(name, str)
         )
     else:
         label_text = ""
