@@ -92,7 +92,7 @@ def validate_wallet_name(name):
         return (False, "Wallet name must be 64 characters or fewer.")
     if name != name.lower():
         return (False, "Wallet name must be lowercase.")
-    if not _WALLET_NAME_RE.match(name):
+    if not _WALLET_NAME_RE.fullmatch(name):
         return (
             False,
             "Wallet name may only contain lowercase letters, digits, and "
