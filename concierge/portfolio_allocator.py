@@ -206,12 +206,15 @@ def _exact_select(items: list[dict[str, Any]], capacity: Decimal) -> list[int]:
     For any chosen subset, earliest-deadline-first scheduling is feasible iff
     cumulative effort at each selected deadline does not exceed that deadline.
     DFS therefore tests that exact condition while also enforcing capacity and
-    one selection per explicit collision group.
+    one selection per explicit collision group. Within a shared deadline,
+    higher estimated EV per hour is visited first to improve the incumbent;
+    this changes search order, not the exact selection or tie criteria.
     """
     ordered = sorted(
         range(len(items)),
         key=lambda i: (
             items[i]["_deadline_fraction"],
+            -(items[i]["_expected_value_fraction"] / items[i]["_effort_fraction"]),
             items[i]["canonical_source_url"],
             items[i]["input_index"],
         ),
@@ -255,26 +258,29 @@ def _exact_select(items: list[dict[str, Any]], capacity: Decimal) -> list[int]:
         item_index = ordered[pos]
         item = items[item_index]
 
+        group = item["collision_group"]
+        if group not in used_groups:
+            next_hours = used_hours + item["_effort_fraction"]
+            if (
+                next_hours <= capacity_fraction
+                and next_hours <= item["_deadline_fraction"]
+            ):
+                # Find a feasible incumbent before excluding work so the EV
+                # bound can prune earlier. Equal-EV branches remain searchable
+                # for the existing effort, skill and canonical-source ties.
+                used_groups.add(group)
+                chosen.append(item_index)
+                visit(
+                    pos + 1,
+                    next_hours,
+                    expected_value + item["_expected_value_fraction"],
+                    skill_sum + item["_skill_fraction"],
+                )
+                chosen.pop()
+                used_groups.remove(group)
+
         # Excluding the item is always feasible.
         visit(pos + 1, used_hours, expected_value, skill_sum)
-
-        group = item["collision_group"]
-        if group in used_groups:
-            return
-        next_hours = used_hours + item["_effort_fraction"]
-        if next_hours > capacity_fraction or next_hours > item["_deadline_fraction"]:
-            return
-
-        used_groups.add(group)
-        chosen.append(item_index)
-        visit(
-            pos + 1,
-            next_hours,
-            expected_value + item["_expected_value_fraction"],
-            skill_sum + item["_skill_fraction"],
-        )
-        chosen.pop()
-        used_groups.remove(group)
 
     visit(0, Fraction(0), Fraction(0), Fraction(0))
     if best is None:
