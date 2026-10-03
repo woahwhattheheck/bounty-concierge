@@ -12,6 +12,7 @@ import sys
 import requests
 
 from concierge.config import DOCS_DIR, GROK_API_KEY
+from concierge._faq_doc_index import iter_paragraphs
 
 
 # ---------------------------------------------------------------------------
@@ -239,8 +240,8 @@ def fuzzy_match(question, entries=None):
 def search_docs(question, docs_dir=None):
     """Search Markdown docs for paragraphs matching question keywords.
 
-    Scans every *.md file in docs_dir, splits on blank lines, and scores
-    each paragraph by keyword overlap.
+    Scores paragraphs by keyword overlap. Unchanged Markdown generations
+    reuse a bounded paragraph/token index between questions.
 
     Returns the best-matching paragraph text, or empty string if nothing
     found.
@@ -256,30 +257,14 @@ def search_docs(question, docs_dir=None):
     best_para = ""
     best_score = 0.0
 
-    for fname in os.listdir(docs_dir):
-        if not fname.endswith(".md"):
+    for para_stripped, p_words in iter_paragraphs(docs_dir, _keywords):
+        overlap = q_words & p_words
+        if not overlap:
             continue
-        fpath = os.path.join(docs_dir, fname)
-        try:
-            with open(fpath, "r", encoding="utf-8", errors="replace") as fh:
-                content = fh.read()
-        except OSError:
-            continue
-
-        # Split into paragraphs on blank lines
-        paragraphs = re.split(r"\n\s*\n", content)
-        for para in paragraphs:
-            para_stripped = para.strip()
-            if len(para_stripped) < 20:
-                continue
-            p_words = _keywords(para_stripped)
-            overlap = q_words & p_words
-            if not overlap:
-                continue
-            score = len(overlap) / len(q_words)
-            if score > best_score:
-                best_score = score
-                best_para = para_stripped
+        score = len(overlap) / len(q_words)
+        if score > best_score:
+            best_score = score
+            best_para = para_stripped
 
     return best_para
 
