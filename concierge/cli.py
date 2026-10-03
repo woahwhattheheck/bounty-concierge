@@ -1019,26 +1019,46 @@ def _cmd_claim(args):
         )
         return
 
+    steps = [
+        "Read the sponsor's current claim, submission, and payout requirements "
+        f"at {issue_url}",
+        "Complete the sponsor's required claim/application and payment setup "
+        "with the intended claimant account.",
+        "Supply the wallet only where the sponsor's payment process requests it.",
+        "Submit the required contribution or update its existing PR, referencing "
+        f"#{issue_num} and following the sponsor's submission process.",
+        "Follow the sponsor's review, award, and payout process; a merge alone "
+        "does not confirm an award or payment.",
+    ]
+
     if args.json:
         _print_json({
             "action": "claim",
+            "status": "instructions_only",
+            "claim_submitted": False,
+            "provider_mutation_executed": False,
             "repo": repo,
             "issue": issue_num,
             "wallet": wallet,
             "url": issue_url,
+            "assignment": None,
+            "payment": None,
+            "next_steps": steps,
         })
     else:
         print(f"Claim instructions for issue #{issue_num}")
         print(f"Repository: {repo}")
         print(f"Issue URL:  {issue_url}")
         print(f"Wallet:     {wallet}")
+        print(
+            "Instructions only; this command has not submitted a claim "
+            "or changed provider state."
+        )
+        print("Assignment and payment are unconfirmed.")
         print()
         print("Next steps:")
-        print(f"  1. Visit {issue_url}")
-        print(f"  2. Comment: \"I would like to claim this bounty. Wallet: {wallet}\"")
-        print(f"  3. Wait for assignment from a maintainer")
-        print(f"  4. Submit your PR referencing #{issue_num}")
-        print(f"  5. RTC will be transferred after merge and review")
+        for number, step in enumerate(steps, 1):
+            print(f"  {number}. {step}")
 
 
 def _cmd_version(args):
