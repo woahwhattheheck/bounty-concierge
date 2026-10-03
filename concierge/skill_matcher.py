@@ -5,6 +5,7 @@ recommend the best fits.
 
 from __future__ import annotations
 
+from importlib import resources
 import json
 import os
 import re
@@ -70,18 +71,25 @@ def _normalise_tags(raw: Dict) -> Dict[str, List[str]]:
     return result
 
 
-# Try to load the authoritative copy from data/skill_tags.json.
+# Source checkouts retain the authoritative data/skill_tags.json lookup.
+# Distributions bundle that same file as a package resource during the build.
 _DATA_FILE = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "data", "skill_tags.json"
 )
-if os.path.isfile(_DATA_FILE):
-    try:
-        with open(_DATA_FILE, "r") as fh:
+try:
+    if os.path.isfile(_DATA_FILE):
+        with open(_DATA_FILE, "r", encoding="utf-8") as fh:
             _loaded = json.load(fh)
-        if isinstance(_loaded, dict):
-            SKILL_TAGS = _normalise_tags(_loaded)
-    except (json.JSONDecodeError, OSError):
-        pass  # fall back to built-in defaults
+    else:
+        _loaded = json.loads(
+            resources.files("concierge").joinpath("skill_tags.json").read_text(
+                encoding="utf-8"
+            )
+        )
+    if isinstance(_loaded, dict):
+        SKILL_TAGS = _normalise_tags(_loaded)
+except (json.JSONDecodeError, OSError):
+    pass  # fall back to built-in defaults
 
 
 def _bounty_text(bounty: dict) -> str:
