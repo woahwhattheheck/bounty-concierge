@@ -25,13 +25,13 @@ _BODY_BOUNTY_RE = re.compile(
     r"(?im)(?:^|\s)/bounty\s+\$([0-9][0-9,]*(?:\.[0-9]{1,2})?)\b"
 )
 _KEYWORD_REWARD_RE = re.compile(
-    r"(?i)\b(?:bounty|reward)(?:\s+(?:amount|payout))?"
+    r"(?i)\b(?:bounty|reward|payout)(?:\s+(?:amount|payout))?"
     r"\s*(?::|=|-|\bis\b|\bof\b)?\s*"
     r"\$([0-9][0-9,]*(?:\.[0-9]{1,2})?)\b"
 )
 _AMOUNT_BEFORE_REWARD_RE = re.compile(
     r"(?i)(?<![\w.])\$([0-9][0-9,]*(?:\.[0-9]{1,2})?)"
-    r"\s+(?:bounty|reward)\b"
+    r"\s+(?:bounty|reward|payout)\b"
 )
 _LABEL_REWARD_RE = re.compile(
     r"(?<![\w.])\$([0-9][0-9,]*(?:\.[0-9]{1,2})?)\b"
@@ -45,11 +45,11 @@ _RTC_RANGE_RE = re.compile(
     rf"(?i)(?<![\w.,])({_RTC_NUMBER})\s*[-–—]\s*({_RTC_NUMBER})\s*RTC\b"
 )
 _RTC_KEYWORD_REWARD_RE = re.compile(
-    rf"(?i)\b(?:bounty|reward)(?:\s+(?:amount|payout))?"
+    rf"(?i)\b(?:bounty|reward|payout)(?:\s+(?:amount|payout))?"
     rf"\s*(?::|=|-|\bis\b|\bof\b)?\s*\**\s*({_RTC_NUMBER})\s*RTC\b"
 )
 _RTC_AMOUNT_BEFORE_REWARD_RE = re.compile(
-    rf"(?i)(?<![\w.,])({_RTC_NUMBER})\s*RTC\s+(?:bounty|reward)\b"
+    rf"(?i)(?<![\w.,])({_RTC_NUMBER})\s*RTC\s+(?:bounty|reward|payout)\b"
 )
 _RTC_SPEC_RE = re.compile(
     rf"(?im)^\s*reward_rtc\s*:\s*({_RTC_NUMBER})\s*(?:#.*)?$"
