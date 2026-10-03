@@ -26,6 +26,13 @@ Incomplete `--json` writes the reason to stderr and does not print a JSON list. 
 
 `COMPLETE` means each requested repository finished its returned pages. It is not an atomic provider snapshot, bounty eligibility, acceptance, or payment. Rate-limit stop, `retry_after_seconds`, and `rate_limit_reset_at` are the collector metadata; browse does not wait or retry.
 
+One HTTP session spans each collector invocation so sequential pages and
+repositories can reuse their connection to GitHub. Every response is closed
+after consumption, and the session closes when the traversal exits, including
+on an error. The collector keeps the same request order, 15-second timeout,
+cache validation and rate-limit handling; it does not add parallel reads or
+background work.
+
 ## Revalidate cached pages
 
 Repeated browsing can reuse issue-page bodies after GitHub confirms that their ETags still match. Caching is optional and off by default. Choose a private directory outside the repository:

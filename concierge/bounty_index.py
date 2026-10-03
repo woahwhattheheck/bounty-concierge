@@ -142,131 +142,132 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
               "rate_limited": False, "retry_after_seconds": None,
               "rate_limit_reset_at": None, "repositories": sources, "bounties": []}
 
-    for source in sources:
-        if report["rate_limited"]:
-            source["status"] = "NOT_ATTEMPTED_RATE_LIMIT"
-            continue
-        repo = source["repo"]
-        seen_numbers = set()
-        api_url = f"https://api.github.com/repos/{repo}/issues"
-        for page in range(1, max_pages + 1):
-            params = {"labels": "bounty", "state": "open", "per_page": 100, "page": page}
-            cached = None
-            request_headers = headers.copy()
-            if cache is not None:
-                cached, cache_error = cache.load(repo, page)
-                source["cache"]["errors"] += int(cache_error)
-                if cached is not None:
-                    request_headers["If-None-Match"] = cached["etag"]
-                    source["cache"]["conditional_requests"] += 1
-            try:
-                response = requests.get(api_url, headers=request_headers, params=params, timeout=15)
-            except requests.RequestException as exc:
-                source["status"] = "TRANSPORT_ERROR"
-                # Exception text may contain request details. Retain only its type.
-                source["error_type"] = type(exc).__name__
-                break
+    with requests.Session() as session:
+        for source in sources:
+            if report["rate_limited"]:
+                source["status"] = "NOT_ATTEMPTED_RATE_LIMIT"
+                continue
+            repo = source["repo"]
+            seen_numbers = set()
+            api_url = f"https://api.github.com/repos/{repo}/issues"
+            for page in range(1, max_pages + 1):
+                params = {"labels": "bounty", "state": "open", "per_page": 100, "page": page}
+                cached = None
+                request_headers = headers.copy()
+                if cache is not None:
+                    cached, cache_error = cache.load(repo, page)
+                    source["cache"]["errors"] += int(cache_error)
+                    if cached is not None:
+                        request_headers["If-None-Match"] = cached["etag"]
+                        source["cache"]["conditional_requests"] += 1
+                try:
+                    response = session.get(api_url, headers=request_headers, params=params, timeout=15)
+                except requests.RequestException as exc:
+                    source["status"] = "TRANSPORT_ERROR"
+                    # Exception text may contain request details. Retain only its type.
+                    source["error_type"] = type(exc).__name__
+                    break
 
-            try:
-                status = response.status_code
-                source["http_status"] = status
-                remaining = _header_integer(response.headers, "X-RateLimit-Remaining")
-                retry_after = _header_integer(response.headers, "Retry-After")
-                reset_at = _header_integer(response.headers, "X-RateLimit-Reset")
-                throttled = status == 429 or (status == 403 and
-                            (remaining == 0 or retry_after is not None))
-                if status == 403 and not throttled:
-                    try:
-                        error = response.json()
-                    except ValueError:
-                        error = {}
-                    message = error.get("message", "") if isinstance(error, dict) else ""
-                    throttled = isinstance(message, str) and "rate limit" in message.casefold()
-                if throttled:
-                    report.update(rate_limited=True, retry_after_seconds=retry_after,
-                                  rate_limit_reset_at=reset_at)
-                    source["status"] = "RATE_LIMITED"
-                    break
-                # Exhaustion applies even when JSON or a cached validator is bad.
-                if remaining == 0:
-                    report.update(rate_limited=True, retry_after_seconds=retry_after,
-                                  rate_limit_reset_at=reset_at)
-                if status not in (200, 304):
-                    source["status"] = "HTTP_ERROR"
-                    break
-                if status == 304:
-                    if cached is None:
-                        source["status"] = "UNEXPECTED_NOT_MODIFIED"
+                try:
+                    status = response.status_code
+                    source["http_status"] = status
+                    remaining = _header_integer(response.headers, "X-RateLimit-Remaining")
+                    retry_after = _header_integer(response.headers, "Retry-After")
+                    reset_at = _header_integer(response.headers, "X-RateLimit-Reset")
+                    throttled = status == 429 or (status == 403 and
+                                (remaining == 0 or retry_after is not None))
+                    if status == 403 and not throttled:
+                        try:
+                            error = response.json()
+                        except ValueError:
+                            error = {}
+                        message = error.get("message", "") if isinstance(error, dict) else ""
+                        throttled = isinstance(message, str) and "rate limit" in message.casefold()
+                    if throttled:
+                        report.update(rate_limited=True, retry_after_seconds=retry_after,
+                                      rate_limit_reset_at=reset_at)
+                        source["status"] = "RATE_LIMITED"
                         break
-                    returned_etag = response.headers.get("ETag")
-                    if returned_etag is not None and not same_validator(returned_etag, cached["etag"]):
-                        source["status"] = "INVALID_CACHE_VALIDATOR"
+                    # Exhaustion applies even when JSON or a cached validator is bad.
+                    if remaining == 0:
+                        report.update(rate_limited=True, retry_after_seconds=retry_after,
+                                      rate_limit_reset_at=reset_at)
+                    if status not in (200, 304):
+                        source["status"] = "HTTP_ERROR"
                         break
-                    issues = cached["issues"]
-                    source["cache"]["revalidated_pages"] += 1
-                else:
-                    try:
-                        issues = response.json()
-                    except ValueError:
-                        source["status"] = "INVALID_JSON"
+                    if status == 304:
+                        if cached is None:
+                            source["status"] = "UNEXPECTED_NOT_MODIFIED"
+                            break
+                        returned_etag = response.headers.get("ETag")
+                        if returned_etag is not None and not same_validator(returned_etag, cached["etag"]):
+                            source["status"] = "INVALID_CACHE_VALIDATOR"
+                            break
+                        issues = cached["issues"]
+                        source["cache"]["revalidated_pages"] += 1
+                    else:
+                        try:
+                            issues = response.json()
+                        except ValueError:
+                            source["status"] = "INVALID_JSON"
+                            break
+                    if not isinstance(issues, list):
+                        source["status"] = "INVALID_PAYLOAD"
                         break
-                if not isinstance(issues, list):
-                    source["status"] = "INVALID_PAYLOAD"
-                    break
-                source["pages_fetched"] += 1
-                source["status"] = "READING"
-                cache_rows = [] if cache is not None and status == 200 else None
-                for item_index, issue in enumerate(issues):
-                    if isinstance(issue, dict) and "pull_request" in issue:
+                    source["pages_fetched"] += 1
+                    source["status"] = "READING"
+                    cache_rows = [] if cache is not None and status == 200 else None
+                    for item_index, issue in enumerate(issues):
+                        if isinstance(issue, dict) and "pull_request" in issue:
+                            if cache_rows is not None:
+                                cache_rows.append({"pull_request": True})
+                            continue
+                        normalized = _normalize_issue_row(issue)
+                        if normalized is None:
+                            source.update(status="INVALID_ISSUE", failed_item=item_index)
+                            break
+                        number = normalized["number"]
+                        if number in seen_numbers:
+                            source.update(status="REPEATED_ISSUE", failed_item=item_index)
+                            break
+                        seen_numbers.add(number)
+                        # Retain only fields consumed by the parser, not profile data.
                         if cache_rows is not None:
-                            cache_rows.append({"pull_request": True})
-                        continue
-                    normalized = _normalize_issue_row(issue)
-                    if normalized is None:
-                        source.update(status="INVALID_ISSUE", failed_item=item_index)
+                            cache_rows.append({"number": number, "title": normalized["title"],
+                                               "body": normalized["body"], "html_url": normalized["url"],
+                                               "labels": [{"name": name} for name in normalized["labels"]],
+                                               "created_at": normalized["created_at"]})
+                        title, body, labels = normalized["title"], normalized["body"], normalized["labels"]
+                        reward = parse_reward(title, body)
+                        reward_evidence = extract_reward_evidence(title, body)
+                        report["bounties"].append({
+                            "repo": repo, **normalized, "reward_rtc": reward,
+                            "difficulty": estimate_difficulty(title, labels, reward),
+                            "skills": tag_skills(title, body),
+                            "reward_evidence": reward_evidence,
+                        })
+                        source["bounty_count"] += 1
+                    if source["status"] != "READING":
                         break
-                    number = normalized["number"]
-                    if number in seen_numbers:
-                        source.update(status="REPEATED_ISSUE", failed_item=item_index)
+                    has_next = bool(response.links.get("next"))
+                    if status == 304:
+                        # A 304 may omit Link. Revalidate past a full cached last page
+                        # rather than hiding older reopened issues newly on page 2.
+                        has_next = has_next or cached["has_next"] or len(issues) == 100
+                    elif cache is not None:
+                        outcome = cache.store(repo, page, response.headers.get("ETag"), cache_rows, has_next)
+                        source["cache"]["stored_pages"] += int(outcome == "stored")
+                        source["cache"]["errors"] += int(outcome == "error")
+                    if not has_next:
+                        source["status"] = "COMPLETE"
                         break
-                    seen_numbers.add(number)
-                    # Retain only fields consumed by the parser, not profile data.
-                    if cache_rows is not None:
-                        cache_rows.append({"number": number, "title": normalized["title"],
-                                           "body": normalized["body"], "html_url": normalized["url"],
-                                           "labels": [{"name": name} for name in normalized["labels"]],
-                                           "created_at": normalized["created_at"]})
-                    title, body, labels = normalized["title"], normalized["body"], normalized["labels"]
-                    reward = parse_reward(title, body)
-                    reward_evidence = extract_reward_evidence(title, body)
-                    report["bounties"].append({
-                        "repo": repo, **normalized, "reward_rtc": reward,
-                        "difficulty": estimate_difficulty(title, labels, reward),
-                        "skills": tag_skills(title, body),
-                        "reward_evidence": reward_evidence,
-                    })
-                    source["bounty_count"] += 1
-                if source["status"] != "READING":
-                    break
-                has_next = bool(response.links.get("next"))
-                if status == 304:
-                    # A 304 may omit Link. Revalidate past a full cached last page
-                    # rather than hiding older reopened issues newly on page 2.
-                    has_next = has_next or cached["has_next"] or len(issues) == 100
-                elif cache is not None:
-                    outcome = cache.store(repo, page, response.headers.get("ETag"), cache_rows, has_next)
-                    source["cache"]["stored_pages"] += int(outcome == "stored")
-                    source["cache"]["errors"] += int(outcome == "error")
-                if not has_next:
-                    source["status"] = "COMPLETE"
-                    break
-                if report["rate_limited"]:
-                    source["status"] = "RATE_LIMITED_BEFORE_NEXT_PAGE"
-                    break
-                if page == max_pages:
-                    source["status"] = "PAGE_LIMIT"
-            finally:
-                response.close()
+                    if report["rate_limited"]:
+                        source["status"] = "RATE_LIMITED_BEFORE_NEXT_PAGE"
+                        break
+                    if page == max_pages:
+                        source["status"] = "PAGE_LIMIT"
+                finally:
+                    response.close()
 
     report["updated_at"] = datetime.now(timezone.utc).isoformat()
     report["complete"] = all(row["status"] == "COMPLETE" for row in sources)
