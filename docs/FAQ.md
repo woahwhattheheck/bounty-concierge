@@ -419,6 +419,6 @@ Filter by label for specific tiers: `micro`, `standard`, `major`,
 
 ```bash
 concierge browse
-concierge browse --difficulty micro
+concierge browse --tier micro
 concierge browse --min-rtc 50
 ```
