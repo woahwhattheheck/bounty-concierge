@@ -146,6 +146,22 @@ concierge version
 
 Full contract: [docs/BROWSE.md](docs/BROWSE.md).
 
+### Inspect a bounty's current GitHub state
+
+```bash
+python -m concierge.bounty_audit Scottcjn/rustchain-bounties 71 --max-pages 10 --json
+```
+
+The audit reads the issue, explicitly referenced PRs, and maintainer expiry
+comments on open issues. `--max-pages` bounds each search or comment traversal.
+Exit 0 means those reads completed. If GitHub reports an incomplete search or a
+traversal reaches its page bound, the command retains the collected JSON/text,
+prints `PARTIAL` to stderr, and exits 2. The JSON `search_truncated` field covers
+both search and comment-history truncation. Increase the page bound when it was
+reached, or retry the source read; a partial census cannot establish that no
+additional competing PRs or expiry comments exist. A complete census does not
+establish claim eligibility, an award, or payment.
+
 ---
 
 ## Platform Links
