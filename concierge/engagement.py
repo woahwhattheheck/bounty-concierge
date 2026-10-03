@@ -69,29 +69,42 @@ def star_all_ecosystem_repos(token: str) -> Dict[str, bool]:
 # Dev.to article stats
 # ---------------------------------------------------------------------------
 
+class DevtoLookupError(RuntimeError):
+    """A Dev.to article request failed; statistics are unavailable."""
+
+
 def check_devto_articles(api_key: str) -> List[dict]:
-    """Fetch the authenticated user's Dev.to articles.
+    """Fetch the authenticated user's Dev.to article statistics.
 
     Returns a list of dicts with keys: title, url, page_views,
-    positive_reactions. Transport failures, malformed JSON, and unsupported
-    payload shapes fail closed to an empty list.
+    positive_reactions. An empty list means the provider returned no articles.
+    Transport, HTTP, JSON and malformed-row failures raise DevtoLookupError
+    without including request headers, credentials or provider response text.
     """
     url = "https://dev.to/api/articles/me"
     headers = {"api-key": api_key, "Accept": "application/json"}
     try:
-        resp = requests.get(url, headers=headers, timeout=15)
-        resp.raise_for_status()
-        payload = resp.json()
-    except (requests.RequestException, ValueError):
-        return []
+        with requests.get(url, headers=headers, timeout=15) as resp:
+            resp.raise_for_status()
+            payload = resp.json()
+    except requests.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else None
+        detail = f"HTTP {status}" if isinstance(status, int) else "HTTP error"
+        raise DevtoLookupError(f"Dev.to article lookup failed ({detail}).") from None
+    except requests.RequestException as exc:
+        raise DevtoLookupError(
+            f"Dev.to article lookup failed ({type(exc).__name__})."
+        ) from None
+    except ValueError:
+        raise DevtoLookupError("Dev.to article lookup returned invalid JSON.") from None
 
     if not isinstance(payload, list):
-        return []
+        raise DevtoLookupError("Dev.to article lookup returned an invalid article list.")
 
     articles = []
     for item in payload:
         if not isinstance(item, dict):
-            continue
+            raise DevtoLookupError("Dev.to article lookup returned a malformed article row.")
         articles.append(
             {
                 "title": item.get("title", ""),

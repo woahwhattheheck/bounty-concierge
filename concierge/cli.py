@@ -58,6 +58,7 @@ try:
     from concierge.engagement import (
         star_all_ecosystem_repos,
         check_devto_articles,
+        DevtoLookupError,
         saascity_upvote,
         SaaSCityError,
         SAASCITY_API_BASE,
@@ -66,6 +67,7 @@ try:
 except ImportError:
     star_all_ecosystem_repos = None
     check_devto_articles = None
+    DevtoLookupError = None
     saascity_upvote = None
     SaaSCityError = None
     SAASCITY_API_BASE = None
@@ -750,7 +752,13 @@ def _cmd_engage(args):
             )
             sys.exit(1)
 
-        articles = check_devto_articles(api_key)
+        try:
+            articles = check_devto_articles(api_key)
+        except DevtoLookupError as exc:
+            if args.json:
+                _print_json({"error": "devto_lookup_failed", "detail": str(exc)})
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
         if args.json:
             _print_json(articles)
         else:
