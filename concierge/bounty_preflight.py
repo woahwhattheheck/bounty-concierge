@@ -1066,6 +1066,21 @@ def preflight_bounty(
     actionable result is returned, issue/comment authority and every audit field
     consumed by qualification are re-read and must remain stable.
     """
+    # Keep one connection pool across context, audit and generation reads. The
+    # captured-issue adapter below forwards through this same owned session.
+    # Caller-supplied sessions retain their existing lifetime and ownership.
+    if session is requests:
+        with requests.Session() as owned_session:
+            return preflight_bounty(
+                repo,
+                number,
+                token,
+                session=owned_session,
+                max_pages=max_pages,
+                saturation_threshold=saturation_threshold,
+                operator_login=operator_login,
+            )
+
     context, issue_snapshot = _collect_issue_context_with_snapshot(
         repo,
         number,
