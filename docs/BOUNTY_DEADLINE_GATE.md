@@ -37,6 +37,14 @@ A concrete fleet failure case on 2026-09-19 was a pair of automatically synced O
 
 All source bytes are gathered outside this module. The gate makes no network calls. `source_content_sha256` fields bind the receipt to the exact frozen observations supplied by the caller. The authority enum is likewise an observed provenance classification, not a signature: orchestration must obtain it from a trusted connector/source collector and must not let untrusted candidate JSON self-assert `REPO_OWNER`, `REPO_MEMBER`, or `OFFICIAL_PROVIDER`.
 
+### Deadline source links
+
+`ISSUE_BODY` evidence must identify the observed GitHub issue, without a fragment. Both the web URL and its canonical REST URL are supported: `https://github.com/example/project/issues/5` and `https://api.github.com/repos/example/project/issues/5`. Other authority types can retain a precise comment permalink, such as `https://github.com/example/project/issues/5#issuecomment-12345`. The receipt preserves that source URL exactly. A GitHub issue or issue-comment source must name the observed owner, repository, and issue number; owner and repository comparisons are case-insensitive.
+
+Existing HTTPS provider and repository source forms remain supported. Query strings, encoded path aliases, and arbitrary fragments remain invalid; the fragment exception is limited to a canonical GitHub `issuecomment-` identifier. The source collector still establishes the relevance and authority of other source types and verifies that a fetched comment actually belongs to the named issue. URL validation does not authenticate its author.
+
+An extension suggestion without a stated cutoff does not supply a valid `DATE` or `INSTANT` value. Keep it separate from deadline evidence until the sponsor supplies an explicit cutoff; this parser does not infer one or widen the authority enum.
+
 ### Deadline precision
 
 - `DATE` uses canonical `YYYY-MM-DD`, but a civil date has neither a sponsor timezone nor a clock cutoff. The gate therefore HOLDs with `DATE_BOUNDARY_CLOCK_AMBIGUOUS` within one UTC calendar day on either side of the named date. Only a deadline at least two calendar days ahead is unambiguously current; only one at least two calendar days behind is unambiguously elapsed. This conservative window avoids inventing timezone/cutoff semantics.
