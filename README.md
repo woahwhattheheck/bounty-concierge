@@ -148,6 +148,51 @@ The `claim --dry-run` example produces a local plan; it does not submit a claim 
 
 Full contract: [docs/BROWSE.md](docs/BROWSE.md).
 
+### Capture final preflight for offline routing
+
+Run the live preflight once and save its final evidence in a new private file:
+
+```bash
+python -m concierge.bounty_preflight OWNER/REPO ISSUE_NUMBER --capture issue-capture.json --json
+python -m concierge.bounty_supply issue-capture.json --evaluated-at CURRENT_OFFSET_AWARE_TIME --json
+```
+
+Replace the repository, issue number and evaluation time with the actual issue
+and current offset-aware ISO-8601 time. The first command reads GitHub; the second
+uses only the saved file. Preflight exits 0 for ACTIONABLE, 2 for HOLD and 3 for
+REJECT. A completed HOLD or REJECT still produces a capture, so do not discard it
+because the preflight exit status is nonzero. Provider failures produce no
+completed capture. `--capture` creates a regular file exclusively with mode 0600;
+its parent directory must exist and an existing path is never overwritten.
+
+The capture binds the exact baseline qualification inputs, maintainer authority
+text, reduced assignment proof, initial issue/comment generations, both audit
+checks, final qualification, policy and provider-read interval. Offline replay
+recomputes the gates in the same conditional order and checks the saved final
+result. A required missing check cannot count as passed. A saved HOLD or REJECT
+cannot become ACTIVE or MAYBE through baseline requalification. Assignment to the
+operator is recognized only after the live same-token authenticated-user read;
+an asserted login never authorizes it. Authentication tokens and raw identity
+fields are omitted.
+
+Supply freshness starts immediately before the first actual provider read, not
+at export or replay. Completion is recorded after the last successful read;
+evaluating before completion also fails closed. Replaying a capture never moves
+its observation time. The existing 900-second default freshness window, $50
+ACTIVE floor, $10 MAYBE floor and acceptance-text safety gate still apply. The
+saturation threshold must match the captured policy. Conflicting captures for
+one issue remain held, or pruned when either contains a terminal rejection.
+
+The file contains source prose needed by the safety checks. Keep it under trusted
+local custody; publish only the reduced routing result. Its digest binds contents
+and detects corruption, but is not a GitHub signature and does not authenticate
+a capture supplied by an untrusted party. The normal preflight JSON/summary stays
+unchanged; Python callers explicitly requesting `include_capture=True` must keep
+the returned `capture` value out of ordinary logs. Routed rows contain reduced
+decisions, generation commitments and receipts, never captured source prose.
+Existing raw snapshots and retained discovery-index inputs remain supported;
+they do not acquire capture provenance from an export timestamp.
+
 The live `mine` command waits for its managed child and returns that child's exit
 code. A child terminated by a signal returns `128 + signal`; stopping with Ctrl+C
 returns 130. With `--json`, stdout contains one final result after exit or stop,
