@@ -544,6 +544,11 @@ def route_supply(
     rows: list[dict[str, Any]] = []
     for canonical_id in sorted(grouped):
         candidates = grouped[canonical_id]
+        if len(candidates) == 1:
+            # route_snapshot already finalized this row and its receipt.
+            rows.append(candidates[0])
+            continue
+
         signatures = {_semantic_signature(row) for row in candidates}
         if len(signatures) != 1:
             rows.append(
