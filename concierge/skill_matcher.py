@@ -129,6 +129,35 @@ def _keyword_matches(text: str, keyword: str) -> bool:
     return re.search(rf"(?<!\w){re.escape(normalized)}(?!\w)", text.casefold()) is not None
 
 
+def _skill_patterns(skills: List[str]) -> List[re.Pattern[str] | None]:
+    """Prepare one token search per requested skill for a recommendation."""
+    patterns = []
+    for skill in skills:
+        keywords = SKILL_TAGS.get(skill.lower(), [skill.lower()])
+        alternatives = [
+            re.escape(keyword.casefold())
+            for keyword in keywords
+            if isinstance(keyword, str) and keyword.strip()
+        ]
+        patterns.append(
+            re.compile(rf"(?<!\w)(?:{'|'.join(alternatives)})(?!\w)")
+            if alternatives else None
+        )
+    return patterns
+
+
+def _score_text(text: str, patterns: List[re.Pattern[str] | None]) -> float:
+    """Score prepared text without repeating normalization for each keyword."""
+    if not patterns or not text.strip():
+        return 0.0
+    normalized = text.casefold()
+    matched = sum(
+        pattern is not None and pattern.search(normalized) is not None
+        for pattern in patterns
+    )
+    return matched / len(patterns)
+
+
 def match_skills(bounty: dict, skills: List[str]) -> float:
     """Score how well *bounty* matches the given *skills* (0.0 -- 1.0).
 
@@ -141,14 +170,7 @@ def match_skills(bounty: dict, skills: List[str]) -> float:
     text = _bounty_text(bounty)
     if not text.strip():
         return 0.0
-
-    matched = 0
-    for skill in skills:
-        keywords = SKILL_TAGS.get(skill.lower(), [skill.lower()])
-        if any(_keyword_matches(text, kw) for kw in keywords):
-            matched += 1
-
-    return matched / len(skills)
+    return _score_text(text, _skill_patterns(skills))
 
 
 def recommend(
@@ -159,14 +181,16 @@ def recommend(
     """Return the top *limit* bounties matching *skills*, sorted by score.
 
     Each returned dict is the original bounty dict with an extra
-    ``match_score`` key (float, 0.0--1.0).
+    ``match_score`` key (float, 0.0--1.0). Keyword patterns are prepared once
+    for this call, so later catalog changes remain visible on the next call.
     """
-    if limit <= 0:
+    if limit <= 0 or not bounties:
         return []
 
+    patterns = _skill_patterns(skills)
     scored = []
     for bounty in bounties:
-        score = match_skills(bounty, skills)
+        score = _score_text(_bounty_text(bounty), patterns) if patterns else 0.0
         entry = dict(bounty)
         entry["match_score"] = score
         scored.append(entry)
