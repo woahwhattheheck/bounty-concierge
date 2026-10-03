@@ -18,7 +18,9 @@ from concierge import config
 # Local migration tracking
 # ---------------------------------------------------------------------------
 
-_TRACKING_DIR = os.path.join(os.path.expanduser("~"), ".concierge")
+_TRACKING_DIR = os.path.expanduser(os.environ.get(
+    "CONCIERGE_STATE_DIR", os.path.join(os.path.expanduser("~"), ".concierge"),
+))
 _TRACKING_DB = os.path.join(_TRACKING_DIR, "migrations.db")
 
 _SCHEMA = """\
@@ -275,11 +277,65 @@ def list_discord_holders(min_balance=0.1):
     return _ssh_query(sql, (threshold,))
 
 
-def debit_discord_balance(user_id, amount):
+def _discord_debit_script(db_path, user_id, amount, migration_key=None):
+    """Build the parameterized SQLite operation used by the NAS transport."""
+    params_json = _serialized_params((str(user_id), amount))
+    if params_json is None:
+        return {"error": "Invalid debit parameters"}
+
+    description = "Migrated to on-chain RTC wallet"
+    if migration_key is not None:
+        if not isinstance(migration_key, str) or not migration_key or len(migration_key) > 128:
+            return {"error": "Migration key must be non-empty text of at most 128 characters"}
+        description = "Chain migration " + migration_key
+    replay = ""
+    if migration_key is not None:
+        replay = (
+            "    previous = c.execute('SELECT amount FROM transactions WHERE "
+            "from_user = ? AND to_user = ? AND type = ? AND description = ? LIMIT 2', "
+            "(user_id, 'CHAIN_MIGRATION', 'migration', description)).fetchall()\n"
+            "    if previous:\n"
+            "        if len(previous) != 1 or previous[0][0] != amount:\n"
+            "            print('migration debit receipt conflicts', file=sys.stderr)\n"
+            "            raise SystemExit(2)\n"
+            "        print('OK')\n"
+            "        raise SystemExit(0)\n"
+        )
+    return (
+        "import sqlite3, json, sys\n"
+        f"params = json.loads({params_json!r})\n"
+        "user_id, amount = params\n"
+        f"description = {description!r}\n"
+        f"c = sqlite3.connect({db_path!r})\n"
+        "try:\n"
+        "    c.execute('BEGIN IMMEDIATE')\n"
+        + replay +
+        "    cur = c.execute('UPDATE balances SET balance = balance - ?, "
+        "total_spent = total_spent + ? WHERE user_id = ? AND balance >= ?', "
+        "(amount, amount, user_id, amount))\n"
+        "    if cur.rowcount != 1:\n"
+        "        c.rollback()\n"
+        "        print('source balance row missing or insufficient', file=sys.stderr)\n"
+        "        raise SystemExit(2)\n"
+        "    c.execute('INSERT INTO transactions "
+        "(from_user, to_user, amount, type, description) "
+        "VALUES (?, ?, ?, ?, ?)', "
+        "(user_id, 'CHAIN_MIGRATION', amount, "
+        "'migration', description))\n"
+        "    c.commit()\n"
+        "    print('OK')\n"
+        "finally:\n"
+        "    c.close()\n"
+    )
+
+
+def debit_discord_balance(user_id, amount, migration_key=None):
     """Debit a user's Discord economy balance and record the transaction.
 
     Runs UPDATE + INSERT in the same script for atomicity. The debit is
     permitted only for one exact user row with enough current balance.
+    A migration_key makes replay return the existing transaction without
+    debiting again after an interrupted or concurrent resume.
 
     Returns:
         True on success, error dict on failure.
@@ -294,34 +350,11 @@ def debit_discord_balance(user_id, amount):
     if amount_value == 0:
         return {"error": "Debit amount must be greater than 0"}
 
-    db_path = config.DISCORD_DB_PATH
-    params_json = _serialized_params((str(user_id), amount_value))
-    if params_json is None:
-        return {"error": "Invalid debit parameters"}
-
-    script = (
-        "import sqlite3, json, sys\n"
-        f"params = json.loads({params_json!r})\n"
-        "user_id, amount = params\n"
-        f"c = sqlite3.connect({db_path!r})\n"
-        "try:\n"
-        "    cur = c.execute('UPDATE balances SET balance = balance - ?, "
-        "total_spent = total_spent + ? WHERE user_id = ? AND balance >= ?', "
-        "(amount, amount, user_id, amount))\n"
-        "    if cur.rowcount != 1:\n"
-        "        c.rollback()\n"
-        "        print('source balance row missing or insufficient', file=sys.stderr)\n"
-        "        raise SystemExit(2)\n"
-        "    c.execute('INSERT INTO transactions "
-        "(from_user, to_user, amount, type, description) "
-        "VALUES (?, ?, ?, ?, ?)', "
-        "(user_id, 'CHAIN_MIGRATION', amount, "
-        "'migration', 'Migrated to on-chain RTC wallet'))\n"
-        "    c.commit()\n"
-        "    print('OK')\n"
-        "finally:\n"
-        "    c.close()\n"
+    script = _discord_debit_script(
+        config.DISCORD_DB_PATH, user_id, amount_value, migration_key,
     )
+    if isinstance(script, dict):
+        return script
     stdout, stderr, rc = _ssh_run_script(script)
     if rc != 0:
         detail = stderr or stdout or f"remote script exited {rc}"

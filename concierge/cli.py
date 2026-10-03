@@ -40,19 +40,17 @@ from concierge.wallet_helper import (
     get_holder_stats,
     get_pending_transfers,
     register_wallet_guide,
-    transfer_rtc,
     validate_wallet_name,
 )
 from concierge.payout_tracker import check_status, format_payout_status
 from concierge.skill_matcher import recommend
+from concierge.migration_journal import get_attempt, prepare_migration
+from concierge.wallet_migration import continue_migration
 from concierge.discord_bridge import (
     already_migrated,
-    debit_discord_balance,
     get_discord_balance,
     get_migration_history,
     list_discord_holders,
-    record_migration,
-    record_migration_force,
 )
 
 # Optional modules -- degrade gracefully if missing or broken.
@@ -515,6 +513,16 @@ def _cmd_wallet_migrate(args):
                 ["Query Discord holders", "Read prior migration records"],
                 ["holders", "prior_migrations"],
             )
+        elif args.resume:
+            if not args.user or args.force:
+                raise ValueError("--resume requires --user and cannot be combined with --force")
+            _print_dry_run_plan(
+                args, "wallet.migrate.resume", {"user": args.user},
+                ["Load the exact retained migration attempt",
+                 "Recover or check its existing transfer with the same idempotency key",
+                 "After confirmation, reconcile its idempotent Discord debit"],
+                ["attempt", "transfer_status", "debit_status"],
+            )
         else:
             if not args.user or not args.to_wallet:
                 raise ValueError("--user and --to are required for migration")
@@ -524,8 +532,10 @@ def _cmd_wallet_migrate(args):
             steps = [] if args.force else ["Check the prior migration record"]
             steps += [
                 "Read Discord balance and require at least 0.1 RTC",
-                "Request on-chain credit before any Discord debit",
-                "Handle the credit response, debit Discord, and record the outcome",
+                "Persist one migration attempt and transfer idempotency key",
+                "Request the credit and retain its transaction receipt",
+                "Require confirmed transfer status before the idempotent Discord debit",
+                "Retain progress for --resume and record completion",
             ]
             _print_dry_run_plan(
                 args, "wallet.migrate.user",
@@ -580,92 +590,55 @@ def _cmd_wallet_migrate(args):
             print("%d holders  |  %.4f RTC total" % (len(holders), total))
         return
 
-    # --- migrate a specific user ---
+    # --- migrate or resume a specific user ---
     user_id = args.user
-    to_wallet = args.to_wallet
-
-    if not user_id or not to_wallet:
-        print("Error: --user and --to are required for migration.", file=sys.stderr)
-        print("  concierge wallet migrate --user DISCORD_ID --to WALLET_NAME")
-        print("  concierge wallet migrate --list    (to see eligible users)")
-        print("  concierge wallet migrate --history (to see past migrations)")
-        sys.exit(1)
-
-    # Validate target wallet name
-    valid, msg = validate_wallet_name(to_wallet)
-    if not valid:
-        print("Error: Invalid target wallet name: %s" % msg, file=sys.stderr)
-        sys.exit(1)
-
-    # Check for prior migration
-    if not args.force and already_migrated(user_id):
-        print("Error: Discord user %s has already been migrated." % user_id,
-              file=sys.stderr)
-        print("Use --force to re-migrate.", file=sys.stderr)
-        sys.exit(1)
-
-    # Fetch Discord balance
-    discord_info = get_discord_balance(user_id)
-    if isinstance(discord_info, dict) and "error" in discord_info:
-        print("Error: %s" % discord_info["error"], file=sys.stderr)
-        sys.exit(1)
-
-    balance = discord_info.get("balance", 0)
-    if balance < 0.1:
-        print("Error: Discord balance %.4f RTC is below minimum (0.1 RTC)" % balance,
-              file=sys.stderr)
-        sys.exit(1)
-
-    source_wallet = _cfg.MIGRATION_SOURCE_WALLET
-
-    print("=== Discord-to-Chain Migration ===")
-    print()
-    print("  Discord user:    %s" % user_id)
-    print("  Discord balance: %.4f RTC" % balance)
-    print("  Target wallet:   %s" % to_wallet)
-    print("  Source wallet:   %s" % source_wallet)
-    print("  Amount:          %.4f RTC" % balance)
-    print()
-
-    # Step 1: On-chain credit (BEFORE Discord debit -- safety first)
-    print("Step 1/3: Transferring %.4f RTC on-chain (%s -> %s)..." % (
-        balance, source_wallet, to_wallet))
-    chain_result = transfer_rtc(source_wallet, to_wallet, balance)
-    if isinstance(chain_result, dict) and "error" in chain_result:
-        print("FAILED: On-chain transfer error: %s" % chain_result["error"],
-              file=sys.stderr)
-        sys.exit(1)
-
-    tx_id = chain_result.get("pending_id", chain_result.get("tx_id", "unknown"))
-    print("  OK -- pending_id: %s" % tx_id)
-
-    # Step 2: Debit Discord balance
-    print("Step 2/3: Debiting Discord balance...")
-    debit_result = debit_discord_balance(user_id, balance)
-    if isinstance(debit_result, dict) and "error" in debit_result:
-        print("WARNING: Discord debit failed: %s" % debit_result["error"],
-              file=sys.stderr)
-        print("  On-chain transfer succeeded but Discord balance NOT debited.",
-              file=sys.stderr)
-        print("  Manual fix needed on NAS.", file=sys.stderr)
-        # Still record as partial
+    if not user_id:
+        raise ValueError("--user is required for migration or --resume")
+    if args.resume:
         if args.force:
-            record_migration_force(user_id, to_wallet, balance, str(tx_id), "partial")
-        else:
-            record_migration(user_id, to_wallet, balance, str(tx_id), "partial")
-        sys.exit(1)
-    print("  OK -- Discord balance zeroed")
-
-    # Step 3: Record locally
-    print("Step 3/3: Recording migration...")
-    if args.force:
-        record_migration_force(user_id, to_wallet, balance, str(tx_id))
+            raise ValueError("--resume cannot be combined with --force")
+        attempt = get_attempt(user_id)
+        if attempt is None:
+            raise ValueError(
+                "No resumable attempt exists for this user. Legacy unresolved records "
+                "require reconciliation of their existing transfer."
+            )
+        if args.to_wallet is not None and args.to_wallet != attempt["target_wallet"]:
+            raise ValueError("--to does not match the retained migration target")
     else:
-        record_migration(user_id, to_wallet, balance, str(tx_id))
-    print("  OK")
+        if not args.to_wallet:
+            raise ValueError("--to is required for a new migration")
+        valid, msg = validate_wallet_name(args.to_wallet)
+        if not valid:
+            raise ValueError("Invalid target wallet name: " + msg)
+        if not args.force and already_migrated(user_id):
+            raise ValueError(
+                "Migration already recorded; use --resume for a retained attempt. "
+                "--force only starts another migration after completion."
+            )
+        discord_info = get_discord_balance(user_id)
+        if not isinstance(discord_info, dict) or "error" in discord_info:
+            detail = discord_info.get("error") if isinstance(discord_info, dict) else "Malformed Discord balance"
+            raise ValueError(detail)
+        if str(discord_info.get("user_id")) != str(user_id):
+            raise ValueError("Discord balance does not match the requested user")
+        attempt = prepare_migration(
+            user_id, _cfg.MIGRATION_SOURCE_WALLET, args.to_wallet,
+            discord_info.get("balance"), _cfg.RUSTCHAIN_NODE_URL, force=args.force,
+        )
 
-    print()
-    print("Migration complete: %.4f RTC -> %s" % (balance, to_wallet))
+    attempt, message, exit_code = continue_migration(attempt)
+    if args.json:
+        _print_json({"migration": attempt, "message": message})
+    else:
+        print(message)
+        print("Attempt: %s | State: %s" % (attempt["attempt_key"], attempt["status"]))
+        if attempt["tx_hash"]:
+            print("Transfer: %s" % attempt["tx_hash"])
+        if exit_code:
+            print("Resume: concierge wallet migrate --user %s --resume" % user_id)
+    if exit_code:
+        sys.exit(exit_code)
 
 
 def _cmd_status(args):
@@ -1161,7 +1134,9 @@ def _build_parser():
     p_w_migrate.add_argument("--history", action="store_true",
                              help="Show migration history")
     p_w_migrate.add_argument("--force", action="store_true",
-                             help="Re-migrate even if already done")
+                             help="Start another migration only after the prior one completed")
+    p_w_migrate.add_argument("--resume", action="store_true",
+                             help="Continue the retained transfer and debit without a new credit")
     p_w_migrate.add_argument("--min-balance", type=float, default=0.1,
                              help="Minimum balance for --list (default: 0.1)")
 

@@ -195,7 +195,8 @@ def register_wallet_guide(name):
     )
 
 
-def transfer_rtc(from_wallet, to_wallet, amount, admin_key=None):
+def transfer_rtc(from_wallet, to_wallet, amount, admin_key=None, *,
+                 reason=None, idempotency_key=None):
     """Transfer RTC between wallets via the admin transfer endpoint.
 
     Requires the RC_ADMIN_KEY environment variable or explicit admin_key.
@@ -205,6 +206,8 @@ def transfer_rtc(from_wallet, to_wallet, amount, admin_key=None):
         to_wallet: Destination miner/wallet ID.
         amount: Finite positive RTC amount (int or float).
         admin_key: Optional admin key override.
+        reason: Required transfer attribution, as required by the node.
+        idempotency_key: Stable key retained before submission and reused on retry.
 
     Returns:
         Parsed JSON dict from the node (includes pending_id on success),
@@ -217,12 +220,29 @@ def transfer_rtc(from_wallet, to_wallet, amount, admin_key=None):
         return {"error": "Transfer amount must be a finite positive number"}
     if isinstance(amount, float) and not math.isfinite(amount):
         return {"error": "Transfer amount must be a finite positive number"}
+    if not isinstance(reason, str) or not reason.strip() or len(reason.strip()) > 500:
+        return {"error": "A non-empty transfer reason of at most 500 characters is required"}
+    if (not isinstance(idempotency_key, str)
+            or re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", idempotency_key) is None):
+        return {"error": "A stable transfer idempotency_key is required"}
     return _post(
         "/wallet/transfer",
         data={"from_miner": from_wallet, "to_miner": to_wallet,
-              "amount_rtc": amount},
+              "amount_rtc": amount, "reason": reason.strip(),
+              "idempotency_key": idempotency_key},
         headers={"X-Admin-Key": key},
     )
+
+
+def get_transfer_status(tx_hash):
+    """Read the node's status-only transaction endpoint for a retained hash.
+
+    A pending acknowledgement does not establish a settled credit. The caller
+    must wait for confirmed status with at least one confirmation before debit.
+    """
+    if not isinstance(tx_hash, str) or re.fullmatch(r"[0-9a-f]{32}", tx_hash) is None:
+        return {"error": "Transfer hash must be 32 lowercase hexadecimal characters"}
+    return _get("/wallet/tx/" + tx_hash)
 
 
 # ---------------------------------------------------------------------------
