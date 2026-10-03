@@ -147,13 +147,13 @@ def _read_issue_generation(
 ) -> tuple[dict[str, Any], tuple[Any, ...]]:
     effective_token = token or bp.GITHUB_TOKEN
     url = f"https://api.github.com/repos/{repo}/issues/{number}"
-    payload = bp._object_payload(
-        bp._get_json(session, url, headers=bp._headers(effective_token)),
-        f"issue {repo}#{number}",
-    )
-    if "pull_request" in payload:
-        raise ValueError(f"{repo}#{number} is a pull request, not an issue")
     try:
+        payload = bp._object_payload(
+            bp._get_json(session, url, headers=bp._headers(effective_token)),
+            f"issue {repo}#{number}",
+        )
+        if "pull_request" in payload:
+            raise ValueError(f"{repo}#{number} is a pull request, not an issue")
         marker = bp._issue_generation_marker(payload)
     except bp.BountyPreflightError as exc:
         raise LiveCashAdmissionError(str(exc)) from exc
@@ -258,7 +258,11 @@ def _build_api():
         saturation_threshold: int = 4,
         operator_login: str | None = None,
     ) -> dict[str, Any]:
-        """Evaluate one GitHub issue using only live canonical source evidence."""
+        """Evaluate one GitHub issue using only live canonical source evidence.
+
+        Default reads share one owned connection pool through nested preflight.
+        A caller-supplied session remains owned and managed by that caller.
+        """
         repo_norm = _repo(repo)
         issue_num = _issue_number(number)
         if isinstance(max_pages, bool) or not isinstance(max_pages, int) or max_pages <= 0:
@@ -269,6 +273,18 @@ def _build_api():
             or saturation_threshold <= 0
         ):
             raise ValueError("saturation_threshold must be a positive integer")
+
+        if session is requests:
+            with requests.Session() as owned_session:
+                return evaluate_live_cash_admission(
+                    repo_norm,
+                    issue_num,
+                    token,
+                    session=owned_session,
+                    max_pages=max_pages,
+                    saturation_threshold=saturation_threshold,
+                    operator_login=operator_login,
+                )
 
         issue_before, marker_before = _read_issue_generation(
             repo_norm, issue_num, token, session=session
