@@ -151,6 +151,15 @@ _PRIVATE_CONTEXT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 
 
+_PRIVATE_CONTEXT_START_RE = re.compile(
+    # Every signal above starts with one of these words. Keep the alternatives
+    # with the signal patterns so texts with no possible start need one scan.
+    r"\b(?:system|developer|private|hidden|session|runtime|model|full|"
+    r"conversation|chat|complete|entire|verbatim|everything)\b",
+    re.IGNORECASE,
+)
+
+
 class QualificationInputError(ValueError):
     """Raised when a dispatch snapshot is structurally unreliable."""
 
@@ -400,6 +409,7 @@ def qualify_dispatch(
         {
             name
             for text in texts
+            if _PRIVATE_CONTEXT_START_RE.search(text)
             for name, pattern in _PRIVATE_CONTEXT_PATTERNS
             if pattern.search(text)
         }
