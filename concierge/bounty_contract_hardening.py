@@ -148,6 +148,14 @@ def _read_stable_generation(
     number = _validate_issue_number(number)
     if isinstance(max_pages, bool) or not isinstance(max_pages, int) or max_pages <= 0:
         raise BountyContractInputError("max_pages must be a positive integer")
+    # The module-level requests API creates a new pool for every GET. Own one
+    # pool for the whole generation read; caller-supplied transports stay open.
+    if session is requests:
+        with requests.Session() as owned_session:
+            return _read_stable_generation(
+                repo, number, token, session=owned_session, max_pages=max_pages
+            )
+
     headers = _headers(token or GITHUB_TOKEN)
     issue_url = f"https://api.github.com/repos/{repo}/issues/{number}"
 
