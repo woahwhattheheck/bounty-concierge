@@ -108,6 +108,10 @@ A new binding rejects authority that is in the future or older than 300 seconds.
 
 ## GitHub proof
 
+The HTTP client loads on the first live GitHub read. Offline queue routing and
+historical receipt verification avoid initializing that transport during package
+startup; package authority capture and hardening still run at import time.
+
 `bind_claim_work(payload)` derives exactly one API URL from the authorized `repo` and `pr`. The function has no public transport/session argument. Redirects are disabled. HTTP must be exactly 200. The response must prove:
 
 - `html_url == https://github.com/{repo}/pull/{pr}`;
