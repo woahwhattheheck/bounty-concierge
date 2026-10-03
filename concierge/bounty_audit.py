@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from typing import Any
 
 import requests
@@ -300,7 +301,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("repo", help="Repository in owner/name form")
     parser.add_argument("issue", type=int, help="Bounty issue number")
-    parser.add_argument("--max-pages", type=int, default=10, help="Maximum GitHub search pages (default: 10)")
+    parser.add_argument(
+        "--max-pages", type=int, default=10,
+        help="Maximum pages per GitHub search/comment read (default: 10); incomplete reads exit 2",
+    )
     parser.add_argument("--json", action="store_true", help="Emit full JSON audit")
     args = parser.parse_args(argv)
 
@@ -313,6 +317,14 @@ def main(argv: list[str] | None = None) -> int:
             status = "merged" if pr["merged"] else pr["state"]
             draft = " draft" if pr["draft"] else ""
             print(f"  PR #{pr['number']}: {status}{draft} - {pr['title']} - {pr['url']}")
+    if result["search_truncated"]:
+        print(
+            "PARTIAL: GitHub search or comment history is incomplete; "
+            "collected evidence is retained, but this is not a complete census. "
+            "Increase --max-pages if the page bound was reached, or retry the source read.",
+            file=sys.stderr,
+        )
+        return 2
     return 0
 
 
