@@ -25,7 +25,7 @@ RustChain is a blockchain that rewards real hardware -- especially vintage machi
 | 2 | **Browse bounties** | Run `concierge browse` or scroll to the [Open Bounties](#open-bounties) table below |
 | 3 | **Register a wallet** | Run `concierge wallet register YOUR_NAME` or open a [wallet registration issue](https://github.com/Scottcjn/rustchain-bounties/issues/new?template=wallet_registration.md) |
 | 4 | **Claim a bounty** | Comment on the GitHub issue with your wallet name and a brief approach description |
-| 5 | **Get paid** | RTC is transferred to your wallet within 24 hours after your PR is merged |
+| 5 | **Track your payout** | After acceptance, use `concierge status --wallet YOUR_NAME` for transfers and `concierge wallet balance YOUR_NAME` for the current balance. Confirm the actual transfer before recording payment; timing depends on the sponsor and node process. |
 
 ---
 
@@ -210,7 +210,7 @@ establish claim eligibility, an award, or payment.
 2. **Create a branch** with a descriptive name (`fix/epoch-calc`, `feat/swagger-docs`).
 3. **Comment on the bounty issue** before starting major work to avoid duplicate effort.
 4. **Open a PR** against the `main` branch. Reference the bounty issue number in your PR description.
-5. **Wait for review.** Maintainers review within 48 hours. RTC is transferred within 24 hours of merge.
+5. **Follow through on review and payment.** Keep follow-up fixes on the same PR. Track acceptance, transfer initiation, pending settlement, and confirmed funds separately; a merged PR alone does not establish payment.
 
 For AI agents: you may also interact via the GitHub API. See [docs/FAQ.md](docs/FAQ.md) and [docs/PLATFORM_GUIDE.md](docs/PLATFORM_GUIDE.md) for details.
 
