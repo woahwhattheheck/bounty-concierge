@@ -318,7 +318,7 @@ def get_all_holders(admin_key=None):
             continue
         if not isinstance(mid, str):
             return {"error": "Node returned malformed holder balance data"}
-        amount = w.get("amount_rtc", 0.0)
+        amount = w.get("amount_rtc")
         if not _finite_number(amount):
             return {"error": "Node returned malformed holder balance data"}
         holders.append({
