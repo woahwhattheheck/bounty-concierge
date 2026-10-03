@@ -36,8 +36,8 @@ _MAX_DECIMAL_TEXT = 128
 def _strict_github_url(value: Any, kind: str) -> tuple[str, str, int]:
     if type(value) is not str or not value or len(value) > _MAX_TEXT:
         raise SubmissionPacketInputError(f"{kind} URL must be a non-empty string")
-    parsed = urlsplit(value)
     try:
+        parsed = urlsplit(value)
         port = parsed.port
     except ValueError as exc:
         raise SubmissionPacketInputError(f"{kind} URL port is invalid") from exc
@@ -119,6 +119,38 @@ def _text(value: Any, name: str) -> str:
     return value
 
 
+def validate_submission_target(value: Any, source: str) -> dict[str, str]:
+    """Bind an explicit delivery repository to retained sponsor instructions.
+
+    This validates an operator-supplied source record; it does not discover a
+    target from links or independently authenticate the sponsor's instructions.
+    """
+    keys = {"repository", "source_url", "source_content_sha256", "instruction_excerpt"}
+    if type(value) is not dict or set(value) != keys:
+        raise SubmissionPacketInputError("submission_target has missing or undeclared fields")
+    repository = _text(value["repository"], "submission_target.repository")
+    _strict_github_url(f"https://github.com/{repository}/pull/1", "pull")
+    source_url = _text(value["source_url"], "submission_target.source_url")
+    source_base, separator, fragment = source_url.partition("#")
+    if separator and re.fullmatch(r"issuecomment-[1-9][0-9]*", fragment) is None:
+        raise SubmissionPacketInputError("submission_target source must be an issue or issue comment")
+    source_identity = _strict_github_url(source, "issue")
+    target_source_identity = _strict_github_url(source_base, "issue")
+    if (source_identity[0].casefold(), source_identity[1].casefold(), source_identity[2]) != (
+        target_source_identity[0].casefold(), target_source_identity[1].casefold(),
+        target_source_identity[2],
+    ):
+        raise SubmissionPacketInputError("submission_target source must belong to the bounty issue")
+    digest = value["source_content_sha256"]
+    if type(digest) is not str or not _SHA256_RE.fullmatch(digest):
+        raise SubmissionPacketInputError("submission_target source digest must be a lowercase SHA-256")
+    excerpt = _text(value["instruction_excerpt"], "submission_target.instruction_excerpt")
+    if not excerpt.strip():
+        raise SubmissionPacketInputError("submission_target instruction excerpt must not be blank")
+    return {"repository": repository, "source_url": source_url,
+            "source_content_sha256": digest, "instruction_excerpt": excerpt}
+
+
 def _tests(value: Any) -> tuple[list[dict[str, str]], bool]:
     if type(value) is not list or not value or len(value) > _MAX_TESTS:
         raise SubmissionPacketInputError("tests must be a non-empty bounded list")
@@ -165,7 +197,9 @@ def _acceptance(value: Any) -> tuple[list[dict[str, str]], bool]:
     return result, all_pass
 
 
-def _bind_evidence(entry: dict[str, Any]) -> dict[str, Any]:
+def _bind_evidence(
+    entry: dict[str, Any], submission_target: dict[str, str] | None = None
+) -> dict[str, Any]:
     allowed_keys = {
         "canonical_source_url",
         "pull_request_url",
@@ -182,10 +216,14 @@ def _bind_evidence(entry: dict[str, Any]) -> dict[str, Any]:
     source_owner, source_repo, _ = _strict_github_url(source, "issue")
     pr_url = entry["pull_request_url"]
     pr_owner, pr_repo, pr_number = _strict_github_url(pr_url, "pull")
-    if (source_owner.casefold(), source_repo.casefold()) != (
-        pr_owner.casefold(),
-        pr_repo.casefold(),
-    ):
+    expected_repo = f"{source_owner}/{source_repo}"
+    if submission_target is not None:
+        expected_repo = submission_target["repository"]
+    if expected_repo.casefold() != f"{pr_owner}/{pr_repo}".casefold():
+        if submission_target is not None:
+            raise SubmissionPacketInputError(
+                "pull request repository must match the explicit submission_target repository"
+            )
         raise SubmissionPacketInputError(
             "pull request repository must match canonical source repository"
         )
@@ -251,7 +289,12 @@ def _validate_portfolio(portfolio: Any) -> list[dict[str, Any]]:
             or row_authority.get("revenue") != "not_earned_or_settled_by_this_receipt"
         ):
             raise SubmissionPacketInputError("selected row revenue authority is invalid")
-        checked.append({"canonical_source_url": source, "advertised_reward_usd": reward})
+        checked_row: dict[str, Any] = {
+            "canonical_source_url": source, "advertised_reward_usd": reward
+        }
+        if "submission_target" in row:
+            checked_row["submission_target"] = validate_submission_target(row["submission_target"], source)
+        checked.append(checked_row)
     return checked
 
 
@@ -261,11 +304,15 @@ def build_submission_packet(portfolio: Any, evidence: Any) -> dict[str, Any]:
     if type(evidence) is not list or len(evidence) > max(len(selected), 1) + 128:
         raise SubmissionPacketInputError("evidence must be a bounded list")
 
+    selected_by_source = {row["canonical_source_url"]: row for row in selected}
     evidence_by_source: dict[str, dict[str, Any]] = {}
     for raw in evidence:
         if type(raw) is not dict:
             raise SubmissionPacketInputError("evidence entries must be objects")
-        bound = _bind_evidence(raw)
+        source = raw.get("canonical_source_url")
+        _strict_github_url(source, "issue")
+        selected_row = selected_by_source.get(source, {})
+        bound = _bind_evidence(raw, selected_row.get("submission_target"))
         source = bound["canonical_source_url"]
         if source in evidence_by_source:
             raise SubmissionPacketInputError("duplicate evidence for canonical source")
@@ -312,6 +359,8 @@ def build_submission_packet(portfolio: Any, evidence: Any) -> dict[str, Any]:
                 "cash_claim": False,
             },
         }
+        if "submission_target" in row:
+            packet_core["submission_target"] = dict(row["submission_target"])
         canonical = json.dumps(packet_core, sort_keys=True, separators=(",", ":")).encode("utf-8")
         packet_core["packet_sha256"] = hashlib.sha256(canonical).hexdigest()
         packets.append(packet_core)

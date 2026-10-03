@@ -25,6 +25,7 @@ from concierge.opportunity_ranker import (
     _fraction_to_metric_decimal,
     rank_opportunities,
 )
+from concierge.submission_packet import SubmissionPacketInputError, validate_submission_target
 
 
 class PortfolioInputError(ValueError):
@@ -170,6 +171,11 @@ def _row_to_item(
         "_expected_value_fraction": expected_value_fraction,
         "_skill_fraction": skill_fraction,
     }
+    if "submission_target" in candidate:
+        try:
+            item["submission_target"] = validate_submission_target(candidate["submission_target"], source)
+        except SubmissionPacketInputError as exc:
+            return None, _portfolio_excluded(item, "SUBMISSION_TARGET_INVALID", detail=str(exc))
     if effort_fraction > capacity_fraction:
         return None, _portfolio_excluded(item, "EXCEEDS_PORTFOLIO_CAPACITY")
     if effort_fraction > deadline_fraction:
@@ -388,6 +394,8 @@ def allocate_portfolio(
                 },
             }
         )
+        if "submission_target" in item:
+            selected[-1]["submission_target"] = dict(item["submission_target"])
 
     portfolio_excluded.sort(key=lambda row: row["input_index"])
     capacity_fraction = Fraction(capacity)
