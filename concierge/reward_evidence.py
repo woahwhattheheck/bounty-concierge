@@ -76,6 +76,11 @@ def extract_reward_evidence(title: str, body: str) -> Dict[str, Any]:
                     "text": text,
                     "source": source_name,
                 })
+                # The result exposes only the primary match and five mentions.
+                if len(rtc_matches) >= 1 + _MAX_MENTIONS:
+                    break
+        if len(rtc_matches) >= 1 + _MAX_MENTIONS:
+            break
 
     if rtc_matches:
         primary = rtc_matches[0]
