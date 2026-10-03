@@ -40,6 +40,12 @@ python3 -m concierge --help
 
 Ship production behavior and report actual outcomes and limitations. Historical module documentation and retained evidence may mention removed suite commands; those records are not current execution prerequisites. The live bounty-index publisher and the existing, separately scoped libpcap deliverable build remain intact. Upstream maintainers retain their own contribution and acceptance requirements.
 
+### Building an installable distribution
+
+Build the wheel with `python3 -m pip wheel --no-deps --wheel-dir dist .`, then install that wheel in the destination environment. Run installed commands from outside the source checkout so they use the delivered package. For example, `concierge-revenue settlement --help` loads the settlement implementation without contacting a provider.
+
+The `concierge/*.source` files are required runtime implementation resources. The package-data declaration includes them in both wheels and source distributions; keep their bytes intact because the reinvestment worker checks its core against a pinned digest. A working source checkout alone does not establish that an installed distribution contains these resources.
+
 ## 📝 Code Style
 
 - Follow PEP 8 style guidelines

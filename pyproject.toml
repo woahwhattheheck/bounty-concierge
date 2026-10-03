@@ -19,3 +19,6 @@ concierge-discover = "concierge.discovered_revenue_intake:main"
 
 [tool.setuptools.packages.find]
 include = ["concierge*"]
+
+[tool.setuptools.package-data]
+concierge = ["*.source"]
