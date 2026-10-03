@@ -34,6 +34,7 @@ from concierge.bounty_acceptance_safety_gate import (
     _compile_bounty_acceptance_safety_gate_at,
 )
 from concierge.bounty_qualification import QualificationInputError, qualify_dispatch
+from concierge.bounty_capture import CaptureInputError, replay_capture
 
 
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
@@ -41,6 +42,10 @@ _ROUTE_ORDER = {"ACTIVE": 0, "MAYBE": 1, "HOLD": 2, "PRUNE": 3}
 _ACTIVE_FLOOR_USD = Decimal("50")
 _MAYBE_FLOOR_USD = Decimal("10")
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
+_CAPTURE_FIELDS = frozenset({
+    "schema", "capture", "observation", "generation", "initial_generation",
+    "checks", "qualification", "capture_receipt_sha256",
+})
 
 
 class SupplyInputError(ValueError):
@@ -288,11 +293,19 @@ def route_snapshot(
     evaluated_text = _timestamp_text(evaluated)
     canonical_id, repo, number = _identity(snapshot)
 
+    capture_evidence: dict[str, Any] | None = None
     try:
-        qualification = qualify_dispatch(
-            snapshot, saturation_threshold=saturation_threshold
-        )
-    except QualificationInputError as exc:
+        if _CAPTURE_FIELDS.intersection(snapshot):
+            # A partial/unknown capture must not become a legacy snapshot and
+            # silently discard the final preflight gates it failed to preserve.
+            snapshot, qualification, capture_evidence = replay_capture(
+                snapshot, saturation_threshold=saturation_threshold
+            )
+        else:
+            qualification = qualify_dispatch(
+                snapshot, saturation_threshold=saturation_threshold
+            )
+    except (QualificationInputError, CaptureInputError) as exc:
         raise SupplyInputError(str(exc)) from exc
 
     reward = _authoritative_usd(qualification.get("signals", {}))
@@ -302,6 +315,11 @@ def route_snapshot(
         evaluated=evaluated,
         max_age_seconds=Decimal(policy["max_age_seconds"]),
     )
+    if (
+        capture_evidence is not None
+        and _timestamp(capture_evidence["completed_at"], "completed_at") > evaluated
+    ):
+        freshness = "FUTURE"
     acceptance_safety = {
         "disposition": "NOT_EVALUATED",
         "reason_codes": [],
@@ -389,37 +407,51 @@ def route_snapshot(
         "acceptance_safety_evidence": acceptance_safety,
         "source_row_count": 1,
     }
+    if capture_evidence is not None:
+        row["capture_evidence"] = capture_evidence
     row["receipt_sha256"] = _receipt(row)
     return row
 
 
 def _semantic_signature(row: dict[str, Any]) -> str:
     """Bind source semantics while allowing newer identical observations to win."""
-    return _receipt(
-        {
-            "canonical_id": row["canonical_id"],
-            "qualification_disposition": row["qualification_disposition"],
-            "qualification_reason_codes": row["qualification_reason_codes"],
-            "qualification_evidence": row["qualification_evidence"],
-            "acceptance_safety_disposition": row["acceptance_safety_evidence"][
-                "disposition"
-            ],
-            "acceptance_safety_reason_codes": row["acceptance_safety_evidence"][
-                "reason_codes"
-            ],
-        }
-    )
+    semantics = {
+        "canonical_id": row["canonical_id"],
+        "qualification_disposition": row["qualification_disposition"],
+        "qualification_reason_codes": row["qualification_reason_codes"],
+        "qualification_evidence": row["qualification_evidence"],
+        "acceptance_safety_disposition": row["acceptance_safety_evidence"][
+            "disposition"
+        ],
+        "acceptance_safety_reason_codes": row["acceptance_safety_evidence"][
+            "reason_codes"
+        ],
+    }
+    if "capture_evidence" in row:
+        semantics["capture_source_generation_sha256"] = row["capture_evidence"][
+            "source_generation_sha256"
+        ]
+    return _receipt(semantics)
 
 
-def _observation_sort_key(row: dict[str, Any]) -> datetime:
+def _observation_sort_key(row: dict[str, Any]) -> tuple[datetime, datetime, str]:
     # Parse the normalized timestamp rather than sorting ISO text: variable
     # fractional-second precision is not lexicographically time-ordered.
     # Missing evidence is older than any bound observation. A future timestamp
     # remains newest and therefore wins into a fail-closed FUTURE hold.
+    earliest = datetime.min.replace(tzinfo=timezone.utc)
     observed = row["observed_at"]
-    if observed is None:
-        return datetime.min.replace(tzinfo=timezone.utc)
-    return _timestamp(observed, "observed_at")
+    observed_time = earliest if observed is None else _timestamp(observed, "observed_at")
+    evidence = row.get("capture_evidence")
+    if evidence is not None:
+        # A future completion must win over an otherwise identical capture
+        # with the same start time. Receipt order resolves exact interval ties.
+        return (
+            observed_time,
+            _timestamp(evidence["completed_at"], "completed_at"),
+            evidence["capture_receipt_sha256"],
+        )
+    return observed_time, earliest, ""
 
 
 def _conflict_row(
@@ -591,7 +623,11 @@ def _load_candidates(path: str) -> list[dict[str, Any]]:
         with Path(path).open("r", encoding="utf-8") as handle:
             payload = json.load(handle)
 
-    if isinstance(payload, dict) and "candidates" in payload:
+    if isinstance(payload, dict) and _CAPTURE_FIELDS.intersection(payload):
+        # Preserve malformed capture envelopes for strict validation instead of
+        # unwrapping a nested legacy candidate list and losing their gate state.
+        payload = [payload]
+    elif isinstance(payload, dict) and "candidates" in payload:
         payload = payload["candidates"]
     elif isinstance(payload, dict) and "bounties" in payload:
         # Retained index exports wrap discovery rows; their export timestamp

@@ -16,12 +16,19 @@ import argparse
 from copy import deepcopy
 import hashlib
 import json
+from pathlib import Path
 import re
 from typing import Any
 
 import requests
 
 from concierge.bounty_audit import BountyAuditError, audit_bounty
+from concierge.bounty_capture import (
+    CaptureInputError,
+    CaptureSession,
+    capture_digest,
+    make_capture,
+)
 from concierge.bounty_qualification import (
     QualificationInputError,
     qualify_dispatch,
@@ -31,6 +38,7 @@ from concierge.credential_safety import (
     apply_credential_gate,
     credential_gate_signal_types,
 )
+from concierge.secure_output import create_exclusive_regular
 
 
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
@@ -569,6 +577,7 @@ def _canonical_generation_stable(
     max_pages: int,
     issue_snapshot: dict[str, Any],
     comment_generation: tuple[tuple[int, str, str], ...] | None,
+    capture_evidence: dict[str, Any] | None = None,
 ) -> bool:
     """Revalidate the exact issue/comment generation before dispatch authority."""
     if comment_generation is None:
@@ -585,7 +594,15 @@ def _canonical_generation_stable(
     )
     if "pull_request" in before:
         raise BountyPreflightError(f"{repo}#{number} became a pull request")
-    if _issue_generation_marker(before) != initial_issue:
+    before_marker = _issue_generation_marker(before)
+    if capture_evidence is not None:
+        capture_evidence.update(
+            before_issue=capture_digest(before_marker),
+            comments=None,
+            comments_truncated=None,
+            after_issue=None,
+        )
+    if before_marker != initial_issue:
         return False
 
     current_comments, truncated = _collect_comment_generation(
@@ -595,6 +612,11 @@ def _canonical_generation_stable(
         session=session,
         max_pages=max_pages,
     )
+    if capture_evidence is not None:
+        capture_evidence.update(
+            comments=[list(marker) for marker in current_comments],
+            comments_truncated=truncated,
+        )
     if truncated or current_comments != comment_generation:
         return False
 
@@ -604,7 +626,10 @@ def _canonical_generation_stable(
     )
     if "pull_request" in after:
         raise BountyPreflightError(f"{repo}#{number} became a pull request")
-    return _issue_generation_marker(after) == initial_issue
+    after_marker = _issue_generation_marker(after)
+    if capture_evidence is not None:
+        capture_evidence["after_issue"] = capture_digest(after_marker)
+    return after_marker == initial_issue
 
 
 def _audit_dispatch_marker(audit: dict[str, Any]) -> tuple[str, int, bool, bool]:
@@ -897,6 +922,7 @@ def _collect_issue_context_with_snapshot(
     session: Any = requests,
     max_pages: int = 10,
     operator_login: str | None = None,
+    include_capture: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Collect safe context plus the exact canonical issue generation used."""
 
@@ -933,6 +959,7 @@ def _collect_issue_context_with_snapshot(
         )
 
     anonymous_assignee_state = _assignee_state(issue, None)
+    principal_check = "NO_ASSIGNEES"
     if anonymous_assignee_state["formal_assignee_count"] > 0:
         authenticated_operator = _authenticated_operator_login(
             session,
@@ -941,6 +968,9 @@ def _collect_issue_context_with_snapshot(
             asserted_login=operator_login,
         )
         assignee_state = _assignee_state(issue, authenticated_operator)
+        principal_check = (
+            "AUTHENTICATED_SAME_TOKEN" if authenticated_operator is not None else "ANONYMOUS"
+        )
     else:
         assignee_state = anonymous_assignee_state
 
@@ -951,6 +981,7 @@ def _collect_issue_context_with_snapshot(
     comment_generation_complete = True
     credential_signals: set[str] = set()
     maintainer_pause_signal_count = 0
+    capture_comments: list[dict[str, Any]] = []
     if _has_maintainer_authority(issue):
         credential_signals.update(credential_gate_signal_types([issue_body]))
         if _signals_maintainer_contribution_pause(issue_body):
@@ -984,6 +1015,24 @@ def _collect_issue_context_with_snapshot(
                     f"GitHub issue comment body was not a string for {repo}#{number}"
                 )
             body = body or ""
+            association = comment.get("author_association")
+            if (
+                include_capture
+                and isinstance(association, str)
+                and association.strip().upper() in _MAINTAINER_ASSOCIATIONS
+            ):
+                # Acceptance safety strips association whitespace; preflight
+                # authority deliberately does not. Retain the original value
+                # so offline replay can preserve both existing boundaries.
+                capture_comments.append(
+                    {
+                        "id": comment.get("id"),
+                        "updated_at": comment.get("updated_at"),
+                        "body": body,
+                        "author_association": association,
+                        "generation_digest": marker[2] if marker is not None else None,
+                    }
+                )
             if _has_maintainer_authority(comment) and body.strip():
                 credential_signals.update(credential_gate_signal_types([body]))
                 if _signals_maintainer_contribution_pause(body):
@@ -1011,6 +1060,16 @@ def _collect_issue_context_with_snapshot(
                 tuple(comment_generation) if comment_generation_complete else None
             ),
             **assignee_state,
+            **(
+                {
+                    "_principal_check": principal_check,
+                    "_capture_authority": {
+                        "issue_author_association": _issue_author_association(issue),
+                        "maintainer_comments": capture_comments,
+                    },
+                }
+                if include_capture else {}
+            ),
         },
         issue,
     )
@@ -1055,6 +1114,7 @@ def preflight_bounty(
     max_pages: int = 10,
     saturation_threshold: int = 4,
     operator_login: str | None = None,
+    include_capture: bool = False,
 ) -> dict[str, Any]:
     """Return an operator-safe paid-work preflight result for one issue.
 
@@ -1065,7 +1125,13 @@ def preflight_bounty(
     by itself. PR competition and maintainer-comment reads remain live. Before an
     actionable result is returned, issue/comment authority and every audit field
     consumed by qualification are re-read and must remain stable.
+
+    ``include_capture=True`` additionally returns a controlled source-text
+    capture under ``capture``. That value is private evidence for offline supply
+    routing, not part of the ordinary operator-safe summary/logging contract.
     """
+    if not isinstance(include_capture, bool):
+        raise ValueError("include_capture must be boolean")
     # Keep one connection pool across context, audit and generation reads. The
     # captured-issue adapter below forwards through this same owned session.
     # Caller-supplied sessions retain their existing lifetime and ownership.
@@ -1079,8 +1145,12 @@ def preflight_bounty(
                 max_pages=max_pages,
                 saturation_threshold=saturation_threshold,
                 operator_login=operator_login,
+                include_capture=include_capture,
             )
 
+    capture_session = CaptureSession(session) if include_capture else None
+    if capture_session is not None:
+        session = capture_session
     context, issue_snapshot = _collect_issue_context_with_snapshot(
         repo,
         number,
@@ -1088,7 +1158,22 @@ def preflight_bounty(
         session=session,
         max_pages=max_pages,
         operator_login=operator_login,
+        include_capture=include_capture,
     )
+    if include_capture:
+        # Incomplete initial generations cannot form a reusable capture. Reject
+        # them before spending more provider reads on audits and revalidation.
+        initial_issue_generation = _issue_generation_marker(issue_snapshot)
+        initial_comments = context["_comment_generation"]
+        if initial_comments is None:
+            raise CaptureInputError("initial comment generation evidence is incomplete")
+        if (
+            not context["comments_truncated"]
+            and len(initial_comments) != initial_issue_generation[6]
+        ):
+            raise CaptureInputError(
+                "complete comment evidence does not match the issue comment count"
+            )
     issue_url = f"https://api.github.com/repos/{repo}/issues/{number}"
     audit_session = _CapturedIssueSession(session, issue_url, issue_snapshot)
     audit = _canonical_audit_snapshot(
@@ -1127,6 +1212,9 @@ def preflight_bounty(
     }
     qualification = _apply_assignee_gate(qualification, assignee_state)
 
+    checks: dict[str, Any] = {
+        "audit_before": None, "generation": None, "audit_after": None,
+    }
     audit_before_generation: dict[str, Any] | None = None
     if qualification.get("dispatch") is True:
         audit_before_generation = _canonical_audit_snapshot(
@@ -1138,9 +1226,17 @@ def preflight_bounty(
             comments_truncated=context["comments_truncated"],
         )
         audit_stable = _audit_dispatch_marker(audit_before_generation) == initial_audit_marker
+        if include_capture:
+            checks["audit_before"] = {
+                key: audit_before_generation[key]
+                for key in (
+                    "issue_state", "open_pr_count", "stale_listing_signal", "search_truncated"
+                )
+            }
         qualification = _apply_audit_generation_gate(qualification, audit_stable)
 
     if qualification.get("dispatch") is True:
+        generation_evidence: dict[str, Any] | None = {} if include_capture else None
         generation_stable = _canonical_generation_stable(
             repo,
             number,
@@ -1149,7 +1245,9 @@ def preflight_bounty(
             max_pages=max_pages,
             issue_snapshot=issue_snapshot,
             comment_generation=context["_comment_generation"],
+            capture_evidence=generation_evidence,
         )
+        checks["generation"] = generation_evidence
         qualification = _apply_generation_gate(qualification, generation_stable)
 
     if qualification.get("dispatch") is True:
@@ -1162,6 +1260,13 @@ def preflight_bounty(
             comments_truncated=context["comments_truncated"],
         )
         final_audit_marker = _audit_dispatch_marker(audit_after_generation)
+        if include_capture:
+            checks["audit_after"] = {
+                key: audit_after_generation[key]
+                for key in (
+                    "issue_state", "open_pr_count", "stale_listing_signal", "search_truncated"
+                )
+            }
         audit_stable = (
             final_audit_marker == initial_audit_marker
             and audit_before_generation is not None
@@ -1169,7 +1274,7 @@ def preflight_bounty(
         )
         qualification = _apply_audit_generation_gate(qualification, audit_stable)
 
-    return {
+    result = {
         "repo": repo,
         "number": number,
         "attempt_count": context["attempt_count"],
@@ -1180,6 +1285,20 @@ def preflight_bounty(
         "canonical_audit": audit,
         "qualification": qualification,
     }
+    if capture_session is not None:
+        result["capture"] = make_capture(
+            repo=repo,
+            number=number,
+            context=context,
+            issue_snapshot=issue_snapshot,
+            audit=audit,
+            checks=checks,
+            qualification=qualification,
+            observation=capture_session.observation(),
+            max_pages=max_pages,
+            saturation_threshold=saturation_threshold,
+        )
+    return result
 
 
 def format_summary(result: dict[str, Any]) -> str:
@@ -1212,6 +1331,11 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument("--json", action="store_true", help="Emit full safe JSON result")
+    parser.add_argument(
+        "--capture",
+        type=Path,
+        help="Write a new private capture file for offline supply routing; never overwrite",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -1221,11 +1345,18 @@ def main(argv: list[str] | None = None) -> int:
             max_pages=args.max_pages,
             saturation_threshold=args.saturation_threshold,
             operator_login=args.operator_login,
+            include_capture=args.capture is not None,
         )
+        if args.capture is not None:
+            capture = result.pop("capture")
+            payload = (json.dumps(capture, indent=2, sort_keys=True) + "\n").encode("utf-8")
+            create_exclusive_regular(args.capture, payload, mode=0o600)
     except (
         BountyPreflightError,
         BountyAuditError,
         QualificationInputError,
+        CaptureInputError,
+        OSError,
         ValueError,
     ) as exc:
         parser.error(str(exc))
