@@ -52,7 +52,7 @@ _AWARD_RE = re.compile(
 _CAP_CLOSED_RE = re.compile(
     r"(?i)\b(?:bounty|submissions?|slots?|capacity)\b.{0,64}"
     r"\b(?:full|closed|filled|exhausted|reached)\b|"
-    r"\b(?:no\s+more|stop)\s+(?:new\s+)?submissions?\b"
+    r"\b(?:(?P<stop_no>no)\s+more|stop)\s+(?:new\s+)?submissions?\b"
 )
 _CANCELLED_RE = re.compile(
     r"(?i)\b(?:bounty|reward|task)\b.{0,48}"
@@ -192,7 +192,13 @@ def _terminal_signals(text: str) -> tuple[str, ...]:
                 match = pattern.search(clause)
                 if match is None:
                     continue
-                context = clause[max(0, match.start() - 40) : match.end()]
+                context_start = max(0, match.start() - 40)
+                context = clause[context_start : match.end()]
+                if code == "MAINTAINER_CAP_CLOSED_SIGNAL" and match.group("stop_no"):
+                    # The "no" in "no more submissions" asserts closure; keep
+                    # any surrounding negation subject to the normal filter.
+                    start, end = match.span("stop_no")
+                    context = clause[context_start:start] + clause[end : match.end()]
                 if _NEGATION_RE.search(context):
                     continue
                 found.add(code)
@@ -357,6 +363,14 @@ def inspect_bounty_availability(
     before_marker = _issue_marker(issue_before)
     if issue_before.get("number") != number:
         raise BountyAvailabilityError("canonical issue number did not match request")
+
+    if before_marker[2] == "closed":
+        return _safe_hold(
+            repo=repo,
+            number=number,
+            code="ISSUE_NOT_OPEN",
+            issue_state="closed",
+        )
 
     comments_before, truncated_before = _read_comments(
         repo, number, token, session=session, max_pages=max_pages
