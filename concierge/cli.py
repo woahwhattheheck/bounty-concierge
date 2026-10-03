@@ -410,14 +410,17 @@ def _cmd_wallet(args):
                     print(f"  {k}: {v}")
 
     elif action == "holders":
+        minimum = getattr(args, "min_balance", None)
+        if minimum is not None and not math.isfinite(minimum):
+            raise ValueError("--min-balance must be finite")
+        limit = getattr(args, "limit", 50)
+        if limit < 0:
+            raise ValueError("--limit must be non-negative")
         if args.dry_run:
-            minimum = getattr(args, "min_balance", None)
-            if minimum is not None and not math.isfinite(minimum):
-                raise ValueError("--min-balance must be finite")
             _print_dry_run_plan(
                 args, "wallet.holders",
                 {"category": getattr(args, "category", None),
-                 "min_balance_rtc": minimum, "limit": getattr(args, "limit", 50)},
+                 "min_balance_rtc": minimum, "limit": limit},
                 ["Read wallet holders from the node (requires RC_ADMIN_KEY)",
                  "Apply holder filters and display limit"],
                 ["holders"],
@@ -431,10 +434,8 @@ def _cmd_wallet(args):
         cat_filter = getattr(args, "category", None)
         if cat_filter:
             holders = [h for h in holders if h["category"] == cat_filter]
-        min_bal = getattr(args, "min_balance", None)
-        if min_bal is not None:
-            holders = [h for h in holders if h["amount_rtc"] >= min_bal]
-        limit = getattr(args, "limit", 50)
+        if minimum is not None:
+            holders = [h for h in holders if h["amount_rtc"] >= minimum]
         holders = holders[:limit]
         if args.json:
             _print_json(holders)
