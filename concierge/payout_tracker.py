@@ -230,10 +230,10 @@ def _check_transfers(
         ) from exc
 
 
-def _check_complete_history(
+def _check_history_snapshot(
     wallet_id: str, node_url: str | None = None
-) -> List[dict]:
-    """Read every canonical history page needed for pending-state authority.
+) -> tuple[List[dict], List[dict]]:
+    """Read complete history and retain its first page for recent history.
 
     Canonical RustChain history is paginated.  The first read keeps the
     historical request shape for compatibility; if its ``total`` proves that
@@ -250,6 +250,7 @@ def _check_complete_history(
     url = f"{base}/wallet/history"
 
     collected: list[dict] = []
+    recent: list[dict] = []
     expected_total: int | None = None
     offset = 0
 
@@ -258,7 +259,7 @@ def _check_complete_history(
         if expected_total is not None:
             remaining = expected_total - offset
             if remaining <= 0:
-                return collected
+                return collected, recent
             alignment = offset % _HISTORY_PAGE_LIMIT
             page_limit = (
                 _HISTORY_PAGE_LIMIT
@@ -295,10 +296,12 @@ def _check_complete_history(
         if canonical is None:
             if expected_total is not None or offset != 0:
                 raise PayoutLookupError("history payout pagination was malformed")
-            return _payload_list(data, "history")
+            history = _payload_list(data, "history")
+            return history, history
 
         page, total = canonical
         if expected_total is None:
+            recent = page
             expected_total = total
             if expected_total > _HISTORY_MAX_RECORDS:
                 raise PayoutLookupError(
@@ -315,9 +318,17 @@ def _check_complete_history(
         collected.extend(page)
         offset += len(page)
         if offset == expected_total:
-            return collected
+            return collected, recent
         if not page or offset > _HISTORY_MAX_OFFSET:
             raise PayoutLookupError("history payout pagination was incomplete")
+
+
+def _check_complete_history(
+    wallet_id: str, node_url: str | None = None
+) -> List[dict]:
+    """Read every canonical history page needed for pending-state authority."""
+    history, _recent = _check_history_snapshot(wallet_id, node_url)
+    return history
 
 
 def check_pending(wallet_id: str, node_url: str | None = None) -> List[dict]:
@@ -347,6 +358,20 @@ def check_history(wallet_id: str, node_url: str | None = None) -> List[dict]:
     payload failures raise :class:`PayoutLookupError`.
     """
     return _check_transfers(wallet_id, "history", "history", node_url)
+
+
+def check_status(
+    wallet_id: str, node_url: str | None = None
+) -> tuple[List[dict], List[dict]]:
+    """Return pending transfers and recent history from one complete read.
+
+    Pending transfers use every validated history page. Recent history retains
+    the first response, matching :func:`check_history` without fetching it
+    again. All existing transport, envelope, pagination, and pending-state
+    failures propagate before either result is returned.
+    """
+    history, recent = _check_history_snapshot(wallet_id, node_url)
+    return _pending_from_history(history), recent
 
 
 def format_payout_status(pending: List[dict], history: List[dict]) -> str:
