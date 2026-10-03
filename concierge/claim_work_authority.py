@@ -30,8 +30,6 @@ import stat
 from pathlib import Path
 from typing import Any, Mapping
 
-import requests
-
 from .sponsor_adjudication import AdjudicationError, verify_report
 
 
@@ -419,6 +417,10 @@ def _live_pull(
     pr = work["pr"]
     api_url = f"https://api.github.com/repos/{repo}/pulls/{pr}"
     try:
+        # Offline callers import this module during package bootstrap.
+        # Initialize the HTTP stack only when a live read is requested.
+        import requests
+
         response = requests.get(
             api_url,
             headers=_github_headers(),
