@@ -159,11 +159,24 @@ FAQ_ENTRIES = {
 # Fuzzy matching
 # ---------------------------------------------------------------------------
 
+# Question framing is not evidence that an FAQ or paragraph answers its topic.
+_QUESTION_WORDS = frozenset({
+    "a", "an", "and", "are", "as", "at", "be", "can", "do", "does", "for",
+    "how", "i", "in", "is", "it", "my", "of", "on", "the", "there", "to",
+    "what", "when", "where", "which", "who", "why", "with", "you", "your",
+})
+
+
 def _normalise(text):
     """Lowercase, strip punctuation, collapse whitespace."""
     text = text.lower().strip()
     text = re.sub(r"[^\w\s]", " ", text)
-    return re.sub(r"\s+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _keywords(text):
+    """Keep topic words, including short domain terms such as RTC and VM."""
+    return set(_normalise(text).split()) - _QUESTION_WORDS
 
 
 def fuzzy_match(question, entries=None):
@@ -182,16 +195,26 @@ def fuzzy_match(question, entries=None):
     if not entries:
         return ("", "", 0.0)
 
-    q_words = set(_normalise(question).split())
+    normalised_question = _normalise(question)
+    if not normalised_question:
+        return ("", "", 0.0)
+
+    # Exact questions win even if a shorter FAQ shares all its topic words.
+    for key, answer in entries.items():
+        if _normalise(key) == normalised_question:
+            return (key, answer, 1.0)
+
+    q_words = _keywords(question)
     if not q_words:
         return ("", "", 0.0)
 
     best_key = ""
     best_answer = ""
     best_score = 0.0
+    best_overlap = 0
 
     for key, answer in entries.items():
-        key_words = set(_normalise(key).split())
+        key_words = _keywords(key)
         if not key_words:
             continue
 
@@ -199,8 +222,10 @@ def fuzzy_match(question, entries=None):
         # Jaccard-like score biased toward the shorter set
         score = len(overlap) / min(len(q_words), len(key_words)) if overlap else 0.0
 
-        if score > best_score:
+        # Prefer the more specific topic when subset scores are tied.
+        if (score, len(overlap)) > (best_score, best_overlap):
             best_score = score
+            best_overlap = len(overlap)
             best_key = key
             best_answer = answer
 
@@ -224,7 +249,7 @@ def search_docs(question, docs_dir=None):
     if not os.path.isdir(docs_dir):
         return ""
 
-    q_words = set(_normalise(question).split())
+    q_words = _keywords(question)
     if not q_words:
         return ""
 
@@ -247,7 +272,7 @@ def search_docs(question, docs_dir=None):
             para_stripped = para.strip()
             if len(para_stripped) < 20:
                 continue
-            p_words = set(_normalise(para_stripped).split())
+            p_words = _keywords(para_stripped)
             overlap = q_words & p_words
             if not overlap:
                 continue
