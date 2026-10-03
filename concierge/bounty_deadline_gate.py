@@ -28,6 +28,10 @@ _GITHUB_HOSTS = frozenset({"github.com", "www.github.com"})
 _GITHUB_ISSUE_PATH_RE = re.compile(
     r"^/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)/?$"
 )
+_GITHUB_API_ISSUE_PATH_RE = re.compile(
+    r"^/repos/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)/?$"
+)
+_GITHUB_ISSUE_COMMENT_RE = re.compile(r"issuecomment-[1-9][0-9]*")
 _SHA256_RE = re.compile(r"[0-9a-f]{64}")
 _ALLOWED_DEADLINE_KINDS = frozenset({"DATE", "INSTANT"})
 _ALLOWED_BASE_AUTHORITIES = frozenset(
@@ -98,7 +102,9 @@ def _require_sha256(value: Any, field: str) -> str:
     return digest
 
 
-def _strict_url_parts(value: Any, field: str) -> tuple[str, str]:
+def _strict_url_parts(
+    value: Any, field: str, *, allow_issue_comment: bool = False
+) -> tuple[str, str]:
     source = _require_string(value, field)
     if len(source) > _MAX_URL_CHARS:
         raise BountyDeadlineInputError(f"{field} exceeds {_MAX_URL_CHARS} characters")
@@ -108,7 +114,7 @@ def _strict_url_parts(value: Any, field: str) -> tuple[str, str]:
         raise BountyDeadlineInputError(
             f"{field} must not contain backslash or encoded path aliases"
         )
-    if "?" in source or "#" in source:
+    if "?" in source or ("#" in source and not allow_issue_comment):
         raise BountyDeadlineInputError(
             f"{field} must not contain query or fragment delimiters"
         )
@@ -124,11 +130,20 @@ def _strict_url_parts(value: Any, field: str) -> tuple[str, str]:
         raise BountyDeadlineInputError(f"{field} must not contain userinfo")
     if port is not None:
         raise BountyDeadlineInputError(f"{field} must not contain an explicit port")
-    if parsed.query or parsed.fragment:
+    if parsed.query:
         raise BountyDeadlineInputError(f"{field} must not contain query or fragment")
     host = (parsed.hostname or "").casefold()
     if not host:
         raise BountyDeadlineInputError(f"{field} must contain a host")
+    if "#" in source and not (
+        allow_issue_comment
+        and host in _GITHUB_HOSTS
+        and _GITHUB_ISSUE_PATH_RE.fullmatch(parsed.path) is not None
+        and _GITHUB_ISSUE_COMMENT_RE.fullmatch(parsed.fragment) is not None
+    ):
+        raise BountyDeadlineInputError(
+            f"{field} fragment must identify a canonical GitHub issue comment"
+        )
     if parsed.path.startswith("//") or "//" in parsed.path:
         raise BountyDeadlineInputError(f"{field} must not contain repeated separators")
     return host, parsed.path
@@ -226,7 +241,11 @@ def _normalize_deadline_evidence(
         raise BountyDeadlineInputError(
             f"{field}.authority must be one of {allowed}"
         )
-    host, path = _strict_url_parts(evidence["source_url"], f"{field}.source_url")
+    host, path = _strict_url_parts(
+        evidence["source_url"],
+        f"{field}.source_url",
+        allow_issue_comment=authority != "ISSUE_BODY",
+    )
     source_digest = _require_sha256(
         evidence["source_content_sha256"], f"{field}.source_content_sha256"
     )
@@ -249,6 +268,34 @@ def _normalize_deadline_evidence(
         "observed_at": evidence["observed_at"],
         "observed_dt": observed,
     }
+
+
+def _require_source_issue(
+    evidence: dict[str, Any], issue: dict[str, Any], field: str
+) -> None:
+    """Bind explicit GitHub issue sources without changing other source types."""
+    if evidence["source_host"] in _GITHUB_HOSTS:
+        source_issue = _GITHUB_ISSUE_PATH_RE.fullmatch(evidence["source_path"])
+    elif evidence["source_host"] == "api.github.com":
+        source_issue = _GITHUB_API_ISSUE_PATH_RE.fullmatch(evidence["source_path"])
+    else:
+        source_issue = None
+    if source_issue is None:
+        if evidence["authority"] == "ISSUE_BODY":
+            raise BountyDeadlineInputError(
+                f"{field}.source_url must identify the observed GitHub issue"
+            )
+        # Existing provider and repository source forms remain supported. Their
+        # relevance and author authority are established by the source collector.
+        return
+
+    owner, repo, number = source_issue.groups()
+    if (owner.casefold(), repo.casefold(), int(number)) != (
+        issue["owner"], issue["repo"], issue["number"]
+    ):
+        raise BountyDeadlineInputError(
+            f"{field}.source_url must identify the observed GitHub issue"
+        )
 
 
 def _deadline_relation(deadline: dict[str, Any], evaluated: datetime) -> str:
@@ -307,6 +354,7 @@ def compile_bounty_deadline_gate(request: dict[str, Any]) -> dict[str, Any]:
         "deadline_evidence",
         allowed_authorities=_ALLOWED_BASE_AUTHORITIES,
     )
+    _require_source_issue(deadline, issue, "deadline_evidence")
     extension_raw = request["extension_evidence"]
     extension = None
     if extension_raw is not None:
@@ -315,6 +363,7 @@ def compile_bounty_deadline_gate(request: dict[str, Any]) -> dict[str, Any]:
             "extension_evidence",
             allowed_authorities=_ALLOWED_EXTENSION_AUTHORITIES,
         )
+        _require_source_issue(extension, issue, "extension_evidence")
 
     evaluated = _parse_timestamp(request["evaluated_at"], "evaluated_at")
     max_age = request["max_observation_age_seconds"]
