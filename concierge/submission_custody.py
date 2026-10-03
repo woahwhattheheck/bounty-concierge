@@ -19,6 +19,8 @@ from pathlib import PurePosixPath
 from typing import Any
 from urllib.parse import urlsplit
 
+from concierge.submission_packet import SubmissionPacketInputError, validate_submission_target
+
 SCHEMA = "bounty-submission-custody/v1"
 _ROUTE_CLASSES = {"github_comment", "github_pr", "email_fallback", "form", "other"}
 _SPONSOR_STATUSES = {
@@ -248,6 +250,7 @@ def _bounded_list(value: Any, field: str, limit: int) -> list[Any]:
 
 def _verify_submission_packet(packet: Any) -> dict[str, str]:
     _reject_secret_keys(packet)
+    packet = _plain_dict(packet, "PACKET_SHAPE_MISMATCH")
     packet = _exact_keys(
         packet,
         {
@@ -258,7 +261,7 @@ def _verify_submission_packet(packet: Any) -> dict[str, str]:
             "evidence",
             "authority",
             "packet_sha256",
-        },
+        } | ({"submission_target"} if "submission_target" in packet else set()),
         "PACKET_SHAPE_MISMATCH",
     )
     source, source_owner, source_repo, _ = _github_object_url(
@@ -304,8 +307,15 @@ def _verify_submission_packet(packet: Any) -> dict[str, str]:
     expected_repo = f"{pr_owner}/{pr_repo}"
     if evidence["pull_request_repo"] != expected_repo:
         _fail("PACKET_PR_REPO_INVALID")
-    if (source_owner.casefold(), source_repo.casefold()) != (pr_owner.casefold(), pr_repo.casefold()):
-        _fail("PACKET_PR_SOURCE_REPO_MISMATCH")
+    target_repo = f"{source_owner}/{source_repo}"
+    if "submission_target" in packet:
+        try:
+            target_repo = validate_submission_target(packet["submission_target"], source)["repository"]
+        except SubmissionPacketInputError as exc:
+            _fail("PACKET_SUBMISSION_TARGET_INVALID", str(exc))
+    if target_repo.casefold() != expected_repo.casefold():
+        _fail("PACKET_PR_TARGET_REPO_MISMATCH" if "submission_target" in packet
+              else "PACKET_PR_SOURCE_REPO_MISMATCH")
     if isinstance(evidence["pull_request_number"], bool) or type(evidence["pull_request_number"]) is not int:
         _fail("PACKET_PR_NUMBER_INVALID")
     if evidence["pull_request_number"] != pr_number:
