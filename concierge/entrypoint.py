@@ -24,7 +24,7 @@ from concierge.claim_economic_admission import (
     ClaimEconomicAdmissionError,
     verify_claim_economic_receipt,
 )
-from concierge.cli import main as _cli_main
+from concierge.cli import _build_parser, main as _cli_main
 from concierge.payoff_claim_gate import ClaimPayoffError, verify_claim_payoff_bundle
 from concierge.payout_tracker import PayoutLookupError
 
@@ -60,16 +60,6 @@ def _json_requested() -> bool:
     return "--json" in sys.argv[1:]
 
 
-def _option_value(args: list[str], name: str) -> str | None:
-    for index, arg in enumerate(args):
-        if arg == name:
-            return args[index + 1] if index + 1 < len(args) else None
-        prefix = f"{name}="
-        if arg.startswith(prefix):
-            return arg[len(prefix) :]
-    return None
-
-
 def _option_values(args: list[str], name: str) -> list[str | None]:
     """Collect wrapper option values without consuming another option as a value."""
     values: list[str | None] = []
@@ -100,25 +90,26 @@ def _claim_tail(argv: list[str]) -> list[str] | None:
 
 
 def _claim_target(argv: list[str]) -> tuple[str, int] | None:
-    """Extract a valid live claim target; leave syntax errors to the main CLI."""
-    tail = _claim_tail(argv)
-    if tail is None:
+    """Resolve live claims with the same parser and argv used by the CLI."""
+    if _claim_tail(argv) is None:
         return None
-    if "--dry-run" in argv or "-h" in tail or "--help" in tail:
+
+    # Parsing the complete command preserves argparse's accepted abbreviations,
+    # last-option semantics, common flags and syntax errors. A separate lexical
+    # target scan could check one bounty while the handler displayed another.
+    parser = _build_parser()
+    parsed = parser.parse_args(_strip_claim_wrapper_options(argv))
+    if parsed.command != "claim":
         return None
-    issue_text = _option_value(tail, "--issue")
-    if issue_text is None:
+    if parsed.issue <= 0:
+        parser.error("--issue must be a positive integer")
+    if parsed.dry_run:
         return None
-    try:
-        issue = int(issue_text)
-    except ValueError:
-        return None
-    if issue <= 0:
-        return None
-    repo = _option_value(tail, "--repo") or "Scottcjn/rustchain-bounties"
+
+    repo = parsed.repo
     if "/" not in repo:
         repo = f"Scottcjn/{repo}"
-    return repo, issue
+    return repo, parsed.issue
 
 
 def _claim_payoff_bundle(argv: list[str]) -> str:
