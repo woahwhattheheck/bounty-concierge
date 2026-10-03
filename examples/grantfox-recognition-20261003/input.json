@@ -1,0 +1,76 @@
+{
+  "schema": "bounty-concierge/reward-settlement-input/v1",
+  "generated_at": "2026-10-03T06:53:24Z",
+  "cases": [
+    {
+      "case_id": "stellar-agentic-426",
+      "work": {
+        "repo": "StellarAgent-AI-Agent-Payment-Rails/Stellar-agentic",
+        "pr": 426,
+        "merge_commit_sha": "fa24e5c7113df6fd58d4c3ada99ef7a637e1d542",
+        "merged_at": "2026-10-02T14:34:57Z",
+        "source": {
+          "source_id": "github-pr426",
+          "source_ref": "https://api.github.com/repos/StellarAgent-AI-Agent-Payment-Rails/Stellar-agentic/pulls/426",
+          "source_sha256": "5ca592e9d77720b0e8bfacfeb6b213f9a09a8089a2c6ff70958d178f62407896",
+          "observed_at": "2026-10-03T06:53:24Z",
+          "authority": "REPOSITORY"
+        }
+      },
+      "events": [
+        {
+          "event_id": "grantfox-comment-5954751622",
+          "kind": "PROVIDER_RECOGNITION",
+          "provider": "grantfox",
+          "claimant": "tokenjunkielabs",
+          "award_id": "github-comment:5954751622",
+          "unit": "FoxPoints",
+          "quantity": 35,
+          "reported_account_total": 35,
+          "source": {
+            "source_id": "github-comment426",
+            "source_ref": "https://api.github.com/repos/StellarAgent-AI-Agent-Payment-Rails/Stellar-agentic/issues/comments/5954751622",
+            "source_sha256": "5f00b31989ef1b176abfdbe635188eb7b8330fd84d769084f04aa5fc29ba0d03",
+            "observed_at": "2026-10-03T06:53:24Z",
+            "authority": "PROVIDER"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "stellar-agentic-427",
+      "work": {
+        "repo": "StellarAgent-AI-Agent-Payment-Rails/Stellar-agentic",
+        "pr": 427,
+        "merge_commit_sha": "74ac46cb503777e37e48d2213ba442b423406f17",
+        "merged_at": "2026-10-02T14:44:38Z",
+        "source": {
+          "source_id": "github-pr427",
+          "source_ref": "https://api.github.com/repos/StellarAgent-AI-Agent-Payment-Rails/Stellar-agentic/pulls/427",
+          "source_sha256": "131c5375e2bc0e671f31e17a1ee0247b682255f9a185dbee8491385921da3f0d",
+          "observed_at": "2026-10-03T06:53:24Z",
+          "authority": "REPOSITORY"
+        }
+      },
+      "events": [
+        {
+          "event_id": "grantfox-comment-5954906363",
+          "kind": "PROVIDER_RECOGNITION",
+          "provider": "grantfox",
+          "claimant": "tokenjunkielabs",
+          "award_id": "github-comment:5954906363",
+          "unit": "FoxPoints",
+          "quantity": 35,
+          "reported_account_total": 70,
+          "source": {
+            "source_id": "github-comment427",
+            "source_ref": "https://api.github.com/repos/StellarAgent-AI-Agent-Payment-Rails/Stellar-agentic/issues/comments/5954906363",
+            "source_sha256": "e5cd6203a652dedce6aa3375f86b4a46e9ab917d86774770e3f5ef45f502eda8",
+            "observed_at": "2026-10-03T06:53:24Z",
+            "authority": "PROVIDER"
+          }
+        }
+      ]
+    }
+  ]
+}

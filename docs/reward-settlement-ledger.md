@@ -14,6 +14,7 @@ It deliberately keeps these facts separate:
 | provider/wallet/bank incoming transfer row | `TRANSFER_EVIDENCED` while non-terminal | payment |
 | terminal incoming provider/wallet/bank evidence | `PAID_CONFIRMED` | accounting revenue recognition |
 | explicit sponsor/provider decline/expiry/no-reward evidence | `CLOSED_WITHOUT_REWARD` | inferred closure from silence |
+| explicit provider points decision | `noncash_recognitions` with its native unit | money award, eligibility, payout readiness or payment |
 
 A GitHub merge is required for every work item, but **merge state never proves payment**.
 
@@ -31,7 +32,28 @@ All timestamps are canonical UTC seconds (`YYYY-MM-DDTHH:MM:SSZ`). Money is posi
 
 Transfer IDs and payout-ticket IDs cannot be reused across merged work items. A transfer may have multiple observations only when amount/currency are stable and state progresses monotonically (`PENDING` → `CONFIRMING` → one terminal `CONFIRMED` or `FAILED`). Terminal conflicts/regressions fail closed.
 
-The in-repo fixture is synthetic and asserts no real sponsor, payment, or revenue fact.
+The existing `data/reward_settlement_ledger.synthetic.json` fixture is synthetic and asserts no real sponsor, payment, or revenue fact. The separate [GrantFox example](../examples/grantfox-recognition-20261003/README.md) contains actual public provider comments and merged-PR records.
+
+## Noncash provider recognition
+
+Use `PROVIDER_RECOGNITION` for an explicit award of points. The event has the usual `event_id` and `source` fields, plus:
+
+| Field | Meaning |
+| --- | --- |
+| `provider` | Stable provider name, normalized to lowercase. |
+| `claimant` | Stable claimant handle, normalized to lowercase. |
+| `award_id` | Stable, case-sensitive identity for this award; the example uses the provider's GitHub comment ID. |
+| `unit` | Native point-unit name, such as `FoxPoints`; no currency conversion. |
+| `quantity` | Positive integer explicitly awarded for this work. |
+| `reported_account_total` | Optional non-negative integer reported account total, retained only as a source-linked observation. |
+
+Recognition requires `source.authority = PROVIDER` and is bound to the case's exact merged work. One award is identified by provider, claimant, canonical GitHub repository/PR and award ID. Repeated observations of that identity count once; conflicting quantities or units are rejected. Separate awards, claimants and providers remain separate.
+
+Each recognition source must describe one award for one work item. Its reference and exact payload SHA-256 cannot be reused for a different award, even with a new event ID, source ID or observation timestamp. Case variants of the same GitHub work item cannot appear as multiple recognition cases. If identical payload bytes supply different reported account totals, compilation rejects the conflicting extraction. An omitted total may be supplied by another observation of those same bytes; distinct payload captures can retain distinct account-total observations.
+
+Per-case `noncash_recognitions` retain the award quantity, source IDs and any account-total observations. `aggregates.noncash_recognized` sums award quantities by **provider, claimant and unit**, and reports the number of distinct awards. It never sums reported account totals. For the real example, two awards of 35 FoxPoints produce 70 recognized FoxPoints; the second comment's 70-point account total adds nothing.
+
+Points do not change the case's existing settlement, monetary award, eligibility, payout ticket, payout rail or payment fields. They never enter a currency aggregate. New recognition fields are omitted when no recognition events exist, so existing money-only input produces byte-identical JSON, Markdown and receipt output.
 
 ## Compile and verify
 
