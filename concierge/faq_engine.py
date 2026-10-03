@@ -26,16 +26,22 @@ FAQ_ENTRIES = {
         "protocol.  Internal reference rate: 1 RTC = $0.15 USD."
     ),
     "how do i set up a wallet": (
-        "Install the RustChain wallet package (Standard, Founder, or Secure "
-        "edition) from the .deb packages or run the PyInstaller binary.  "
-        "On first launch the wallet generates a BIP39 24-word seed phrase and "
-        "an Ed25519 keypair.  Your address starts with 'RTC...'."
+        "For a named RustChain bounty wallet, choose 3-64 lowercase letters, "
+        "digits, or hyphens, starting and ending with a letter or digit. "
+        "Run `concierge wallet register NAME` for instructions. The command "
+        "prints the existing registration options; the usual named-wallet "
+        "path creates the wallet on the first RTC transfer. The optional "
+        "RustChain Wallet GUI can generate a BIP39 seed phrase and an "
+        "Ed25519 keypair."
     ),
     "how do payouts work": (
-        "Bounty payouts are made in RTC after a PR is merged or a deliverable "
-        "is accepted.  An admin triggers a signed transfer via the "
-        "/wallet/transfer/signed endpoint.  You will see the RTC in your "
-        "wallet balance within one epoch (~10 minutes)."
+        "The maintainer initiates an RTC transfer after accepting the bounty "
+        "deliverable. Acceptance, merge, transfer initiation, pending "
+        "settlement, and confirmed funds are separate states. Use "
+        "`concierge status --wallet NAME` for pending transfers and history, "
+        "and `concierge wallet balance NAME` for the current balance. Track "
+        "the actual transfer confirmation before recording the award as paid; "
+        "timing depends on the sponsor and node process."
     ),
     "what is wrtc": (
         "wRTC (Wrapped RTC) is a planned representation of RTC on the Ergo "
@@ -126,16 +132,21 @@ FAQ_ENTRIES = {
         "on any exchange."
     ),
     "how do i claim a bounty": (
-        "Comment on the GitHub issue saying you want to work on it, and "
-        "include your RustChain wallet name.  Once assigned, submit a PR "
-        "referencing the issue number.  After merge, RTC is transferred to "
-        "your wallet."
+        "Follow the bounty issue's intake instructions and include your "
+        "RustChain wallet name and planned approach. Wait for the required "
+        "maintainer acknowledgment before significant work, then submit a "
+        "PR referencing the bounty and keep review fixes on the same PR. "
+        "After acceptance and merge, track the maintainer's transfer and "
+        "settlement separately before recording payment."
     ),
     "how do i register a wallet": (
-        "Pick a wallet name (alphanumeric, hyphens, underscores, 3-50 chars). "
-        "Your first bounty claim automatically registers it.  Or install the "
-        "RustChain wallet GUI to generate a cryptographic wallet with a "
-        "BIP39 seed phrase."
+        "Choose a name of 3-64 lowercase letters, digits, or hyphens, "
+        "starting and ending with a letter or digit; underscores are invalid. "
+        "Run `concierge wallet register NAME` to display the registration "
+        "guide. This prints instructions without creating a wallet or "
+        "submitting a claim. The usual named-wallet path creates the wallet "
+        "when the first RTC transfer is made. The guide also includes the "
+        "Wallet GUI and an explicit admin-registration option."
     ),
     "epoch schedule": (
         "Epochs are 600 seconds (10 minutes).  Each epoch distributes a pot "
