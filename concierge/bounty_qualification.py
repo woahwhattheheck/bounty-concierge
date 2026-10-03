@@ -177,6 +177,8 @@ def _amount_strings(values: set[Decimal]) -> list[str]:
 
 def _advertised_rewards(text: str) -> set[Decimal]:
     """Extract high-confidence sponsor-advertised USD amounts from one field."""
+    if "$" not in text:
+        return set()
     values = {_amount(match) for match in _BODY_BOUNTY_RE.findall(text)}
     values.update(_amount(match) for match in _KEYWORD_REWARD_RE.findall(text))
     values.update(_amount(match) for match in _AMOUNT_BEFORE_REWARD_RE.findall(text))
