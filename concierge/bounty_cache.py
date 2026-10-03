@@ -59,7 +59,12 @@ class PageCache:
                 info = os.fstat(stream.fileno())
                 if not stat.S_ISREG(info.st_mode) or info.st_size > _MAX_BYTES:
                     return None, True
-                raw = stream.read(_MAX_BYTES + 1)
+                # Size the ordinary read to this file, not the 8 MiB ceiling.
+                raw = stream.read(info.st_size + 1)
+                if len(raw) > info.st_size:
+                    # Preserve bounded reads if an in-place writer grew it
+                    # after fstat; cache.store itself uses atomic replacement.
+                    raw += stream.read(_MAX_BYTES + 1 - len(raw))
             if len(raw) > _MAX_BYTES:
                 return None, True
             record = json.loads(raw)
