@@ -588,6 +588,10 @@ def _load_candidates(path: str) -> list[dict[str, Any]]:
 
     if isinstance(payload, dict) and "candidates" in payload:
         payload = payload["candidates"]
+    elif isinstance(payload, dict) and "bounties" in payload:
+        # Retained index exports wrap discovery rows; their export timestamp
+        # and count do not establish canonical evidence for those rows.
+        payload = payload["bounties"]
     elif isinstance(payload, dict):
         payload = [payload]
 
@@ -596,7 +600,7 @@ def _load_candidates(path: str) -> list[dict[str, Any]]:
     ):
         raise SupplyInputError(
             "input JSON must be a snapshot, a list of snapshots, or an object "
-            "with a candidates list"
+            "with a candidates or bounties list"
         )
     return payload
 
