@@ -988,8 +988,13 @@ def _cmd_claim(args):
     issue_url = f"https://github.com/{repo}/issues/{issue_num}"
 
     if args.dry_run:
-        print(f"[dry-run] Would claim issue #{issue_num} in {repo}")
-        print(f"[dry-run] Wallet: {wallet}")
+        _print_dry_run_plan(
+            args, "claim.instructions",
+            {"repo": repo, "issue": issue_num, "wallet": wallet, "url": issue_url},
+            ["Validate live claim prerequisites",
+             "Show claim instructions for the supplied issue and wallet; this handler does not post"],
+            ["bounty_availability", "claim_eligibility", "assignment", "payment"],
+        )
         return
 
     if args.json:
