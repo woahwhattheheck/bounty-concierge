@@ -148,6 +148,14 @@ The `claim --dry-run` example produces a local plan; it does not submit a claim 
 
 Full contract: [docs/BROWSE.md](docs/BROWSE.md).
 
+The live `mine` command waits for its managed child and returns that child's exit
+code. A child terminated by a signal returns `128 + signal`; stopping with Ctrl+C
+returns 130. With `--json`, stdout contains one final result after exit or stop,
+including `status`, `returncode`, `exit_code`, the command and captured proof
+results. Failure to launch the executable returns a JSON error and exit 1. The final result does
+not count an exited child as a running managed process; progress remains available
+in text mode and child output stays in `--log-file`.
+
 ### Inspect a bounty's current GitHub state
 
 ```bash

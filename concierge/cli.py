@@ -17,7 +17,6 @@ import argparse
 import json
 import math
 import sys
-import time
 
 from concierge import __version__
 from concierge import config
@@ -905,33 +904,26 @@ def _cmd_mine(args):
             miner_path=args.miner_path or "janusminer-ubuntu22",
         )
 
+    result = {
+        "command": command,
+        "pool_proof": pool_proof,
+        "node_rpc_proof": node_proof,
+    }
     managed = None
     try:
         managed = pow_miners.start_managed_miner(command, log_path=args.log_file)
-        print(f"Started {args.miner} (pid={managed.process.pid})")
-        print(f"Pool: {pool_result['endpoint']}")
-        print(f"Wallet: {args.wallet}")
-        print(f"Logs: {managed.log_path}")
-
-        bonus = pow_miners.calculate_bonus_multiplier(
-            managed_subprocess_running=True,
-            external_miner_detected=detection.get("external_miner_detected", False),
-            pool_account_verified=pool_proof.get("verified", False),
-            node_rpc_verified=node_proof.get("verified", False),
-        )
-
-        if args.json:
-            _print_json(
-                {
-                    "status": "running",
-                    "pid": managed.process.pid,
-                    "command": command,
-                    "pool_proof": pool_proof,
-                    "node_rpc_proof": node_proof,
-                    "bonus": bonus,
-                }
+        result.update(pid=managed.process.pid, log_path=managed.log_path)
+        if not args.json:
+            print(f"Started {args.miner} (pid={managed.process.pid})")
+            print(f"Pool: {pool_result['endpoint']}")
+            print(f"Wallet: {args.wallet}")
+            print(f"Logs: {managed.log_path}")
+            bonus = pow_miners.calculate_bonus_multiplier(
+                managed_subprocess_running=managed.process.poll() is None,
+                external_miner_detected=detection.get("external_miner_detected", False),
+                pool_account_verified=pool_proof.get("verified", False),
+                node_rpc_verified=node_proof.get("verified", False),
             )
-        else:
             print()
             print("Verification summary:")
             print(pow_miners.summarize_for_console(
@@ -944,22 +936,42 @@ def _cmd_mine(args):
             print()
             print("Press Ctrl+C to stop mining.")
 
-        while managed.process.poll() is None:
-            time.sleep(1)
-
-        print(f"Miner exited with code {managed.process.returncode}")
+        returncode = managed.process.wait()
+        # Popen uses negative return codes for signals; shells use 128 + signal.
+        exit_code = returncode if returncode >= 0 else 128 - returncode
+        result.update(
+            status="exited" if returncode == 0 else "failed",
+            returncode=returncode,
+            exit_code=exit_code,
+            bonus=pow_miners.calculate_bonus_multiplier(
+                managed_subprocess_running=False,
+                external_miner_detected=detection.get("external_miner_detected", False),
+                pool_account_verified=pool_proof.get("verified", False),
+                node_rpc_verified=node_proof.get("verified", False),
+            ),
+        )
+        if args.json:
+            _print_json(result)
+        else:
+            print(f"Miner exited with code {returncode}")
+        sys.exit(exit_code)
     except KeyboardInterrupt:
+        result.update(status="interrupted", exit_code=130)
         if managed is not None:
             stop_info = pow_miners.stop_managed_miner(managed)
-            if args.json:
-                _print_json({"status": "stopped", "stop_info": stop_info})
-            else:
+            result.update(status="stopped", returncode=managed.process.returncode,
+                          stop_info=stop_info)
+            if not args.json:
                 print("Stopping miner...")
                 print(pow_miners.summarize_for_console(stop_info))
         else:
             print("Interrupted.", file=sys.stderr)
-            sys.exit(130)
+        if args.json:
+            _print_json(result)
+        sys.exit(130)
     except Exception as exc:
+        if args.json:
+            _print_json(dict(result, status="failed", error=str(exc), exit_code=1))
         print(f"Error: failed to start mining: {exc}", file=sys.stderr)
         sys.exit(1)
 
