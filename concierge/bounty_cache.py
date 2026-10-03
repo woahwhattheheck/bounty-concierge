@@ -92,7 +92,11 @@ class PageCache:
         temporary = None
         try:
             entry = {"key": key, "etag": etag, "issues": issues, "has_next": bool(has_next)}
-            data = _bytes({"entry": entry, "sha256": hashlib.sha256(_bytes(entry)).hexdigest()})
+            # Reuse the canonical entry bytes for both the checksum and envelope.
+            entry_data = _bytes(entry)
+            data = b"".join((b'{"entry":', entry_data, b',"sha256":"',
+                             hashlib.sha256(entry_data).hexdigest().encode("ascii"), b'"}'))
+            del entry_data
             if len(data) > _MAX_BYTES:
                 return "skipped"
             self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
