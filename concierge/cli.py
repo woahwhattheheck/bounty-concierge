@@ -43,7 +43,7 @@ from concierge.wallet_helper import (
     transfer_rtc,
     validate_wallet_name,
 )
-from concierge.payout_tracker import check_pending, check_history, format_payout_status
+from concierge.payout_tracker import check_status, format_payout_status
 from concierge.skill_matcher import recommend
 from concierge.discord_bridge import (
     already_migrated,
@@ -672,8 +672,7 @@ def _cmd_status(args):
         print(f"[dry-run] Would check payout status for wallet: {wallet}")
         return
 
-    pending = check_pending(wallet)
-    history = check_history(wallet)
+    pending, history = check_status(wallet)
 
     if args.json:
         _print_json({"wallet": wallet, "pending": pending, "history": history})
