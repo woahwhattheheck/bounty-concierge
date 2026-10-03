@@ -1160,20 +1160,21 @@ def preflight_bounty(
         operator_login=operator_login,
         include_capture=include_capture,
     )
-    if include_capture:
-        # Incomplete initial generations cannot form a reusable capture. Reject
-        # them before spending more provider reads on audits and revalidation.
-        initial_issue_generation = _issue_generation_marker(issue_snapshot)
-        initial_comments = context["_comment_generation"]
-        if initial_comments is None:
-            raise CaptureInputError("initial comment generation evidence is incomplete")
-        if (
-            not context["comments_truncated"]
-            and len(initial_comments) != initial_issue_generation[6]
-        ):
-            raise CaptureInputError(
-                "complete comment evidence does not match the issue comment count"
-            )
+    # Repeatedly observing the same partial comments cannot establish complete
+    # authority. Reject before audits in both modes; bounded reads remain held
+    # by the existing comments_truncated audit signal.
+    initial_issue_generation = _issue_generation_marker(issue_snapshot)
+    initial_comments = context["_comment_generation"]
+    generation_error = CaptureInputError if include_capture else BountyPreflightError
+    if initial_comments is None:
+        raise generation_error("initial comment generation evidence is incomplete")
+    if (
+        not context["comments_truncated"]
+        and len(initial_comments) != initial_issue_generation[6]
+    ):
+        raise generation_error(
+            "complete comment evidence does not match the issue comment count"
+        )
     issue_url = f"https://api.github.com/repos/{repo}/issues/{number}"
     audit_session = _CapturedIssueSession(session, issue_url, issue_snapshot)
     audit = _canonical_audit_snapshot(
