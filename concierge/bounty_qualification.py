@@ -55,7 +55,9 @@ _RTC_SPEC_RE = re.compile(
     rf"(?im)^\s*reward_rtc\s*:\s*({_RTC_NUMBER})\s*(?:#.*)?$"
 )
 
-_REWARDED_LABEL_RE = re.compile(r"\brewarded\b", re.IGNORECASE)
+_REWARDED_LABEL_RE = re.compile(
+    r"^\s*(?:(?:already|bounty|status)[\s:_-]+)?rewarded\s*$", re.IGNORECASE
+)
 _BOUNTY_WORD_RE = re.compile(r"\b(?:bounty|reward)\b", re.IGNORECASE)
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
 
