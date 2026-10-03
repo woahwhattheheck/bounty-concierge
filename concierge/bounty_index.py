@@ -16,7 +16,7 @@ import requests
 
 from concierge.config import GITHUB_TOKEN, REPOS
 from concierge.bounty_cache import PageCache, same_validator
-from concierge.reward_evidence import extract_reward_evidence
+from concierge.reward_evidence import extract_reward_evidence, reward_summary
 
 
 # ---------------------------------------------------------------------------
@@ -407,19 +407,32 @@ def aggregate(repos=None, token=None, *, cache_dir=None):
 
 
 def _markdown_cell(value):
-    """Escape untrusted text so it cannot create Markdown table cells or rows."""
-    text = str(value).replace("\\", "\\\\").replace("|", "\\|")
-    return re.sub(r"[\r\n]+", " ", text)
+    """Keep retained source text literal inside a Markdown table cell."""
+    escaped = []
+    for char in re.sub(r"[\r\n]+", " ", str(value)):
+        if char in "\\|[]*_`":
+            escaped.append("\\" + char)
+        elif char == "&":
+            escaped.append("&amp;")
+        elif char == "<":
+            escaped.append("&lt;")
+        elif char == ">":
+            escaped.append("&gt;")
+        elif not char.isprintable():
+            escaped.append(ascii(char)[1:-1])
+        else:
+            escaped.append(char)
+    return "".join(escaped)
 
 
 def format_markdown(bounties):
-    """Format a list of bounty dicts as a Markdown table.
+    """Format retained bounty rows without turning mentions into promised pay.
 
-    Columns: #, Repo, Title, RTC, Tier, Skills
+    Columns: #, Repo, Title, Reward evidence, Tier, Skills
     """
     lines = [
-        "| # | Repo | Title | RTC | Tier | Skills |",
-        "|---|------|-------|-----|------|--------|",
+        "| # | Repo | Title | Reward evidence | Tier | Skills |",
+        "|---|------|-------|-----------------|------|--------|",
     ]
     for b in bounties:
         repo_short = _markdown_cell(b["repo"].split("/")[-1])
@@ -427,9 +440,10 @@ def format_markdown(bounties):
         skills = _markdown_cell(skill_text)
         difficulty = _markdown_cell(b["difficulty"])
         title_short = _markdown_cell(b["title"][:60])
+        reward = _markdown_cell(reward_summary(b))
         lines.append(
             f"| {b['number']} | {repo_short} | {title_short} | "
-            f"{b['reward_rtc']:.1f} | {difficulty} | {skills} |"
+            f"{reward} | {difficulty} | {skills} |"
         )
     return "\n".join(lines)
 
