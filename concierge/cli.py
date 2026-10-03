@@ -1022,10 +1022,11 @@ def _cmd_claim(args):
     issue_num = args.issue
     wallet = args.wallet
 
-    valid, msg = validate_wallet_name(wallet)
-    if not valid:
-        print(f"Error: {msg}", file=sys.stderr)
-        sys.exit(1)
+    if wallet is not None:
+        valid, msg = validate_wallet_name(wallet)
+        if not valid:
+            print(f"Error: {msg}", file=sys.stderr)
+            sys.exit(1)
 
     issue_url = f"https://github.com/{repo}/issues/{issue_num}"
 
@@ -1069,7 +1070,8 @@ def _cmd_claim(args):
         print(f"Claim instructions for issue #{issue_num}")
         print(f"Repository: {repo}")
         print(f"Issue URL:  {issue_url}")
-        print(f"Wallet:     {wallet}")
+        if wallet is not None:
+            print(f"Wallet:     {wallet}")
         print(
             "Instructions only; this command has not submitted a claim "
             "or changed provider state."
@@ -1250,7 +1252,9 @@ def _build_parser():
     p_claim.add_argument("--issue", type=int, required=True, help="Issue number")
     p_claim.add_argument("--repo", default="Scottcjn/rustchain-bounties",
                          help="Repository (default: Scottcjn/rustchain-bounties)")
-    p_claim.add_argument("--wallet", required=True, help="Your wallet name")
+    p_claim.add_argument(
+        "--wallet", help="Optional RustChain wallet name, when required by the sponsor"
+    )
 
     # --- version ---
     p_version = sub.add_parser("version", help="Show version")
