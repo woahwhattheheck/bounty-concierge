@@ -62,12 +62,16 @@ try:
         check_devto_articles,
         saascity_upvote,
         SaaSCityError,
+        SAASCITY_API_BASE,
+        SAASCITY_LISTINGS,
     )
 except ImportError:
     star_all_ecosystem_repos = None
     check_devto_articles = None
     saascity_upvote = None
     SaaSCityError = None
+    SAASCITY_API_BASE = None
+    SAASCITY_LISTINGS = {}
 
 try:
     from concierge.announcer import format_announcement
@@ -84,7 +88,7 @@ def _print_json(obj):
     print(json.dumps(obj, indent=2, default=str))
 
 
-def _print_dry_run_plan(args, action, inputs, steps, unknown):
+def _print_dry_run_plan(args, action, inputs, steps, unknown, *, json_output=False):
     """Render an argument-only plan, never a fabricated provider observation."""
     plan = {
         "mode": "dry-run",
@@ -94,7 +98,7 @@ def _print_dry_run_plan(args, action, inputs, steps, unknown):
         "unknown": {name: None for name in unknown},
         "note": "Local plan only. No handler reads or actions performed; live checks remain required.",
     }
-    if not args.json:
+    if not (args.json or json_output):
         print(f"[dry-run] {action}; null values are unknown, not zero or success.")
     _print_json(plan)
 
@@ -262,14 +266,17 @@ def _cmd_browse(args):
         raise ValueError("--min-rtc must not exceed --max-rtc")
 
     if args.dry_run:
-        print("[dry-run] Would fetch bounties from GitHub API")
-        if repos:
-            print(f"[dry-run] Repos: {', '.join(repos)}")
-        if args.skill:
-            print(f"[dry-run] Skill filter: {args.skill}")
-        if args.tier:
-            print(f"[dry-run] Tier filter: {args.tier}")
-        print(f"[dry-run] max_pages={args.max_pages} report={args.report}")
+        _print_dry_run_plan(
+            args, "browse.preview",
+            {"repos": repos or list(config.REPOS), "skill": args.skill,
+             "tier": args.tier, "min_rtc": args.min_rtc, "max_rtc": args.max_rtc,
+             "limit": args.limit, "max_pages": args.max_pages,
+             "report": args.report, "evidence": args.evidence},
+            ["Fetch bounty candidates", "Apply filters to retained reward mentions",
+             "Display selected rows with source-completion metadata"],
+            ["bounties", "source_completeness", "filtered_count", "displayed_count"],
+            json_output=args.report,
+        )
         return
 
     try:
@@ -328,7 +335,12 @@ def _cmd_faq(args):
         sys.exit(1)
 
     if args.dry_run:
-        print(f"[dry-run] Would look up FAQ for: {question}")
+        _print_dry_run_plan(
+            args, "faq.lookup", {"question": question, "use_grok": args.grok},
+            ["Look up the question in the FAQ",
+             "Use Grok for unanswered questions only when requested"],
+            ["answer", "source", "confidence"],
+        )
         return
 
     result = faq_answer(question, use_grok=args.grok)
@@ -693,9 +705,11 @@ def _cmd_engage(args):
             sys.exit(1)
 
         if args.dry_run:
-            print("[dry-run] Would star the following repos:")
-            for repo in config.REPOS:
-                print(f"  {repo}")
+            _print_dry_run_plan(
+                args, "engage.star_repos", {"repos": list(config.REPOS)},
+                ["Star the configured repositories with the existing GitHub account"],
+                ["star_results"],
+            )
             return
 
         token = config.GITHUB_TOKEN
@@ -723,7 +737,10 @@ def _cmd_engage(args):
             sys.exit(1)
 
         if args.dry_run:
-            print("[dry-run] Would fetch Dev.to article stats")
+            _print_dry_run_plan(
+                args, "engage.devto", {}, ["Fetch Dev.to article statistics"],
+                ["articles", "statistics"],
+            )
             return
 
         api_key = config.DEVTO_API_KEY
@@ -759,7 +776,12 @@ def _cmd_engage(args):
             sys.exit(1)
 
         if args.dry_run:
-            saascity_upvote(dry_run=True)
+            _print_dry_run_plan(
+                args, "engage.saascity",
+                {"listings": dict(SAASCITY_LISTINGS), "api_base": SAASCITY_API_BASE},
+                ["Upvote the configured SaaSCity listings with the existing provider account"],
+                ["upvote_results"],
+            )
             return
 
         api_key = config.SAASCITY_KEY

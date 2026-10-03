@@ -1,8 +1,13 @@
 # Local CLI plans
 
-`announce`, `mine`, `wallet migrate`, and `claim` turn `--dry-run` into an argument-only plan. These handlers return before bounty collection, process/service detection, node RPC, Discord/SSH/database reads, migration-history reads, transfers, debits, or miner launch. They do not inspect the selected log file or miner executable. Normal package bootstrap and authority controls remain in place; this is not an alternate runtime or a way to execute without live checks.
+`browse`, `faq`, `engage`, `announce`, `mine`, `wallet migrate`, and `claim` turn `--dry-run` into an argument-only plan. These handlers return before bounty collection, FAQ lookup, engagement actions, process/service detection, node RPC, Discord/SSH/database reads, migration-history reads, transfers, debits, or miner launch. They do not inspect the selected log file or miner executable. Normal package bootstrap and authority controls remain in place; this is not an alternate runtime or a way to execute without live checks.
 
 ```sh
+concierge browse --repo rustchain-bounties --skill python --limit 5 --dry-run --report
+concierge faq "How do I claim a bounty?" --dry-run --json
+concierge engage --star-repos --dry-run --json
+concierge engage --devto --dry-run --json
+concierge engage --saascity --dry-run --json
 concierge announce --dry-run --json
 concierge mine --pow warthog --detect-only --dry-run --json
 concierge mine --pow warthog --wallet EXAMPLE_ADDRESS --dry-run --json
@@ -13,7 +18,9 @@ concierge wallet migrate --user EXAMPLE_DISCORD_ID --to example-wallet --dry-run
 concierge claim --repo rustchain-bounties --issue 1 --wallet example-wallet --dry-run --json
 ```
 
-Common flags also work before the command, such as `concierge --dry-run --json announce`. Successful JSON output is one object with `mode`, `action`, `inputs`, `steps`, `unknown`, and `note`. Without `--json`, a short dry-run heading precedes the same plan. Invalid required arguments produce an error instead of a success-shaped plan.
+Common flags also work before the command, such as `concierge --dry-run --json announce`. Successful JSON output is one object with `mode`, `action`, `inputs`, `steps`, `unknown`, and `note`. Without `--json` or browse's `--report`, a short dry-run heading precedes the same plan. Invalid required arguments produce an error instead of a success-shaped plan.
+
+For `browse`, `--report` also selects a single JSON plan during dry-run, even without `--json`. The plan retains filters, display limit, source-page budget, and normalized repository names; row counts and source completeness remain unknown. FAQ plans retain the question and `--grok` choice without looking up or generating an answer. Engagement plans list only configured targets, with star/upvote results and article statistics unknown. When several engagement flags are supplied, the existing star-repos, devto, then saascity precedence applies.
 
 The `claim.instructions` plan includes the normalized repository, issue number, issue URL, and supplied wallet after local wallet-name validation. Bounty availability, claim eligibility, assignment, and payment stay unknown. It neither posts a claim nor looks up the target; ordinary live claim prerequisites still apply when `--dry-run` is omitted.
 
