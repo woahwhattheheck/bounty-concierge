@@ -109,7 +109,7 @@ pip install bounty-concierge
 ```bash
 # Browse open bounties (filterable by difficulty, skill, RTC range)
 concierge browse
-concierge browse --difficulty micro
+concierge browse --tier micro
 concierge browse --min-rtc 50
 
 # Register a wallet
@@ -118,8 +118,8 @@ concierge wallet register my-wallet-name
 # Check wallet balance
 concierge wallet balance my-wallet-name
 
-# Claim a bounty
-concierge claim 491 --wallet my-wallet-name --approach "I will fuzz the fleet detector"
+# Preview a local claim plan (replace 491 with your chosen issue)
+concierge claim --issue 491 --repo rustchain-bounties --wallet my-wallet-name --dry-run
 
 # Browse recent bounties
 concierge browse --limit 5
@@ -128,15 +128,17 @@ concierge browse --limit 5
 concierge browse --max-pages 1
 concierge browse --report
 
-# Check concierge status
-concierge status
+# Check pending payouts for a wallet
+concierge status --wallet my-wallet-name
 
-# View FAQ / helper docs
-concierge faq
+# Ask the FAQ / helper docs a question
+concierge faq "How do I register a wallet?"
 
 # Check installed version
 concierge version
 ```
+
+The `claim --dry-run` example produces a local plan; it does not submit a claim or check live availability, eligibility, assignment, or payment. See [docs/DRY_RUN.md](docs/DRY_RUN.md) for preview output and [docs/CLAIM_ECONOMIC_ADMISSION.md](docs/CLAIM_ECONOMIC_ADMISSION.md) for the evidence required by live claim instructions.
 
 `browse` calls `fetch_bounties_report()` once. `--limit` only shortens the displayed rows. `--max-pages` is the collector page bound (1-1000). A finished traversal is not eligibility or payment.
 
