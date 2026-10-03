@@ -40,6 +40,7 @@ _EVENT_KINDS = frozenset(
         "PAYOUT_RAIL",
         "TRANSFER",
         "CLOSURE",
+        "PROVIDER_RECOGNITION",
     }
 )
 _SOURCE_AUTHORITIES = frozenset(
@@ -61,9 +62,11 @@ _ALLOWED_AUTHORITY = {
     "PAYOUT_RAIL": frozenset({"SPONSOR", "PROVIDER", "OPERATOR_CAPTURE"}),
     "TRANSFER": frozenset({"PROVIDER", "WALLET", "BANK"}),
     "CLOSURE": frozenset({"SPONSOR", "PROVIDER"}),
+    "PROVIDER_RECOGNITION": frozenset({"PROVIDER"}),
 }
 _TRANSFER_RANK = {"PENDING": 0, "CONFIRMING": 1, "CONFIRMED": 2, "FAILED": 2}
 _TERMINAL_TRANSFER = frozenset({"CONFIRMED", "FAILED"})
+_RecognitionKey = tuple[str, str, str, int, str]
 
 
 class LedgerInputError(ValueError):
@@ -291,6 +294,27 @@ def _normalize_event(
         amount = _positive_int(raw["amount_minor"], field=f"event[{event_id}].amount_minor")
         currency = _currency(raw["currency"], field=f"event[{event_id}].currency")
         return {"event_id": event_id, "kind": kind, "source": source, "amount_minor": amount, "currency": currency}
+    if kind == "PROVIDER_RECOGNITION":
+        keys = ["event_id", "kind", "source", "provider", "claimant", "award_id", "unit", "quantity"]
+        if "reported_account_total" in raw:
+            keys.append("reported_account_total")
+        _exact_keys(raw, keys, field=f"event[{event_id}]")
+        recognition = {
+            "event_id": event_id,
+            "kind": kind,
+            "source": source,
+            "provider": _token(raw["provider"], field="recognition.provider").casefold(),
+            "claimant": _token(raw["claimant"], field="recognition.claimant").casefold(),
+            "award_id": _token(raw["award_id"], field="recognition.award_id"),
+            "unit": _token(raw["unit"], field="recognition.unit"),
+            "quantity": _positive_int(raw["quantity"], field="recognition.quantity"),
+        }
+        if "reported_account_total" in raw:
+            total = raw["reported_account_total"]
+            if type(total) is not int or total < 0:
+                raise LedgerInputError("recognition.reported_account_total must be a non-negative integer")
+            recognition["reported_account_total"] = total
+        return recognition
     if kind == "ELIGIBILITY":
         _exact_keys(raw, ["event_id", "kind", "source", "decision"], field=f"event[{event_id}]")
         decision = raw["decision"]
@@ -402,6 +426,86 @@ def _money_aggregate(rows: list[dict[str, Any]], key: str) -> dict[str, int]:
     return dict(sorted(out.items()))
 
 
+def _noncash_recognitions(
+    events: list[dict[str, Any]],
+    *,
+    work_key: tuple[str, int],
+    source_owners: dict[tuple[str, str], _RecognitionKey],
+    source_totals: dict[str, int],
+) -> list[dict[str, Any]]:
+    """Count one provider award once, retaining each source observation separately."""
+    grouped: dict[_RecognitionKey, list[dict[str, Any]]] = {}
+    for event in events:
+        identity = (
+            event["provider"], event["claimant"], work_key[0].casefold(), work_key[1], event["award_id"]
+        )
+        source = event["source"]
+        # Re-observation timestamps and newly minted source/event IDs do not turn
+        # the same provider record into a second award, even on another work item.
+        for field in ("source_ref", "source_sha256"):
+            source_key = (field, source[field])
+            prior = source_owners.get(source_key)
+            if prior is not None and prior != identity:
+                raise LedgerInputError("recognition source was reused for a different award or work item")
+            source_owners[source_key] = identity
+        if "reported_account_total" in event:
+            digest = source["source_sha256"]
+            total = event["reported_account_total"]
+            prior_total = source_totals.get(digest)
+            if prior_total is not None and prior_total != total:
+                raise LedgerInputError("conflicting recognition account total for identical source bytes")
+            source_totals[digest] = total
+        grouped.setdefault(identity, []).append(event)
+
+    summaries: list[dict[str, Any]] = []
+    for identity, rows in sorted(grouped.items()):
+        facts = {(row["unit"], row["quantity"]) for row in rows}
+        if len(facts) != 1:
+            raise LedgerInputError("conflicting recognition quantity or unit for the same award")
+        unit, quantity = next(iter(facts))
+        account_totals: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            if "reported_account_total" not in row:
+                continue
+            source = row["source"]
+            observation = {
+                "source_id": source["source_id"],
+                "observed_at": source["observed_at"],
+                "reported_account_total": row["reported_account_total"],
+            }
+            prior = account_totals.get(source["source_id"])
+            if prior is not None and prior != observation:
+                raise LedgerInputError("conflicting recognition account total for the same source")
+            account_totals[source["source_id"]] = observation
+        summary = {
+            "provider": identity[0],
+            "claimant": identity[1],
+            "award_id": identity[4],
+            "unit": unit,
+            "quantity": quantity,
+            "source_ids": sorted({row["source"]["source_id"] for row in rows}),
+        }
+        if account_totals:
+            summary["account_total_observations"] = sorted(
+                account_totals.values(), key=lambda row: (row["observed_at"], row["source_id"])
+            )
+        summaries.append(summary)
+    return summaries
+
+
+def _noncash_aggregate(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    totals: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for record in records:
+        for recognition in record.get("noncash_recognitions", []):
+            key = (recognition["provider"], recognition["claimant"], recognition["unit"])
+            total = totals.setdefault(key, {
+                "provider": key[0], "claimant": key[1], "unit": key[2], "quantity": 0, "award_count": 0
+            })
+            total["quantity"] += recognition["quantity"]
+            total["award_count"] += 1
+    return [totals[key] for key in sorted(totals)]
+
+
 def _paid_aggregate(rows: list[dict[str, Any]]) -> dict[str, int]:
     out: dict[str, int] = {}
     for row in rows:
@@ -424,6 +528,9 @@ def compile_document(document: dict[str, Any]) -> dict[str, Any]:
     global_event_ids: set[str] = set()
     global_ticket_owner: dict[str, tuple[str, int]] = {}
     global_transfer_owner: dict[str, tuple[str, int]] = {}
+    recognition_source_owners: dict[tuple[str, str], _RecognitionKey] = {}
+    recognition_source_totals: dict[str, int] = {}
+    recognition_work_ids: set[tuple[str, int]] = set()
     case_ids: set[str] = set()
     work_ids: set[tuple[str, int]] = set()
     records: list[dict[str, Any]] = []
@@ -481,6 +588,18 @@ def compile_document(document: dict[str, Any]) -> dict[str, Any]:
             events.append(event)
 
         by_kind = {kind: [e for e in events if e["kind"] == kind] for kind in _EVENT_KINDS}
+        recognition_events = by_kind["PROVIDER_RECOGNITION"]
+        if recognition_events:
+            canonical_work_key = (repo.casefold(), pr)
+            if canonical_work_key in recognition_work_ids:
+                raise LedgerInputError("duplicate canonical merged work item for noncash recognition")
+            recognition_work_ids.add(canonical_work_key)
+        recognitions = _noncash_recognitions(
+            recognition_events,
+            work_key=work_key,
+            source_owners=recognition_source_owners,
+            source_totals=recognition_source_totals,
+        )
         advertised = _money_fact(by_kind["ADVERTISED_BOUNTY"], label="advertised bounty")
         award = _money_fact(by_kind["SPONSOR_AWARD"], label="sponsor award")
         if advertised is not None and award is not None and advertised["currency"] != award["currency"]:
@@ -548,6 +667,8 @@ def compile_document(document: dict[str, Any]) -> dict[str, Any]:
                 "recognized_revenue": False,
             },
         }
+        if recognitions:
+            record["noncash_recognitions"] = recognitions
         records.append(record)
 
     records.sort(key=lambda r: (r["work"]["repo"], r["work"]["pr"], r["case_id"]))
@@ -556,7 +677,7 @@ def compile_document(document: dict[str, Any]) -> dict[str, Any]:
         state = record["settlement_state"]
         state_counts[state] = state_counts.get(state, 0) + 1
 
-    return {
+    ledger = {
         "schema": LEDGER_SCHEMA,
         "generated_at": generated_at,
         "truth_boundary": TRUTH_BOUNDARY,
@@ -577,6 +698,10 @@ def compile_document(document: dict[str, Any]) -> dict[str, Any]:
             "recognize_accounting_revenue": False,
         },
     }
+    noncash_totals = _noncash_aggregate(records)
+    if noncash_totals:
+        ledger["aggregates"]["noncash_recognized"] = noncash_totals
+    return ledger
 
 
 def render_markdown(ledger: dict[str, Any]) -> str:
@@ -600,6 +725,18 @@ def render_markdown(ledger: dict[str, Any]) -> str:
         values = ledger["aggregates"][key]
         rendered = ", ".join(f"{currency} {amount} minor units" for currency, amount in values.items()) or "none"
         lines.append(f"- {label}: {rendered}")
+    noncash_totals = ledger["aggregates"].get("noncash_recognized", [])
+    if noncash_totals:
+        lines.extend(["", "## Noncash provider recognition", ""])
+        for total in noncash_totals:
+            lines.append(
+                f"- {total['provider']} / {total['claimant']}: {total['quantity']} {total['unit']} "
+                f"across {total['award_count']} awards"
+            )
+        lines.extend([
+            "",
+            "Points are separate from money, eligibility and payout readiness. Reported account totals are observations and are never added to awards.",
+        ])
     lines.extend(["", "## Cases", ""])
     for record in ledger["records"]:
         work = record["work"]
@@ -615,6 +752,16 @@ def render_markdown(ledger: dict[str, Any]) -> str:
         paid_text = ", ".join(f"{c} {a} minor units" for c, a in paid.items()) or "none"
         lines.append(f"- Terminal payment evidence: {paid_text}")
         lines.append(f"- Closure: `{record['closure']['status']}`")
+        for recognition in record.get("noncash_recognitions", []):
+            lines.append(
+                f"- Noncash recognition: {recognition['provider']} / {recognition['claimant']} — "
+                f"{recognition['quantity']} {recognition['unit']} (award `{recognition['award_id']}`)"
+            )
+            for observation in recognition.get("account_total_observations", []):
+                lines.append(
+                    f"- Reported account total: {observation['reported_account_total']} {recognition['unit']} "
+                    f"(source `{observation['source_id']}`; observation only, not added)"
+                )
         lines.append("")
     lines.extend(
         [
