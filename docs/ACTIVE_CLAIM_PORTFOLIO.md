@@ -6,7 +6,7 @@
 
 Only `compile_live_active_claim_portfolio()` may return `READY_FOR_INTERNAL_CLAIM`.
 
-The live path accepts identity, worker/sponsor assignment, reward metadata, and an optional discovery URL. It does **not** accept qualification receipts, availability receipts, `observed_at`, or an `as_of` clock. It obtains current UTC itself, then independently calls:
+The live path accepts identity, worker/sponsor assignment, reward metadata, an optional discovery URL, and an optional existing source-bound `submission_target`. It does **not** accept qualification receipts, availability receipts, `observed_at`, or an `as_of` clock. It obtains current UTC itself, then independently calls:
 
 - `revenue_intake.qualify_live_revenue_intake()` for canonical reward/provenance/competition qualification; and
 - `bounty_availability.inspect_bounty_availability()` for a separate stable-generation availability read.
@@ -22,12 +22,34 @@ without consuming GitHub requests. The same validation errors are reported.
 Valid input still follows the existing live readers and ledger decisions;
 event conflicts and future-event holds remain ledger outcomes.
 
+### Preserve an explicit delivery repository
+
+A live candidate may include the existing four-field `submission_target`
+record: `repository`, `source_url`, `source_content_sha256`, and
+`instruction_excerpt`. The record is validated against that candidate's
+canonical bounty issue before any provider read, then passed to live revenue
+intake so delivery-repository competition remains in scope. Null, malformed,
+or differently sourced records are rejected; no delivery target is inferred.
+
+Qualification caching includes the validated target's SHA-256 alongside the
+issue and discovery URL. Identical targets reuse one qualification during the
+compilation; different targets never share its result. Availability remains
+issue-scoped. Only `submission_target_sha256` is added to the qualification
+receipt, so the existing authority-generation digest binds the delivery scope
+without retaining its instruction excerpt. The target hash uses sorted-key,
+compact, ASCII-escaped JSON, matching live cash admission.
+
+This field does not create another opportunity: grouping and custody remain
+bound to the canonical issue. Conflicting candidate generations still follow
+the existing conflict decisions. Candidates without a target retain their
+previous receipt shape; historical replay remains non-dispatch.
+
 ### Reuse availability for repeated issue listings
 
 Within one live compilation, successfully returned availability observations
 are reused by canonical GitHub repository and issue number. `max_pages` is
 fixed for that invocation. Qualification remains specific to each discovery
-URL, so different marketplace listings retain independent qualification
+URL and explicit delivery target, so different marketplace listings retain independent qualification
 results and the existing duplicate/conflict decisions.
 
 The cache is local to the compilation. A later compilation reads fresh
