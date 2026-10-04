@@ -27,6 +27,18 @@ from concierge.bounty_contract_common import (
     _validate_repo,
 )
 
+def _matches_repository_url(value: Any, prefix: str, repo: str, suffix: str = "") -> bool:
+    """Compare only the GitHub owner/repository portion case-insensitively."""
+    if (
+        not isinstance(value, str)
+        or not value.isascii()
+        or not value.startswith(prefix)
+        or not value.endswith(suffix)
+    ):
+        return False
+    end = len(value) - len(suffix)
+    return value[len(prefix):end].casefold() == repo.casefold()
+
 def _source_from_issue(issue: Any, repo: str, number: int) -> dict[str, Any]:
     if not isinstance(issue, dict):
         raise BountyContractEvidenceError(
@@ -38,11 +50,16 @@ def _source_from_issue(issue: Any, repo: str, number: int) -> dict[str, Any]:
         )
     canonical_url = f"https://github.com/{repo}/issues/{number}"
     api_url = f"https://api.github.com/repos/{repo}/issues/{number}"
-    repository_url = f"https://api.github.com/repos/{repo}"
     if (
-        issue.get("html_url") != canonical_url
-        or issue.get("url") != api_url
-        or issue.get("repository_url") != repository_url
+        not _matches_repository_url(
+            issue.get("html_url"), "https://github.com/", repo, f"/issues/{number}"
+        )
+        or not _matches_repository_url(
+            issue.get("url"), "https://api.github.com/repos/", repo, f"/issues/{number}"
+        )
+        or not _matches_repository_url(
+            issue.get("repository_url"), "https://api.github.com/repos/", repo
+        )
         or issue.get("number") != number
     ):
         raise BountyContractEvidenceError(
