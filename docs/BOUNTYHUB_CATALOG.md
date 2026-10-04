@@ -10,7 +10,7 @@ repeating the provider reads.
 
 ```bash
 python -m concierge.bountyhub_catalog collect \
-  --max-pages 10 --page-size 100 --max-details 50 --min-funded-usd 50.00 > catalog.json
+  --max-pages 10 --page-size 100 --max-details 50 --min-funded-usd 25.00 > catalog.json
 ```
 
 The collector uses one `requests.Session`, reads ascending numbered pages from
@@ -19,7 +19,7 @@ flag. Each page requests `limit=100` by default; `--page-size` accepts 1 through
 100 and is recorded in the report. It then reads pledge/claim details only for
 nonterminal listings whose
 advertised total can reach the selected funding floor. The default floor is
-$50. The page and detail bounds are independent; no retry, sleep, watcher,
+$25. The page and detail bounds are independent; no retry, sleep, watcher,
 schedule, claim, proposal, account change or other provider write is performed.
 
 `catalog.json` contains every collected listing, source observation start/end,
@@ -35,10 +35,10 @@ permits promised rewards, add `--include-promised` to either subcommand:
 
 ```bash
 python -m concierge.bountyhub_catalog collect \
-  --include-promised --min-reward-usd 50.00 > catalog.json
+  --include-promised --min-reward-usd 25.00 > catalog.json
 
 python -m concierge.bountyhub_catalog targets catalog.json \
-  --include-promised --min-reward-usd 50.00 > shortlist.json
+  --include-promised --min-reward-usd 25.00 > shortlist.json
 ```
 
 This mode applies the floor to each resolved listing's funded plus promised
@@ -50,10 +50,10 @@ No new detail reads are needed when selecting from an existing report.
 `--min-reward-usd` and `--min-funded-usd` are aliases for the same floor; the
 chosen mode determines which amounts count. In the new mode, the selected
 result records `reward_basis: "reported_funded_plus_promised"` and
-`minimum_reward_usd` instead of `minimum_funded_usd`. The default result remains
-unchanged. `collect` includes those fields in `shortlist`; `targets` reports them
+`minimum_reward_usd` instead of `minimum_funded_usd`. The default mode remains
+funded-only. `collect` includes those fields in `shortlist`; `targets` reports them
 to stderr while preserving the batch parser's exact candidates envelope.
-Programmatic callers can use `select_targets(report, "50.00", include_promised=True)`
+Programmatic callers can use `select_targets(report, "25.00", include_promised=True)`
 to obtain the same selection and its complete `listing_ids_by_issue` associations.
 Promised amounts remain promises; this option does not establish funding,
 assignment, eligibility, award or payment.

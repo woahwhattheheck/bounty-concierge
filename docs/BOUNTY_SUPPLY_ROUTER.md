@@ -15,14 +15,17 @@ and unsafe private-context requirements.
 
 | Route | Fresh fixed USD evidence | Operational meaning |
 | --- | ---: | --- |
-| `ACTIVE` | `>= $50` | Eligible for the main work queue after normal collision checks |
-| `MAYBE` | `$10 <= reward < $50` | Save only in `#bounty-pile-10-49`; do not consume active build capacity |
+| `ACTIVE` | `>= $25` | Eligible for the main work queue after normal collision checks |
+| `MAYBE` | `$10 <= reward < $25` | Save only in `#bounty-pile-10-49`; do not consume active build capacity |
 | `PRUNE` | `< $10` | Disregard for paid-work dispatch |
 | `HOLD` | stale/incomplete/ambiguous or no trustworthy fixed USD floor | Refresh source/terms; do not infer value |
 
-The **$50 ACTIVE / $10 MAYBE floors are fixed owner policy**, not caller
+The **$25 ACTIVE / $10 MAYBE floors are fixed owner policy**, not caller
 configuration. API calls that attempt to override either floor fail closed, and
 the CLI does not expose floor override flags.
+
+The existing `bounty-pile-10-49` queue name remains for compatibility; its current
+range is $10 through $24.99.
 
 A qualification-level `REJECT` is routed to `PRUNE`/suppression. A
 qualification-level `HOLD` stays `HOLD`. Fresh otherwise-actionable rows also

@@ -5,7 +5,7 @@ The GrantFox lifecycle stack intentionally keeps provider/source/dependency
 evidence separate from canonical bounty economics. This module joins those
 surfaces at dispatch time. A lifecycle receipt is actionable only when the same
 GitHub issue also has a *currently re-verified* fixed-USD admission of at least
-$50 routed to ``main_bounty_queue``.
+$25 routed to ``main_bounty_queue``.
 
 This module is advisory-only. It does not apply to GrantFox, mutate GitHub,
 submit pull requests, contact sponsors, move funds, or grant any provider-side
@@ -31,7 +31,7 @@ SCHEMA = "grantfox-live-cash-activation/v1"
 RECEIPT_SCHEMA = "grantfox-live-cash-activation-receipt/v1"
 ACTIVE_CASH_DISPOSITION = "ACTIVE_REVIEW"
 ACTIVE_CASH_ROUTE = "main_bounty_queue"
-ACTIVE_USD_FLOOR = Decimal("50")
+ACTIVE_USD_FLOOR = Decimal("25")
 PASSTHROUGH = frozenset(
     {
         "APPLY_ELIGIBLE",
@@ -332,7 +332,7 @@ def compile_live_cash_activation(
             "currency": cash_view["currency"],
             "fixed_amount": cash_view["fixed_amount"],
             "fixed_semantics": cash_view["fixed_semantics"],
-            "required_active_floor_usd": "50",
+            "required_active_floor_usd": "25",
         },
         "activation": {
             "disposition": activation_disposition,
@@ -426,7 +426,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m concierge.grantfox_live_cash_activation",
         description=(
-            "Compose GrantFox activation with live canonical >=$50 fixed-USD "
+            "Compose GrantFox activation with live canonical >=$25 fixed-USD "
             "admission. Verification re-reads GitHub."
         ),
     )

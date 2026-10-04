@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Fail-closed canonical-state gate for externally listed $50+ bounties."""
+"""Fail-closed canonical-state gate for externally listed cash bounties."""
 from __future__ import annotations
 
 import argparse, hashlib, json, re

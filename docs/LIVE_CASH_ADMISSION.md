@@ -28,10 +28,13 @@ Production floors are captured privately by the module:
 
 | fixed canonical USD reward | disposition |
 | --- | --- |
-| >= 50 | ACTIVE_REVIEW / main_bounty_queue |
-| 10 through 49.99 | PILE_SAVE_UP / bounty_pile_10_49 |
+| >= 25 | ACTIVE_REVIEW / main_bounty_queue |
+| 10 through 24.99 | PILE_SAVE_UP / bounty_pile_10_49 |
 | < 10 | PRUNE_BELOW_DOLLAR_FLOOR |
 | no fixed USD | HOLD_NO_FIXED_USD_REWARD |
+
+The existing `bounty_pile_10_49` route identifier remains for compatibility;
+the current active floor is $25.
 
 ACTIVE_REVIEW grants no claim, implementation, submission, outbound-contact,
 payment, wallet, or revenue authority.
