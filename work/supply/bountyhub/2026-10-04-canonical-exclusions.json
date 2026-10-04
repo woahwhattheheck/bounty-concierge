@@ -53,5 +53,10 @@
     "reason": "The canonical issue is closed with state_reason completed (closed at 2025-04-09T19:06:53Z).",
     "source_url": "https://github.com/SPLURT-Station/S.P.L.U.R.T-tg/issues/115",
     "observed_at": "2026-10-04T12:52:53Z"
+  },
+  "fluxerapp/fluxer-meta#8": {
+    "reason": "The retained Fluxer RPC bounty is delivered through fluxerapp/fluxer. That repository's current LLM usage policy applies to contributors without write access and prohibits model-authored upstream submissions; the authenticated woahwhattheheck connection reports pull access but no push permission. Exclude new automated upstream-submission intake for this listing while preserving existing owner-fork work.",
+    "source_url": "https://github.com/fluxerapp/fluxer/blob/main/.github/LLM_USAGE_POLICY.md",
+    "observed_at": "2026-10-04T14:51:49.529Z"
   }
 }
