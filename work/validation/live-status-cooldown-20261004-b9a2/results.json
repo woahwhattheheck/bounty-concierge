@@ -1,0 +1,170 @@
+{
+  "python": "3.12.14",
+  "requests": "2.34.2",
+  "network_attempts": 0,
+  "passed": 14,
+  "cases": [
+    {
+      "case": "429 seconds",
+      "before_delay": null,
+      "after_cooldown": {
+        "rate_limited": true,
+        "retry_after_seconds": 90,
+        "retry_not_before": "2026-10-04T09:31:30.250000Z"
+      },
+      "before_requests": 1,
+      "after_requests": 1,
+      "classification": "UNVERIFIABLE",
+      "pass": true
+    },
+    {
+      "case": "429 HTTP date rounds up",
+      "before_delay": null,
+      "after_cooldown": {
+        "rate_limited": true,
+        "retry_after_seconds": 60,
+        "retry_not_before": "2026-10-04T09:31:00.250000Z"
+      },
+      "before_requests": 1,
+      "after_requests": 1,
+      "classification": "UNVERIFIABLE",
+      "pass": true
+    },
+    {
+      "case": "403 later primary reset",
+      "before_delay": null,
+      "after_cooldown": {
+        "rate_limited": true,
+        "retry_after_seconds": 90,
+        "retry_not_before": "2026-10-04T09:31:30.250000Z"
+      },
+      "before_requests": 1,
+      "after_requests": 1,
+      "classification": "UNVERIFIABLE",
+      "pass": true
+    },
+    {
+      "case": "403 later retry after",
+      "before_delay": null,
+      "after_cooldown": {
+        "rate_limited": true,
+        "retry_after_seconds": 120,
+        "retry_not_before": "2026-10-04T09:32:00.250000Z"
+      },
+      "before_requests": 1,
+      "after_requests": 1,
+      "classification": "UNVERIFIABLE",
+      "pass": true
+    },
+    {
+      "case": "permission 403",
+      "before_delay": null,
+      "after_cooldown": null,
+      "before_requests": 1,
+      "after_requests": 1,
+      "classification": "UNVERIFIABLE",
+      "pass": true
+    },
+    {
+      "case": "429 malformed delay",
+      "before_delay": null,
+      "after_cooldown": {
+        "rate_limited": true,
+        "retry_after_seconds": null,
+        "retry_not_before": null
+      },
+      "before_requests": 1,
+      "after_requests": 1,
+      "classification": "UNVERIFIABLE",
+      "pass": true
+    },
+    {
+      "case": "429 unknown delay",
+      "before_delay": null,
+      "after_cooldown": {
+        "rate_limited": true,
+        "retry_after_seconds": null,
+        "retry_not_before": null
+      },
+      "before_requests": 1,
+      "after_requests": 1,
+      "classification": "UNVERIFIABLE",
+      "pass": true
+    },
+    {
+      "case": "429 oversized delay",
+      "before_delay": null,
+      "after_cooldown": {
+        "rate_limited": true,
+        "retry_after_seconds": null,
+        "retry_not_before": null
+      },
+      "before_requests": 1,
+      "after_requests": 1,
+      "classification": "UNVERIFIABLE",
+      "pass": true
+    },
+    {
+      "case": "429 representational overflow",
+      "before_delay": null,
+      "after_cooldown": {
+        "rate_limited": true,
+        "retry_after_seconds": 999999999999,
+        "retry_not_before": null
+      },
+      "before_requests": 1,
+      "after_requests": 1,
+      "classification": "UNVERIFIABLE",
+      "pass": true
+    },
+    {
+      "case": "open issue",
+      "before_delay": null,
+      "after_cooldown": null,
+      "before_requests": 1,
+      "after_requests": 1,
+      "classification": "OPEN",
+      "pass": true
+    },
+    {
+      "case": "not found",
+      "before_delay": null,
+      "after_cooldown": null,
+      "before_requests": 1,
+      "after_requests": 1,
+      "classification": "UNVERIFIABLE",
+      "pass": true
+    },
+    {
+      "case": "gone",
+      "before_delay": null,
+      "after_cooldown": null,
+      "before_requests": 1,
+      "after_requests": 1,
+      "classification": "DELETED_OR_MOVED",
+      "pass": true
+    },
+    {
+      "case": "cross-host remains rejected",
+      "before_delay": null,
+      "after_cooldown": null,
+      "before_requests": 1,
+      "after_requests": 1,
+      "classification": "UNVERIFIABLE",
+      "pass": true
+    },
+    {
+      "case": "transport failure",
+      "before_delay": null,
+      "after_cooldown": null,
+      "before_requests": 1,
+      "after_requests": 1,
+      "classification": "UNVERIFIABLE",
+      "pass": true
+    }
+  ],
+  "sources_sha256": {
+    "before.py": "8078f1ed9f081023347dad9bcf131a664c3be660f7e73a491c90b1c92409b2b0",
+    "after.py": "2b0c76e9e4be066b5145cc8f08bc341870224067647711aacb3683d315901234"
+  }
+}
