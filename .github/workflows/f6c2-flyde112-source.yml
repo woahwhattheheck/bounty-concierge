@@ -1,0 +1,30 @@
+name: Flyde 112 pinned source
+on:
+  push:
+    branches: [f6c2/flyde112-source-20261004]
+    paths: [.github/workflows/f6c2-flyde112-source.yml]
+permissions: {}
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Retrieve public source and build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/flyde112"
+          cd "$RUNNER_TEMP/flyde112"
+          curl --fail --location --max-time 60 --output upstream.tar.gz https://codeload.github.com/flydelabs/flyde/tar.gz/913ff75c6781259da35c32fd001a90607756cb24
+          npm install --prefix tools --ignore-scripts --no-audit --no-fund yaml@2.3.1 typescript@5.5.4 @types/node@20 @types/vscode@1.69.0 @types/mocha@10.0.1 mocha@10.2.0
+          tar -czf tools.tar.gz tools
+          rm -rf tools
+          printf '%s\n' 'upstream=flydelabs/flyde' 'commit=913ff75c6781259da35c32fd001a90607756cb24' > receipt.txt
+          date -u +%FT%TZ >> receipt.txt
+          sha256sum upstream.tar.gz tools.tar.gz >> receipt.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flyde112-source-f6c2
+          path: ${{ runner.temp }}/flyde112
+          retention-days: 7
+          if-no-files-found: error
