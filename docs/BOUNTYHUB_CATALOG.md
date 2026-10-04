@@ -175,6 +175,16 @@ capture is not silently expanded by the current $25 default. Use a new `collect`
 for a changed scope or current catalog facts. `resume_catalog(snapshot,
 max_details=10)` is the equivalent programmatic entrypoint.
 
+Early `bountyhub-catalog/v1` captures did not record `page_size`. Detail-only
+resume accepts those captures and keeps the field absent; it never guesses the
+historical page size or recollects catalog pages. When the field is present, it
+must remain an integer from 1 through 100. The original observation interval,
+collection floor, retained counts and source digest remain binding. The checked-in
+`2026-10-04-catalog-56f3.json` therefore supports a zero-request no-op resume,
+without converting its old funding or claim observations into current facts.
+A focused executable covering that retained report and controlled partial
+recovery is `work/benchmarks/bountyhub-legacy-resume.py`.
+
 The complete retained catalog is validated before any provider read. A missing or
 unfinished catalog traversal, inconsistent identity/funding totals, duplicate
 listing ID, or CLI input over 4 MiB is rejected. A resume before the retained
