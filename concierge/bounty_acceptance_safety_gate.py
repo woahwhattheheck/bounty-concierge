@@ -13,13 +13,14 @@ submission, reward, wallet, or payment authority.
 from __future__ import annotations
 
 import argparse
+from bisect import bisect_left
 import hashlib
 import json
 import re
 import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 from urllib.parse import urlsplit
 
 
@@ -286,8 +287,14 @@ def _action_positions(segment: str) -> list[int]:
     return positions
 
 
-def _within_bound(action_positions: Iterable[int], start: int, end: int) -> bool:
-    return any(min(abs(pos - start), abs(pos - end)) <= 220 for pos in action_positions)
+def _within_bound(action_positions: list[int], start: int, end: int) -> bool:
+    # _action_positions emits sorted offsets. Search the two endpoint windows
+    # independently: a long match's middle is not within 220 of either edge.
+    for edge in (start, end):
+        index = bisect_left(action_positions, edge - 220)
+        if index < len(action_positions) and action_positions[index] <= edge + 220:
+            return True
+    return False
 
 
 def _classify_text(text: str) -> tuple[list[str], dict[str, int]]:
