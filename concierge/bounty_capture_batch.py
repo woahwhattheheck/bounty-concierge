@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+from itertools import chain
 import json
 import os
 from pathlib import Path
@@ -22,6 +23,7 @@ from concierge.bounty_preflight import BountyPreflightError, preflight_bounty
 from concierge.secure_output import (
     SecureOutputError,
     create_exclusive_regular,
+    create_exclusive_regular_chunks,
     open_verified_parent,
 )
 from concierge.submission_packet import validate_submission_target
@@ -159,8 +161,20 @@ class _BatchSession:
 
 
 def _write_json(path: Path, value: Any) -> None:
-    payload = (json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n").encode("utf-8")
-    create_exclusive_regular(path, payload, mode=0o600)
+    # Finish serialization before creating the leaf so invalid JSON leaves no file.
+    payload = json.dumps(value, indent=2, sort_keys=True, allow_nan=False)
+    chunk_size = 64 * 1024
+    if len(payload) <= chunk_size:
+        payload += "\n"
+        create_exclusive_regular(path, payload.encode("utf-8"), mode=0o600)
+        return
+    # Default ensure_ascii makes every character one UTF-8 byte. Keep the fast
+    # serializer, but avoid another output-sized newline string and byte buffer.
+    chunks = (
+        payload[start:start + chunk_size].encode("utf-8")
+        for start in range(0, len(payload), chunk_size)
+    )
+    create_exclusive_regular_chunks(path, chain(chunks, (b"\n",)), mode=0o600)
 
 
 def collect_batch(
