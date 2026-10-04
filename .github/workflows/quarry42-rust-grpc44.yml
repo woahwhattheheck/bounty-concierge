@@ -1,0 +1,109 @@
+name: rust-grpc44 dependency migration
+on:
+  push:
+    branches: [quarry42/rust-grpc44]
+    paths:
+      - candidate/rust-grpc44/**
+      - .github/workflows/quarry42-rust-grpc44.yml
+permissions:
+  contents: read
+concurrency:
+  group: quarry42-rust-grpc44
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          path: handoff
+      - uses: actions/checkout@v4
+        with:
+          repository: tailcallhq/rust-grpc
+          ref: e5faeec6e9d833ecf5d46da718d3d0b5e2b9e542
+          persist-credentials: false
+          path: source
+      - name: Prepare exact candidate
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = e5faeec6e9d833ecf5d46da718d3d0b5e2b9e542
+          test "$(git hash-object src/main.rs)" = 7e2aed4ad5179f5c67ac52bd7c7367f69a7d4ac0
+          printf '%s  %s\n' b3b97a4e99f8f1cc3280ea397e4552ee5f942a4b2d07e61009d5d16d0e8c02e5 ../handoff/candidate/rust-grpc44/main-api-migration.patch | sha256sum -c
+          printf '%s  %s\n' d55df0fd47166fbe1e6988f4ff2c278b376525e1c641e8493be327283f9d2a56 ../handoff/candidate/rust-grpc44/runtime-tracing.patch | sha256sum -c
+          git apply --check ../handoff/candidate/rust-grpc44/main-api-migration.patch
+          git apply ../handoff/candidate/rust-grpc44/main-api-migration.patch
+          git apply --check ../handoff/candidate/rust-grpc44/runtime-tracing.patch
+          git apply ../handoff/candidate/rust-grpc44/runtime-tracing.patch
+          cp ../handoff/candidate/rust-grpc44/Cargo.toml Cargo.toml
+          cp ../handoff/candidate/rust-grpc44/build.rs build.rs
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('README.md')
+          s = p.read_text()
+          old = '- [Rust](https://www.rust-lang.org/tools/install)'
+          assert old in s
+          p.write_text(s.replace(old, old + ' 1.91 or newer\n- Protocol Buffers compiler (`protoc`)'))
+          PY
+      - name: Install build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+          rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+          rustup default stable
+          rustc --version
+          cargo --version
+          protoc --version
+      - name: Resolve dependencies and synchronize generated CI
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo update
+          cargo fmt --all
+          env -u CI cargo test --test ci generate -- --exact
+      - name: Run required build checks
+        working-directory: source
+        shell: bash
+        env:
+          RUSTFLAGS: -D warnings
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo test --locked --all-features
+          cargo clippy --locked --all-targets --all-features -- -D warnings
+          git diff --check -- Cargo.toml build.rs src/main.rs README.md
+      - name: Export candidate and provenance
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p out
+          cd source
+          git diff --binary > ../out/implementation.patch
+          git status --short > ../out/worktree-status.txt
+          cargo tree --locked --depth 1 > ../out/dependencies.txt 2>&1 || true
+          tar -czf ../out/candidate.tar.gz Cargo.toml Cargo.lock build.rs src/main.rs README.md .github/workflows/ci.yml tests/ci.rs news.proto
+          python3 - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+          paths = ['Cargo.toml', 'Cargo.lock', 'build.rs', 'src/main.rs', 'README.md', '.github/workflows/ci.yml', 'tests/ci.rs', 'news.proto']
+          manifest = {
+              'source_repository': 'tailcallhq/rust-grpc',
+              'base_sha': 'e5faeec6e9d833ecf5d46da718d3d0b5e2b9e542',
+              'handoff_sha': os.environ['GITHUB_SHA'],
+              'run_id': os.environ['GITHUB_RUN_ID'],
+              'files': {p: {'sha256': hashlib.sha256(Path(p).read_bytes()).hexdigest(), 'git_blob': subprocess.check_output(['git', 'hash-object', p], text=True).strip()} for p in paths},
+          }
+          Path('../out/manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rust-grpc44-${{ github.sha }}
+          path: out/
+          retention-days: 7
