@@ -1,0 +1,351 @@
+{
+  "baseline_commit": "4ec4bee4b75fc1db313e183b343457a536286144",
+  "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+  "repeats": 3,
+  "timing_scope": "offline elapsed parser runtime; no provider calls or fleet-load claim",
+  "retained_rows": 266,
+  "retained_index_sha256": "813456d656875c7d04ddbd48d20ff9f6dac0289c053b7d38b1fd04ce9736c67a",
+  "retained_evidence_and_legacy_reward_parity": true,
+  "general_match_span_and_order_fixtures": 62,
+  "unicode_rtc_boundary_regressions": 3,
+  "source_sha256": {
+    "concierge/reward_evidence.py": "30d6ced46612b439e0bb75228dc6fad1e5dd81a33828c5791ea763becb247607",
+    "concierge/bounty_index.py": "23233c54d11c8ea45614f4bb2a9674bdfdcb294ca53e72e8456fc2a470675dbd"
+  },
+  "measurements": [
+    {
+      "family": "digits",
+      "characters": 512,
+      "before_seconds": 0.013963929002784425,
+      "after_seconds": 0.0001052189982146956,
+      "speedup": 132.7130008811862
+    },
+    {
+      "family": "digits",
+      "characters": 1024,
+      "before_seconds": 0.06840439300140133,
+      "after_seconds": 0.00021459300114656799,
+      "speedup": 318.7633922631094
+    },
+    {
+      "family": "digits",
+      "characters": 2048,
+      "before_seconds": 0.2658825809994596,
+      "after_seconds": 0.0004959069992764853,
+      "speedup": 536.1541204043803
+    },
+    {
+      "family": "digits",
+      "characters": 4096,
+      "before_seconds": 1.2619582389997959,
+      "after_seconds": 0.0008997340009955224,
+      "speedup": 1402.5903629333623
+    },
+    {
+      "family": "comma_chain",
+      "characters": 513,
+      "before_seconds": 0.00469890499880421,
+      "after_seconds": 0.00011713700223481283,
+      "speedup": 40.11460861346601
+    },
+    {
+      "family": "comma_chain",
+      "characters": 1025,
+      "before_seconds": 0.018592102998809423,
+      "after_seconds": 0.00021408199972938746,
+      "speedup": 86.84570875791034
+    },
+    {
+      "family": "comma_chain",
+      "characters": 2049,
+      "before_seconds": 0.07480818399926648,
+      "after_seconds": 0.00044127399814897217,
+      "speedup": 169.52774084370944
+    },
+    {
+      "family": "comma_chain",
+      "characters": 4097,
+      "before_seconds": 0.29229083599784644,
+      "after_seconds": 0.0008657530015625525,
+      "speedup": 337.6145799902581
+    },
+    {
+      "family": "decimal",
+      "characters": 514,
+      "before_seconds": 0.02037163299974054,
+      "after_seconds": 0.00010495800233911723,
+      "speedup": 194.09318532873937
+    },
+    {
+      "family": "decimal",
+      "characters": 1026,
+      "before_seconds": 0.08022939700094867,
+      "after_seconds": 0.0002068009998765774,
+      "speedup": 387.95458943056866
+    },
+    {
+      "family": "decimal",
+      "characters": 2050,
+      "before_seconds": 0.25737341299827676,
+      "after_seconds": 0.0002563860034570098,
+      "speedup": 1003.851261488354
+    },
+    {
+      "family": "decimal",
+      "characters": 4098,
+      "before_seconds": 1.0521824919997016,
+      "after_seconds": 0.0004488260019570589,
+      "speedup": 2344.2993218123943
+    },
+    {
+      "family": "reward_whitespace",
+      "characters": 519,
+      "before_seconds": 0.00620271800289629,
+      "after_seconds": 0.00011838800128316507,
+      "speedup": 52.393130517174505
+    },
+    {
+      "family": "reward_whitespace",
+      "characters": 1031,
+      "before_seconds": 0.023656343000766356,
+      "after_seconds": 0.00019233900093240663,
+      "speedup": 122.99295975380399
+    },
+    {
+      "family": "reward_whitespace",
+      "characters": 2055,
+      "before_seconds": 0.09739775400157669,
+      "after_seconds": 0.00037007699938840233,
+      "speedup": 263.18240302028613
+    },
+    {
+      "family": "reward_whitespace",
+      "characters": 4103,
+      "before_seconds": 0.37307460000010906,
+      "after_seconds": 0.000897731999430107,
+      "speedup": 415.5745815420884
+    },
+    {
+      "family": "unicode_digits",
+      "characters": 512,
+      "before_seconds": 0.02763621600024635,
+      "after_seconds": 0.00013251999916974455,
+      "speedup": 208.54373810285938
+    },
+    {
+      "family": "unicode_digits",
+      "characters": 1024,
+      "before_seconds": 0.11931061199720716,
+      "after_seconds": 0.0002002809997065924,
+      "speedup": 595.7160797679
+    },
+    {
+      "family": "unicode_digits",
+      "characters": 2048,
+      "before_seconds": 0.4488184840010945,
+      "after_seconds": 0.0005482649976329412,
+      "speedup": 818.61597209161
+    },
+    {
+      "family": "unicode_digits",
+      "characters": 4096,
+      "before_seconds": 1.93112113800089,
+      "after_seconds": 0.0008483269994030707,
+      "speedup": 2276.387689369468
+    },
+    {
+      "family": "broken_group_before_currency",
+      "characters": 519,
+      "before_seconds": 0.003058155001781415,
+      "after_seconds": 7.04260019119829e-05,
+      "speedup": 43.42366340209743
+    },
+    {
+      "family": "broken_group_before_currency",
+      "characters": 1031,
+      "before_seconds": 0.016351106998627074,
+      "after_seconds": 0.0001876520000223536,
+      "speedup": 87.13526632638761
+    },
+    {
+      "family": "broken_group_before_currency",
+      "characters": 2055,
+      "before_seconds": 0.05384146299911663,
+      "after_seconds": 0.000418930001615081,
+      "speedup": 128.5213825496961
+    },
+    {
+      "family": "broken_group_before_currency",
+      "characters": 4103,
+      "before_seconds": 0.2544521880008688,
+      "after_seconds": 0.0004942140003549866,
+      "speedup": 514.862362899674
+    }
+  ],
+  "patched_scaling": [
+    {
+      "family": "digits",
+      "characters": 8192,
+      "after_seconds": 0.0013446940029098187
+    },
+    {
+      "family": "digits",
+      "characters": 16384,
+      "after_seconds": 0.0023135929986892734
+    },
+    {
+      "family": "digits",
+      "characters": 32768,
+      "after_seconds": 0.005251146001683082
+    },
+    {
+      "family": "digits",
+      "characters": 65536,
+      "after_seconds": 0.01041384799827938
+    },
+    {
+      "family": "comma_chain",
+      "characters": 8193,
+      "after_seconds": 0.0009739960005390458
+    },
+    {
+      "family": "comma_chain",
+      "characters": 16385,
+      "after_seconds": 0.0018903460004366934
+    },
+    {
+      "family": "comma_chain",
+      "characters": 32769,
+      "after_seconds": 0.004066973000590224
+    },
+    {
+      "family": "comma_chain",
+      "characters": 65537,
+      "after_seconds": 0.007518108999647666
+    },
+    {
+      "family": "decimal",
+      "characters": 8194,
+      "after_seconds": 0.0008814470020297449
+    },
+    {
+      "family": "decimal",
+      "characters": 16386,
+      "after_seconds": 0.0018030940009339247
+    },
+    {
+      "family": "decimal",
+      "characters": 32770,
+      "after_seconds": 0.0036346829983813222
+    },
+    {
+      "family": "decimal",
+      "characters": 65538,
+      "after_seconds": 0.006928802999027539
+    },
+    {
+      "family": "reward_whitespace",
+      "characters": 8199,
+      "after_seconds": 0.0014399669998965692
+    },
+    {
+      "family": "reward_whitespace",
+      "characters": 16391,
+      "after_seconds": 0.0031397070015373174
+    },
+    {
+      "family": "reward_whitespace",
+      "characters": 32775,
+      "after_seconds": 0.006436140000005253
+    },
+    {
+      "family": "reward_whitespace",
+      "characters": 65543,
+      "after_seconds": 0.01362244000119972
+    },
+    {
+      "family": "unicode_digits",
+      "characters": 8192,
+      "after_seconds": 0.0018078020002576523
+    },
+    {
+      "family": "unicode_digits",
+      "characters": 16384,
+      "after_seconds": 0.003624436001700815
+    },
+    {
+      "family": "unicode_digits",
+      "characters": 32768,
+      "after_seconds": 0.00682325299931108
+    },
+    {
+      "family": "unicode_digits",
+      "characters": 65536,
+      "after_seconds": 0.013843462998920586
+    },
+    {
+      "family": "broken_group_before_currency",
+      "characters": 8199,
+      "after_seconds": 0.0011441429996921215
+    },
+    {
+      "family": "broken_group_before_currency",
+      "characters": 16391,
+      "after_seconds": 0.0021628569993481506
+    },
+    {
+      "family": "broken_group_before_currency",
+      "characters": 32775,
+      "after_seconds": 0.004257338998286286
+    },
+    {
+      "family": "broken_group_before_currency",
+      "characters": 65543,
+      "after_seconds": 0.00813577000008081
+    }
+  ],
+  "legacy_rtc_scaling": [
+    {
+      "characters": 1024,
+      "before_seconds": 0.044970898001338355,
+      "after_seconds": 7.494300007238053e-05
+    },
+    {
+      "characters": 2048,
+      "before_seconds": 0.12881182300043292,
+      "after_seconds": 0.0002008320007007569
+    },
+    {
+      "characters": 4096,
+      "before_seconds": 0.6556766220019199,
+      "after_seconds": 0.000432621000072686
+    }
+  ],
+  "integration_recheck": {
+    "main_commit": "15c048ff50e19c2bbec9d69326762b537fd720a7",
+    "bounty_index_main_blob": "7356f6460188ada76a077ff47b056bb5912ef5f9",
+    "bounty_index_ast_delta_only_rtc_pattern": true,
+    "retained_evidence_parity": 266,
+    "fresh_import_legacy_rtc_cases": 5,
+    "source_sha256": {
+      "concierge/reward_evidence.py": "30d6ced46612b439e0bb75228dc6fad1e5dd81a33828c5791ea763becb247607",
+      "concierge/bounty_index.py": "23233c54d11c8ea45614f4bb2a9674bdfdcb294ca53e72e8456fc2a470675dbd"
+    },
+    "note": "Current main snapshot included one tool-added trailing LF; removing exactly that LF reproduced published Git blob7356f6460188ada76a077ff47b056bb5912ef5f9 before applying our RTC boundary. Stress timing source hashes precede peer keyword changes; retained batch timing uses current composed source."
+  },
+  "adversarial_timing_source_sha256": {
+    "concierge/reward_evidence.py": "30d6ced46612b439e0bb75228dc6fad1e5dd81a33828c5791ea763becb247607",
+    "concierge/bounty_index.py": "b27f4e92ae06f77b5374ac23fe61bf2d75b8dbfdd529bc6f6671405b77f66250"
+  },
+  "retained_batch_timing": {
+    "before_seconds": 0.07499275200098054,
+    "after_seconds": 0.09237725200000568,
+    "speedup": 0.8118097299644281,
+    "repeats": 3,
+    "rows": 266,
+    "source_sha256": {
+      "concierge/reward_evidence.py": "30d6ced46612b439e0bb75228dc6fad1e5dd81a33828c5791ea763becb247607",
+      "concierge/bounty_index.py": "23233c54d11c8ea45614f4bb2a9674bdfdcb294ca53e72e8456fc2a470675dbd"
+    }
+  }
+}

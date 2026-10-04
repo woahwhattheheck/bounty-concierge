@@ -12,9 +12,10 @@ import re
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
 
-# Standard RTC regex pattern matching finite numeric amounts
+# Use the same Unicode digit class for the amount and its left boundary;
+# otherwise a blocked number can be retried at each Unicode-digit suffix.
 _RTC_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9_.,])"
+    r"(?<![A-Za-z\d_.,])"
     r"((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)"
     r"[ \t]*RTC\b",
     re.IGNORECASE,
@@ -24,7 +25,15 @@ _RTC_PATTERN = re.compile(
 _GENERAL_AMOUNT_PATTERN = re.compile(
     r"(?:\$\s*(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|"
     r"(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?\s*(?:USD|USDT|USDC|EUR|GBP|SOL|ETH|SATS|POINTS|CREDITS)\b|"
-    r"\b(?:bounty|reward|prize|grant|pool)\s*[:=]?\s*(?:of\s*)?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?\b)",
+    r"\b(?:bounty|reward|prize|grant|pool)\s*(?:[:=]\s*)?(?:of\s*)?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?\b)",
+    re.IGNORECASE,
+)
+
+# Search short indicators first. Starting the amount regex at every digit
+# retries the whole remaining numeric suffix for an unmatched number.
+_GENERAL_INDICATOR_PATTERN = re.compile(
+    r"\$|\b(?:bounty|reward|prize|grant|pool)|"
+    r"(?P<currency>USD|USDT|USDC|EUR|GBP|SOL|ETH|SATS|POINTS|CREDITS)\b",
     re.IGNORECASE,
 )
 
@@ -47,6 +56,55 @@ def _make_excerpt(text: str, match_start: int, match_end: int, max_len: int = _M
     if len(clean) > max_len:
         return clean[:max_len - 3] + "..."
     return clean
+
+
+def _currency_amount_start(text: str, end: int, floor: int) -> Optional[int]:
+    """Find the earliest valid numeric suffix before a currency, in one pass."""
+    while end > floor and text[end - 1].isspace():
+        end -= 1
+
+    def digit_start(stop: int) -> int:
+        while stop > floor and text[stop - 1].isdecimal():
+            stop -= 1
+        return stop
+
+    start = digit_start(end)
+    if start == end:
+        return None
+    if start - 1 > floor and text[start - 1] == "." and text[start - 2].isdecimal():
+        end = start - 1
+        start = digit_start(end)
+
+    # Only complete three-digit groups can extend a number to the left. A
+    # longer initial run keeps its last three digits, preserving the existing
+    # regex's substring behavior for text such as "1234,567 USD".
+    while end - start == 3 and start > floor and text[start - 1] == ",":
+        previous_end = start - 1
+        previous_start = digit_start(previous_end)
+        if previous_start == previous_end:
+            break
+        start = max(previous_start, previous_end - 3)
+        if previous_end - previous_start != 3:
+            break
+        end = previous_end
+    return start
+
+
+def _iter_general_amounts(text: str):
+    """Yield the original regex's nonoverlapping matches without suffix retries."""
+    floor = 0
+    for indicator in _GENERAL_INDICATOR_PATTERN.finditer(text):
+        if indicator.start() < floor:
+            continue
+        start = indicator.start()
+        if indicator.lastgroup == "currency":
+            start = _currency_amount_start(text, start, floor)
+            if start is None:
+                continue
+        match = _GENERAL_AMOUNT_PATTERN.match(text, start)
+        if match is not None:
+            yield match
+            floor = match.end()
 
 
 def extract_reward_evidence(title: str, body: str) -> Dict[str, Any]:
@@ -91,7 +149,7 @@ def extract_reward_evidence(title: str, body: str) -> Dict[str, Any]:
         # Also collect other non-RTC currency mentions if room permits
         if len(additional_mentions) < _MAX_MENTIONS:
             combined = f"{safe_title} {safe_body}"
-            for gm in _GENERAL_AMOUNT_PATTERN.finditer(combined):
+            for gm in _iter_general_amounts(combined):
                 g_text = gm.group(0).strip()
                 if g_text not in additional_mentions and g_text != primary["exact"]:
                     additional_mentions.append(g_text)
@@ -114,7 +172,7 @@ def extract_reward_evidence(title: str, body: str) -> Dict[str, Any]:
     first_general_text: str = ""
 
     for text in (safe_title, safe_body):
-        for gm in _GENERAL_AMOUNT_PATTERN.finditer(text):
+        for gm in _iter_general_amounts(text):
             m_text = gm.group(0).strip()
             if m_text not in general_matches:
                 if not first_general_match:
