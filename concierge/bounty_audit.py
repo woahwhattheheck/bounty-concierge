@@ -45,15 +45,17 @@ _MAINTAINER_EXPIRY_PATTERNS = (
 class BountyAuditError(RuntimeError):
     """Unreliable GitHub state, optionally retaining an interrupted batch.
 
-    ``partial_report`` contains only audits that returned before the failure;
-    the failed and later rows remain unaudited. Library callers still receive
-    this exception rather than a success-shaped partial list.
+    ``partial_report`` contains completed audits plus any issue-local unavailable
+    outcomes. A shared failure leaves its row and later rows unaudited. Library
+    callers receive this exception rather than a success-shaped partial list.
     """
 
     partial_report: dict[str, Any] | None = None
     http_status: int | None = None
     retry_after: str | None = None
     rate_limit_reset: str | None = None
+    request_url: str | None = None
+    rate_limit_remaining: int | None = None
 
 
 def _headers(token: str | None) -> dict[str, str]:
@@ -76,6 +78,7 @@ def _get_json(
         response.raise_for_status()
     except requests.RequestException as exc:
         error = BountyAuditError(f"GitHub request failed for {url}: {exc}")
+        error.request_url = url
         failed_response = getattr(exc, "response", None)
         status = getattr(failed_response, "status_code", None)
         error.http_status = status if type(status) is int else None
@@ -85,6 +88,12 @@ def _get_json(
             reset = failed_headers.get("X-RateLimit-Reset", failed_headers.get("x-ratelimit-reset"))
             error.retry_after = retry_after if isinstance(retry_after, str) else None
             error.rate_limit_reset = reset if isinstance(reset, str) else None
+            remaining = failed_headers.get("X-RateLimit-Remaining", failed_headers.get("x-ratelimit-remaining"))
+            if isinstance(remaining, str):
+                try:
+                    error.rate_limit_remaining = int(remaining)
+                except ValueError:
+                    pass
         raise error from exc
     try:
         payload = response.json()
@@ -380,14 +389,48 @@ def audit_bounty(
     }
 
 
+def _batch_error_details(exc: BountyAuditError) -> dict[str, Any]:
+    return {
+        "type": "BountyAuditError", "message": str(exc),
+        "http_status": exc.http_status, "retry_after": exc.retry_after,
+        "rate_limit_reset": exc.rate_limit_reset,
+    }
+
+
+def _batch_partial_report(
+    bounties: list[dict[str, Any]], audited: list[dict[str, Any]],
+    exc: BountyAuditError, failed_row: int, remaining_start: int,
+    unavailable: list[dict[str, Any]],
+) -> dict[str, Any]:
+    # A cached input audit must not masquerade as an observation from this run.
+    remaining = [
+        {key: value for key, value in candidate.items() if key != "canonical_audit"}
+        for candidate in bounties[remaining_start:]
+    ]
+    report = {
+        "status": "PARTIAL", "input_count": len(bounties),
+        "audited_count": len(audited), "remaining_count": len(remaining),
+        "failed_row": failed_row, "rows": deepcopy(audited),
+        "remaining_candidates": deepcopy(remaining), "error": _batch_error_details(exc),
+    }
+    if unavailable:
+        report.update(
+            unavailable_count=len(unavailable),
+            unavailable_candidates=deepcopy(unavailable),
+            traversal_complete=remaining_start == len(bounties),
+        )
+    return report
+
+
 def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, session: Any = requests, max_pages: int = 10) -> list[dict[str, Any]]:
     """Read each case-insensitive issue/explicit-target combination once per invocation.
 
     Canonical PR details are shared within this batch when distinct issues link
     the same PR. Later invocations and standalone audits perform fresh reads.
-    A provider/evidence failure stops immediately and raises BountyAuditError
-    with completed rows and a remaining shortlist in ``partial_report``. It
-    neither retries the failed read nor calls the provider for later rows.
+    A canonical issue 404/410 is retained as unavailable while independent rows
+    continue. Other provider/evidence failures stop immediately. Any failed row
+    raises BountyAuditError with explicit outcomes in ``partial_report``; there
+    are no retries or fabricated audits for unavailable issues.
     """
     if session is requests:
         with requests.Session() as owned_session:
@@ -398,7 +441,10 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
     audited = []
     pr_detail_cache: dict[tuple[str, int], dict[str, Any]] = {}
     audit_by_issue: dict[tuple[str, int, str | None], dict[str, Any]] = {}
-    for bounty in bounties:
+    unavailable_by_issue: dict[tuple[str, int, str | None], BountyAuditError] = {}
+    unavailable: list[dict[str, Any]] = []
+    first_unavailable: tuple[int, BountyAuditError] | None = None
+    for index, bounty in enumerate(bounties):
         row = dict(bounty)
         repo, number = row["repo"], int(row["number"])
         target = row.get("submission_target")
@@ -415,6 +461,8 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
         key = (repo.casefold(), number, target_key)
         if key not in audit_by_issue:
             try:
+                if key in unavailable_by_issue:
+                    raise unavailable_by_issue[key]
                 audit_by_issue[key] = audit_bounty(
                     repo,
                     key[1],
@@ -425,29 +473,29 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
                     _pr_detail_cache=pr_detail_cache,
                 )
             except BountyAuditError as exc:
-                # Keep the caller's original exception contract, but do not
-                # lose finished work when a later source read fails. A cached
-                # input audit must never masquerade as a newly observed result.
-                remaining = [
-                    {key: value for key, value in candidate.items() if key != "canonical_audit"}
-                    for candidate in bounties[len(audited):]
-                ]
-                exc.partial_report = {
-                    "status": "PARTIAL",
-                    "input_count": len(bounties),
-                    "audited_count": len(audited),
-                    "remaining_count": len(remaining),
-                    "failed_row": len(audited) + 1,
-                    "rows": deepcopy(audited),
-                    "remaining_candidates": deepcopy(remaining),
-                    "error": {
-                        "type": "BountyAuditError",
-                        "message": str(exc),
-                        "http_status": exc.http_status,
-                        "retry_after": exc.retry_after,
-                        "rate_limit_reset": exc.rate_limit_reset,
-                    },
-                }
+                if (
+                    exc.http_status in {404, 410}
+                    and exc.request_url is not None
+                    and exc.request_url.casefold() == f"https://api.github.com/repos/{repo}/issues/{key[1]}".casefold()
+                    and exc.retry_after is None and exc.rate_limit_remaining != 0
+                ):
+                    # Unavailable is an observation, not proof of permanent
+                    # deletion or permission to submit. Keep it out of the
+                    # automatic remaining-list recovery path, with full input
+                    # identity/metadata retained for source resolution.
+                    unavailable_by_issue[key] = exc
+                    unavailable.append({
+                        "input_row": index + 1, "status": "ISSUE_UNAVAILABLE",
+                        "candidate": deepcopy({key: value for key, value in row.items()
+                                               if key != "canonical_audit"}),
+                        "error": _batch_error_details(exc),
+                    })
+                    if first_unavailable is None:
+                        first_unavailable = index + 1, exc
+                    continue
+                exc.partial_report = _batch_partial_report(
+                    bounties, audited, exc, index + 1, index, unavailable,
+                )
                 raise
         # Each row owns its nested report. A caller editing one scout's result
         # must not alter another row or the evidence reused later in this batch.
@@ -459,6 +507,12 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
             if pr.get("repository", "").casefold() == key[0]:
                 pr["repository"] = repo
         audited.append(row)
+    if first_unavailable is not None:
+        failed_row, exc = first_unavailable
+        exc.partial_report = _batch_partial_report(
+            bounties, audited, exc, failed_row, len(bounties), unavailable,
+        )
+        raise exc
     return audited
 
 
@@ -588,14 +642,32 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  PR {identity}: {status}{draft} - {pr['title']} - {pr['url']}{suffix}")
     if partial_report is not None:
         error = partial_report["error"]
-        print(
-            f"PARTIAL: retained {partial_report['audited_count']} of "
-            f"{partial_report['input_count']} input rows; stopped at row "
-            f"{partial_report['failed_row']}. {partial_report['remaining_count']} "
-            f"rows still need an audit. {error['message']}",
-            file=sys.stderr,
-        )
-        if error["retry_after"] is not None or error["rate_limit_reset"] is not None:
+        if partial_report.get("traversal_complete"):
+            print(
+                f"PARTIAL: retained {partial_report['audited_count']} of "
+                f"{partial_report['input_count']} input rows; traversal completed. "
+                f"{partial_report['unavailable_count']} unavailable issue rows need source resolution.",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"PARTIAL: retained {partial_report['audited_count']} of "
+                f"{partial_report['input_count']} input rows; stopped at row "
+                f"{partial_report['failed_row']}. {partial_report['remaining_count']} "
+                f"rows still need an audit. {error['message']}",
+                file=sys.stderr,
+            )
+        for outcome in partial_report.get("unavailable_candidates", []):
+            candidate = outcome["candidate"]
+            print(
+                f"Unavailable input row {outcome['input_row']}: "
+                f"{candidate['repo']}#{candidate['number']} HTTP {outcome['error']['http_status']}; "
+                "resolve the source before explicitly adding it to another shortlist.",
+                file=sys.stderr,
+            )
+        if not partial_report.get("traversal_complete") and (
+            error["retry_after"] is not None or error["rate_limit_reset"] is not None
+        ):
             print(
                 f"Provider cooldown metadata: Retry-After={error['retry_after']!r}; "
                 f"X-RateLimit-Reset={error['rate_limit_reset']!r}. "
