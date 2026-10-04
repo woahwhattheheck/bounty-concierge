@@ -48,6 +48,8 @@ def verify(filename, listener):
     selector = service["spec"]["selector"]
     labels = pod["metadata"]["labels"]
     assert selector and all(labels.get(key) == value for key, value in selector.items()), (selector, labels)
+    ingress_routes = [path["backend"]["service"] for obj in objects if obj.get("kind") == "Ingress" for rule in obj.get("spec", {}).get("rules", []) for path in rule.get("http", {}).get("paths", []) if path.get("backend", {}).get("service", {}).get("name") == service["metadata"]["name"]]
+    assert ingress_routes and all(route["port"].get("number") == 8080 for route in ingress_routes), ingress_routes
     probes = {}
     for name in ("startupProbe", "livenessProbe", "readinessProbe"):
         actual = container[name]["httpGet"]["port"]
@@ -63,6 +65,7 @@ def verify(filename, listener):
         "config_map": {"name": config["metadata"]["name"], "PORT": config["data"]["PORT"]},
         "probe_ports": probes,
         "service_selector_matches_pod": True,
+        "ingress_backend_ports": [route["port"]["number"] for route in ingress_routes],
     }
 
 cases = [
@@ -81,6 +84,7 @@ receipt = {
     "pyyaml": yaml.__version__,
     "runner_os": platform.platform(),
     "values_file": "charts/payd/values-staging.yaml",
+    "fixture": "Documented RENDER_ONLY_NOT_A_SIGNING_KEY file and backend Ingress path override8080; no real credential.",
     "passed": len(cases),
     "failed": 0,
     "cases": cases,

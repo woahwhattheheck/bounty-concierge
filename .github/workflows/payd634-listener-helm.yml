@@ -37,8 +37,8 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C source rev-parse HEAD)" = "fd4960e766ccd804ac7a0f99f788efde511a45b1"
-          tools/linux-amd64/helm template ledger634 source/charts/payd --namespace staging --values source/charts/payd/values-staging.yaml --set backend.service.port=8080 > evidence/service-8080-listener-3001.yaml
-          tools/linux-amd64/helm template ledger634 source/charts/payd --namespace staging --values source/charts/payd/values-staging.yaml --set backend.service.port=8080 --set-string backend.config.PORT=4001 > evidence/service-8080-listener-4001.yaml
+          tools/linux-amd64/helm template ledger634 source/charts/payd --namespace staging --values source/charts/payd/values-staging.yaml --set backend.service.port=8080 --set 'ingress.hosts[1].paths[0].port=8080' --set-file backend.secrets.JWT_REFRESH_SECRET=review/fixtures/render-only-refresh.txt > evidence/service-8080-listener-3001.yaml
+          tools/linux-amd64/helm template ledger634 source/charts/payd --namespace staging --values source/charts/payd/values-staging.yaml --set backend.service.port=8080 --set 'ingress.hosts[1].paths[0].port=8080' --set-file backend.secrets.JWT_REFRESH_SECRET=review/fixtures/render-only-refresh.txt --set-string backend.config.PORT=4001 > evidence/service-8080-listener-4001.yaml
           .review-venv/bin/python review/scripts/payd634_listener_render.py | tee evidence/acceptance.log
           git -C source diff --exit-code
       - uses: actions/upload-artifact@v4
