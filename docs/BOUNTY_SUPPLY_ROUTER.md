@@ -124,9 +124,8 @@ Run `python examples/capture_redirect_budget.py` for the focused loopback check;
 it uses real Requests without calling GitHub.
 
 An issue-specific failure does not stop independent candidates. For example,
-a missing issue (HTTP 404), a repository-specific HTTP 403 without rate-limit
-signals, or a PR mistakenly included in an issue shortlist is recorded as a
-failed item, then collection continues. Failed issues remain in `remaining.json`;
+a missing issue (HTTP 404 or 410), or a PR mistakenly included in an issue
+shortlist is recorded as a failed item, then collection continues. Failed issues remain in `remaining.json`;
 completed captures remain available to the supply router. When every candidate
 has been attempted but some failed, the partial summary reports `ITEM_ERRORS`.
 `attempted_count` and `failed_count` distinguish these failures from unattempted
@@ -138,8 +137,8 @@ issues instead of repeatedly spending its entire budget on the same early failur
 Failed rows remain available for retry; the original summary, item order and
 observation times stay unchanged. This ordering does not clear a provider cooldown.
 
-Rate limits, HTTP 401 authentication errors, server errors, transport failures,
-output failures and interruption still stop the run. Handled failures and Ctrl+C
+Rate limits, HTTP 401 authentication errors, HTTP 403 access errors, server errors,
+transport failures, output failures and interruption still stop the run. Handled failures and Ctrl+C
 retain completed captures and write the final summary, supply and remaining files
 when storage is available. The collector neither retries automatically nor
 schedules a later run. After resolving the recorded failure, resume only the
