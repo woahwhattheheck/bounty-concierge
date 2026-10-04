@@ -121,6 +121,9 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
     means every requested source traversed its returned pagination; it is not
     an atomic GitHub snapshot, bounty eligibility, or payment evidence.
 
+    An authenticated HTTP 401 stops remaining requests with the same credential;
+    earlier results and the first HTTP error remain in the report.
+
     ``cache_dir`` (or CONCIERGE_BOUNTY_CACHE) enables conditional page reads.
     Cached rows are used only after a matching provider 304; errors never serve
     stale rows. Pass False to disable an environment-configured cache.
@@ -161,10 +164,14 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
               "rate_limited": False, "retry_after_seconds": None,
               "rate_limit_reset_at": None, "repositories": sources, "bounties": []}
 
+    authentication_failed = False
     with requests.Session() as session:
         for source in sources:
             if report["rate_limited"]:
                 source["status"] = "NOT_ATTEMPTED_RATE_LIMIT"
+                continue
+            if authentication_failed:
+                source["status"] = "NOT_ATTEMPTED_AUTH_ERROR"
                 continue
             repo = source["repo"]
             seen_numbers = set()
@@ -212,6 +219,8 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                         report.update(rate_limited=True, retry_after_seconds=retry_after,
                                       rate_limit_reset_at=reset_at)
                     if status not in (200, 304):
+                        if status == 401 and "Authorization" in headers:
+                            authentication_failed = True
                         source["status"] = "HTTP_ERROR"
                         break
                     if status == 304:
