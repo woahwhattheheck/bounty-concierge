@@ -39,7 +39,7 @@ from concierge.bounty_capture import CaptureInputError, replay_capture
 
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _ROUTE_ORDER = {"ACTIVE": 0, "MAYBE": 1, "HOLD": 2, "PRUNE": 3}
-_ACTIVE_FLOOR_USD = Decimal("25")
+_ACTIVE_FLOOR_USD = Decimal("15")
 _MAYBE_FLOOR_USD = Decimal("10")
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
 _CAPTURE_FIELDS = frozenset({
@@ -114,10 +114,10 @@ def _policy(
 
     # Owner economics are an invariant, not a caller preference.  Keeping the
     # parameters for API compatibility is deliberate, but any attempted override
-    # fails closed so rewards below $25 can never be promoted into ACTIVE/main.
+    # fails closed so rewards below $15 can never be promoted into ACTIVE/main.
     if active != _ACTIVE_FLOOR_USD or maybe != _MAYBE_FLOOR_USD:
         raise SupplyInputError(
-            "bounty floors are fixed: active_floor_usd=25 and maybe_floor_usd=10"
+            "bounty floors are fixed: active_floor_usd=15 and maybe_floor_usd=10"
         )
     if (
         isinstance(saturation_threshold, bool)
@@ -126,7 +126,7 @@ def _policy(
     ):
         raise SupplyInputError("saturation_threshold must be a positive integer")
     return {
-        "active_floor_usd": "25",
+        "active_floor_usd": "15",
         "maybe_floor_usd": "10",
         "max_age_seconds": _decimal_text(max_age),
         "saturation_threshold": saturation_threshold,
@@ -274,7 +274,7 @@ def route_snapshot(
     snapshot: dict[str, Any],
     *,
     evaluated_at: Any,
-    active_floor_usd: Any = "25",
+    active_floor_usd: Any = "15",
     maybe_floor_usd: Any = "10",
     max_age_seconds: Any = "900",
     saturation_threshold: int = 4,
@@ -543,7 +543,7 @@ def route_supply(
     snapshots: list[dict[str, Any]],
     *,
     evaluated_at: Any,
-    active_floor_usd: Any = "25",
+    active_floor_usd: Any = "15",
     maybe_floor_usd: Any = "10",
     max_age_seconds: Any = "900",
     saturation_threshold: int = 4,

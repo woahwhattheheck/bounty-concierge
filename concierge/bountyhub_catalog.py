@@ -218,7 +218,7 @@ def _unique_target_fields(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
-def select_targets(report: dict[str, Any], minimum_funded_usd: str = "25.00", *,
+def select_targets(report: dict[str, Any], minimum_funded_usd: str = "15.00", *,
                    include_promised: bool = False,
                    submission_targets: dict[str, Any] | None = None) -> dict[str, Any]:
     """Reduce a retained report without refreshing its time or making requests."""
@@ -320,7 +320,7 @@ def _fill_details(session: Any, report: dict[str, Any], floor: Decimal, max_deta
 
 
 def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int = 100,
-                  minimum_total_usd: str = "25.00", include_promised: bool = False,
+                  minimum_total_usd: str = "15.00", include_promised: bool = False,
                   session: Any = None) -> dict[str, Any]:
     """Collect once with bounded reads; retain partial progress and never retry."""
     if type(max_pages) is not int or not 1 <= max_pages <= 100:
@@ -551,9 +551,9 @@ def main(argv: list[str] | None = None) -> int:
                          help="Last targeted-refresh receipt; enforces its Retry-After cooldown")
     for command in (collect, targets):
         command.add_argument(
-            "--min-funded-usd", "--min-reward-usd", dest="min_funded_usd", default="25.00",
+            "--min-funded-usd", "--min-reward-usd", dest="min_funded_usd", default="15.00",
             help="Minimum USD in the selected reward basis: funded by default, funded plus promised "
-                 "with --include-promised (default: 25.00)",
+                 "with --include-promised (default: 15.00)",
         )
         command.add_argument(
             "--include-promised", action="store_true",
