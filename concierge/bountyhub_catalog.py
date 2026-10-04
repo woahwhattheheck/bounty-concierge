@@ -171,7 +171,8 @@ def _get(session: Any, url: str, report: dict[str, Any], **params: Any) -> Any:
         response.close()
 
 
-def select_targets(report: dict[str, Any], minimum_funded_usd: str = "50.00") -> dict[str, Any]:
+def select_targets(report: dict[str, Any], minimum_funded_usd: str = "50.00", *,
+                   include_promised: bool = False) -> dict[str, Any]:
     """Reduce a retained report without refreshing its time or making requests."""
     if not isinstance(report, dict) or report.get("schema") != SCHEMA or not isinstance(report.get("listings"), list):
         raise ValueError("expected a bountyhub-catalog/v1 report")
@@ -193,7 +194,10 @@ def select_targets(report: dict[str, Any], minimum_funded_usd: str = "50.00") ->
         if _amount(row["payout_marked_usd"]) != 0 or _amount(row["other_payment_status_usd"]) != 0:
             unresolved += 1
             continue
-        if _amount(row["reported_funded_usd"]) < floor:
+        reward = _amount(row["reported_funded_usd"])
+        if include_promised:
+            reward += _amount(row["reported_promised_usd"])
+        if reward < floor:
             continue
         repo, number, listing_id = row.get("repo"), row.get("number"), row.get("listing_id")
         if (not isinstance(repo, str) or not _REPO.fullmatch(repo)
@@ -203,17 +207,22 @@ def select_targets(report: dict[str, Any], minimum_funded_usd: str = "50.00") ->
         key = (repo.casefold(), number)
         targets.setdefault(key, {"repo": repo, "number": number})
         associations.setdefault(f"{repo.casefold()}#{number}", []).append(listing_id)
-    return {
+    result = {
         "targets": list(targets.values()), "listing_ids_by_issue": associations,
         "minimum_funded_usd": _money(floor), "unresolved_funding_count": unresolved,
         "source_started_at": report.get("started_at"),
         "source_completed_at": report.get("completed_at"),
         "source_complete": report.get("complete") is True and unresolved == 0,
     }
+    if include_promised:
+        del result["minimum_funded_usd"]
+        result.update(reward_basis="reported_funded_plus_promised", minimum_reward_usd=_money(floor))
+    return result
 
 
 def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int = 100,
-                  minimum_total_usd: str = "50.00", session: Any = None) -> dict[str, Any]:
+                  minimum_total_usd: str = "50.00", include_promised: bool = False,
+                  session: Any = None) -> dict[str, Any]:
     """Collect once with bounded reads; retain partial progress and never retry."""
     if type(max_pages) is not int or not 1 <= max_pages <= 100:
         raise ValueError("max_pages must be between 1 and 100")
@@ -226,7 +235,7 @@ def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int 
         with requests.Session() as owned:
             return fetch_catalog(max_pages=max_pages, max_details=max_details,
                                  page_size=page_size, minimum_total_usd=minimum_total_usd,
-                                 session=owned)
+                                 include_promised=include_promised, session=owned)
     report: dict[str, Any] = {
         "schema": SCHEMA, "source_url": API, "started_at": _now(),
         "completed_at": None, "complete": False, "catalog_complete": False,
@@ -295,7 +304,7 @@ def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int 
     report["completed_at"] = _now()
     report["complete"] = report["catalog_complete"] and report["details_complete"]
     report["listing_count"] = len(report["listings"])
-    report["shortlist"] = select_targets(report, minimum_total_usd)
+    report["shortlist"] = select_targets(report, minimum_total_usd, include_promised=include_promised)
     return report
 
 
@@ -306,35 +315,50 @@ def main(argv: list[str] | None = None) -> int:
     collect.add_argument("--max-pages", type=int, default=10)
     collect.add_argument("--max-details", type=int, default=50)
     collect.add_argument("--page-size", type=int, default=100)
-    collect.add_argument("--min-funded-usd", default="50.00")
     targets = commands.add_parser("targets", help="Export targets from a retained catalog with no provider reads")
     targets.add_argument("snapshot", type=Path)
-    targets.add_argument("--min-funded-usd", default="50.00")
+    for command in (collect, targets):
+        command.add_argument(
+            "--min-funded-usd", "--min-reward-usd", dest="min_funded_usd", default="50.00",
+            help="Minimum USD in the selected reward basis: funded by default, funded plus promised "
+                 "with --include-promised (default: 50.00)",
+        )
+        command.add_argument(
+            "--include-promised", action="store_true",
+            help="Include resolved PROMISED pledges with funded pledges when applying the reward floor",
+        )
     args = parser.parse_args(argv)
     try:
         if args.command == "collect":
             result = fetch_catalog(max_pages=args.max_pages, max_details=args.max_details,
                                    page_size=args.page_size,
-                                   minimum_total_usd=args.min_funded_usd)
+                                   minimum_total_usd=args.min_funded_usd,
+                                   include_promised=args.include_promised)
             complete = result["shortlist"]["source_complete"]
         else:
             with args.snapshot.open(encoding="utf-8") as source:
-                result = select_targets(json.load(source), args.min_funded_usd)
+                result = select_targets(json.load(source), args.min_funded_usd,
+                                        include_promised=args.include_promised)
             complete = result["source_complete"]
         if args.command == "targets":
             # The existing batch preflight accepts this exact envelope. Keep
             # observation/funding evidence in the original catalog report.
             print(json.dumps({"candidates": result["targets"]}, indent=2, sort_keys=True))
+            basis = (
+                f" reward_basis={result['reward_basis']} minimum_reward_usd={result['minimum_reward_usd']}"
+                if args.include_promised else ""
+            )
             print(
                 f"source_started_at={result['source_started_at']} "
                 f"source_completed_at={result['source_completed_at']} "
                 f"source_complete={str(complete).lower()} "
-                f"candidates={len(result['targets'])}", file=sys.stderr,
+                f"candidates={len(result['targets'])}{basis}", file=sys.stderr,
             )
         else:
             print(json.dumps(result, indent=2, sort_keys=True))
         if not complete:
-            print("PARTIAL: retained rows do not establish a complete funded shortlist", file=sys.stderr)
+            basis = "funded plus promised" if args.include_promised else "funded"
+            print(f"PARTIAL: retained rows do not establish a complete {basis} shortlist", file=sys.stderr)
         return 0 if complete else 2
     except (OSError, ValueError, KeyError) as exc:
         print(f"bountyhub-catalog: {type(exc).__name__}", file=sys.stderr)
