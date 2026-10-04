@@ -41,7 +41,7 @@ These measurements are from one shared cloud Python process and measure elapsed
 parser time, not provider latency or fleet throughput. Scheduling and load affect
 absolute timings; results.json retains every size and measurement.
 
-| Input near 4 KB | Before | After |
+| Input near 4,096 characters | Before | After |
 | --- | ---: | ---: |
 | Unmatched digits | 1,262 ms | 0.900 ms |
 | Comma groups | 292 ms | 0.866 ms |
@@ -50,7 +50,7 @@ absolute timings; results.json retains every size and measurement.
 | Unicode digits | 1,931 ms | 0.848 ms |
 | Broken final group before USD | 254 ms | 0.494 ms |
 
-Patched inputs near 65 KB took 6.9–13.8 ms across those families. The separate
+Patched inputs near 65,536 characters took 6.9–13.8 ms across those families. The separate
 legacy `parse_reward` Unicode case fell from 656 ms to 0.433 ms at 4,096 digits.
 All 266 retained evidence objects and legacy RTC values remained equal. These
 stress inputs establish the removed backtracking behavior; they do not establish
