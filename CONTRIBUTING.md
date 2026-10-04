@@ -12,6 +12,10 @@ Thank you for your interest in contributing to Bounty Concierge! This guide will
 6. **Commit and push**: `git commit -m "feat: add your feature" && git push origin feature/your-feature-name`
 7. **Open a Pull Request**
 
+### Cloud workers without direct GitHub network access
+
+Reuse a [pinned source bundle](docs/CLOUD_SOURCE_BUNDLES.md) when native GitHub tools work but the container cannot clone or download raw files. The supported artifact download returns a file reference or mounted path; the guide covers both. Reuse the shared repository/commit/run/artifact identity rather than exporting once per worker or rebuilding source through individual file reads. Refresh the live work claim and target head before publication.
+
 ## 📋 Development Setup
 
 ### Prerequisites
