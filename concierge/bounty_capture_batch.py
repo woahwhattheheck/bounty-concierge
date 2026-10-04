@@ -92,7 +92,7 @@ def _integer_header(headers: Any, name: str) -> int | None:
 
 
 class _BatchSession:
-    """Count real GETs and stop further reads after provider quota exhaustion."""
+    """Count transport calls and Requests redirect hops before dispatch."""
 
     def __init__(self, session: Any, max_requests: int) -> None:
         self.session = session
@@ -105,6 +105,12 @@ class _BatchSession:
         self.failure: dict[str, Any] | None = None
 
     def get(self, url: str, **kwargs: Any) -> Any:
+        if isinstance(self.session, requests.Session) and kwargs.get("allow_redirects", True):
+            return self._get_with_redirects(url, **kwargs)
+        return self._request(self.session.get, url, **kwargs)
+
+    def _request(self, send: Any, target: Any, **kwargs: Any) -> Any:
+        """Apply the shared budget immediately before one transport attempt."""
         if self.rate_limited:
             self.failure = {"code": "RATE_LIMITED"}
             raise requests.RequestException("provider quota exhausted; remaining reads deferred")
@@ -113,7 +119,7 @@ class _BatchSession:
             raise requests.RequestException("batch request budget reached; remaining reads deferred")
         self.request_count += 1
         try:
-            response = self.session.get(url, **kwargs)
+            response = send(target, **kwargs)
         except requests.RequestException as exc:
             if isinstance(exc, requests.HTTPError) and exc.response is not None:
                 try:
@@ -130,6 +136,62 @@ class _BatchSession:
             raise
         self._record_response(response)
         return response
+
+    def _get_with_redirects(self, url: str, **kwargs: Any) -> Any:
+        """Budget each Requests-prepared redirect without changing the session."""
+        settings: dict[str, Any] = {}
+
+        def remember_settings(response: Any, **effective: Any) -> None:
+            # Session.get merges environment and session settings before send.
+            # Keep those exact settings, including caller hooks' transport values.
+            settings.clear()
+            settings.update(effective)
+
+        request_hooks = requests.Request(hooks=kwargs.get("hooks")).hooks
+        hooks = requests.sessions.merge_hooks(request_hooks, self.session.hooks)
+        response_hooks = hooks.get("response") or []
+        if callable(response_hooks):
+            response_hooks = [response_hooks]
+        kwargs["hooks"] = dict(hooks, response=[*response_hooks, remember_settings])
+        kwargs["allow_redirects"] = False
+        response = None
+        history: list[Any] = []
+        try:
+            response = self._request(self.session.get, url, **kwargs)
+            while response.next is not None:
+                response.history = history[:]
+                if len(history) >= self.session.max_redirects:
+                    self.failure = {"code": "TRANSPORT_ERROR", "error_type": "TooManyRedirects"}
+                    raise requests.TooManyRedirects(
+                        f"Exceeded {self.session.max_redirects} redirects.", response=response,
+                    )
+                history.append(response)
+                prepared = response.next
+                send_settings = settings.copy()
+                # Requests prepared the URL, method, cookies and stripped auth.
+                # Recover its per-hop proxy map without preparing auth again.
+                send_settings["proxies"] = self.session.rebuild_proxies(
+                    prepared, send_settings.get("proxies"),
+                )
+                response = self._request(
+                    self.session.send, prepared, allow_redirects=False, **send_settings,
+                )
+            if history:
+                response.history = history
+            return response
+        except BaseException as exc:
+            failed_response = getattr(exc, "response", None)
+            pending = [response] if response is not failed_response else []
+            # _request already attempted cleanup for an HTTPError response.
+            if failed_response is not None and not isinstance(exc, requests.HTTPError):
+                pending.append(failed_response)
+            for item in pending:
+                if item is not None:
+                    try:
+                        item.close()
+                    except Exception:
+                        pass
+            raise
 
     def _record_response(self, response: Any) -> None:
         """Classify returned responses and HTTP errors raised by session hooks."""

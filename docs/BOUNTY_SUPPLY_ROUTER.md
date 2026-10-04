@@ -104,10 +104,18 @@ private capture is written with mode 0600 as the run progresses. Its outputs are
 `--max-issues` bounds the unique issues attempted in this run; excess issues stay
 in `remaining.json`. `--max-pages` bounds each paginated traversal, not total
 requests: related-PR reads can still require many GETs even at `--max-pages 1`.
-`--max-requests` supplies the strict total budget, counting actual HTTP GET
-attempts. It defaults to 100 and accepts 1–10,000. Exhaustion stops with
+`--max-requests` supplies the total dispatch budget. With the CLI's default
+Requests session, it counts the initial HTTP GET and each followed redirect hop.
+It defaults to 100 and accepts 1–10,000. Exhaustion stops with
 `REQUEST_LIMIT` before another call; the current incomplete issue and all
 unattempted issues remain in `remaining.json`.
+
+The default CLI session does not configure automatic retries. Python callers
+using custom retrying adapters, authentication or response hooks that send
+requests themselves, or get-only transports may perform additional attempts
+inside one counted call; those internal attempts are outside this counter.
+Run `python examples/capture_redirect_budget.py` for the focused loopback check;
+it uses real Requests without calling GitHub.
 
 An issue-specific failure does not stop independent candidates. For example,
 a missing issue (HTTP 404), a repository-specific HTTP 403 without rate-limit
