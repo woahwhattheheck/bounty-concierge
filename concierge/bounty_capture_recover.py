@@ -133,7 +133,7 @@ def recover_batch(source_run: str | Path, output_dir: str | Path) -> dict[str, A
                 item["error"] = {
                     "code": "CAPTURE_JSON_ERROR", "error_type": type(exc).__name__,
                 }
-            except (CaptureInputError, ValueError, TypeError, KeyError, RecursionError) as exc:
+            except (CaptureInputError, ValueError, TypeError, KeyError, OverflowError, RecursionError) as exc:
                 item["error"] = {"code": "CAPTURE_INVALID", "error_type": type(exc).__name__}
         items.append(item)
 
