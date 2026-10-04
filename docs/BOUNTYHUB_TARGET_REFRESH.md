@@ -71,6 +71,11 @@ inferred, inserted into the original or reported as known. Other retained catalo
 validation remains the same. The CLI caps each input at 4 MiB.
 
 Exit 0 means this requested scope completed; exit 2 means partial or invalid input.
+Input errors name their cause on stderr, such as `invalid listing identity`,
+`requested listing is absent from the retained catalog`, or
+`retained Retry-After cooldown has not elapsed`. Correct the named input or honor
+the saved cooldown before invoking the command again. Invalid JSON includes its
+line and column; diagnostics do not echo file contents, paths or malformed timestamps.
 Inspect a partial receipt before routing its successful candidates. The receipt
 is not input to `catalog targets` or `catalog resume`, and it does not refresh a
 GitHub preflight. Preserve it alongside any explicitly selected issue shortlist.
