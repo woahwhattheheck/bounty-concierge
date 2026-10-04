@@ -1,0 +1,22 @@
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -191,7 +191,9 @@
+         .with_threads(false)
+         .with_tracer(tracer);
+ 
+-    let subscriber = tracing_subscriber::registry().with(trace_layer);
++    let subscriber = tracing_subscriber::registry()
++        .with(tracing_subscriber::fmt::layer())
++        .with(trace_layer);
+ 
+     tracing::subscriber::set_global_default(subscriber)?;
+ 
+@@ -204,6 +206,8 @@
+ async fn shuttle_main() -> Result<impl Service, shuttle_runtime::Error> {
+     if std::env::var("HONEYCOMB_API_KEY").is_ok() {
+         init_tracer()?;
++    } else {
++        tracing_subscriber::fmt::init();
+     }
+ 
+     let news_service = MyNewsService::new();
