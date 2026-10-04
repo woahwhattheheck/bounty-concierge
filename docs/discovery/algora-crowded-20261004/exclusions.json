@@ -1,0 +1,12 @@
+{
+  "tine1117/oss-hunter-livefire#1": {
+    "reason": "Avoid another same-scope days-unit implementation: matching PR162 was OPEN and unmerged at head 0198218990acdc3382c96960e9e02a14afbeb3bc. Open-PR search also returned 161, 160, 159 and 158. This is a duplicate-work observation, not an award, funding or eligibility decision; changes to an existing PR remain separate.",
+    "source_url": "https://github.com/tine1117/oss-hunter-livefire/pull/162",
+    "observed_at": "2026-10-04T13:27:36Z"
+  },
+  "seveibar/pgstrap#2": {
+    "reason": "Avoid another same-scope PGlite type-generation implementation: matching PR86 was OPEN and unmerged at head c03496b821b6abcabf39034f74d0848632e8fb86. Open-PR search also returned 85 and 84. This is a duplicate-work observation, not an award, funding or eligibility decision; changes to an existing PR remain separate.",
+    "source_url": "https://github.com/seveibar/pgstrap/pull/86",
+    "observed_at": "2026-10-04T13:27:36Z"
+  }
+}
