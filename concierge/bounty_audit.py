@@ -293,7 +293,8 @@ def audit_bounty(
     for search_repo in search_repos:
         query = f"repo:{search_repo} is:pr {number}"
         # The owning batch fixes the session, token, representation and page size.
-        search_key = (query, max_pages)
+        # GitHub repository identity ignores case; preserve query spelling on the wire.
+        search_key = (f"repo:{search_repo.casefold()} is:pr {number}", max_pages)
         if _search_cache is not None and search_key in _search_cache:
             candidates.extend((search_repo, item) for item in deepcopy(_search_cache[search_key]))
             continue
