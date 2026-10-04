@@ -472,7 +472,7 @@ def _resume_input(snapshot: Any) -> dict[str, Any]:
 
 
 def resume_catalog(snapshot: dict[str, Any], *, max_details: int = 50,
-                   session: Any = None) -> dict[str, Any]:
+                   minimum_total_usd: str | None = None, session: Any = None) -> dict[str, Any]:
     """Finish unresolved detail reads, not a fresh catalog or eligibility check."""
     if type(max_details) is not int or not 0 <= max_details <= 100:
         raise ValueError("max_details must be between 0 and 100")
@@ -484,11 +484,15 @@ def resume_catalog(snapshot: dict[str, Any], *, max_details: int = 50,
     if basis is not None and basis != "reported_funded_plus_promised":
         raise ValueError("invalid retained reward basis")
     include_promised = basis is not None
-    minimum = report["minimum_total_usd"]
+    source_minimum = report["minimum_total_usd"]
     floor_key = "minimum_reward_usd" if include_promised else "minimum_funded_usd"
-    if _amount(shortlist.get(floor_key)) != _amount(minimum):
+    if _amount(shortlist.get(floor_key)) != _amount(source_minimum):
         raise ValueError("retained shortlist floor disagrees with collection")
+    # Every listing summary was retained, including those below the old floor.
+    # Changing the detail scope explicitly does not refresh those observations.
+    minimum = source_minimum if minimum_total_usd is None else _money(_amount(minimum_total_usd))
     floor = _amount(minimum)
+    report["minimum_total_usd"] = minimum
     try:
         source_sha256 = hashlib.sha256(json.dumps(snapshot, sort_keys=True, separators=(",", ":"),
                                                  allow_nan=False).encode("utf-8")).hexdigest()
@@ -524,6 +528,10 @@ def resume_catalog(snapshot: dict[str, Any], *, max_details: int = 50,
         "requests_made": report["requests_made"] - previous_requests,
         "details_fetched": report["details_fetched"] - previous_details,
     }
+    if minimum_total_usd is not None:
+        report["resume"].update(source_minimum_total_usd=source_minimum,
+                                minimum_total_usd=minimum,
+                                floor_changed=minimum != source_minimum)
     report["shortlist"] = select_targets(report, minimum, include_promised=include_promised)
     return report
 
@@ -544,6 +552,11 @@ def main(argv: list[str] | None = None) -> int:
     resume = commands.add_parser("resume", help="Finish unresolved details from a retained complete catalog")
     resume.add_argument("snapshot", type=Path)
     resume.add_argument("--max-details", type=int, default=50)
+    resume.add_argument(
+        "--min-funded-usd", "--min-reward-usd", dest="min_funded_usd",
+        help="Explicit detail/shortlist floor; default preserves the retained floor. "
+             "The retained funded or funded-plus-promised reward basis is unchanged.",
+    )
     refresh = commands.add_parser("refresh", help="Refresh explicit known listing details without catalog pages")
     refresh.add_argument("snapshot", type=Path)
     refresh.add_argument("--listing-id", action="append", required=True, dest="listing_ids")
@@ -579,7 +592,8 @@ def main(argv: list[str] | None = None) -> int:
                 raw = source.read(4 * 1024 * 1024 + 1)
             if len(raw) > 4 * 1024 * 1024:
                 raise ValueError("retained catalog exceeds 4 MiB")
-            result = resume_catalog(json.loads(raw), max_details=args.max_details)
+            result = resume_catalog(json.loads(raw), max_details=args.max_details,
+                                    minimum_total_usd=args.min_funded_usd)
             complete = result["shortlist"]["source_complete"]
         else:
             submission_targets = None
