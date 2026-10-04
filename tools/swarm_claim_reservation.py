@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import base64
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 import hashlib
 import json
 import os
@@ -224,10 +225,41 @@ class GitHub:
             detail.get("provider_message")
             or f"GitHub HTTP {response.status_code}"
         )
-        if (
-            response.status_code in {403, 429}
-            and "rate limit" in message.casefold()
-        ):
+        rate_limited = response.status_code == 429
+        if response.status_code == 403:
+            remaining = response.headers.get("X-RateLimit-Remaining")
+            remaining_exhausted = False
+            if isinstance(remaining, str):
+                try:
+                    remaining_exhausted = int(remaining.strip()) == 0
+                except ValueError:
+                    pass
+
+            retry_after = response.headers.get("Retry-After")
+            retry_after_valid = False
+            if isinstance(retry_after, str) and len(retry_after) <= 128:
+                raw_retry_after = retry_after.strip()
+                if raw_retry_after:
+                    try:
+                        retry_after_valid = int(raw_retry_after) >= 0
+                    except ValueError:
+                        try:
+                            parsed_retry_after = parsedate_to_datetime(
+                                raw_retry_after
+                            )
+                            retry_after_valid = (
+                                parsed_retry_after.tzinfo is not None
+                            )
+                        except (TypeError, ValueError, OverflowError):
+                            pass
+
+            rate_limited = (
+                remaining_exhausted
+                or retry_after_valid
+                or "rate limit" in message.casefold()
+            )
+
+        if rate_limited:
             raise ReservationError(
                 "provider_rate_limited", message, detail=detail
             )
