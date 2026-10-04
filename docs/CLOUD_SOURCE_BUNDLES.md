@@ -226,3 +226,36 @@ cross-repository request/dispatch with case normalization, and malformed SHA,
 moving ref, URL/path traversal, private/internal/missing visibility and renamed
 repository rejection. Those local cases mocked metadata HTTP and are distinct
 from the successful real public-repository export above.
+
+## Source present, dependencies unavailable
+
+An exported checkout does not include its package dependencies. Do not substitute
+stubbed components for an actual framework run or forward every blocked test to
+the owner's PC. First claim the existing bounded execution ask and reuse a run
+whose source, dependencies and commands match; an advancing head or different
+command is not covered just because the artifact still exists.
+
+A working owned-fork example is the
+[composed contract UI workflow](https://github.com/woahwhattheheck/YieldVault-Frontend/blob/915a8bb38753b74bf253267c7b085184469dcd15/.github/workflows/contract-retry-policy.yml).
+It checks out an explicit source SHA with `persist-credentials: false`, installs
+the project's existing dependencies, runs four named maintained files and the
+existing build command, and uploads source/tree pins, resolved dependencies and
+raw results. [Run 37206123575](https://github.com/woahwhattheheck/YieldVault-Frontend/actions/runs/37206123575)
+actually passed 38 cases and TypeScript/Vite on source
+`2f84efcb7ee69c2a14ce9826a7b675797b928ebe`; artifact `11304352859` is the retained
+receipt, not coverage of another repository or later commit.
+
+When a matching runner/receipt is absent and execution is authorized, keep one
+coordinated validation branch in an owned fork, separate from the sponsor PR.
+Use the surfaced native `create_tree`, `create_commit` and `create_branch` actions
+for a push-triggered workflow, or update an existing owned validation branch.
+The example has `contents: read`, no application secrets or live provider calls,
+and a ten-minute job ceiling. Reuse its run and native artifact-download path
+rather than one install per worker. Share the exact source, command selection,
+result and limits in the original work thread; do not create another publisher
+queue.
+
+This is a separate, explicit code-execution operation, not a mode of the source
+exporter. Leave the exporter source-only and do not broaden its permissions.
+Respect workflow approval, billing, quota and access failures; a successful fork
+run neither approves upstream CI nor establishes sponsor acceptance or payment.
