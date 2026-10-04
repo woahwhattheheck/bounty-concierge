@@ -249,7 +249,17 @@ def collect_batch(
                     "code": "PREFLIGHT_ERROR", "error_type": type(exc).__name__,
                 }
                 item["error"] = error
-                stop_reason = error["code"]
+                # A bad or unavailable issue does not invalidate independent
+                # candidates. Keep its error and retry row, then continue.
+                # Authentication, provider/server/transport failures and shared
+                # budgets still stop the run instead of multiplying failures.
+                issue_error = error["code"] == "PREFLIGHT_ERROR" or (
+                    error["code"] == "HTTP_ERROR"
+                    and 400 <= error["http_status"] < 500
+                    and error["http_status"] not in {401, 429}
+                )
+                if not issue_error:
+                    stop_reason = error["code"]
             except (OSError, SecureOutputError) as exc:
                 item["error"] = {"code": "OUTPUT_ERROR", "error_type": type(exc).__name__}
                 stop_reason = "OUTPUT_ERROR"
@@ -266,7 +276,10 @@ def collect_batch(
     remaining = [row for row in unique if (row["repo"], row["number"]) not in completed]
     complete = not remaining
     if remaining and stop_reason is None:
-        stop_reason = "RATE_LIMITED" if transport.rate_limited else "ISSUE_LIMIT"
+        if len(items) == len(unique):
+            stop_reason = "ITEM_ERRORS"
+        else:
+            stop_reason = "RATE_LIMITED" if transport.rate_limited else "ISSUE_LIMIT"
     summary = {
         "schema": "bounty-preflight-batch/v1",
         "status": "COMPLETE" if complete else "PARTIAL",
@@ -278,7 +291,9 @@ def collect_batch(
         "input_count": len(unique) + duplicate_count,
         "unique_count": len(unique),
         "duplicate_count": duplicate_count,
+        "attempted_count": len(items),
         "captured_count": len(captures),
+        "failed_count": sum(item["status"] == "FAILED" for item in items),
         "remaining_count": len(remaining),
         "request_count": transport.request_count,
         "rate_limited": transport.rate_limited,
