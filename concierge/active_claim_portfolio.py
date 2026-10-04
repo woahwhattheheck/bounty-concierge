@@ -432,6 +432,14 @@ def compile_live_active_claim_portfolio(
     validated = [_validate_live_candidate(row) for row in candidates]
     canonical_events = _canonicalize_events(events)
     as_of = _format_utc(_utc_now())
+    # Reject local input errors before spending requests on live evidence.
+    # Reuse the core validators; receipt and ledger decisions still belong to it.
+    _core._normalize_policy(policy)
+    if len(canonical_events) > _core._MAX_ITEMS:
+        raise ActiveClaimPortfolioError("too many events")
+    as_of_dt = _core._parse_utc(as_of, "as_of")
+    for event in canonical_events:
+        _core._normalize_event(event, as_of_dt)
     cache: Dict[Tuple[str, int, Optional[str]], Tuple[Dict[str, Any], Dict[str, Any], List[str]]] = {}
     # Availability is issue-scoped; qualification also depends on the listing.
     # max_pages is fixed for this invocation. Never reuse observations across

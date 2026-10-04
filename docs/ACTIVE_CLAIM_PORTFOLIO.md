@@ -13,6 +13,15 @@ The live path accepts identity, worker/sponsor assignment, reward metadata, and 
 
 Either read failing or returning non-object data fails closed. Provider exception text is not copied into the receipt. GitHub `owner/repo` identity is case-folded before live reads, candidate grouping, generation binding, event lineage, and capacity accounting.
 
+### Validate local inputs before live reads
+
+The live path validates the policy and event records with the existing ledger
+validators before requesting qualification or availability. Invalid policy
+fields, malformed events, and an oversized event list therefore fail locally
+without consuming GitHub requests. The same validation errors are reported.
+Valid input still follows the existing live readers and ledger decisions;
+event conflicts and future-event holds remain ledger outcomes.
+
 ### Reuse availability for repeated issue listings
 
 Within one live compilation, successfully returned availability observations
