@@ -284,10 +284,12 @@ def snapshot_data(payload: dict) -> dict:
         },
         "rows": rows,
     }
+    # Retain the collection's declared cooldown on the first preview as well
+    # as offline replays. Dropping it here can hide a partial provider read.
+    for key in ("repositories", "rate_limited", "retry_after_seconds", "rate_limit_reset_at"):
+        if key in metadata:
+            result["source"][key] = metadata[key]
     if offline:
-        for key in ("repositories", "rate_limited", "retry_after_seconds", "rate_limit_reset_at"):
-            if key in metadata:
-                result["source"][key] = metadata[key]
         result["selection"] = selection
     return result
 
@@ -324,7 +326,15 @@ def main(argv=None) -> int:
         return 1
     source = result["source"]
     if args.format == "json":
-        print(json.dumps(result, indent=2, ensure_ascii=True))
+        # Rewards are already rendered as text; retained source metadata can
+        # still contain Decimal timing values from the lossless JSON reader.
+        try:
+            rendered = json.dumps(result, indent=2, ensure_ascii=True,
+                                  default=float, allow_nan=False)
+        except (ValueError, TypeError, OverflowError) as exc:
+            print("error: " + _single_line_text(exc), file=sys.stderr)
+            return 1
+        print(rendered)
     else:
         print(f"Retained snapshot: {source['kind']}; collection coverage: {source['coverage']}")
         print(f"Updated: {source['updated_at']}; started: {source['started_at'] or 'not supplied'}")
