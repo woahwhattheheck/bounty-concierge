@@ -10,7 +10,6 @@ before a new index can replace the last-known-good file.
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -42,8 +41,8 @@ def _matches_issue_url(url: str, repo: str, number: int) -> bool:
     )
 
 
-def fetch_complete_bounties(repos=None, token=None):
-    """Publishable rows from the shared bounded collector, never partial data.
+def _fetch_complete_report(repos=None, token=None):
+    """Validate a publishable report without discarding its source metadata.
 
     The shared collector validates source names, rejects an empty source set,
     normalizes issue rows, traverses at most its configured default page limit,
@@ -77,18 +76,19 @@ def fetch_complete_bounties(repos=None, token=None):
         if identity in seen_identities:
             _fail(f"duplicate bounty identity for {repo} issue {number}")
         seen_identities.add(identity)
-    return bounties
+    return report
+
+
+def fetch_complete_bounties(repos=None, token=None):
+    """Return validated rows, preserving the existing list-valued API."""
+    return _fetch_complete_report(repos=repos, token=token)["bounties"]
 
 
 def aggregate_complete(repos=None, token=None):
-    """Return one authoritative index only after complete source traversal."""
-    bounties = fetch_complete_bounties(repos=repos, token=token)
-    bounties.sort(key=lambda bounty: bounty["reward_rtc"], reverse=True)
-    return {
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "total_count": len(bounties),
-        "bounties": bounties,
-    }
+    """Return a sorted index with its original read interval and coverage."""
+    report = _fetch_complete_report(repos=repos, token=token)
+    report["bounties"].sort(key=lambda bounty: bounty["reward_rtc"], reverse=True)
+    return report
 
 
 def render_index(data) -> str:

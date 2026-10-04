@@ -149,7 +149,7 @@ def _snapshot_count(payload: dict, key: str) -> int:
     return value
 
 
-def _read_snapshot(path: str) -> dict:
+def _read_snapshot(path: str, *, parse_float=Decimal) -> dict:
     """Read one bounded ordinary file, with no collector or provider call."""
     flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NONBLOCK", 0)
     fd = os.open(path, flags)
@@ -173,21 +173,19 @@ def _read_snapshot(path: str) -> dict:
             os.close(fd)
     return json.loads(
         raw.decode("utf-8-sig"),
-        parse_float=Decimal,
+        parse_float=parse_float,
         parse_constant=_invalid_constant,
         object_pairs_hook=_index_object,
     )
 
 
-def format_snapshot(payload: dict, limit: int = 10) -> dict:
-    """Preview an existing index or browse report without upgrading its claims.
+def snapshot_data(payload: dict) -> dict:
+    """Validate retained rows and coverage once for local snapshot consumers.
 
     A complete collection and a display subset are separate facts. All coverage
     and timestamps are declarations in the supplied file, not authentication.
     Input ordering and the existing formatter's return shape remain unchanged.
     """
-    if isinstance(limit, bool) or not isinstance(limit, int) or not 0 <= limit <= 1000:
-        raise ValueError("preview limit must be between 0 and 1000")
     if not isinstance(payload, dict):
         raise ValueError("supply an index object or browse --report, not a bare row list")
     if ("bounties" in payload) == ("rows" in payload):
@@ -222,7 +220,6 @@ def format_snapshot(payload: dict, limit: int = 10) -> dict:
         started = _parse_index_timestamp(started_at)
         if started > _parse_index_timestamp(updated_at):
             raise ValueError("snapshot collection interval ends before it starts")
-    selected = rows[:limit]
     coverage = "reported_complete" if complete is True else "partial" if complete is False else "unspecified"
     return {
         "source": {
@@ -234,17 +231,29 @@ def format_snapshot(payload: dict, limit: int = 10) -> dict:
             "collected_count": collected,
             "filtered_count": filtered,
             "rows_in_snapshot": displayed,
-            "rows_selected": len(selected),
+            "rows_selected": len(rows),
             "omitted_from_snapshot": filtered - displayed,
-            "preview_limit": limit,
+            "preview_limit": None,
             "note": (
                 "Retained file only; no live read, freshness check, source authentication, "
                 "claim, payment or posting. Reported collection coverage is not display "
                 "coverage. Zero selected rows do not establish an empty live queue."
             ),
         },
-        "previews": _format_validated_announcement(selected),
+        "rows": rows,
     }
+
+
+def format_snapshot(payload: dict, limit: int = 10) -> dict:
+    """Preview an existing index or browse report without upgrading its claims."""
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 0 <= limit <= 1000:
+        raise ValueError("preview limit must be between 0 and 1000")
+    snapshot = snapshot_data(payload)
+    selected = snapshot["rows"][:limit]
+    source = snapshot["source"]
+    source["rows_selected"] = len(selected)
+    source["preview_limit"] = limit
+    return {"source": source, "previews": _format_validated_announcement(selected)}
 
 
 def main(argv=None) -> int:

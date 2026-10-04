@@ -7,6 +7,7 @@
 | Flag | Meaning |
 |---|---|
 | `--repo` | One or more `owner/repo` names, or a short name under `Scottcjn/` |
+| `--index PATH` | Filter a retained index or saved live browse report, with no provider read |
 | `--skill`, `--tier`, `--min-rtc`, `--max-rtc` | Filters applied after the read |
 | `--limit` | Maximum displayed rows (default 20). Not a source-completeness bound |
 | `--max-pages` | Passed to the collector. Integer 1-1000, default 100 |
@@ -32,6 +33,49 @@ after consumption, and the session closes when the traversal exits, including
 on an error. The collector keeps the same request order, 15-second timeout,
 cache validation and rate-limit handling; it does not add parallel reads or
 background work.
+
+## Filter one retained collection offline
+
+Workers can apply the ordinary browse filters to an existing index or saved live
+`browse --report` without repeating the collector:
+
+```sh
+python -m concierge browse --index data/bounty_index.json --skill security --min-rtc 50
+python -m concierge browse --index data/bounty_index.json --repo rustchain-bounties --tier major --report
+python -m concierge browse --index saved-browse-report.json --limit 5 --json
+```
+
+This path uses the same reward filters, unknown-amount handling and stable ranking
+as live browse. `--repo` selects retained rows; it does not fetch missing sources.
+`--max-pages` has no effect because no provider traversal starts. `--dry-run`
+prints an argument-only local plan and does not open the supplied file.
+
+Text starts with `OFFLINE`. Both `--json` and `--report` print one object containing
+`mode: offline`, `source`, `rows`, the current filter/display counts and the selected
+filters. They never print a bare list that could be mistaken for a fresh live
+read. `source` preserves the original collection interval, reported coverage,
+collected/filtered counts, retained row count and rows omitted by the saved
+report's display limit. The current `filtered_count` counts matches only among
+rows actually present in the file. Captured per-repository and rate-limit details
+also remain in `source` when supplied. The input file and its timestamp are not
+rewritten; filtering does not recover omitted rows or refresh an expired offer.
+
+The input accepts the same bounded index and saved live report shapes as the
+[offline announcement preview](OFFLINE_PREVIEWS.md): at most 16 MiB, unique JSON
+keys, consistent row counts and valid source timestamps. Whole-input validation
+runs before selection. Browse rows also require repository and issue identity;
+missing skills and difficulty remain empty/unknown. JSON numbers use the same
+representation as live browse, while exact reward text and source excerpts stay
+attached to their rows.
+
+Offline exit 0 means the file was processed and did not explicitly report a
+partial collection; older indexes with unspecified coverage also exit 0. Exit 2
+still prints the selected output when the saved source says `complete: false`.
+Input errors exit 1. Read `source.coverage`; none of these exits certifies a
+current live queue, eligible assignment, award or payment. The offline JSON
+envelope is a filtered result, not a replacement live `browse --report` capture.
+Keep the original index/report for later workers and select new output paths
+when redirecting stdout.
 
 ## Revalidate cached pages
 

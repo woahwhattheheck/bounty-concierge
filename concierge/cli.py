@@ -256,6 +256,61 @@ def _browse_report_payload(report, filtered, displayed, limit):
     }
 
 
+def _cmd_browse_index(args, repos):
+    """Filter one retained discovery file without starting the live collector."""
+    from concierge.announcer import _read_snapshot, snapshot_data
+
+    # Live browse emits ordinary JSON numbers. Preserve that representation in
+    # saved reports while sharing the bounded reader and whole-input validation.
+    payload = _read_snapshot(args.index, parse_float=float)
+    snapshot = snapshot_data(payload)
+    rows = snapshot["rows"]
+    for index, row in enumerate(rows):
+        if not row.get("repo") or row.get("number") is None:
+            raise ValueError(f"bounties[{index}] needs repo and number for browsing")
+        if row.get("skills") is None:
+            row["skills"] = []
+        if row.get("difficulty") is None:
+            row["difficulty"] = "unknown"
+    if repos:
+        wanted = {repo.casefold() for repo in repos}
+        rows = [row for row in rows if row["repo"].casefold() in wanted]
+    filtered = _filter_bounties(rows, args)
+    displayed = filtered[:args.limit]
+    source = snapshot["source"]
+    source.pop("rows_selected")
+    source.pop("preview_limit")
+    for key in ("repositories", "rate_limited", "retry_after_seconds", "rate_limit_reset_at"):
+        if key in payload:
+            source[key] = payload[key]
+    result = {
+        "mode": "offline",
+        "source": source,
+        "rows": displayed,
+        "filtered_count": len(filtered),
+        "displayed_count": len(displayed),
+        "display_limit": args.limit,
+        "filters": {"repos": repos, "skill": args.skill, "tier": args.tier,
+                    "min_rtc": args.min_rtc, "max_rtc": args.max_rtc},
+    }
+    if args.json or args.report:
+        # Never label retained rows as a fresh success-shaped live JSON list.
+        print(json.dumps(result, indent=2, allow_nan=False))
+    else:
+        print(f"OFFLINE {source['kind']}; collection coverage: {source['coverage']}")
+        print(f"Collection {source['started_at'] or 'not supplied'} .. {source['updated_at']}")
+        print(
+            f"Source collected {source['collected_count']} rows; retained "
+            f"{source['rows_in_snapshot']}; omitted by the saved display limit "
+            f"{source['omitted_from_snapshot']}."
+        )
+        print(source["note"])
+        _print_bounty_table(displayed, show_evidence=getattr(args, "evidence", False))
+        print(f"Showing {len(displayed)} of {len(filtered)} matching retained rows.")
+    if source["complete"] is False:
+        sys.exit(2)
+
+
 def _cmd_browse(args):
     """Handle the 'browse' subcommand."""
     repos = _browse_repos(args)
@@ -263,6 +318,19 @@ def _cmd_browse(args):
         raise ValueError("--limit must be non-negative")
     if args.min_rtc is not None and args.max_rtc is not None and args.min_rtc > args.max_rtc:
         raise ValueError("--min-rtc must not exceed --max-rtc")
+
+    if args.dry_run and getattr(args, "index", None):
+        _print_dry_run_plan(
+            args, "browse.offline.preview",
+            {"index": args.index, "repos": repos, "skill": args.skill,
+             "tier": args.tier, "min_rtc": args.min_rtc, "max_rtc": args.max_rtc,
+             "limit": args.limit, "report": args.report, "evidence": args.evidence},
+            ["Read retained bounty candidates", "Apply filters to retained reward mentions",
+             "Display selected rows with the original source metadata"],
+            ["bounties", "source_completeness", "filtered_count", "displayed_count"],
+            json_output=args.report,
+        )
+        return
 
     if args.dry_run:
         _print_dry_run_plan(
@@ -276,6 +344,10 @@ def _cmd_browse(args):
             ["bounties", "source_completeness", "filtered_count", "displayed_count"],
             json_output=args.report,
         )
+        return
+
+    if getattr(args, "index", None):
+        _cmd_browse_index(args, repos)
         return
 
     try:
@@ -1138,6 +1210,7 @@ def _build_parser():
     # --- browse ---
     p_browse = sub.add_parser("browse", help="List and filter open bounties")
     _add_common_flags(p_browse)
+    p_browse.add_argument("--index", help="Filter a retained index or saved live browse --report without network access")
     p_browse.add_argument("--repo", nargs="+", help="Filter by repo (short name or owner/repo)")
     p_browse.add_argument("--skill", help="Filter by required skill")
     p_browse.add_argument("--tier", choices=["micro", "standard", "major", "critical"],
