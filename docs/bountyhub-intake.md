@@ -33,6 +33,23 @@ Without an explicit original timestamp, offline `retrieved_at` is `null`.
 `normalized_at` is not a source freshness claim. Offline input also does not
 invent a query URL. The raw response hash binds the projection to its input.
 
+## Split reconciliation across workers without another provider fetch
+
+Use the committed sanitized snapshot as shared input for the offline sharder:
+
+```sh
+python tools/bountyhub_shard.py \
+  --input work/bounty-intake/20261004-bountyhub-compact.json \
+  --worker-key Sol-Bounty-Scout-1925 \
+  --worker-count 16
+```
+
+The worker key is hashed and not emitted. Candidate rows sharing one `work_key` stay together,
+so duplicate provider cards never become duplicate implementation tasks. The shard is advisory
+collision reduction only: it does not claim work, lock a lane, contact BountyHub, or replace the
+required live GitHub and swarm-ownership checks. For one snapshot, keep the shard count near or
+below the number of unique candidate work keys; excess workers should use other feeds or roles.
+
 ## Read funding and ownership correctly
 
 - `advertised_usd` comes from `totalAmount`, never `amountPaid`. `PAID` means
