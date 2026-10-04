@@ -150,12 +150,13 @@ Full contract: [docs/BROWSE.md](docs/BROWSE.md).
 
 ### BountyHub intake from the installed command
 
-The installed `concierge` command exposes the shared catalog reader and bounded
-capture workflow:
+The installed `concierge` command exposes the shared catalog reader, bounded
+capture workflow and offline recovery:
 
 ```bash
 concierge bountyhub --help
 concierge capture-batch --help
+concierge capture-recover --help
 ```
 
 Collect a bounded catalog when a new source observation is needed, then export
@@ -171,14 +172,15 @@ An existing retained catalog can be passed directly to `targets`; its original
 observation times remain attached to the source report.
 
 `bountyhub` delegates to `concierge.bountyhub_catalog`; `capture-batch` delegates
-to `concierge.bounty_capture_batch` in the same process. Each module remains the
+to `concierge.bounty_capture_batch`; `capture-recover` delegates to
+`concierge.bounty_capture_recover` in the same process. Each module remains the
 source of its flags, help, output, request limits and exit status. Use the
 [catalog guide](docs/BOUNTYHUB_CATALOG.md) to export a shortlist, then use the
 capture command below. Catalog listing identities and funding observations stay
 in the catalog report; the issue shortlist contains only `repo` and `number`.
 
-Common `--json` and `--dry-run` flags work before or after either command. Catalog
-output is always JSON; the batch command uses `--json` for its safe summary.
+Common `--json` and `--dry-run` flags work before or after these commands. Catalog
+output is always JSON; the capture commands use `--json` for their safe summaries.
 `--dry-run` prints an argument-only plan without reading the source or creating
 capture files; result counts and eligibility remain unknown. Command-specific
 arguments are validated when the delegated command runs. Other commands still
@@ -227,8 +229,19 @@ concierge capture-batch capture-run/remaining.json \
   --max-requests 100 --json
 ```
 
-A hard kill may prevent final summary/supply/remaining files from being written;
-recover unfinished issues from the saved shortlist and completed capture files.
+A hard kill may prevent final summary/supply/remaining files from being written.
+Recover offline from the saved shortlist and completed capture files into a new
+directory outside the source run:
+
+```bash
+concierge capture-recover capture-run --output-dir capture-run-recovered --json
+```
+
+Recovery writes `supply.json`, `summary.json` and `remaining.json` without provider
+requests. It preserves the original capture observations and reports recovery
+times separately. Exit 0 means every issue has a valid retained capture; exit 2
+means partial recovery or invalid input. Use the recovered `remaining.json` with
+`capture-batch` to collect only the unfinished issues into another new directory.
 A partial `supply.json` covers only its completed subset. Captures retain their
 actual provider-read clocks and final preflight decisions; replay does not make
 old evidence fresh. Keep source captures private and share the reduced routing
