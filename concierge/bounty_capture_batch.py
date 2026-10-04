@@ -113,8 +113,16 @@ class _BatchSession:
         try:
             response = self.session.get(url, **kwargs)
         except requests.RequestException as exc:
-            self.failure = {"code": "TRANSPORT_ERROR", "error_type": type(exc).__name__}
+            if isinstance(exc, requests.HTTPError) and exc.response is not None:
+                self._record_response(exc.response)
+            else:
+                self.failure = {"code": "TRANSPORT_ERROR", "error_type": type(exc).__name__}
             raise
+        self._record_response(response)
+        return response
+
+    def _record_response(self, response: Any) -> None:
+        """Classify returned responses and HTTP errors raised by session hooks."""
         status = response.status_code
         headers = response.headers
         remaining = _integer_header(headers, "X-RateLimit-Remaining")
@@ -148,7 +156,6 @@ class _BatchSession:
                 "code": "RATE_LIMITED" if throttled else "HTTP_ERROR",
                 "http_status": status,
             }
-        return response
 
 
 def _write_json(path: Path, value: Any) -> None:
