@@ -1,0 +1,111 @@
+name: Dozer1653 WASM SQL build
+on:
+  push:
+    branches: [quarry42/dozer1653]
+    paths:
+      - candidate/dozer1653/**
+      - .github/workflows/quarry42-dozer1653-build.yml
+permissions:
+  contents: read
+concurrency:
+  group: quarry42-dozer1653-build
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: handoff
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: getdozer/dozer
+          ref: 8b0b4cc021db089722cb3d48dbe915e8e9c532ec
+          path: source
+          persist-credentials: false
+      - name: Apply exact implementation
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, hashlib, zlib
+          from pathlib import Path
+          patch = zlib.decompress(base64.b64decode(Path('../handoff/candidate/dozer1653/implementation.patch.zlib.b64').read_text()))
+          assert hashlib.sha256(patch).hexdigest() == 'e167da6a679b162c017ea1b856fdac078365dbbf7ab44db35f097db28fdbd02d'
+          Path('../implementation.patch').write_bytes(patch)
+          PY
+          git apply --check ../implementation.patch
+          git apply ../implementation.patch
+          git add -N dozer-sql/expression/src/wasm.rs dozer-sql/expression/examples/wasm_udf.rs dozer-sql/expression/examples/wasm
+      - name: Install ordinary build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler libssl-dev pkg-config clang cmake
+          rustup toolchain install stable --profile minimal --component rustfmt
+          rustup default stable
+          rustc --version
+          cargo --version
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: source
+          key: quarry42-dozer1653
+          cache-on-failure: true
+      - name: Compile AssemblyScript example
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes --package assemblyscript@0.27.31 asc dozer-sql/expression/examples/wasm/my_function.ts --outFile dozer-sql/expression/examples/wasm/my_function.wasm --runtime stub --optimize
+      - name: Format changed Rust sources
+        working-directory: source
+        shell: bash
+        run: |
+          git diff --name-only -- '*.rs' | xargs rustfmt --edition 2021
+      - name: Compile and run focused existing-configuration and WASM checks
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p dozer-types --lib udf_yaml_deserialize -- --nocapture
+          cargo test -p dozer-sql-expression --lib wasm::tests -- --nocapture
+      - name: Execute real YAML and SQL example
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p dozer-sql-expression --example wasm_udf -- dozer-sql/expression/examples/wasm/dozer-config.yaml | tee ../demo-output.txt
+          git diff --check
+      - name: Export exact candidate and build evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p out
+          cd source
+          git diff --binary > ../out/implementation.patch
+          git diff --name-only > ../out/changed-files.txt
+          test ! -f ../demo-output.txt || cp ../demo-output.txt ../out/
+          python3 - <<'PY'
+          import hashlib, json, os, subprocess, tarfile
+          from pathlib import Path
+          names = subprocess.check_output(['git','diff','--name-only'],text=True).splitlines()
+          if 'Cargo.lock' not in names: names.append('Cargo.lock')
+          wasm = 'dozer-sql/expression/examples/wasm/my_function.wasm'
+          if Path(wasm).exists(): names.append(wasm)
+          manifest = {'base_sha':'8b0b4cc021db089722cb3d48dbe915e8e9c532ec','handoff_sha':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'files':{n:{'sha256':hashlib.sha256(Path(n).read_bytes()).hexdigest()} for n in names}}
+          Path('../out/manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
+          with tarfile.open('../out/candidate.tar.gz','w:gz') as archive:
+              for name in names: archive.add(name,arcname=name)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dozer1653-${{ github.sha }}
+          path: out/
+          retention-days: 7
