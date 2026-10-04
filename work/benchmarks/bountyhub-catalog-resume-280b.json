@@ -1,0 +1,29 @@
+{
+  "initial_requests": 14,
+  "fresh_restart_requests": 18,
+  "resumed_requests": 5,
+  "restart_total_requests": 32,
+  "resume_total_requests": 19,
+  "recovery_request_reduction_percent": 72.22,
+  "whole_capture_request_reduction_percent": 40.62,
+  "synthetic_listings": 26,
+  "selected_details": 17,
+  "completed_details_reused": 12,
+  "checks": [
+    "collect output and call sequence unchanged across four original paths",
+    "recorded cooldown refuses reads",
+    "429 recovery: 18 to 5 GETs, identical funding rows, immutable source and original catalog age",
+    "bounded 2+3 request continuation preserves original catalog age and totals",
+    "completed input opens no session and does not advance observation dates",
+    "zero budget preserves age and cooldown; nonfinite source rejects before reads",
+    "malformed late rows, URLs, timestamps, counts, duplicate identities and scope reject before reads",
+    "404/410 continue; 429/500 stop, retaining partial rows and quota evidence",
+    "real resume/targets CLI: partial exit2, complete exit0, age warning, oversized source no session",
+    "explicit promised-reward scope preserved"
+  ],
+  "checks_passed": 10,
+  "network_requests": 0,
+  "boundary": "Entire production module and real CLI; controlled synthetic provider responses. Not a live-provider, fleet-latency, bounty availability, award or payment measurement.",
+  "baseline_git_blob_sha": "1943602ce6bac1504f1802793115923b57e303ae",
+  "candidate_git_blob_sha": "c5a6e78357c8d7560a2c072b9cc49d37cb198bd5"
+}

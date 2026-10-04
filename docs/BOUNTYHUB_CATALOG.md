@@ -137,6 +137,85 @@ separate so an operator can inspect retained partial results before deliberately
 passing their known targets to the existing batch. Never treat a nonzero exit as
 a complete census or reset the saved observation timestamp to make it current.
 
+## Resume interrupted funding details
+
+After respecting provider and shared-workspace cooldowns, finish only missing
+funding details from a report whose catalog traversal completed:
+
+```bash
+# Use a NEW output filename; shell redirection must not truncate the source.
+python -m concierge.bountyhub_catalog resume catalog.partial.json \
+  --max-details 10 > catalog.resumed.json
+python -m concierge.bountyhub_catalog targets catalog.resumed.json > shortlist.json
+```
+
+`resume` inherits the source report's collection floor and explicit promised-reward
+mode. It accepts no new floor or reward-mode switch. In particular, an old $50
+capture is not silently expanded by the current $25 default. Use a new `collect`
+for a changed scope or current catalog facts. `resume_catalog(snapshot,
+max_details=10)` is the equivalent programmatic entrypoint.
+
+The complete retained catalog is validated before any provider read. A missing or
+unfinished catalog traversal, inconsistent identity/funding totals, duplicate
+listing ID, or CLI input over 4 MiB is rejected. A resume before the retained
+observation time is refused before new reads. Detail
+URLs are reconstructed from the canonical API and validated UUIDs, never followed
+from an arbitrary saved URL. Existing `COMPLETE` details are not fetched again;
+only active listings meeting the original floor with unresolved details consume
+the new 0-100 request budget. A completed input or zero budget opens no session.
+The existing detail reader still continues past 404/410 removals and stops on
+other HTTP/transport failures; no automatic retry loop, sleep or schedule is added.
+Any recorded `Retry-After` prevents early resumption, measured conservatively
+from the prior observation end. Missing retry guidance is not permission to ignore
+provider limits: the operator must respect any current shared cooldown before
+explicitly invoking this command.
+
+Keep both files. The new report retains the original `started_at`, successful
+listing evidence and order. `catalog_observed_through` permanently records the
+initial report's end as an upper bound on catalog observation, and
+`shortlist.catalog_refreshed` is false. Only a resume that attempts detail reads
+advances the overall `completed_at`; this is the cumulative observation interval,
+not a refreshed catalog. A no-op preserves observation times and cooldown fields.
+Top-level request/detail counts are cumulative; `resume.requests_made` and
+`resume.details_fetched` describe only this invocation. The receipt separately
+records invocation times, source observation times, original error count and a
+SHA-256 of the source's canonical JSON (`sort_keys=True`, compact separators,
+finite JSON values). `errors` contains this invocation's errors; preserve the
+source file for previous errors. Additional resumes bind the immediately prior
+report rather than embedding an unbounded history.
+
+`targets` retains its exact batch-compatible stdout envelope and additionally
+reports the retained catalog bound and `catalog_refreshed=false` to stderr.
+Complete traversal/selected funding exits 0; unresolved details or selected
+funding still exits 2. Completed but ineligible funding is not refreshed merely
+by resuming. These are mixed-time discovery observations, not a fresh census,
+assignment, accepted contribution, current availability or payment receipt.
+
+### Reproduce the request reduction without provider traffic
+
+```bash
+git show b3d0d0f5f6526f4b592627e157ee19fe40caca45:concierge/bountyhub_catalog.py \
+  > /tmp/bountyhub-catalog-before.py
+python work/benchmarks/bountyhub-catalog-resume-280b.py \
+  --baseline /tmp/bountyhub-catalog-before.py \
+  --candidate concierge/bountyhub_catalog.py \
+  --output /tmp/bountyhub-catalog-resume-results.json
+```
+
+The bounded replay imports both complete production modules and runs the real
+CLI, replacing only provider transport and the clock with controlled responses.
+On Python 3.13.5 with requests 2.32.5, 26 synthetic listings / 17 selected details
+were interrupted by a 429 after 12 successful details. Restart required 18 GETs;
+resume required 5, a 72.22% reduction in recovery requests. Including the failed
+initial attempt, total requests fell from 32 to 19 (40.62%). The resulting reduced
+listing rows and ordering matched the uninterrupted baseline. Ten focused check
+groups passed, including unchanged original collection behavior, cooldowns,
+bounded continuation, no-op behavior, malformed input and partial CLI exits.
+Raw results: [bountyhub-catalog-resume-280b.json](../work/benchmarks/bountyhub-catalog-resume-280b.json).
+This is a synthetic request-count measurement with zero network requests, not a
+live-provider or fleet-latency benchmark. No new availability or reward claim is
+made and the existing GitHub preflight remains required.
+
 ## Export and measurement boundary
 
 The report is constructed from an allowlist. It omits issue bodies, contribution
