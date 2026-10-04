@@ -221,6 +221,8 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
             ),
             f"pull request {repo}#{pr_number}",
         )
+        if not references_issue(detail, repo, number):
+            continue
         merged = bool(detail.get("merged_at"))
         state = detail.get("state") or "unknown"
         linked_prs.append(
