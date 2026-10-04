@@ -1,7 +1,10 @@
 name: Export source bundle
-run-name: Source bundle ${{ inputs.source_sha }}
+run-name: Source bundle ${{ inputs.source_sha || github.ref_name }}
 
 on:
+  push:
+    branches: ["source-bundle/request-*"]
+    paths: [".github/source-bundle-request.json"]
   workflow_dispatch:
     inputs:
       source_sha:
@@ -13,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: source-bundle-${{ inputs.source_sha }}
+  group: source-bundle-${{ inputs.source_sha || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -22,20 +25,23 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Validate immutable source identity
+        id: source
         shell: bash
         env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          REQUESTED_SOURCE: ${{ inputs.source_sha || github.ref_name }}
         run: |
           set -euo pipefail
+          SOURCE_SHA="${REQUESTED_SOURCE#source-bundle/request-}"
           if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
             echo 'source_sha must be a full lowercase 40-character commit SHA' >&2
             exit 1
           fi
+          printf 'sha=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Check out the requested commit without retained credentials
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ inputs.source_sha }}
+          ref: ${{ steps.source.outputs.sha }}
           persist-credentials: false
           fetch-depth: 1
           lfs: false
@@ -44,7 +50,7 @@ jobs:
       - name: Export tracked source and provenance
         shell: bash
         env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
         run: |
           python - <<'PY'
           import hashlib
@@ -92,7 +98,7 @@ jobs:
         id: upload
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: source-${{ inputs.source_sha }}
+          name: source-${{ steps.source.outputs.sha }}
           path: ${{ runner.temp }}/source-bundle/
           if-no-files-found: error
           compression-level: 0
