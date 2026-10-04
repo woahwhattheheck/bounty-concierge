@@ -47,7 +47,7 @@ jobs:
           root = Path(os.environ["EVIDENCE"])
           for kind, custom in [("express", {"noSerdeLayer": True, "outputSourceFiles": True}), ("openapi", {"format": "yaml"})]:
               (root / (kind + "-output")).mkdir()
-              config = {"dryRun": False, "irFilepath": "/fern/ir.json", "output": {"path": "/fern/output", "mode": {"type": "downloadFiles"}}, "workspaceName": "revert-api", "organization": "revert", "customConfig": custom, "environment": {"_type": "local"}}
+              config = {"dryRun": False, "whitelabel": False, "writeUnitTests": False, "irFilepath": "/fern/ir.json", "output": {"path": "/fern/output", "mode": {"type": "downloadFiles"}}, "workspaceName": "revert-api", "organization": "revert", "customConfig": custom, "environment": {"_type": "local"}}
               (root / (kind + "-config.json")).write_text(json.dumps(config, indent=2) + "\n")
           PY
       - name: Generate Express interfaces with the pinned public image
@@ -57,7 +57,7 @@ jobs:
           image=fernapi/fern-typescript-express@sha256:7ad4d3c4c59ec55be1cc6d8261608965966c808691f375c41e4adc55229810e5
           docker pull "$image" 2>&1 | tee "$EVIDENCE/express-pull.log"
           docker image inspect "$image" --format '{{.Id}} {{json .RepoDigests}}' | tee "$EVIDENCE/express-image.txt"
-          docker run --rm --network none -v "$EVIDENCE/express-config.json:/fern/config.json:ro" -v "$EVIDENCE/express-ir.json:/fern/ir.json:ro" -v "$EVIDENCE/express-output:/fern/output" "$image" /fern/config.json 2>&1 | tee "$EVIDENCE/express-generator.log"
+          docker run --rm -v "$EVIDENCE/express-config.json:/fern/config.json:ro" -v "$EVIDENCE/express-ir.json:/fern/ir.json:ro" -v "$EVIDENCE/express-output:/fern/output" "$image" /fern/config.json 2>&1 | tee "$EVIDENCE/express-generator.log"
       - name: Generate OpenAPI with the pinned public image
         shell: bash
         run: |
@@ -65,7 +65,7 @@ jobs:
           image=fernapi/fern-openapi@sha256:7f8d9b1a27479e1e16133757b8342f66c35b0af67d1c495b212a8ebf98e45cae
           docker pull "$image" 2>&1 | tee "$EVIDENCE/openapi-pull.log"
           docker image inspect "$image" --format '{{.Id}} {{json .RepoDigests}}' | tee "$EVIDENCE/openapi-image.txt"
-          docker run --rm --network none -v "$EVIDENCE/openapi-config.json:/fern/config.json:ro" -v "$EVIDENCE/openapi-ir.json:/fern/ir.json:ro" -v "$EVIDENCE/openapi-output:/fern/output" "$image" /fern/config.json 2>&1 | tee "$EVIDENCE/openapi-generator.log"
+          docker run --rm -v "$EVIDENCE/openapi-config.json:/fern/config.json:ro" -v "$EVIDENCE/openapi-ir.json:/fern/ir.json:ro" -v "$EVIDENCE/openapi-output:/fern/output" "$image" /fern/config.json 2>&1 | tee "$EVIDENCE/openapi-generator.log"
       - name: Normalize generated files and record hashes
         shell: bash
         run: |
