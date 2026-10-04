@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
 """Optional private page cache; entries are usable only after provider revalidation."""
 
+from collections.abc import Iterator
 import hashlib
 import json
 import os
@@ -31,15 +32,8 @@ def _bytes(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
 
 
-def _entry_bytes(entry: dict) -> bytes | None:
-    """Encode a cache entry without retaining an oversized aggregate page.
-
-    Ordinary pages retain the single-pass encoder. Text-heavy issue pages use
-    batches, including after the size limit is reached, so malformed JSON still
-    returns an error. This is not a bound on individual or deeply nested values.
-    """
-    # Account for the entry wrapper, SHA-256 hex digest and closing delimiters.
-    limit = _MAX_BYTES - len(b'{"entry":,"sha256":""}') - 64
+def _entry_chunks(entry: dict) -> Iterator[bytes]:
+    """Yield canonical entry bytes, batching text-heavy issue pages."""
     issues = entry["issues"]
     # JSON's ASCII escaping can expand a non-BMP code point to 12 bytes.
     # This shallow estimate selects an optimization, not cache admission.
@@ -48,30 +42,48 @@ def _entry_bytes(entry: dict) -> bytes | None:
         for value in issue.values() if type(value) is str
     ) if type(issues) is list and len(issues) > 8 else 0
     if text_size < _MAX_BYTES // 12:
-        data = _bytes(entry)
-        return data if len(data) <= limit else None
+        yield _bytes(entry)
+        return
 
     prefix = _bytes({"etag": entry["etag"], "has_next": entry["has_next"]})[:-1]
-    prefix += b',"issues":['
-    suffix = b'],"key":' + _bytes(entry["key"]) + b'}'
-    size = len(prefix) + len(suffix)
-    parts = [prefix]
-    oversized = size > limit
+    yield prefix + b',"issues":['
     for offset in range(0, len(issues), 8):
-        chunk = _bytes(issues[offset:offset + 8])
-        size += len(chunk) - 2 + bool(offset)
+        if offset:
+            yield b","
+        yield _bytes(issues[offset:offset + 8])[1:-1]
+    yield b'],"key":' + _bytes(entry["key"]) + b'}'
+
+
+def _entry_bytes(entry: dict) -> bytes | None:
+    """Encode within the page bound, still validating all oversized values.
+
+    This is not a bound on individual or deeply nested values. Store and load
+    use the same canonical chunks so existing checksums remain compatible.
+    """
+    limit = _MAX_BYTES - len(b'{"entry":,"sha256":""}') - 64
+    size = 0
+    parts = []
+    for chunk in _entry_chunks(entry):
+        size += len(chunk)
         if size > limit:
-            oversized = True
             parts.clear()
-        elif not oversized:
-            if offset:
-                parts.append(b",")
-            parts.append(chunk[1:-1])
-        del chunk
-    if oversized:
+        else:
+            parts.append(chunk)
+    if size > limit:
         return None
-    parts.append(suffix)
     return b"".join(parts)
+
+
+def _entry_sha256(entry: dict, file_size: int) -> str:
+    """Verify a large page without retaining its entire re-encoded buffer."""
+    # Avoid even the shallow issue scan for an ordinary serialized page.
+    # File size only selects an optimization; it never admits cached data.
+    if file_size < _MAX_BYTES // 12:
+        return hashlib.sha256(_bytes(entry)).hexdigest()
+    digest = hashlib.sha256()
+    for chunk in _entry_chunks(entry):
+        digest.update(chunk)
+    return digest.hexdigest()
 
 
 class PageCache:
@@ -111,6 +123,9 @@ class PageCache:
                     raw += stream.read(_MAX_BYTES + 1 - len(raw))
             if len(raw) > _MAX_BYTES:
                 return None, True
+            # Match json.loads' byte decoding, but release the input bytes
+            # before parsing allocates the issue dictionaries and strings.
+            raw = raw.decode(json.detect_encoding(raw), 'surrogatepass')
             record = json.loads(raw)
             del raw  # Parsed values no longer need the serialized input buffer.
             if not isinstance(record, dict) or set(record) != {"entry", "sha256"}:
@@ -121,7 +136,7 @@ class PageCache:
                     or entry["key"] != key or not valid_etag(entry["etag"])
                     or type(entry["has_next"]) is not bool
                     or not isinstance(entry["issues"], list) or len(entry["issues"]) > 100
-                    or record["sha256"] != hashlib.sha256(_bytes(entry)).hexdigest()):
+                    or record["sha256"] != _entry_sha256(entry, info.st_size)):
                 return None, True
             return entry, False
         except FileNotFoundError:
