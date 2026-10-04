@@ -164,7 +164,8 @@ def _read_stable_generation(
         raise BountyContractEvidenceError(
             "LIVE_EVIDENCE_INVALID", "GitHub issue response was not an object"
         )
-    comments_before = _fetch_comments(
+    issue_marker = _issue_generation_marker(issue_before, repo, number)
+    comments_before = [] if issue_before["comments"] == 0 else _fetch_comments(
         session, repo, number, headers=headers, max_pages=max_pages
     )
     issue_middle = _get_json(session, issue_url, headers=headers)
@@ -172,7 +173,12 @@ def _read_stable_generation(
         raise BountyContractEvidenceError(
             "LIVE_EVIDENCE_INVALID", "GitHub issue response was not an object"
         )
-    comments_after = _fetch_comments(
+    if _issue_generation_marker(issue_middle, repo, number) != issue_marker:
+        raise BountyContractEvidenceError(
+            "LIVE_GENERATION_UNSTABLE",
+            f"GitHub issue/comment generation changed while reading {repo}#{number}",
+        )
+    comments_after = [] if issue_middle["comments"] == 0 else _fetch_comments(
         session, repo, number, headers=headers, max_pages=max_pages
     )
     issue_after = _get_json(session, issue_url, headers=headers)
@@ -181,14 +187,10 @@ def _read_stable_generation(
             "LIVE_EVIDENCE_INVALID", "GitHub issue response was not an object"
         )
 
-    issue_markers = {
-        _issue_generation_marker(issue_before, repo, number),
-        _issue_generation_marker(issue_middle, repo, number),
-        _issue_generation_marker(issue_after, repo, number),
-    }
+    issue_after_marker = _issue_generation_marker(issue_after, repo, number)
     before_marker = _comment_generation_digest(comments_before)
     after_marker = _comment_generation_digest(comments_after)
-    if len(issue_markers) != 1 or before_marker != after_marker:
+    if issue_after_marker != issue_marker or before_marker != after_marker:
         raise BountyContractEvidenceError(
             "LIVE_GENERATION_UNSTABLE",
             f"GitHub issue/comment generation changed while reading {repo}#{number}",
