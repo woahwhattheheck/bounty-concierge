@@ -30,6 +30,49 @@ def _bytes(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
 
 
+def _entry_bytes(entry: dict) -> bytes | None:
+    """Encode a cache entry without retaining an oversized aggregate page.
+
+    Ordinary pages retain the single-pass encoder. Text-heavy issue pages use
+    batches, including after the size limit is reached, so malformed JSON still
+    returns an error. This is not a bound on individual or deeply nested values.
+    """
+    # Account for the entry wrapper, SHA-256 hex digest and closing delimiters.
+    limit = _MAX_BYTES - len(b'{"entry":,"sha256":""}') - 64
+    issues = entry["issues"]
+    # JSON's ASCII escaping can expand a non-BMP code point to 12 bytes.
+    # This shallow estimate selects an optimization, not cache admission.
+    text_size = sum(
+        len(value) for issue in issues if type(issue) is dict
+        for value in issue.values() if type(value) is str
+    ) if type(issues) is list and len(issues) > 8 else 0
+    if text_size < _MAX_BYTES // 12:
+        data = _bytes(entry)
+        return data if len(data) <= limit else None
+
+    prefix = _bytes({"etag": entry["etag"], "has_next": entry["has_next"]})[:-1]
+    prefix += b',"issues":['
+    suffix = b'],"key":' + _bytes(entry["key"]) + b'}'
+    size = len(prefix) + len(suffix)
+    parts = [prefix]
+    oversized = size > limit
+    for offset in range(0, len(issues), 8):
+        chunk = _bytes(issues[offset:offset + 8])
+        size += len(chunk) - 2 + bool(offset)
+        if size > limit:
+            oversized = True
+            parts.clear()
+        elif not oversized:
+            if offset:
+                parts.append(b",")
+            parts.append(chunk[1:-1])
+        del chunk
+    if oversized:
+        return None
+    parts.append(suffix)
+    return b"".join(parts)
+
+
 class PageCache:
     """Atomic, bounded cache of parser inputs, not an offline bounty authority.
 
@@ -94,12 +137,12 @@ class PageCache:
         try:
             entry = {"key": key, "etag": etag, "issues": issues, "has_next": bool(has_next)}
             # Reuse the canonical entry bytes for both the checksum and envelope.
-            entry_data = _bytes(entry)
+            entry_data = _entry_bytes(entry)
+            if entry_data is None:
+                return "skipped"
             data = b"".join((b'{"entry":', entry_data, b',"sha256":"',
                              hashlib.sha256(entry_data).hexdigest().encode("ascii"), b'"}'))
             del entry_data
-            if len(data) > _MAX_BYTES:
-                return "skipped"
             self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
             # Readers retain their own entry while another process replaces it.
             # A failed writer can only remove its own temporary file.
