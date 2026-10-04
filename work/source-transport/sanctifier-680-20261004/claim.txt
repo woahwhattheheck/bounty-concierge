@@ -1,1 +1,0 @@
-I have a focused implementation ready for this detector: it flags unchecked additions to loop-carried accumulators, suggests checked/saturating addition, and includes the required golden snapshot, registry entry, and finding-code documentation. Is this issue still available for a contribution, given the earlier assignment request?
