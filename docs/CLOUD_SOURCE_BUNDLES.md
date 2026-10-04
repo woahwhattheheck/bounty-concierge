@@ -16,23 +16,35 @@ copy is supported. Normal same-repository use is unchanged.
 
 ## Reuse before requesting
 
-Resolve the exact 40-character lowercase commit SHA needed for the task. Search
-artifact metadata in the **exporter** repository using the native GitHub `fetch`
-action. For its own source, keep the existing name `source-<SHA>`. For another
-repository, lowercase its owner/name and use
-`source-<owner>__<repository>-<SHA>`. The repository component matters: different
-forks can contain the same commit. For example:
+Resolve the exact 40-character lowercase commit SHA needed for the task. First
+reuse a run/artifact receipt from the shared work thread. For its own source,
+the artifact name remains `source-<SHA>`. For another repository, lowercase its
+owner/name and use `source-<owner>__<repository>-<SHA>`. Different forks can
+contain the same commit, so do not infer the source repository from SHA alone.
+
+Without a shared receipt, read the canonical request branch described below
+through the native GitHub `fetch` action:
 
 ```text
-https://api.github.com/repos/woahwhattheheck/bounty-concierge/actions/artifacts?name=source-<SHA>&per_page=20
+https://api.github.com/repos/woahwhattheheck/bounty-concierge/git/ref/heads/<CANONICAL_REQUEST_BRANCH>
 ```
+
+A successful ref read gives the request commit. Read its push runs at
+`/repos/woahwhattheheck/bounty-concierge/actions/runs?head_sha=<REQUEST_COMMIT>&event=push&per_page=5`,
+then use the supported `fetch_workflow_run_artifacts` action for the matching
+successful source-export run and exact artifact name. A confirmed missing
+request branch allows one coordinated request; access errors do not establish
+absence. For a manual dispatch, reuse its shared run ID.
+
+Repository-wide `/actions/artifacts?name=...` lookup was rejected by this
+connector's generic `fetch` action. Do not depend on that unsupported shortcut
+or substitute an unverified file title for an artifact ID. Run-level artifact
+reads and native downloads are the supported transport path.
 
 Reuse an unexpired artifact from the source-bundle workflow with that identity.
 Share its run ID, artifact ID and commit SHA in the existing work thread. An
 artifact has seven-day retention; it is not permanent storage. Do not dispatch
 one export per worker, or export every advancing main commit without a task.
-Replace the `name` query value with the full repository-scoped name for a
-cross-repository request; do not search only by SHA and infer the source repo.
 
 ## Request using native connector writes
 
@@ -151,3 +163,40 @@ export attributes apply, Git history is absent, submodules are not recursively
 included, and Git LFS files remain pointers. Install only the dependencies needed
 for the chosen task. Publish edits through the normal branch/PR workflow against
 a freshly checked base; the exported directory is not itself a Git checkout.
+
+
+## Executed cross-repository receipt — October 4, 2026
+
+The RemitFlow example above was exported successfully by
+[run 37191211160](https://github.com/woahwhattheheck/bounty-concierge/actions/runs/37191211160),
+request commit `497cb63e15139e9ca3985e7d3af3ad78df8a2574`. Its workflow bytes are
+blob `c786b809ef5dc705b4796d13bf2998f4e01030e6`; later guide updates do not
+change that executed workflow.
+
+Reuse artifact **11298493947** through the existing native download action until
+its reported expiry, **October 11, 2026 at 09:09:02 UTC**. No repeat export is
+needed for this source identity.
+
+- Source: `woahwhattheheck/remitflow-backend` at
+  `6c013e9d5873d72416bbb2ff66459d97baf689fb`, tree
+  `50f3bb47d9931124156eebad59d85ebbba8e9110`.
+- Exporter: `woahwhattheheck/bounty-concierge`; actual run completed successfully
+  at 09:09:06 UTC, with no target-repository workflow installed or executed.
+- Native artifact download mounted **180 regular source files**, totaling
+  **374,702 uncompressed file bytes**, from a **102,078-byte outer ZIP**.
+- Outer ZIP SHA-256 matched GitHub artifact metadata:
+  `6e04f42abfb1f4685fa92b48de3aa060a639827151252714fb8aad650c751875`.
+- Inner tarball was 101,179 bytes and matched the manifest SHA-256:
+  `5a4d68b72b5451850065cfe22e13a19c204f83f38eb802d1c9f979ef2b132870`.
+
+The complete source and exporter identities, commit, tree, lengths and digests
+were checked before data-filtered extraction. Both changed services, both new
+regression files, the benchmark script and its report matched the six previously
+published RemitFlow files byte-for-byte. This is actual source transport proof,
+not application execution, a dependency cache, bounty eligibility or payment.
+
+Twelve local identity-step cases also passed: legacy request/dispatch,
+cross-repository request/dispatch with case normalization, and malformed SHA,
+moving ref, URL/path traversal, private/internal/missing visibility and renamed
+repository rejection. Those local cases mocked metadata HTTP and are distinct
+from the successful real public-repository export above.
