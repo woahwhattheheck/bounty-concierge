@@ -4,7 +4,14 @@
 
 Input is a JSON object with exactly `portfolio` and `evidence`. The portfolio must use `qualified-opportunity-portfolio/v1`, explicitly carry `cash_claim: false`, and selected rows must retain `advertised_only` reward authority plus `not_earned_or_settled_by_this_receipt` revenue authority. Evidence is recipient-scoped by canonical GitHub issue URL and binds a canonical PR URL, exact lowercase 40-hex head SHA, changed paths and their allowlist, terminal test outcomes, a lowercase SHA-256 evidence digest, and criterion IDs with explicit acceptance-check statuses.
 
-A selected row is `READY_FOR_HUMAN_SUBMISSION` only when evidence exists, every changed path is allowed, every declared test is `PASS`, and every acceptance check is `PASS`. Otherwise it is `HOLD` with deterministic reason codes. Extra or duplicate evidence, URL aliases, path traversal, malformed hashes, or invalid authority fail the request closed.
+
+GitHub owner and repository capitalization is ignored when matching selected
+issues to their evidence and detecting duplicate sources. The selected source
+URL, PR URL, sponsor instruction record and existing packet hash format retain
+their original spelling. A different issue number or repository remains a
+different source.
+
+A selected row is `READY_FOR_HUMAN_SUBMISSION` only when evidence exists, every changed path is allowed, every declared test is `PASS`, and every acceptance check is `PASS`. Otherwise it is `HOLD` with deterministic reason codes. Extra or duplicate evidence, noncanonical URL aliases, path traversal, malformed hashes, or invalid authority fail the request closed.
 
 ```bash
 python -m concierge.submission_packet request.json
