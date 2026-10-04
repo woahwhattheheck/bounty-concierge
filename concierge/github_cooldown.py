@@ -91,6 +91,8 @@ def cooldown_deadline(
 
     A reset header for a non-exhausted primary quota does not describe the
     secondary throttle. Ignore that unrelated reset rather than pausing an hour.
+    An explicit zero delay or elapsed deadline is known, not a missing hint;
+    do not add a new fallback minute after the provider wait has ended.
     """
     now = time()
     deadlines: list[float] = []
@@ -100,5 +102,5 @@ def cooldown_deadline(
         deadlines.append(datetime.fromisoformat(retry_at.replace("Z", "+00:00")).timestamp())
     if primary_exhausted and reset_at is not None:
         deadlines.append(float(reset_at))
-    future = [value for value in deadlines if math.isfinite(value) and value > now]
-    return max(future) if future else now + 60.0
+    known = [value for value in deadlines if math.isfinite(value)]
+    return max(now, max(known)) if known else now + 60.0
