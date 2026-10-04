@@ -25,3 +25,29 @@ This matrix helps you self-select bounties that match your skills. Pick a row th
 
 - GitHub issue search: `label:bounty state:open`
 - RustChain ecosystem bounties: https://github.com/Scottcjn/rustchain-bounties
+
+## Contributor skill aliases in the matcher
+
+`concierge.skill_matcher.match_skills` and `recommend` accept the explicit
+`aliases` in the structured `data/skill_tags.json` catalog. For example, `py`
+uses the `python` category's terms, `qa` uses `testing`, and `writing` uses
+`docs`; they do not require the bounty to contain the abbreviation itself.
+Names are case-insensitive, as before.
+
+```python
+from concierge.skill_matcher import recommend
+
+rows = [
+    {"number": 1, "title": "Python backend integration"},
+    {"number": 2, "title": "Testing coverage for pagination"},
+]
+assert recommend(rows, ["qa"], limit=1)[0]["number"] == 2
+```
+
+Canonical category names take precedence over aliases. An alias shared by
+multiple categories stays a literal keyword rather than selecting an arbitrary
+category. Bounty labels and flat-list keyword catalogs do not create aliases.
+Unknown skills retain their literal matching behavior, and changes to
+`SKILL_TAGS` remain visible on the next call. Ranking, stable ties and bounded
+selection are unchanged; this only matches supplied rows and does not establish
+availability, eligibility, assignment or payment.

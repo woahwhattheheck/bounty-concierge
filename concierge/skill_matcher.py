@@ -72,6 +72,36 @@ def _normalise_tags(raw: Dict) -> Dict[str, List[str]]:
     return result
 
 
+def _normalise_aliases(raw: Dict) -> Dict[str, str]:
+    """Resolve only explicit, unambiguous contributor aliases from the catalog.
+
+    Bounty labels and flat keyword lists are search terms, not category aliases.
+    A name declared by multiple categories stays a literal skill; canonical
+    category names take precedence when preparing a request.
+    """
+    aliases: Dict[str, str] = {}
+    ambiguous = set()
+    for skill, value in raw.items():
+        if not isinstance(skill, str) or not skill.strip() or not isinstance(value, dict):
+            continue
+        entries = value.get("aliases", [])
+        if not isinstance(entries, list):
+            continue
+        for alias in entries:
+            if not isinstance(alias, str) or not alias.strip():
+                continue
+            name = alias.lower()
+            previous = aliases.get(name)
+            if previous is not None and previous != skill:
+                ambiguous.add(name)
+            else:
+                aliases[name] = skill
+    return {name: skill for name, skill in aliases.items() if name not in ambiguous}
+
+
+SKILL_ALIASES: Dict[str, str] = {}
+
+
 # Source checkouts retain the authoritative data/skill_tags.json lookup.
 # Distributions bundle that same file as a package resource during the build.
 _DATA_FILE = os.path.join(
@@ -89,6 +119,7 @@ try:
         )
     if isinstance(_loaded, dict):
         SKILL_TAGS = _normalise_tags(_loaded)
+        SKILL_ALIASES = _normalise_aliases(_loaded)
 except (json.JSONDecodeError, OSError):
     pass  # fall back to built-in defaults
 
@@ -142,7 +173,11 @@ def _skill_patterns(skills: List[str]) -> List[_SkillPattern | None]:
     """Prepare literal prefilters and one token search per requested skill."""
     patterns = []
     for skill in skills:
-        keywords = SKILL_TAGS.get(skill.lower(), [skill.lower()])
+        name = skill.lower()
+        # Canonical categories win over aliases. Resolve against the current
+        # mapping on every call so removed/replaced categories cannot be cached.
+        category = name if name in SKILL_TAGS else SKILL_ALIASES.get(name, name)
+        keywords = SKILL_TAGS.get(category, [name])
         normalized_keywords = [
             keyword.casefold()
             for keyword in keywords
@@ -174,8 +209,9 @@ def _score_text(text: str, patterns: List[_SkillPattern | None]) -> float:
 def match_skills(bounty: dict, skills: List[str]) -> float:
     """Score how well *bounty* matches the given *skills* (0.0 -- 1.0).
 
-    *skills* is a list of skill category names (keys of ``SKILL_TAGS``),
-    e.g. ``["python", "security"]``.
+    *skills* accepts category names (keys of ``SKILL_TAGS``) and explicit,
+    unambiguous catalog aliases, e.g. ``["python", "qa"]``. Unknown names keep
+    their literal keyword behavior.
     """
     if not skills:
         return 0.0
