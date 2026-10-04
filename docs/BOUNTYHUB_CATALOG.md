@@ -40,6 +40,22 @@ reported as 3. Direct collection remained 2 requests, and a redirected 429 retai
 its 120-second cooldown. These are local transport observations, not live-provider
 throughput or availability measurements.
 
+Response cleanup is best effort: an ordinary `close()` exception no longer
+replaces parsed JSON or the original read failure and its retry guidance. Cleanup
+is attempted once per returned response; cancellation such as `KeyboardInterrupt`
+still propagates. This does not guarantee resource recovery when an underlying
+close operation itself fails.
+
+A bounded Python 3.12.14 / Requests 2.34.2 loopback execution used the exact
+production `_get` and helper definitions, with failures injected only at response
+cleanup and the existing HTTP-error hook. Before the change, cleanup errors hid
+all three results: successful JSON, HTTP 429 with `Retry-After: 120`, and hook-raised
+HTTP 403 with `Retry-After: 60`. Afterward each original result was preserved;
+`KeyboardInterrupt` still propagated. Every case made one request and attempted
+cleanup once (eight loopback requests total across both versions). Package
+bootstrap and the full collector were not executed; no provider request or
+throughput improvement is claimed.
+
 `catalog.json` contains every collected listing, source observation start/end,
 request/page/detail counts, declared traversal coverage, reduced funding data,
 and a `shortlist`. Its observation time belongs to this collection and does not
