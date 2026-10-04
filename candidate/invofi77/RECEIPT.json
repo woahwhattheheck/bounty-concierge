@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "upstream": "Stellar-VaultLink/invofi-contracts",
+  "issue": 77,
+  "base_sha": "54e63c835c7679dd32e9f99e0d9f67743b0d1d01",
+  "existing_intake": "INVOFI77-46139",
+  "claimant": "woahwhattheheck",
+  "state": "validated_candidate_assignment_pending",
+  "postimages": {
+    "CHANGELOG.md": "788bc9a231a7c462074b0b5a33614af335acdaa5",
+    "financing/src/lib.rs": "cd41c65ad47fc2770596e03975d2590431c4bc81",
+    "financing/src/test.rs": "c2e0befbfff16396d86dcd97bc9bec1a31349bf3"
+  },
+  "runtime": {
+    "os": "Ubuntu 24.04",
+    "rustc": "1.99.0 (b940084d7 2026-09-28)",
+    "cargo": "1.99.0 (5f94df478 2026-08-27)",
+    "host": "x86_64-unknown-linux-gnu",
+    "contract_target": "wasm32v1-none",
+    "soroban_sdk": "22.0.11",
+    "cargo_build_jobs": 2,
+    "dev_and_test_debug": 0,
+    "locks": "unchanged; commands use --locked"
+  },
+  "validation": [
+    {
+      "run": 37206584756,
+      "job": 111448920524,
+      "controller": "83e6be775393f4d46f53d90e2f6e496481332ed3",
+      "format": "pass",
+      "clippy": "pass",
+      "release_wasm": "pass",
+      "production_blob": "cd41c65ad47fc2770596e03975d2590431c4bc81",
+      "test_blob": "3c066bad264d8a4e0af53a8351a0a6ca677646fc",
+      "overall": "failure",
+      "failure": "New test compared a tuple containing raw Soroban Val, which lacks PartialEq (E0369). Final test decodes event symbols/address before comparison; production source unchanged.",
+      "artifact": {
+        "id": 11305040779,
+        "size": 77122,
+        "reported_digest": "sha256:869e7e714e46ffb1c4d2dab389d81f49ef938109e4ced58aab5af05584065769"
+      }
+    },
+    {
+      "run": 37206867133,
+      "job": 111449756833,
+      "controller": "1ae1733a20e18916d5f349055162c0d4a8d0ec2d",
+      "format": "pass",
+      "focused_acceptance": {
+        "passed": 25,
+        "failed": 0,
+        "ignored": 0,
+        "filtered_out": 72,
+        "execution_seconds": 0.23,
+        "compile_seconds": 40.81,
+        "new_cases": 6,
+        "existing_cases": 19
+      },
+      "overall": "success",
+      "artifact": {
+        "id": 11305420357,
+        "size": 47743,
+        "reported_digest": "sha256:7fd72ce6db20cbf866f8d68e3262b94c6c73cae649e044091854d913857a18d3"
+      }
+    }
+  ],
+  "wasm": {
+    "size": 85670,
+    "sha256": "7e186b0de0a56805c0be421696094c0cc2b9d35263ff7a607d7b745a75bdd6ba",
+    "build_seconds": 25.18,
+    "production_blob": "cd41c65ad47fc2770596e03975d2590431c4bc81",
+    "artifact_run": 37206584756,
+    "artifact_id": 11305040779
+  },
+  "commands": {
+    "tests": "cargo test --locked -p invofi-financing --lib --target x86_64-unknown-linux-gnu -- cancel withdraw negotiation --skip proptest:: --nocapture",
+    "clippy": "cargo clippy --locked -p invofi-financing --target wasm32v1-none -- -D warnings",
+    "build": "cargo build --locked --release -p invofi-financing --target wasm32v1-none"
+  },
+  "limitations": [
+    "Not the complete workspace/property suite;72 unrelated financing tests filtered out.",
+    "No deployment or chain transaction.",
+    "Maintainer assignment remains pending; no upstream PR or award/payment claim.",
+    "Conditional GrantFox Third Campaign reward; no fixed USD amount established.",
+    "Artifact digests are reported by GitHub; archives were not locally downloaded. Exact executed source chunks/hashes were read through native job logs and match the published postimages."
+  ]
+}

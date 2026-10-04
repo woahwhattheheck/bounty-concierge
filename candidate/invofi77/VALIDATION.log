@@ -1,0 +1,41 @@
+Final source and focused acceptance: https://github.com/woahwhattheheck/bounty-concierge/actions/runs/37206867133/job/111449756833
+2026-10-04T13:47:34.3556392Z   stable-x86_64-unknown-linux-gnu updated - rustc 1.99.0 (b940084d7 2026-09-28) (from rustc 1.98.1 (48a229cea 2026-09-01))
+2026-10-04T13:47:34.3883926Z   stable-x86_64-unknown-linux-gnu unchanged - rustc 1.99.0 (b940084d7 2026-09-28)
+2026-10-04T13:47:34.5370066Z rustc 1.99.0 (b940084d7 2026-09-28)
+2026-10-04T13:47:34.5683522Z rustc 1.99.0 (b940084d7 2026-09-28)
+2026-10-04T13:47:34.5756953Z cargo 1.99.0 (5f94df478 2026-08-27)
+2026-10-04T13:47:34.8046295Z INVOFI77_HASHES {"CHANGELOG.md": "788bc9a231a7c462074b0b5a33614af335acdaa5", "financing/src/lib.rs": "cd41c65ad47fc2770596e03975d2590431c4bc81", "financing/src/test.rs": "c2e0befbfff16396d86dcd97bc9bec1a31349bf3"}
+2026-10-04T13:48:15.6461363Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 40.81s
+2026-10-04T13:48:15.6848108Z running 25 tests
+2026-10-04T13:48:15.7247887Z test test::test_amend_offer_rewrites_terms_and_opens_negotiation ... ok
+2026-10-04T13:48:15.7248403Z test test::test_cancel_offer_rejects_accepted_offer - should panic ... ok
+2026-10-04T13:48:15.7304109Z test test::test_cancel_offer_rejects_paused_contract - should panic ... ok
+2026-10-04T13:48:15.7304477Z test test::test_auto_accept_emits_negotiation_closed ... ok
+2026-10-04T13:48:15.7304838Z test test::test_cancel_offer_and_withdraw_preserve_a_financed_invoice ... ok
+2026-10-04T13:48:15.7428444Z test test::test_cancel_offer_rejects_originator_authorization - should panic ... ok
+2026-10-04T13:48:15.7588142Z test test::test_close_negotiation_after_expiry_is_permissionless ... ok
+2026-10-04T13:48:15.7677978Z test test::test_cancel_offer_updates_views_stats_and_negotiation ... ok
+2026-10-04T13:48:15.7767971Z test test::test_cancel_offer_rejects_third_party_authorization - should panic ... ok
+2026-10-04T13:48:15.7858003Z test test::test_close_negotiation_that_was_never_opened_panics - should panic ... ok
+2026-10-04T13:48:15.7888289Z test test::test_close_negotiation_twice_panics - should panic ... ok
+2026-10-04T13:48:15.8038114Z test test::test_negotiation_emits_amend_counter_and_close_events ... ok
+2026-10-04T13:48:15.8215625Z test test::test_negotiation_history_records_every_round_in_order ... ok
+2026-10-04T13:48:15.8225357Z test test::test_negotiation_status_expires_on_read_without_any_call ... ok
+2026-10-04T13:48:15.8337866Z test test::test_negotiation_window_above_maximum_panics - should panic ... ok
+2026-10-04T13:48:15.8368925Z test test::test_negotiation_window_below_minimum_panics - should panic ... ok
+2026-10-04T13:48:15.8568135Z test test::test_negotiation_window_is_configurable_and_deadlines_are_frozen ... ok
+2026-10-04T13:48:15.8846899Z test test::test_plain_accept_closes_an_open_negotiation_as_accepted ... ok
+2026-10-04T13:48:15.8847403Z test test::test_plain_accept_without_a_negotiation_emits_no_closure ... ok
+2026-10-04T13:48:15.8848067Z test test::test_negotiation_round_cap_is_enforced - should panic ... ok
+2026-10-04T13:48:15.8870980Z test test::test_set_negotiation_window_is_admin_only - should panic ... ok
+2026-10-04T13:48:15.8894147Z test test::test_withdraw_offer_wrong_lender_panics - should panic ... ok
+2026-10-04T13:48:15.8894566Z test test::test_withdraw_offer ... ok
+2026-10-04T13:48:15.8985285Z test test::test_stranger_cannot_close_an_open_negotiation - should panic ... ok
+2026-10-04T13:48:15.9140746Z test test::test_withdrawing_the_offer_ends_its_negotiation ... ok
+2026-10-04T13:48:15.9141293Z test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 72 filtered out; finished in 0.23s
+
+Unchanged contract Clippy/release: https://github.com/woahwhattheheck/bounty-concierge/actions/runs/37206584756/job/111448920524
+2026-10-04T13:44:24.4642272Z [1m[92m    Finished[0m `dev` profile [unoptimized] target(s) in 23.24s
+2026-10-04T13:44:49.6972863Z [1m[92m    Finished[0m `release` profile [optimized] target(s) in 25.18s
+2026-10-04T13:44:49.7105241Z 85670 bytes
+2026-10-04T13:44:49.7128784Z 7e186b0de0a56805c0be421696094c0cc2b9d35263ff7a607d7b745a75bdd6ba  target/wasm32v1-none/release/invofi_financing.wasm
