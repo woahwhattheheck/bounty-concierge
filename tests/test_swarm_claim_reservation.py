@@ -1,5 +1,6 @@
 """Focused regression checks for snapshot-consistent swarm reservation reads."""
 import base64
+import copy
 import importlib.util
 import json
 from pathlib import Path
@@ -12,6 +13,13 @@ SPEC = importlib.util.spec_from_file_location(
 )
 reservation = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(reservation)
+
+FRESH_SPEC = importlib.util.spec_from_file_location(
+    "bountyhub_fresh_targets",
+    Path(__file__).parents[1] / "concierge/bountyhub_fresh_targets.py",
+)
+fresh_targets = importlib.util.module_from_spec(FRESH_SPEC)
+FRESH_SPEC.loader.exec_module(fresh_targets)
 
 
 def active_state(work_key="github:owner/repo#1"):
@@ -87,6 +95,47 @@ class SnapshotReadTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(github.seen_ref, observed_head)
         self.assertEqual(result["commit_sha"], observed_head)
+
+    def test_fresh_target_annotations_match_custody_helper_without_mutation(self):
+        selected = {
+            "listing_ids_by_issue": {"owner/repo#7": ["listing-1"]},
+            "targets": [
+                {
+                    "repo": "Owner/Repo",
+                    "number": 7,
+                    "listing_ids": ["listing-1"],
+                }
+            ],
+        }
+        report = {
+            "listings": [
+                {
+                    "listing_id": "listing-1",
+                    "repo": "Owner/Repo",
+                    "number": 7,
+                    "assignment_type": "open",
+                    "has_assignee": False,
+                }
+            ]
+        }
+        original = copy.deepcopy(selected)
+
+        result = fresh_targets._exclude_assigned_exclusive(report, selected)
+        annotation = result["targets"][0]["swarm_reservation"]
+
+        self.assertEqual(selected, original)
+        self.assertEqual(
+            result["swarm_reservation_schema"], reservation.SCHEMA
+        )
+        self.assertEqual(annotation["schema"], reservation.SCHEMA)
+        self.assertEqual(annotation["work_key"], "bountyhub:owner/repo#7")
+        self.assertEqual(
+            annotation["branch"],
+            reservation._branch(annotation["work_key"]),
+        )
+        self.assertEqual(
+            annotation["tool"], "tools/swarm_claim_reservation.py"
+        )
 
 
 if __name__ == "__main__":
