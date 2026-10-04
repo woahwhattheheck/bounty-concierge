@@ -18,10 +18,26 @@ concierge bountyhub refresh catalog.json \
 ```
 
 Repeat `--listing-id` for another known listing. Between 1 and 100 input IDs are
-accepted; duplicates share one GET, in first-occurrence order. Unknown IDs and
+accepted; duplicate identities are visited once, in first-occurrence order. Unknown IDs and
 malformed source identities fail before any request. All callers inherit the
 catalog's original reward floor and explicit promised-reward mode; this command
 does not silently change a $50 capture into a $25 discovery scope.
+
+The default HTTP request budget equals the distinct listing count. Each outgoing
+request, including a redirect hop, consumes that budget. To allow one known
+listing to follow a redirect, set an explicit allowance:
+
+```bash
+concierge bountyhub refresh catalog.json \
+  --listing-id "$LISTING_ID" --max-requests 2 > refresh-with-redirect.json
+```
+
+`--max-requests` accepts an integer from 0 through 100 and is recorded as
+`request_limit` beside the actual `requests_made` count. It changes only the
+transport allowance, without adding listing IDs, catalog reads, or automatic
+retries. Zero performs no HTTP requests, opens no session, and retains the selected
+records as unattempted in a partial receipt. Increasing the allowance does not
+override a retained cooldown; pass the previous receipt when repeating a refresh.
 
 After respecting any provider and shared-workspace cooldown, pass the latest
 refresh receipt when deliberately updating those details again:
@@ -102,7 +118,7 @@ Keep the original receipt beside the shortlist. It is still not input to
 
 Equivalent entrypoints are `python -m concierge.bountyhub_catalog refresh ...`,
 `python -m concierge.bountyhub_refresh ...`, and
-`refresh_listings(snapshot, listing_ids, previous_refresh=receipt, session=session)`
+`refresh_listings(snapshot, listing_ids, previous_refresh=receipt, max_requests=2, session=session)`
 from `concierge.bountyhub_refresh`.
 
 ## Measured delivery
