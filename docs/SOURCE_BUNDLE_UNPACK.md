@@ -28,6 +28,31 @@ output identifies `source_root`, the pinned repository/commit/tree, archive
 checksum and available/extracted regular-file counts and byte totals. Errors
 produce JSON on standard error and exit status 2.
 
+### Select a temporary volume when the default disk is full
+
+`--destination` selects where the requested source files are written. The
+compressed archive is verified in a separate temporary file before extraction.
+Use `--temp-directory /existing/temporary/directory` to place that file on an
+available volume; the directory must already exist. Without the option, Python's
+normal temporary-directory selection (including `TMPDIR`) is unchanged. Python
+callers can pass `temp_directory=Path(...)` to `unpack_bundle`.
+
+For example, when the container's default disk is full and `/dev/shm` has enough
+free space for both the compressed archive and selected source files, add
+`--temp-directory /dev/shm` and use a fresh destination under `/dev/shm`. Check
+available space first and retain completed edits through the existing GitHub
+publication workflow: tmpfs is temporary and consumes shared memory. A failed
+temporary-directory selection does not create the output directory or remove
+other workers' files. The option does not select a different source artifact or
+relax its identity, length, checksum, or extraction checks.
+
+An actual full-disk run of retained artifact `11302078522` failed with the
+default temporary-directory selection, then extracted the two requested files
+(39,689 bytes) with `--temp-directory` on an available volume. See the
+[source-bound receipt](../work/throughput/source-unpack-temp-volume-20261004/receipt.json) for the exact source and archive
+identities. This demonstrates recovery from that local storage failure, not a
+speedup or a general capacity guarantee.
+
 The command checks the expected **source** repository and commit, including
 legacy v1 manifests without `exporter_repository`. It streams the ZIP's tarball
 through a temporary file, checks its complete length and SHA-256 before creating

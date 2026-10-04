@@ -81,6 +81,7 @@ def unpack_bundle(
     repository: str,
     commit: str,
     paths: list[str] | None = None,
+    temp_directory: Path | None = None,
 ) -> dict[str, Any]:
     """Verify, then extract all or selected paths into an exclusive fresh directory.
 
@@ -88,6 +89,8 @@ def unpack_bundle(
     A selection is a path or directory prefix; dependencies and symlink targets
     are not automatically added. On a handled extraction error, remove only the
     directory created by this invocation. Existing destinations are never used.
+    temp_directory optionally selects the existing volume for the verified
+    compressed-archive spool; None keeps Python's normal temporary directory.
     """
     if not hasattr(tarfile, "data_filter"):
         raise ValueError("Python with tarfile.data_filter is required (use Python 3.12+)")
@@ -95,6 +98,8 @@ def unpack_bundle(
     if not isinstance(commit, str) or not _SHA.fullmatch(commit):
         raise ValueError("commit must be a full lowercase 40-character SHA")
     selectors = list(dict.fromkeys(_path(value) for value in (paths or [])))
+    if temp_directory is not None:
+        temp_directory = Path(temp_directory).expanduser()
     destination = Path(destination).expanduser().absolute()
     if destination.exists() or destination.is_symlink():
         raise FileExistsError(f"destination already exists: {destination}")
@@ -105,7 +110,7 @@ def unpack_bundle(
 
     # Spool compressed bytes to disk rather than retaining the whole archive in
     # memory. Verify the complete input before creating the output directory.
-    with zipfile.ZipFile(zip_path) as bundle, tempfile.TemporaryFile() as archive:
+    with zipfile.ZipFile(zip_path) as bundle, tempfile.TemporaryFile(dir=temp_directory) as archive:
         manifest = _manifest(bundle, repository, commit)
         digest = hashlib.sha256()
         size = 0
@@ -197,10 +202,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--commit", required=True, help="expected immutable source commit SHA")
     parser.add_argument("--destination", type=Path, required=True, help="new directory; parent must exist")
     parser.add_argument("--path", action="append", default=[], help="file/directory relative to repo; repeatable")
+    parser.add_argument("--temp-directory", type=Path,
+                        help="existing directory for the compressed archive spool (default: Python temp directory)")
     args = parser.parse_args(argv)
     try:
         result = unpack_bundle(args.artifact, args.destination, repository=args.repository,
-                               commit=args.commit, paths=args.path)
+                               commit=args.commit, paths=args.path,
+                               temp_directory=args.temp_directory)
     except (OSError, ValueError, EOFError, tarfile.TarError, zipfile.BadZipFile,
             RuntimeError, NotImplementedError) as exc:
         print(json.dumps({"error": str(exc), "error_type": type(exc).__name__}), file=sys.stderr)
