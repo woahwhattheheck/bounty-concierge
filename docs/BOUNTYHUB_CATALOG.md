@@ -28,6 +28,36 @@ and a `shortlist`. Its observation time belongs to this collection and does not
 move when the file is reused. A complete traversal means the returned pages and
 selected details were read; it is not an atomic snapshot of the changing service.
 
+## Include promised rewards explicitly
+
+The default shortlist uses only `reported_funded_usd`. When the work order also
+permits promised rewards, add `--include-promised` to either subcommand:
+
+```bash
+python -m concierge.bountyhub_catalog collect \
+  --include-promised --min-reward-usd 50.00 > catalog.json
+
+python -m concierge.bountyhub_catalog targets catalog.json \
+  --include-promised --min-reward-usd 50.00 > shortlist.json
+```
+
+This mode applies the floor to each resolved listing's funded plus promised
+amount. A listing with $0 funded and $50 promised can therefore qualify, while
+its two reported amounts remain distinct. Marked payouts, unknown payment
+statuses, unresolved details and terminal listing exclusions are unchanged.
+No new detail reads are needed when selecting from an existing report.
+
+`--min-reward-usd` and `--min-funded-usd` are aliases for the same floor; the
+chosen mode determines which amounts count. In the new mode, the selected
+result records `reward_basis: "reported_funded_plus_promised"` and
+`minimum_reward_usd` instead of `minimum_funded_usd`. The default result remains
+unchanged. `collect` includes those fields in `shortlist`; `targets` reports them
+to stderr while preserving the batch parser's exact candidates envelope.
+Programmatic callers can use `select_targets(report, "50.00", include_promised=True)`
+to obtain the same selection and its complete `listing_ids_by_issue` associations.
+Promised amounts remain promises; this option does not establish funding,
+assignment, eligibility, award or payment.
+
 ## Use the existing batch capture
 
 ```bash
@@ -50,7 +80,8 @@ collected; those stay unresolved and make the selection partial.
 The collector deduplicates GitHub issue targets without collapsing BountyHub
 listing identities. `listings` keeps every distinct pool, while
 `shortlist.listing_ids_by_issue` binds each selected issue to its qualifying
-listing IDs. Each listing must independently meet the funded floor; separate
+listing IDs. Each listing must independently meet the selected floor: funded
+alone by default, or funded plus promised with `--include-promised`. Separate
 pool amounts are not silently added together. For example, Cast #580 has two
 separate listings, which must keep separate claim/payment records.
 
