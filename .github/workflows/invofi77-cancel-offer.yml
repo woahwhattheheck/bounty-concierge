@@ -1,0 +1,118 @@
+name: InvoFi lender cancellation candidate
+on:
+  push:
+    branches:
+      - validation/invofi77-cancel-offer-ledger0938
+permissions:
+  contents: read
+jobs:
+  financing:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CARGO_BUILD_JOBS: 2
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_DEV_DEBUG: 0
+      CARGO_PROFILE_TEST_DEBUG: 0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: candidate
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: Stellar-VaultLink/invofi-contracts
+          ref: 54e63c835c7679dd32e9f99e0d9f67743b0d1d01
+          path: source
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+          targets: wasm32v1-none
+      - name: Verify and apply the three-file candidate
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          rustc -vV | tee evidence/rustc.txt
+          cargo --version | tee evidence/cargo.txt
+          git -C candidate rev-parse HEAD > evidence/candidate-head.txt
+          git -C source rev-parse HEAD > evidence/source-base.txt
+          python3 - <<'PY'
+          import json, pathlib, shutil, subprocess
+          root = pathlib.Path.cwd()
+          manifest = json.loads((root / "candidate/candidate/invofi77/SOURCES.json").read_text())
+          actual_base = subprocess.check_output(["git", "-C", "source", "rev-parse", "HEAD"], text=True).strip()
+          assert actual_base == manifest["base_sha"] == "54e63c835c7679dd32e9f99e0d9f67743b0d1d01"
+          expected_paths = {"financing/src/lib.rs", "financing/src/test.rs", "CHANGELOG.md"}
+          assert set(manifest["postimages"]) == expected_paths
+          for relative, expected in manifest["postimages"].items():
+              candidate = root / "candidate/candidate/invofi77/postimages" / relative
+              actual = subprocess.check_output(["git", "hash-object", str(candidate)], text=True).strip()
+              assert actual == expected, (relative, actual, expected)
+              shutil.copyfile(candidate, root / "source" / relative)
+              print(relative, actual)
+          PY
+          git -C source diff --check
+          git -C source diff --binary > evidence/candidate.patch
+          git -C source diff --stat > evidence/diff-stat.txt
+      - name: Format the two changed Rust files and retain exact executed sources
+        id: format
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2021 --config skip_children=true financing/src/lib.rs financing/src/test.rs
+          rustfmt --check --edition 2021 --config skip_children=true financing/src/lib.rs financing/src/test.rs
+          git diff --check
+          git diff --binary > "$GITHUB_WORKSPACE/evidence/candidate.patch"
+          git diff --stat > "$GITHUB_WORKSPACE/evidence/diff-stat.txt"
+          python3 - <<'PY'
+          import json, os, pathlib, shutil, subprocess
+          evidence = pathlib.Path(os.environ["GITHUB_WORKSPACE"]) / "evidence"
+          hashes = {}
+          for relative in ("financing/src/lib.rs", "financing/src/test.rs", "CHANGELOG.md"):
+              source = pathlib.Path(relative)
+              destination = evidence / "postimages" / relative
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(source, destination)
+              hashes[relative] = subprocess.check_output(["git", "hash-object", str(source)], text=True).strip()
+              content = source.read_text()
+              for index, offset in enumerate(range(0, len(content), 4000)):
+                  print("INVOFI77_POSTIMAGE " + json.dumps({"path": relative, "index": index, "text": content[offset:offset+4000]}, ensure_ascii=True))
+          print("INVOFI77_HASHES " + json.dumps(hashes, sort_keys=True))
+          (evidence / "EXECUTED_SOURCES.json").write_text(json.dumps(hashes, sort_keys=True, indent=2) + "\n")
+          PY
+      - name: Cancellation, withdrawal and negotiation acceptance
+        if: always() && steps.format.outcome == 'success'
+        id: acceptance
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          INVOFI_HOST_TARGET="$(rustc -vV | sed -n 's/^host: //p')"
+          cargo test --locked -p invofi-financing --lib --target "$INVOFI_HOST_TARGET" -- cancel withdraw negotiation --skip proptest:: --nocapture 2>&1 | tee "$GITHUB_WORKSPACE/evidence/acceptance.log"
+      - name: Clippy on the real contract target
+        if: always() && steps.format.outcome == 'success'
+        working-directory: source
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo clippy --locked -p invofi-financing --target wasm32v1-none -- -D warnings 2>&1 | tee "$GITHUB_WORKSPACE/evidence/clippy.log"
+      - name: Build the financing WASM
+        if: always() && steps.format.outcome == 'success'
+        working-directory: source
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo build --locked --release -p invofi-financing --target wasm32v1-none 2>&1 | tee "$GITHUB_WORKSPACE/evidence/build.log"
+          stat --printf='%s bytes\n' target/wasm32v1-none/release/invofi_financing.wasm | tee "$GITHUB_WORKSPACE/evidence/wasm-size.txt"
+          sha256sum target/wasm32v1-none/release/invofi_financing.wasm | tee "$GITHUB_WORKSPACE/evidence/wasm-sha256.txt"
+          cp target/wasm32v1-none/release/invofi_financing.wasm "$GITHUB_WORKSPACE/evidence/"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: invofi77-cancellation-candidate
+          path: evidence/
+          retention-days: 7

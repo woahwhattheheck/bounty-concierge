@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "upstream": "Stellar-VaultLink/invofi-contracts",
+  "issue": 77,
+  "base_sha": "54e63c835c7679dd32e9f99e0d9f67743b0d1d01",
+  "existing_intake": "INVOFI77-46139",
+  "claimant": "woahwhattheheck",
+  "state": "candidate_validation_pending_assignment_pending",
+  "reward": "conditional GrantFox Third Campaign; no fixed dollar amount, award, or payment established",
+  "postimages": {
+    "financing/src/lib.rs": "cd41c65ad47fc2770596e03975d2590431c4bc81",
+    "financing/src/test.rs": "5f7750293aee3e750810dee45003d87493925f92",
+    "CHANGELOG.md": "788bc9a231a7c462074b0b5a33614af335acdaa5"
+  }
+}
