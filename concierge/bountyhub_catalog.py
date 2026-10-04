@@ -162,31 +162,53 @@ class _ReadFailure(Exception):
 
 
 def _get(session: Any, url: str, report: dict[str, Any], **params: Any) -> Any:
-    report["requests_made"] += 1
-    try:
-        response = session.get(url, params=params or None, timeout=20)
-    except requests.RequestException as exc:
-        # Response hooks may raise before Session.get returns. Preserve the
-        # same status/retry metadata and cleanup as a returned HTTP failure.
-        response = exc.response if isinstance(exc, requests.HTTPError) else None
-        if response is None:
-            raise _ReadFailure(type(exc).__name__) from None
+    request_limit = report.get("request_limit")
+    if request_limit is None and "requested_listing_ids" in report:
+        request_limit = len(report["requested_listing_ids"])
+    prepared = None
+    redirects = 0
+    while True:
+        if request_limit is not None and report["requests_made"] >= request_limit:
+            raise _ReadFailure("REQUEST_LIMIT")
+        report["requests_made"] += 1
         try:
-            raise _ReadFailure("HTTP_ERROR", response.status_code,
-                               _retry_after(response.headers.get("Retry-After"))) from None
+            if prepared is None:
+                response = session.get(url, params=params or None, timeout=20, allow_redirects=False)
+            else:
+                settings = session.merge_environment_settings(prepared.url, {}, None, None, None)
+                response = session.send(prepared, timeout=20, allow_redirects=False, **settings)
+        except requests.RequestException as exc:
+            # Response hooks may raise before Session.get returns. Preserve the
+            # same status/retry metadata and cleanup as a returned HTTP failure.
+            response = exc.response if isinstance(exc, requests.HTTPError) else None
+            if response is None:
+                raise _ReadFailure(type(exc).__name__) from None
+            try:
+                raise _ReadFailure("HTTP_ERROR", response.status_code,
+                                   _retry_after(response.headers.get("Retry-After"))) from None
+            finally:
+                response.close()
+        try:
+            delay = _retry_after(response.headers.get("Retry-After"))
+            status = response.status_code
+            if response.is_redirect and response.next is not None:
+                if delay is not None and delay > 0:
+                    raise _ReadFailure("HTTP_ERROR", status, delay)
+                if redirects >= session.max_redirects:
+                    raise _ReadFailure("TooManyRedirects", status)
+                # Requests prepares this hop with its normal auth/cookie
+                # stripping. Count and bound the send before following it.
+                prepared = response.next
+                redirects += 1
+                continue
+            if status != 200:
+                raise _ReadFailure("HTTP_ERROR", status, delay)
+            try:
+                return response.json()
+            except ValueError:
+                raise _ReadFailure("INVALID_JSON", status) from None
         finally:
             response.close()
-    try:
-        delay = _retry_after(response.headers.get("Retry-After"))
-        status = response.status_code
-        if status != 200:
-            raise _ReadFailure("HTTP_ERROR", status, delay)
-        try:
-            return response.json()
-        except ValueError:
-            raise _ReadFailure("INVALID_JSON", status) from None
-    finally:
-        response.close()
 
 
 def _submission_target_map(value: Any) -> dict[tuple[str, int], dict[str, str]]:
@@ -340,6 +362,7 @@ def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int 
         "completed_at": None, "complete": False, "catalog_complete": False,
         "details_complete": True, "pages_fetched": 0, "details_fetched": 0,
         "requests_made": 0, "minimum_total_usd": _money(floor),
+        "request_limit": max_pages + max_details,
         "max_pages": max_pages, "max_details": max_details, "page_size": page_size,
         "rate_limited": False,
         "retry_after_seconds": None, "errors": [], "listings": [],
@@ -511,7 +534,8 @@ def resume_catalog(snapshot: dict[str, Any], *, max_details: int = 50,
             elapsed = (_instant(started_at) - _instant(report["completed_at"])).total_seconds()
             if elapsed < report["retry_after_seconds"]:
                 raise ValueError("retained Retry-After cooldown has not elapsed")
-        report.update(max_details=max_details, rate_limited=False, retry_after_seconds=None)
+        report.update(max_details=max_details, request_limit=previous_requests + max_details,
+                      rate_limited=False, retry_after_seconds=None)
         if session is None:
             with requests.Session() as owned:
                 _fill_details(owned, report, floor, max_details, skip_complete=True)

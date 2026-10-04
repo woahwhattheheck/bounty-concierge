@@ -23,6 +23,23 @@ $15, following the current green-platform floor in [AGENTS.md](../AGENTS.md).
 The page and detail bounds are independent; no retry, sleep, watcher,
 schedule, claim, proposal, account change or other provider write is performed.
 
+Every outgoing HTTP request, including a redirect hop, consumes the request
+budget. `collect` sets `request_limit` to `max_pages + max_details`; an explicit
+`resume` adds at most its new `max_details` allowance to the cumulative request
+count. The shared explicit-listing refresh reader uses its requested identity
+count as the bound. Redirects use Requests' prepared next request, retaining its
+normal authorization/cookie handling and session redirect ceiling. A positive
+`Retry-After` stops the redirect without sleeping. Budget exhaustion reports
+`REQUEST_LIMIT` and retains partial progress before another request is sent.
+
+One local HTTP run of the full collector with Requests 2.34.2 observed a looping
+redirect fall from 31 outgoing requests (reported as 1) to the declared budget of
+3 (reported as 3). A valid cross-origin redirect still returned the same candidate
+and stripped the synthetic authorization/cookie headers; its 3 requests are now
+reported as 3. Direct collection remained 2 requests, and a redirected 429 retained
+its 120-second cooldown. These are local transport observations, not live-provider
+throughput or availability measurements.
+
 `catalog.json` contains every collected listing, source observation start/end,
 request/page/detail counts, declared traversal coverage, reduced funding data,
 and a `shortlist`. Its observation time belongs to this collection and does not
