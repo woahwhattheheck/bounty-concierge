@@ -788,14 +788,18 @@ fn test_cancel_offer_updates_views_stats_and_negotiation() {
     assert_eq!(cancelled.status, OfferStatus::Rejected);
     assert_eq!(count_events(&env, symbol_short!("off_wdr")), 1);
     assert_eq!(count_events(&env, symbol_short!("neg_clsd")), 1);
+    let (event_contract, event_topics, event_data) = env.events().all().last().unwrap();
+    assert_eq!(event_contract, fin.address);
+    assert_eq!(event_topics.len(), 2);
     assert_eq!(
-        env.events().all().last().unwrap(),
-        (
-            fin.address.clone(),
-            (symbol_short!("off_wdr"), offer_id.clone()).into_val(&env),
-            lender.clone().into_val(&env),
-        )
+        Symbol::try_from_val(&env, &event_topics.get(0).unwrap()).unwrap(),
+        symbol_short!("off_wdr")
     );
+    assert_eq!(
+        Symbol::try_from_val(&env, &event_topics.get(1).unwrap()).unwrap(),
+        offer_id
+    );
+    assert_eq!(Address::try_from_val(&env, &event_data).unwrap(), lender);
 
     let offers = fin.get_offers_by_invoice(&invoice_id);
     assert_eq!(offers.len(), 2);
@@ -815,8 +819,14 @@ fn test_cancel_offer_updates_views_stats_and_negotiation() {
     let lender_stats = fin.get_lender_stats(&lender);
     assert_eq!(lender_stats_before.offers_pending, 2);
     assert_eq!(lender_stats.offers_pending, 1);
-    assert_eq!(lender_stats.total_offered, lender_stats_before.total_offered);
-    assert_eq!(lender_stats.total_accepted, lender_stats_before.total_accepted);
+    assert_eq!(
+        lender_stats.total_offered,
+        lender_stats_before.total_offered
+    );
+    assert_eq!(
+        lender_stats.total_accepted,
+        lender_stats_before.total_accepted
+    );
     assert_eq!(fin.get_stats(), stats_before);
     assert_eq!(token_client.balance(&lender), lender_balance);
     assert_eq!(token_client.balance(&originator), originator_balance);
@@ -968,7 +978,10 @@ fn test_cancel_offer_and_withdraw_preserve_a_financed_invoice() {
     assert_eq!(fin.get_offer(&pending_id), pending);
     assert_eq!(fin.get_offer(&accepted_id), accepted);
     assert_eq!(reg.get_invoice(&invoice_id), invoice);
-    assert_eq!(fin.get_lender_stats(&lender).offers_pending, stats.offers_pending);
+    assert_eq!(
+        fin.get_lender_stats(&lender).offers_pending,
+        stats.offers_pending
+    );
     assert_eq!(token_client.balance(&lender), lender_balance);
     assert_eq!(token_client.balance(&originator), originator_balance);
 }
@@ -1241,7 +1254,7 @@ fn test_get_offers_paginated() {
             &rate,
             &86_400u64,
             &0u64,
-    );
+        );
     }
 
     let page1 = fin.get_offers_paginated(&0_u32, &2_u32);
@@ -1432,7 +1445,11 @@ fn test_financing_bootstrap_admin_config_defaults() {
     let admin = Address::generate(&env);
     let financing_id = env.register(
         FinancingContract,
-        (admin.clone(), Address::generate(&env), Address::generate(&env)),
+        (
+            admin.clone(),
+            Address::generate(&env),
+            Address::generate(&env),
+        ),
     );
     let fin = super::FinancingContractClient::new(&env, &financing_id);
 
@@ -1449,7 +1466,11 @@ fn test_financing_set_signers_requires_threshold() {
     let admin = Address::generate(&env);
     let financing_id = env.register(
         FinancingContract,
-        (admin.clone(), Address::generate(&env), Address::generate(&env)),
+        (
+            admin.clone(),
+            Address::generate(&env),
+            Address::generate(&env),
+        ),
     );
     let fin = super::FinancingContractClient::new(&env, &financing_id);
 
@@ -1540,7 +1561,7 @@ fn test_pause_blocks_all_financing_state_changes() {
             &500u32,
             &86_400u64,
             &0u64,
-    );
+        );
     });
     assert_paused(|| {
         fin.withdraw_offer(&symbol_short!("offx2"), &lender);
@@ -1558,7 +1579,11 @@ fn test_pause_blocks_all_financing_state_changes() {
         fin.transfer_admin(&one(&env, &admin), &new_admin);
     });
     assert_paused(|| {
-        fin.register_currency(&one(&env, &admin), &symbol_short!("EUR"), &Address::generate(&env));
+        fin.register_currency(
+            &one(&env, &admin),
+            &symbol_short!("EUR"),
+            &Address::generate(&env),
+        );
     });
     assert_paused(|| {
         fin.set_position_token(&one(&env, &admin), &pos_token);
@@ -3373,5 +3398,8 @@ fn test_counter_offer_interest_rate_at_cap_records_in_history() {
     // The rate is recorded in negotiation history
     let history = fin.get_negotiation(&offer_id);
     assert_eq!(history.len(), 1);
-    assert_eq!(history.get(0).unwrap().interest_rate, invofi_common::MAX_INTEREST_BPS);
+    assert_eq!(
+        history.get(0).unwrap().interest_rate,
+        invofi_common::MAX_INTEREST_BPS
+    );
 }

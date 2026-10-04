@@ -9,7 +9,7 @@
   "reward": "conditional GrantFox Third Campaign; no fixed dollar amount, award, or payment established",
   "postimages": {
     "financing/src/lib.rs": "cd41c65ad47fc2770596e03975d2590431c4bc81",
-    "financing/src/test.rs": "5f7750293aee3e750810dee45003d87493925f92",
+    "financing/src/test.rs": "c2e0befbfff16396d86dcd97bc9bec1a31349bf3",
     "CHANGELOG.md": "788bc9a231a7c462074b0b5a33614af335acdaa5"
   }
 }

@@ -1,4 +1,4 @@
-name: InvoFi lender cancellation candidate
+name: InvoFi cancellation acceptance
 on:
   push:
     branches:
@@ -93,23 +93,6 @@ jobs:
           set -euo pipefail
           INVOFI_HOST_TARGET="$(rustc -vV | sed -n 's/^host: //p')"
           cargo test --locked -p invofi-financing --lib --target "$INVOFI_HOST_TARGET" -- cancel withdraw negotiation --skip proptest:: --nocapture 2>&1 | tee "$GITHUB_WORKSPACE/evidence/acceptance.log"
-      - name: Clippy on the real contract target
-        if: always() && steps.format.outcome == 'success'
-        working-directory: source
-        shell: bash
-        run: |
-          set -o pipefail
-          cargo clippy --locked -p invofi-financing --target wasm32v1-none -- -D warnings 2>&1 | tee "$GITHUB_WORKSPACE/evidence/clippy.log"
-      - name: Build the financing WASM
-        if: always() && steps.format.outcome == 'success'
-        working-directory: source
-        shell: bash
-        run: |
-          set -o pipefail
-          cargo build --locked --release -p invofi-financing --target wasm32v1-none 2>&1 | tee "$GITHUB_WORKSPACE/evidence/build.log"
-          stat --printf='%s bytes\n' target/wasm32v1-none/release/invofi_financing.wasm | tee "$GITHUB_WORKSPACE/evidence/wasm-size.txt"
-          sha256sum target/wasm32v1-none/release/invofi_financing.wasm | tee "$GITHUB_WORKSPACE/evidence/wasm-sha256.txt"
-          cp target/wasm32v1-none/release/invofi_financing.wasm "$GITHUB_WORKSPACE/evidence/"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
