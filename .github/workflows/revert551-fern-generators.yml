@@ -1,0 +1,107 @@
+name: Revert 551 pinned Fern interfaces
+on:
+  push:
+    branches: [validation/revert551-fern-generators-ledger0938]
+permissions:
+  contents: read
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      FERN_NO_VERSION_REDIRECTION: 'true'
+      EVIDENCE: ${{ runner.temp }}/revert551-fern
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: revertinc/revert
+          ref: bb2c010b5e52e8458783d1770ebb6f379388eefd
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18.20.4
+      - name: Pin public source and CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE"
+          git rev-parse HEAD | tee "$EVIDENCE/source-sha.txt"
+          test "$(git rev-parse HEAD)" = bb2c010b5e52e8458783d1770ebb6f379388eefd
+          node --version | tee "$EVIDENCE/node-version.txt"
+          npm install --prefix "$RUNNER_TEMP/fern-cli" --no-audit --no-fund fern-api@0.16.22 2>&1 | tee "$EVIDENCE/cli-install.log"
+          sha256sum "$RUNNER_TEMP/fern-cli/node_modules/fern-api/bundle.cjs" > "$EVIDENCE/cli-sha256.txt"
+          git ls-files -s fern/definition fern/generators.yml fern/fern.config.json > "$EVIDENCE/definition-blobs.txt"
+      - name: Compile generator intermediate representations
+        shell: bash
+        run: |
+          set -euo pipefail
+          node "$RUNNER_TEMP/fern-cli/node_modules/fern-api/cli.cjs" ir "$EVIDENCE/express-ir.json" --version v31 --language typescript --log-level debug 2>&1 | tee "$EVIDENCE/express-ir.log"
+          node "$RUNNER_TEMP/fern-cli/node_modules/fern-api/cli.cjs" ir "$EVIDENCE/openapi-ir.json" --version v12 --log-level debug 2>&1 | tee "$EVIDENCE/openapi-ir.log"
+      - name: Prepare the published local generator interface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ["EVIDENCE"])
+          for kind, custom in [("express", {"noSerdeLayer": True, "outputSourceFiles": True}), ("openapi", {"format": "yaml"})]:
+              (root / (kind + "-output")).mkdir()
+              config = {"dryRun": False, "irFilepath": "/fern/ir.json", "output": {"path": "/fern/output", "mode": {"type": "downloadFiles"}}, "workspaceName": "revert-api", "organization": "revert", "customConfig": custom, "environment": {"_type": "local"}}
+              (root / (kind + "-config.json")).write_text(json.dumps(config, indent=2) + "\n")
+          PY
+      - name: Generate Express interfaces with the pinned public image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image=fernapi/fern-typescript-express@sha256:7ad4d3c4c59ec55be1cc6d8261608965966c808691f375c41e4adc55229810e5
+          docker pull "$image" 2>&1 | tee "$EVIDENCE/express-pull.log"
+          docker image inspect "$image" --format '{{.Id}} {{json .RepoDigests}}' | tee "$EVIDENCE/express-image.txt"
+          docker run --rm --network none -v "$EVIDENCE/express-config.json:/fern/config.json:ro" -v "$EVIDENCE/express-ir.json:/fern/ir.json:ro" -v "$EVIDENCE/express-output:/fern/output" "$image" /fern/config.json 2>&1 | tee "$EVIDENCE/express-generator.log"
+      - name: Generate OpenAPI with the pinned public image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image=fernapi/fern-openapi@sha256:7f8d9b1a27479e1e16133757b8342f66c35b0af67d1c495b212a8ebf98e45cae
+          docker pull "$image" 2>&1 | tee "$EVIDENCE/openapi-pull.log"
+          docker image inspect "$image" --format '{{.Id}} {{json .RepoDigests}}' | tee "$EVIDENCE/openapi-image.txt"
+          docker run --rm --network none -v "$EVIDENCE/openapi-config.json:/fern/config.json:ro" -v "$EVIDENCE/openapi-ir.json:/fern/ir.json:ro" -v "$EVIDENCE/openapi-output:/fern/output" "$image" /fern/config.json 2>&1 | tee "$EVIDENCE/openapi-generator.log"
+      - name: Normalize generated files and record hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, os, shutil, zipfile
+          from pathlib import Path
+          root = Path(os.environ["EVIDENCE"])
+          destination = root / "generated"
+          for kind, relative in [("express", "typescript"), ("openapi", "oas")]:
+              output = root / (kind + "-output")
+              entries = list(output.iterdir())
+              assert entries, kind + " emitted no output"
+              target = destination / relative
+              target.mkdir(parents=True)
+              if len(entries) == 1 and entries[0].suffix == ".zip":
+                  with zipfile.ZipFile(entries[0]) as archive:
+                      assert all(not Path(n).is_absolute() and ".." not in Path(n).parts for n in archive.namelist())
+                      archive.extractall(target)
+              else:
+                  shutil.copytree(output, target, dirs_exist_ok=True)
+          files = []
+          for path in sorted(destination.rglob("*")):
+              if path.is_file():
+                  data = path.read_bytes()
+                  files.append({"path": str(path.relative_to(destination)), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+          assert any(f["path"].endswith(".ts") for f in files), "TypeScript interfaces absent"
+          (root / "generated-manifest.json").write_text(json.dumps({"source": "bb2c010b5e52e8458783d1770ebb6f379388eefd", "fern": "0.16.22", "generators": {"express": "0.9.9", "openapi": "0.0.28"}, "files": files}, indent=2) + "\n")
+          print(json.dumps({"files": len(files), "bytes": sum(f["bytes"] for f in files)}))
+          PY
+          git status --porcelain | tee "$EVIDENCE/source-status-after.txt"
+          test -z "$(git status --porcelain)"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: revert551-pinned-fern-interfaces
+          path: ${{ runner.temp }}/revert551-fern
+          retention-days: 7
+          if-no-files-found: error
