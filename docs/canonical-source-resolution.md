@@ -27,14 +27,23 @@ concierge-discover listing.json --json
 
 Resolution precedence is deliberate:
 
-1. A clean `https://github.com/<owner>/<repo>/issues/<n>` listing resolves to
-   itself. References in that issue text cannot redirect the canonical identity.
+1. A clean `https://github.com/<owner>/<repo>/issues/<n>` or
+   `https://api.github.com/repos/<owner>/<repo>/issues/<n>` listing resolves to
+   the canonical web issue URL. References in that issue text cannot redirect
+   the canonical identity.
 2. An external listing with `source_urls` must expose exactly one distinct
    GitHub issue. Multiple canonical candidates HOLD.
 3. Without explicit source URLs, full GitHub issue URLs or qualified
    `owner/repo#number` references in the title/body may resolve the row. Multiple
    distinct candidates HOLD.
 4. No unique canonical issue means HOLD. The resolver never guesses.
+
+Native GitHub issue responses expose the web URL as `html_url` and the REST URL
+as `url`; either can be used in `listing_url`, `source_urls`, or title/body
+references. Web and REST forms of the same issue count as one candidate. The
+existing `#issuecomment-<id>` fragment behavior applies to both forms; queries
+and other subresources do not identify an issue. Different repositories or
+issue numbers remain distinct candidates.
 
 The resolver only returns normalized repository/issue identity, safe counts, and
 reason codes. It does not echo mirror paths, listing title/body text, or source
