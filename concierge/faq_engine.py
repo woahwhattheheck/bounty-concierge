@@ -332,10 +332,13 @@ def ask_grok(question, context=""):
         )
         resp.raise_for_status()
         data = resp.json()
-        return data["choices"][0]["message"]["content"].strip()
+        content = data["choices"][0]["message"]["content"]
+        if not isinstance(content, str):
+            return "[error] Unexpected response format from Grok API."
+        return content.strip()
     except requests.RequestException as exc:
         return f"[error] Grok API request failed: {exc}"
-    except (KeyError, IndexError):
+    except (KeyError, IndexError, TypeError):
         return "[error] Unexpected response format from Grok API."
 
 
