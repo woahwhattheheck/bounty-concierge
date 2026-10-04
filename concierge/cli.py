@@ -3,6 +3,8 @@
 
 Subcommands:
     browse   -- List and filter open bounties across all repos
+    bountyhub -- Read the public BountyHub catalog and export an intake shortlist
+    capture-batch -- Capture a bounded issue shortlist for offline routing
     faq      -- Ask a question about RustChain or bounties
     wallet   -- Register a wallet or check balance
     status   -- Check pending payouts for a wallet
@@ -165,6 +167,38 @@ def _print_bounty_table(bounties, show_evidence=False):
 # ---------------------------------------------------------------------------
 # Subcommand handlers
 # ---------------------------------------------------------------------------
+
+def _cmd_bounty_intake(args):
+    """Delegate intake flags, output and exit status to the shared modules."""
+    module_args = list(args.intake_args)
+    if args.json:
+        module_args.insert(0, "--json")
+    if args.dry_run and not any(flag in module_args for flag in ("-h", "--help")):
+        if args.command == "bountyhub":
+            steps = ["Read the public BountyHub catalog using the requested source bounds",
+                     "Return the reader's catalog report or intake shortlist"]
+            unknown = ["catalog_rows", "source_completeness", "claim_eligibility"]
+        else:
+            steps = ["Read the requested issue shortlist",
+                     "Collect GitHub preflight evidence within the request budget",
+                     "Save completed captures and an explicit remaining shortlist"]
+            unknown = ["captured_count", "remaining_count", "request_count", "dispositions"]
+        _print_dry_run_plan(
+            args,
+            f"{args.command}.preview",
+            {"arguments": module_args},
+            steps,
+            unknown,
+        )
+        return
+
+    if args.command == "bountyhub":
+        from concierge.bountyhub_catalog import main as intake_main
+    else:
+        from concierge.bounty_capture_batch import main as intake_main
+
+    sys.exit(intake_main(module_args))
+
 
 def _browse_repos(args):
     """Resolve browse --repo values the same way the existing command did."""
@@ -1228,6 +1262,15 @@ def _build_parser():
 
     sub = parser.add_subparsers(dest="command", help="Available commands")
 
+    # Each intake module owns its flags and help; the installed entry point
+    # forwards them instead of keeping another parser in sync.
+    for command, description in (
+        ("bountyhub", "Read the public BountyHub catalog and export an intake shortlist"),
+        ("capture-batch", "Capture a bounded issue shortlist for offline routing"),
+    ):
+        delegated = sub.add_parser(command, add_help=False, help=description)
+        _add_common_flags(delegated)
+
     # --- browse ---
     p_browse = sub.add_parser("browse", help="List and filter open bounties")
     _add_common_flags(p_browse)
@@ -1365,7 +1408,11 @@ def _build_parser():
 def main():
     """Main CLI entry point."""
     parser = _build_parser()
-    args = parser.parse_args()
+    args, remaining = parser.parse_known_args()
+    if args.command in {"bountyhub", "capture-batch"}:
+        args.intake_args = remaining
+    elif remaining:
+        parser.error("unrecognized arguments: " + " ".join(remaining))
 
     if not args.command:
         parser.print_help()
@@ -1373,6 +1420,8 @@ def main():
 
     dispatch = {
         "browse": _cmd_browse,
+        "bountyhub": _cmd_bounty_intake,
+        "capture-batch": _cmd_bounty_intake,
         "faq": _cmd_faq,
         "wallet": _cmd_wallet,
         "status": _cmd_status,

@@ -148,6 +148,29 @@ The `claim --dry-run` example produces a local plan; it does not submit a claim 
 
 Full contract: [docs/BROWSE.md](docs/BROWSE.md).
 
+### BountyHub intake from the installed command
+
+The installed `concierge` command exposes the shared catalog reader and bounded
+capture workflow:
+
+```bash
+concierge bountyhub --help
+concierge capture-batch --help
+```
+
+`bountyhub` delegates to `concierge.bountyhub_catalog`; `capture-batch` delegates
+to `concierge.bounty_capture_batch` in the same process. Each module remains the
+source of its flags, help, output, request limits and exit status. Use the
+[catalog guide](docs/BOUNTYHUB_CATALOG.md) to export a shortlist, then use the
+capture command below. Catalog listing identities and funding observations stay
+in the catalog report; the issue shortlist contains only `repo` and `number`.
+
+Common `--json` and `--dry-run` flags work before or after either command.
+`--dry-run` prints an argument-only plan without reading the source or creating
+capture files; result counts and eligibility remain unknown. Command-specific
+arguments are validated when the delegated command runs. Other commands still
+reject unrecognized arguments.
+
 ### Capture final preflight for offline routing
 
 One collector can capture a shortlist for builders to route offline. Save
@@ -155,7 +178,7 @@ One collector can capture a shortlist for builders to route offline. Save
 using the actual repositories and issue numbers, then run:
 
 ```bash
-python -m concierge.bounty_capture_batch shortlist.json \
+concierge capture-batch shortlist.json \
   --output-dir capture-run --max-issues 25 --max-pages 10 \
   --max-requests 100 --json
 python -m concierge.bounty_supply capture-run/supply.json \
@@ -179,7 +202,7 @@ next run. There are no automatic retries or schedules. Resume explicitly into a
 new directory:
 
 ```bash
-python -m concierge.bounty_capture_batch capture-run/remaining.json \
+concierge capture-batch capture-run/remaining.json \
   --output-dir capture-run-next --max-issues 25 --max-pages 10 \
   --max-requests 100 --json
 ```
