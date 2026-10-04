@@ -8,6 +8,7 @@ claim availability, per-claim compensation, or evidence of our payment route.
 from __future__ import annotations
 
 import argparse
+import heapq
 import json
 import math
 import os
@@ -153,22 +154,22 @@ def render_table(bounties: Iterable[dict], top_n: int = DEFAULT_TOP_N) -> str:
     """Render a stable discovery table; indexed rewards are not promised pay."""
     _validate_top_n(top_n)
     validated = _validated_bounty_rows(bounties)
-    # Stable two-pass sorting needs no Decimal arithmetic or context rounding.
-    ordered = sorted(
-        validated,
-        key=lambda b: ((b.get("repo") or "").casefold(), b.get("number") or 0,
-                       b.get("title") or "", b.get("url") or ""),
-    )
-    ordered.sort(
-        key=lambda b: (b.get("reward_rtc") is not None,
-                       b.get("reward_rtc") if b.get("reward_rtc") is not None else 0),
-        reverse=True,
-    )
+    def order_key(bounty):
+        reward = bounty.get("reward_rtc")
+        # Unary minus can round Decimal under the caller's active context.
+        # copy_negate changes only its sign, preserving the original ordering.
+        descending_reward = (reward.copy_negate() if isinstance(reward, Decimal)
+                             else -reward if reward is not None else 0)
+        return (reward is None, descending_reward,
+                (bounty.get("repo") or "").casefold(), bounty.get("number") or 0,
+                bounty.get("title") or "", bounty.get("url") or "")
+
+    ordered = heapq.nsmallest(top_n, validated, key=order_key)
     lines = [
         "| Repo | Issue | Title | Indexed RTC | Difficulty | Skills |",
         "|------|-------|-------|-------------|------------|--------|",
     ]
-    for bounty in ordered[:top_n]:
+    for bounty in ordered:
         repo = bounty.get("repo") or ""
         repo_short = _markdown_cell(repo.split("/")[-1] or "unknown")
         number = bounty.get("number")
