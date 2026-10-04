@@ -186,6 +186,7 @@ def audit_bounty(
     session: Any = requests,
     max_pages: int = 10,
     submission_target: dict[str, str] | None = None,
+    _pr_detail_cache: dict[tuple[str, int], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Audit one GitHub bounty issue against canonical repository signals.
 
@@ -218,6 +219,7 @@ def audit_bounty(
             return audit_bounty(
                 repo, number, token, session=owned_session, max_pages=max_pages,
                 submission_target=submission_target,
+                _pr_detail_cache=_pr_detail_cache,
             )
 
     token = token or GITHUB_TOKEN
@@ -277,14 +279,20 @@ def audit_bounty(
     for identity in sorted(exact_candidates):
         pr_repo, candidate = exact_candidates[identity]
         pr_number = identity[1]
-        detail = _object_payload(
-            _get_json(
-                session,
-                f"https://api.github.com/repos/{pr_repo}/pulls/{pr_number}",
-                headers=headers,
-            ),
-            f"pull request {pr_repo}#{pr_number}",
-        )
+        if _pr_detail_cache is not None and identity in _pr_detail_cache:
+            detail = deepcopy(_pr_detail_cache[identity])
+        else:
+            detail = _object_payload(
+                _get_json(
+                    session,
+                    f"https://api.github.com/repos/{pr_repo}/pulls/{pr_number}",
+                    headers=headers,
+                ),
+                f"pull request {pr_repo}#{pr_number}",
+            )
+            if _pr_detail_cache is not None:
+                # Share only a successful payload; each consumer owns its copy.
+                _pr_detail_cache[identity] = deepcopy(detail)
         if not references_issue(detail, repo, number, pr_repo=pr_repo):
             # Search discovery may lag an edited reference in either repository.
             continue
@@ -353,7 +361,11 @@ def audit_bounty(
 
 
 def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, session: Any = requests, max_pages: int = 10) -> list[dict[str, Any]]:
-    """Read each case-insensitive issue/explicit-target combination once per invocation."""
+    """Read each case-insensitive issue/explicit-target combination once per invocation.
+
+    Canonical PR details are shared within this batch when distinct issues link
+    the same PR. Later invocations and standalone audits perform fresh reads.
+    """
     if session is requests:
         with requests.Session() as owned_session:
             return audit_bounties(
@@ -361,6 +373,7 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
             )
 
     audited = []
+    pr_detail_cache: dict[tuple[str, int], dict[str, Any]] = {}
     audit_by_issue: dict[tuple[str, int, str | None], dict[str, Any]] = {}
     for bounty in bounties:
         row = dict(bounty)
@@ -385,6 +398,7 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
                 session=session,
                 max_pages=max_pages,
                 submission_target=target,
+                _pr_detail_cache=pr_detail_cache,
             )
         # Each row owns its nested report. A caller editing one scout's result
         # must not alter another row or the evidence reused later in this batch.
