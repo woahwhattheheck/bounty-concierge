@@ -54,7 +54,7 @@ def _entry_chunks(entry: dict) -> Iterator[bytes]:
     yield b'],"key":' + _bytes(entry["key"]) + b'}'
 
 
-def _entry_bytes(entry: dict) -> bytes | None:
+def _entry_parts(entry: dict) -> list[bytes] | None:
     """Encode within the page bound, still validating all oversized values.
 
     This is not a bound on individual or deeply nested values. Store and load
@@ -71,7 +71,7 @@ def _entry_bytes(entry: dict) -> bytes | None:
             parts.append(chunk)
     if size > limit:
         return None
-    return b"".join(parts)
+    return parts
 
 
 def _entry_sha256(entry: dict, file_size: int) -> str:
@@ -152,19 +152,21 @@ class PageCache:
         temporary = None
         try:
             entry = {"key": key, "etag": etag, "issues": issues, "has_next": bool(has_next)}
-            # Reuse the canonical entry bytes for both the checksum and envelope.
-            entry_data = _entry_bytes(entry)
-            if entry_data is None:
+            # Validate before touching the filesystem, retaining no aggregate copies.
+            parts = _entry_parts(entry)
+            if parts is None:
                 return "skipped"
-            data = b"".join((b'{"entry":', entry_data, b',"sha256":"',
-                             hashlib.sha256(entry_data).hexdigest().encode("ascii"), b'"}'))
-            del entry_data
+            digest = hashlib.sha256()
+            for part in parts:
+                digest.update(part)
             self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
             # Readers retain their own entry while another process replaces it.
             # A failed writer can only remove its own temporary file.
             with tempfile.NamedTemporaryFile(dir=self.root, prefix=".bounty-page-", delete=False) as stream:
                 temporary = stream.name
-                stream.write(data)
+                stream.write(b'{"entry":')
+                stream.writelines(parts)
+                stream.write(b',"sha256":"' + digest.hexdigest().encode("ascii") + b'"}')
                 stream.flush()
                 os.fsync(stream.fileno())
             os.replace(temporary, self.root / (key + ".json"))
