@@ -27,8 +27,9 @@ jobs:
           receipt=work/throughput/preflight-http-release-20261004
           test "$(git hash-object "$target")" = cc78fff3f030c8d222030a4355201978e7b5cf2d
           cp "$target" "$RUNNER_TEMP/preflight-before.py"
-          git apply --check "$receipt/fix.patch"
-          git apply "$receipt/fix.patch"
+          # Recount the transported hunk; exact before/after blobs still bind every byte.
+          git apply --recount --check "$receipt/fix.patch"
+          git apply --recount "$receipt/fix.patch"
           test "$(git hash-object "$target")" = 820f0e432d923442882bcbd05465212b1524da09
           python "$receipt/replay.py" --baseline-source "$RUNNER_TEMP/preflight-before.py" > "$receipt/results.json"
           python -m py_compile "$target" "$receipt/replay.py"
