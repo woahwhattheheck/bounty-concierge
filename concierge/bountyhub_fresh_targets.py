@@ -8,6 +8,7 @@ continues to include existing assignments for their current owners to recover.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -67,6 +68,22 @@ def _exclude_assigned_exclusive(
     result["fresh_intake_policy"] = "exclude_assigned_exclusive_listings"
     result["assigned_exclusive_exclusions"] = excluded
     result["assigned_exclusive_exclusion_count"] = len(excluded)
+    result["swarm_reservation_schema"] = "swarm-custody-reservation/v1"
+    annotated_targets = []
+    for retained_target in result["targets"]:
+        target = dict(retained_target)
+        work_key = (
+            f"bountyhub:{target['repo'].casefold()}#{target['number']}"
+        )
+        digest = hashlib.sha256(work_key.encode("utf-8")).hexdigest()
+        target["swarm_reservation"] = {
+            "schema": result["swarm_reservation_schema"],
+            "work_key": work_key,
+            "branch": f"swarm-custody/v1/{digest}",
+            "tool": "tools/swarm_claim_reservation.py",
+        }
+        annotated_targets.append(target)
+    result["targets"] = annotated_targets
     return result
 
 
