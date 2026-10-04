@@ -83,15 +83,40 @@ audit evidence and never authorizes later qualification.
 When `X-RateLimit-Remaining` is zero, the later of that wait and
 `X-RateLimit-Reset` is retained, rounding fractional seconds upward. This follows
 [GitHub's rate-limit guidance](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api).
-A permission-only 403 receives no quota annotation. A 429 with missing or invalid
-headers records a known quota response with unknown delay (`null`), so callers
-must use their existing conservative backoff policy rather than treating it as
-permission to retry immediately. An exceptionally large valid delay stays intact
-even if its derived calendar date cannot be represented.
+A permission-only 403 receives no quota annotation. A 403 whose top-level JSON
+`message` explicitly identifies a secondary rate limit or an exceeded rate limit
+is recognized even without wait headers, including when ordinary primary quota
+remains. The message is inspected only when headers do not already establish a
+quota response; malformed JSON, nonobject payloads and permission errors remain
+separate. Error text and documentation links are not added to the receipt.
+
+A quota response with no usable timing evidence records an unknown delay
+(`null`), including a 429 or an explicit limit-message 403. Callers must use their
+existing conservative backoff policy rather than treating it as permission to
+retry immediately. An exceptionally large valid delay stays intact even if its
+derived calendar date cannot be represented.
 
 The optional field is sealed with the receipt. Successful responses, existing
 classifications and reason codes, canonical-identity handling, and the positive
 qualification predicate are unchanged. No raw headers or credentials are saved.
+
+The [secondary-limit replay](../work/validation/live-status-secondary-limit-20261004/replay.py)
+uses complete source modules and actual Requests response objects at the private
+HTTP seam. Its eight bounded cases include a retained native GitHub error
+message with controlled header conditions, permission and malformed-response
+controls, and the existing retry-header/429 paths. Every call still produces the
+same prior decision and receipt fields apart from the newly applicable quota
+annotation and its seal; one HTTP-seam call per source, zero network calls.
+[Raw results and source hashes](../work/validation/live-status-secondary-limit-20261004/results.json)
+retain that local observation. To reproduce from the repository root:
+
+```bash
+git show 3c7e5c788dbce2667798fe901e5342f8e97c0d33:concierge/bounty_live_status.py > /tmp/bounty_live_status_before.py
+python work/validation/live-status-secondary-limit-20261004/replay.py \
+  --before /tmp/bounty_live_status_before.py \
+  --after concierge/bounty_live_status.py \
+  --output /tmp/live_status_secondary_limit.json
+```
 
 ## Discovery metadata
 

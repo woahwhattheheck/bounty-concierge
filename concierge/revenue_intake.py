@@ -157,6 +157,7 @@ def qualify_live_revenue_intake(
     session: Any = None,
     max_pages: int = 10,
     saturation_threshold: int = 4,
+    submission_target: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Refresh canonical GitHub state before authorizing paid-work dispatch.
 
@@ -167,6 +168,10 @@ def qualify_live_revenue_intake(
 
     The live saturation policy is authoritative: callers may request a lower
     threshold to tighten dispatch, but cannot raise the policy ceiling.
+
+    An explicit source-bound ``submission_target`` is passed to the existing
+    preflight validator and every competition audit. It does not change the
+    canonical bounty issue or authorize a submission by itself.
     """
     kwargs: dict[str, Any] = {
         "max_pages": max_pages,
@@ -176,6 +181,8 @@ def qualify_live_revenue_intake(
     }
     if session is not None:
         kwargs["session"] = session
+    if submission_target is not None:
+        kwargs["submission_target"] = submission_target
 
     preflight = preflight_bounty(repo, number, token, **kwargs)
     if not isinstance(preflight, dict):
@@ -256,6 +263,11 @@ def main(argv: list[str] | None = None) -> int:
         help="optional discovery listing URL; live mode still dispatches canonically",
     )
     parser.add_argument(
+        "--submission-target",
+        type=Path,
+        help="JSON file containing an explicit source-bound submission_target for live intake",
+    )
+    parser.add_argument(
         "--max-pages",
         type=int,
         default=10,
@@ -277,6 +289,7 @@ def main(argv: list[str] | None = None) -> int:
         args.repo is not None
         or args.issue is not None
         or args.listing_url is not None
+        or args.submission_target is not None
     )
     if live_requested:
         if args.snapshot is not None:
@@ -288,12 +301,18 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if live_requested:
+            target = None
+            if args.submission_target is not None:
+                target = json.loads(args.submission_target.read_text(encoding="utf-8"))
+                if not isinstance(target, dict):
+                    raise RevenueIntakeInputError("submission_target JSON must contain an object")
             result = qualify_live_revenue_intake(
                 args.repo,
                 args.issue,
                 listing_url=args.listing_url,
                 max_pages=args.max_pages,
                 saturation_threshold=args.saturation_threshold,
+                submission_target=target,
             )
         else:
             snapshot = _load_snapshot(args.snapshot)

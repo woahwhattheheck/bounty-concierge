@@ -23,6 +23,23 @@ $15, following the current green-platform floor in [AGENTS.md](../AGENTS.md).
 The page and detail bounds are independent; no retry, sleep, watcher,
 schedule, claim, proposal, account change or other provider write is performed.
 
+Every outgoing HTTP request, including a redirect hop, consumes the request
+budget. `collect` sets `request_limit` to `max_pages + max_details`; an explicit
+`resume` adds at most its new `max_details` allowance to the cumulative request
+count. The shared explicit-listing refresh reader uses its requested identity
+count as the bound. Redirects use Requests' prepared next request, retaining its
+normal authorization/cookie handling and session redirect ceiling. A positive
+`Retry-After` stops the redirect without sleeping. Budget exhaustion reports
+`REQUEST_LIMIT` and retains partial progress before another request is sent.
+
+One local HTTP run of the full collector with Requests 2.34.2 observed a looping
+redirect fall from 31 outgoing requests (reported as 1) to the declared budget of
+3 (reported as 3). A valid cross-origin redirect still returned the same candidate
+and stripped the synthetic authorization/cookie headers; its 3 requests are now
+reported as 3. Direct collection remained 2 requests, and a redirected 429 retained
+its 120-second cooldown. These are local transport observations, not live-provider
+throughput or availability measurements.
+
 `catalog.json` contains every collected listing, source observation start/end,
 request/page/detail counts, declared traversal coverage, reduced funding data,
 and a `shortlist`. Its observation time belongs to this collection and does not
@@ -111,6 +128,29 @@ flag can be false while many open claim records exist. A listing may also lag a
 closed GitHub issue or an exclusive assignment. This shortlist does not establish
 that work is unclaimed, that our account is eligible, or that money has been paid
 to us. Existing issue-level contributors and submission owners retain their work.
+
+Pass `--exclude-issues` to reuse dated canonical issue findings when selecting
+fresh intake targets from a retained catalog. The optional JSON object maps each
+`owner/repo#number` to `reason`, `source_url` (an HTTPS evidence link), and
+`observed_at` (a timezone-aware ISO timestamp). For example:
+
+```bash
+python -m concierge.bountyhub_catalog targets \
+  work/supply/bountyhub/2026-10-04-catalog-56f3.json \
+  --include-promised \
+  --exclude-issues work/supply/bountyhub/2026-10-04-canonical-exclusions.json \
+  > shortlist.json
+```
+
+Exclusions are off unless a file is supplied. The command preserves the exact
+batch-compatible candidates envelope on stdout and reports each excluded issue,
+reason, source and observation time on stderr; programmatic selection also
+returns an `excluded_targets` list. Funding amounts, listing evidence and their
+original observation times stay in the retained report. The example records
+reserved funding and existing submission ownership for three issues; it is dated
+decision evidence, not a refreshed availability check or a hold on continuing an
+existing submission. Update the supplied entries when canonical evidence changes,
+and apply the usual preflight to the remaining targets.
 
 ## Funding reduction
 

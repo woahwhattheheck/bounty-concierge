@@ -22,6 +22,7 @@ from typing import Any
 import requests
 
 from concierge.submission_packet import validate_submission_target
+from concierge.bountyhub_exclusions import normalize_exclusions, unique_exclusion_fields
 
 API = "https://api.bountyhub.dev/api/bounties"
 SCHEMA = "bountyhub-catalog/v1"
@@ -162,31 +163,53 @@ class _ReadFailure(Exception):
 
 
 def _get(session: Any, url: str, report: dict[str, Any], **params: Any) -> Any:
-    report["requests_made"] += 1
-    try:
-        response = session.get(url, params=params or None, timeout=20)
-    except requests.RequestException as exc:
-        # Response hooks may raise before Session.get returns. Preserve the
-        # same status/retry metadata and cleanup as a returned HTTP failure.
-        response = exc.response if isinstance(exc, requests.HTTPError) else None
-        if response is None:
-            raise _ReadFailure(type(exc).__name__) from None
+    request_limit = report.get("request_limit")
+    if request_limit is None and "requested_listing_ids" in report:
+        request_limit = len(report["requested_listing_ids"])
+    prepared = None
+    redirects = 0
+    while True:
+        if request_limit is not None and report["requests_made"] >= request_limit:
+            raise _ReadFailure("REQUEST_LIMIT")
+        report["requests_made"] += 1
         try:
-            raise _ReadFailure("HTTP_ERROR", response.status_code,
-                               _retry_after(response.headers.get("Retry-After"))) from None
+            if prepared is None:
+                response = session.get(url, params=params or None, timeout=20, allow_redirects=False)
+            else:
+                settings = session.merge_environment_settings(prepared.url, {}, None, None, None)
+                response = session.send(prepared, timeout=20, allow_redirects=False, **settings)
+        except requests.RequestException as exc:
+            # Response hooks may raise before Session.get returns. Preserve the
+            # same status/retry metadata and cleanup as a returned HTTP failure.
+            response = exc.response if isinstance(exc, requests.HTTPError) else None
+            if response is None:
+                raise _ReadFailure(type(exc).__name__) from None
+            try:
+                raise _ReadFailure("HTTP_ERROR", response.status_code,
+                                   _retry_after(response.headers.get("Retry-After"))) from None
+            finally:
+                response.close()
+        try:
+            delay = _retry_after(response.headers.get("Retry-After"))
+            status = response.status_code
+            if response.is_redirect and response.next is not None:
+                if delay is not None and delay > 0:
+                    raise _ReadFailure("HTTP_ERROR", status, delay)
+                if redirects >= session.max_redirects:
+                    raise _ReadFailure("TooManyRedirects", status)
+                # Requests prepares this hop with its normal auth/cookie
+                # stripping. Count and bound the send before following it.
+                prepared = response.next
+                redirects += 1
+                continue
+            if status != 200:
+                raise _ReadFailure("HTTP_ERROR", status, delay)
+            try:
+                return response.json()
+            except ValueError:
+                raise _ReadFailure("INVALID_JSON", status) from None
         finally:
             response.close()
-    try:
-        delay = _retry_after(response.headers.get("Retry-After"))
-        status = response.status_code
-        if status != 200:
-            raise _ReadFailure("HTTP_ERROR", status, delay)
-        try:
-            return response.json()
-        except ValueError:
-            raise _ReadFailure("INVALID_JSON", status) from None
-    finally:
-        response.close()
 
 
 def _submission_target_map(value: Any) -> dict[tuple[str, int], dict[str, str]]:
@@ -220,11 +243,13 @@ def _unique_target_fields(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 def select_targets(report: dict[str, Any], minimum_funded_usd: str = "15.00", *,
                    include_promised: bool = False,
-                   submission_targets: dict[str, Any] | None = None) -> dict[str, Any]:
+                   submission_targets: dict[str, Any] | None = None,
+                   excluded_issues: dict[str, Any] | None = None) -> dict[str, Any]:
     """Reduce a retained report without refreshing its time or making requests."""
     if not isinstance(report, dict) or report.get("schema") != SCHEMA or not isinstance(report.get("listings"), list):
         raise ValueError("expected a bountyhub-catalog/v1 report")
     delivery = _submission_target_map(submission_targets)
+    exclusions = normalize_exclusions(excluded_issues)
     floor = _amount(minimum_funded_usd)
     targets: dict[tuple[str, int], dict[str, Any]] = {}
     associations: dict[str, list[str]] = {}
@@ -258,6 +283,15 @@ def select_targets(report: dict[str, Any], minimum_funded_usd: str = "15.00", *,
         if key in delivery:
             target["submission_target"] = delivery[key]
         associations.setdefault(f"{repo.casefold()}#{number}", []).append(listing_id)
+    excluded = []
+    for key in list(targets):
+        if key not in exclusions:
+            continue
+        target = targets.pop(key)
+        excluded.append({
+            **target, **exclusions[key],
+            "listing_ids": associations.pop(f"{key[0]}#{key[1]}"),
+        })
     result = {
         "targets": list(targets.values()), "listing_ids_by_issue": associations,
         "minimum_funded_usd": _money(floor), "unresolved_funding_count": unresolved,
@@ -271,6 +305,8 @@ def select_targets(report: dict[str, Any], minimum_funded_usd: str = "15.00", *,
     if include_promised:
         del result["minimum_funded_usd"]
         result.update(reward_basis="reported_funded_plus_promised", minimum_reward_usd=_money(floor))
+    if excluded_issues is not None:
+        result["excluded_targets"] = excluded
     return result
 
 
@@ -340,6 +376,7 @@ def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int 
         "completed_at": None, "complete": False, "catalog_complete": False,
         "details_complete": True, "pages_fetched": 0, "details_fetched": 0,
         "requests_made": 0, "minimum_total_usd": _money(floor),
+        "request_limit": max_pages + max_details,
         "max_pages": max_pages, "max_details": max_details, "page_size": page_size,
         "rate_limited": False,
         "retry_after_seconds": None, "errors": [], "listings": [],
@@ -386,7 +423,10 @@ def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int 
 def _instant(value: Any) -> datetime:
     if not isinstance(value, str):
         raise ValueError("missing observation timestamp")
-    instant = datetime.fromisoformat(value)
+    try:
+        instant = datetime.fromisoformat(value)
+    except ValueError:
+        raise ValueError("invalid observation timestamp") from None
     if instant.tzinfo is None:
         raise ValueError("observation timestamp must have a timezone")
     return instant
@@ -511,7 +551,8 @@ def resume_catalog(snapshot: dict[str, Any], *, max_details: int = 50,
             elapsed = (_instant(started_at) - _instant(report["completed_at"])).total_seconds()
             if elapsed < report["retry_after_seconds"]:
                 raise ValueError("retained Retry-After cooldown has not elapsed")
-        report.update(max_details=max_details, rate_limited=False, retry_after_seconds=None)
+        report.update(max_details=max_details, request_limit=previous_requests + max_details,
+                      rate_limited=False, retry_after_seconds=None)
         if session is None:
             with requests.Session() as owned:
                 _fill_details(owned, report, floor, max_details, skip_complete=True)
@@ -534,6 +575,17 @@ def resume_catalog(snapshot: dict[str, Any], *, max_details: int = 50,
     return report
 
 
+def _input_error_message(exc: Exception) -> str:
+    """Explain input failures without echoing file contents or input paths."""
+    if isinstance(exc, json.JSONDecodeError):
+        return f"invalid JSON at line {exc.lineno}, column {exc.colno}"
+    if isinstance(exc, OSError):
+        return "cannot read the input file"
+    if isinstance(exc, KeyError):
+        return "missing a required catalog field"
+    return str(exc)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -546,6 +598,10 @@ def main(argv: list[str] | None = None) -> int:
     targets.add_argument(
         "--submission-target-map", type=Path,
         help="Optional JSON owner/repo#number map of existing source-bound submission_target records",
+    )
+    targets.add_argument(
+        "--exclude-issues", type=Path,
+        help="Optional JSON owner/repo#number map of retained reasons, source URLs and observation times",
     )
     resume = commands.add_parser("resume", help="Finish unresolved details from a retained complete catalog")
     resume.add_argument("snapshot", type=Path)
@@ -589,6 +645,15 @@ def main(argv: list[str] | None = None) -> int:
             complete = result["shortlist"]["source_complete"]
         else:
             submission_targets = None
+            excluded_issues = None
+            if args.exclude_issues is not None:
+                with args.exclude_issues.open("rb") as source:
+                    raw = source.read(1024 * 1024 + 1)
+                if len(raw) > 1024 * 1024:
+                    raise ValueError("issue exclusions exceed 1 MiB")
+                excluded_issues = json.loads(raw, object_pairs_hook=unique_exclusion_fields)
+                if excluded_issues is None:
+                    raise ValueError("issue exclusions must be an object")
             if args.submission_target_map is not None:
                 with args.submission_target_map.open("rb") as source:
                     raw = source.read(1024 * 1024 + 1)
@@ -600,7 +665,8 @@ def main(argv: list[str] | None = None) -> int:
             with args.snapshot.open(encoding="utf-8") as source:
                 result = select_targets(json.load(source), args.min_funded_usd,
                                         include_promised=args.include_promised,
-                                        submission_targets=submission_targets)
+                                        submission_targets=submission_targets,
+                                        excluded_issues=excluded_issues)
             complete = result["source_complete"]
         if args.command == "targets":
             # The existing batch preflight accepts this exact envelope. Keep
@@ -614,6 +680,10 @@ def main(argv: list[str] | None = None) -> int:
                 basis += f" catalog_refreshed=false catalog_observed_through={result['catalog_observed_through']}"
             if args.submission_target_map is not None:
                 basis += f" mapped_submission_targets={sum('submission_target' in row for row in result['targets'])}"
+            if args.exclude_issues is not None:
+                basis += f" excluded_targets={len(result['excluded_targets'])}"
+                for excluded in result["excluded_targets"]:
+                    print("excluded_target=" + json.dumps(excluded, sort_keys=True), file=sys.stderr)
             print(
                 f"source_started_at={result['source_started_at']} "
                 f"source_completed_at={result['source_completed_at']} "
@@ -628,7 +698,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"PARTIAL: retained rows do not establish a complete {basis} shortlist", file=sys.stderr)
         return 0 if complete else 2
     except (OSError, ValueError, KeyError) as exc:
-        print(f"bountyhub-catalog: {type(exc).__name__}", file=sys.stderr)
+        print(f"bountyhub-catalog: {type(exc).__name__}: {_input_error_message(exc)}", file=sys.stderr)
         return 2
 
 

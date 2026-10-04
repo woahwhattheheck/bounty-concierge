@@ -418,6 +418,7 @@ def _batch_error_details(exc: BountyAuditError) -> dict[str, Any]:
         "type": "BountyAuditError", "message": str(exc),
         "http_status": exc.http_status, "retry_after": exc.retry_after,
         "rate_limit_reset": exc.rate_limit_reset,
+        "rate_limit_remaining": exc.rate_limit_remaining,
     }
 
 

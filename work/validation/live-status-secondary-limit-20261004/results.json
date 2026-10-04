@@ -1,0 +1,110 @@
+{
+  "python": "3.12.14",
+  "requests": "2.34.2",
+  "network_attempts": 0,
+  "passed": 8,
+  "cases": [
+    {
+      "case": "captured secondary, no wait header",
+      "before_cooldown": null,
+      "after_cooldown": {
+        "rate_limited": true,
+        "retry_after_seconds": null,
+        "retry_not_before": null
+      },
+      "http_seam_calls_per_source": 1,
+      "prior_decision_preserved": true,
+      "pass": true
+    },
+    {
+      "case": "secondary with ordinary remaining quota",
+      "before_cooldown": null,
+      "after_cooldown": {
+        "rate_limited": true,
+        "retry_after_seconds": null,
+        "retry_not_before": null
+      },
+      "http_seam_calls_per_source": 1,
+      "prior_decision_preserved": true,
+      "pass": true
+    },
+    {
+      "case": "explicit primary limit, no wait header",
+      "before_cooldown": null,
+      "after_cooldown": {
+        "rate_limited": true,
+        "retry_after_seconds": null,
+        "retry_not_before": null
+      },
+      "http_seam_calls_per_source": 1,
+      "prior_decision_preserved": true,
+      "pass": true
+    },
+    {
+      "case": "permission with rate-limit documentation URL",
+      "before_cooldown": null,
+      "after_cooldown": null,
+      "http_seam_calls_per_source": 1,
+      "prior_decision_preserved": true,
+      "pass": true
+    },
+    {
+      "case": "malformed JSON",
+      "before_cooldown": null,
+      "after_cooldown": null,
+      "http_seam_calls_per_source": 1,
+      "prior_decision_preserved": true,
+      "pass": true
+    },
+    {
+      "case": "nonobject JSON",
+      "before_cooldown": null,
+      "after_cooldown": null,
+      "http_seam_calls_per_source": 1,
+      "prior_decision_preserved": true,
+      "pass": true
+    },
+    {
+      "case": "existing Retry-After seconds",
+      "before_cooldown": {
+        "rate_limited": true,
+        "retry_after_seconds": 45,
+        "retry_not_before": "2026-10-04T12:11:45Z"
+      },
+      "after_cooldown": {
+        "rate_limited": true,
+        "retry_after_seconds": 45,
+        "retry_not_before": "2026-10-04T12:11:45Z"
+      },
+      "http_seam_calls_per_source": 1,
+      "prior_decision_preserved": true,
+      "pass": true
+    },
+    {
+      "case": "existing unknown 429",
+      "before_cooldown": {
+        "rate_limited": true,
+        "retry_after_seconds": null,
+        "retry_not_before": null
+      },
+      "after_cooldown": {
+        "rate_limited": true,
+        "retry_after_seconds": null,
+        "retry_not_before": null
+      },
+      "http_seam_calls_per_source": 1,
+      "prior_decision_preserved": true,
+      "pass": true
+    }
+  ],
+  "sources": {
+    "before": {
+      "sha256": "2b0c76e9e4be066b5145cc8f08bc341870224067647711aacb3683d315901234",
+      "git_blob": "d71e3a3326673cd9121397d589d661e8d8cee852"
+    },
+    "after": {
+      "sha256": "716f9a9602bd7533b4e1fc1454d806420a07254b29de8aa9624ad3241f395107",
+      "git_blob": "95a8fd69fe5b8e3396265355ea521a5b4826309a"
+    }
+  }
+}

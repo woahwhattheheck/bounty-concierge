@@ -175,7 +175,7 @@ def main(argv: list[str] | None = None) -> int:
             print("PARTIAL: requested listing details or funding remain unresolved", file=sys.stderr)
         return 0 if result["complete"] else 2
     except (OSError, ValueError, KeyError) as exc:
-        print(f"bountyhub-refresh: {type(exc).__name__}", file=sys.stderr)
+        print(f"bountyhub-refresh: {type(exc).__name__}: {catalog._input_error_message(exc)}", file=sys.stderr)
         return 2
 
 

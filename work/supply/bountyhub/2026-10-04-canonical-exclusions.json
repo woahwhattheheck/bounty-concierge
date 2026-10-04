@@ -1,0 +1,17 @@
+{
+  "freelensapp/freelens#1280": {
+    "reason": "The canonical issue warns that the bounty is reserved and asks for no new pull requests.",
+    "source_url": "https://github.com/freelensapp/freelens/issues/1280",
+    "observed_at": "2026-10-04T12:04:44Z"
+  },
+  "inventree/InvenTree#12064": {
+    "reason": "The maintainer states that the funding is spoken for.",
+    "source_url": "https://github.com/inventree/InvenTree/issues/12064#issuecomment-5764043674",
+    "observed_at": "2026-10-04T06:51:52.136229Z"
+  },
+  "react/react#37620": {
+    "reason": "Existing owned submission https://github.com/react/react/pull/37729; the retained observation records the exclusive platform assignment as PENDING at 2026-10-04T07:38:21Z. Continue the existing submission instead of opening a duplicate intake.",
+    "source_url": "https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1791099603791749",
+    "observed_at": "2026-10-04T07:38:21Z"
+  }
+}
