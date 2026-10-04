@@ -254,7 +254,9 @@ def _terminal_signals(text: str) -> tuple[str, ...]:
     return tuple(sorted(found))
 
 
-def _comment_evidence(comment: dict[str, Any]) -> _CommentEvidence:
+def _comment_evidence(
+    comment: dict[str, Any], *, classify: bool = True
+) -> _CommentEvidence:
     raw_id = comment.get("id")
     created_at = comment.get("created_at")
     updated_at = comment.get("updated_at")
@@ -286,7 +288,7 @@ def _comment_evidence(comment: dict[str, Any]) -> _CommentEvidence:
     normalized_association = association.upper()
     signals = (
         _terminal_signals(body)
-        if normalized_association in _MAINTAINER_ASSOCIATIONS
+        if classify and normalized_association in _MAINTAINER_ASSOCIATIONS
         else ()
     )
     marker = (
@@ -313,6 +315,7 @@ def _read_comments(
     *,
     session: Any,
     max_pages: int,
+    classify: bool = True,
 ) -> tuple[tuple[_CommentEvidence, ...], bool]:
     headers = _headers(token or GITHUB_TOKEN)
     url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
@@ -334,7 +337,7 @@ def _read_comments(
                 raise BountyAvailabilityError(
                     "GitHub issue comments response contained a malformed item"
                 )
-            evidence.append(_comment_evidence(item))
+            evidence.append(_comment_evidence(item, classify=classify))
         if not has_next:
             return tuple(evidence), False
     return tuple(evidence), True
@@ -442,8 +445,10 @@ def inspect_bounty_availability(
             code="COMMENT_HISTORY_TRUNCATED",
             issue_state=before_marker[2],
         )
+    # Only first-pass signals are used. The second pass still validates and
+    # hashes every comment independently before comparing its generation.
     comments_after, truncated_after = _read_comments(
-        repo, number, token, session=session, max_pages=max_pages
+        repo, number, token, session=session, max_pages=max_pages, classify=False
     )
 
     issue_after = _object(

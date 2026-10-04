@@ -76,6 +76,31 @@ comment ids needed for operator follow-up. The installed claim boundary further
 reduces a HOLD to reason and signal classes only; comment ids and evidence
 objects are not emitted in claim-blocked output.
 
+## Classify each stable comment generation once
+
+The first comment traversal records terminal maintainer signals. The second
+traversal independently validates and hashes every comment, but skips the
+unused repeat of text classification. Both live traversals, issue reads,
+pagination checks, generation comparisons, count checks, and duplicate-ID
+checks remain in place. A change between traversals still prevents CLEAR.
+
+A local replay on October 4, 2026 used the actual retained response for
+`moorcheh-ai/memanto#1852`: 48 comments, including 9 maintainer-associated
+comments. Both source versions returned the same complete receipt and made
+the same four canonical requests through Requests to a loopback HTTP server.
+Classifier calls fell from 18 to 9, while both passes produced identical
+generation markers and the first-pass terminal signals were unchanged.
+
+Against source blob `c3b25c1e1e7a05670de53b398dfb40b1dd2f1051`, median CPU time
+for preparing both passes of comment evidence fell from 1.624 ms to 0.863 ms:
+about 0.76 ms saved per check of this page (46.8%). Nine alternating sample
+pairs each repeated the same retained input 100 times; the history itself was
+not expanded. This measures local evidence preparation only, excluding HTTP,
+JSON decoding, and package startup, using Python 3.12.14 and Requests 2.34.2.
+It does not measure provider latency, API quota savings, or fleet throughput.
+The retained comment response SHA-256 was
+`a88ae3c6faf196273b82d8b6cea44ba01d8c27ae872495e5bb654ed0e6b81625`.
+
 ## HTTP connection reuse
 
 The default availability check owns one `requests.Session` for its issue reads
