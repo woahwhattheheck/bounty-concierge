@@ -19,7 +19,12 @@ A confirmed GitHub rate-limit failure stops further provider reads in the
 current compilation. The live readers wrap Requests errors, so the portfolio
 inspects chained `HTTPError` responses: HTTP 429, or HTTP 403 with
 `X-RateLimit-Remaining: 0` or a valid `Retry-After` value. `Retry-After` accepts
-delay seconds and HTTP dates. Exception wording alone does not trigger a stop.
+delay seconds and HTTP dates. A 403 JSON object whose string `message`
+contains `rate limit` also stops the compilation: GitHub secondary limits
+can omit `Retry-After` while primary quota remains. Malformed/non-object
+JSON, a non-string message, other statuses and exception wording alone
+do not provide that evidence. The response is already in memory; no
+additional request is made. See [GitHub rate-limit documentation](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api#exceeding-the-rate-limit).
 
 The row that encounters the failure retains its read-failure reason and adds
 `LIVE_PROVIDER_RATE_LIMITED`. Reads skipped after that point receive
@@ -83,3 +88,24 @@ python -m concierge.active_claim_portfolio replay \
 A READY result is internal work-custody permission only. It is not a GitHub claim, sponsor contact, upstream submission, acceptance, payout, cash, or revenue assertion. The receipt records these limits explicitly, including `caller_reward_metadata_authoritative=false`.
 
 Reward values remain per-opportunity metadata; currencies are never summed or converted.
+
+## Reproduce secondary-limit request savings
+
+Run `PYTHONPATH=. python examples/active_claim_secondary_limit_replay.py`
+from the repository root. The example uses the actual portfolio, qualification,
+availability and Requests code; only HTTP transport and the verifier clock
+are replaced. No provider calls, claims or payout operations occur.
+
+The 2026-10-04 before/after replay at parent `3c3f18bc1ee20c08dafb736316dbb6f57212cd77`
+covers 12 scenarios. A body-only secondary-limit 403 reduces three-candidate
+prepared requests from 6 to 1 (also with nonzero remaining quota), or from
+6 to 2 when encountered by the availability reader. With 100 candidates,
+the count drops from 200 to 1. All result rows and fail-closed decisions remain.
+Eight control scenarios have identical full receipt digests before/after:
+ordinary permission errors, invalid JSON shapes, other statuses, transport
+failure and the already-supported header/429 throttle cases. This is a
+deterministic prepared-request reduction, not measured fleet or network speed.
+
+Source blob after repair: `66aefdf85a99e8cefdbed8c9990041d5fd85842f`.
+Use `--observe` on the original source to obtain the baseline counts.
+No loop, custody, retry, scheduling or persistent-throttle behavior changes.

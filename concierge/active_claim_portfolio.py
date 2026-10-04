@@ -164,6 +164,16 @@ def _provider_rate_limited(error: BaseException) -> bool:
                 )
             ):
                 return True
+            # Secondary limits may have neither Retry-After nor zero quota.
+            # Inspect provider JSON only; exception wording is not evidence.
+            if response is not None and response.status_code == 403:
+                try:
+                    payload = response.json()
+                except (TypeError, ValueError):
+                    payload = None
+                message = payload.get("message") if isinstance(payload, dict) else None
+                if isinstance(message, str) and "rate limit" in message.casefold():
+                    return True
         error = error.__cause__ or error.__context__
     return False
 
