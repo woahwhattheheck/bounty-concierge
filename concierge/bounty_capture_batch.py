@@ -351,6 +351,7 @@ def collect_batch(
     completed: set[tuple[str, int]] = set()
     items: list[dict[str, Any]] = []
     stop_reason: str | None = None
+    cleanup_error: dict[str, str] | None = None
     try:
         for row in unique[:max_issues]:
             if transport.rate_limited:
@@ -423,7 +424,14 @@ def collect_batch(
         stop_reason = "INTERRUPTED"
     finally:
         if owned:
-            provider.close()
+            try:
+                provider.close()
+            except Exception as exc:
+                # Cleanup must not discard captures, retry work or quota evidence.
+                # Keep exception text private and preserve the primary outcome.
+                cleanup_error = {
+                    "code": "SESSION_CLOSE_ERROR", "error_type": type(exc).__name__,
+                }
 
     remaining = [row for row in unique if (row["repo"], row["number"]) not in completed]
     # Let the next bounded run reach untouched issues before retrying failures.
@@ -468,6 +476,8 @@ def collect_batch(
         "supply_file": "supply.json",
         "remaining_file": "remaining.json",
     }
+    if cleanup_error is not None:
+        summary["cleanup_error"] = cleanup_error
     _write_json(output / "remaining.json", {"candidates": remaining})
     _write_json(output / "supply.json", {"candidates": captures})
     _write_json(output / "summary.json", summary)
@@ -508,6 +518,8 @@ def main(argv: list[str] | None = None) -> int:
         )
     except (OSError, ValueError, SecureOutputError) as exc:
         parser.error(str(exc))
+    if result.get("cleanup_error"):
+        print("warning: SESSION_CLOSE_ERROR; capture results retained in summary", file=sys.stderr)
     if args.json:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
