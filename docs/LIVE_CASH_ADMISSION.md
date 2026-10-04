@@ -7,9 +7,10 @@ historical evaluation time.
 
 ## Trust boundary
 
-The caller supplies only GitHub repository identity, issue number, and optional
-authenticated read parameters. The caller cannot supply reward amount, reward
-authority, evidence URL, currency conversion, or an as-of timestamp.
+The caller supplies GitHub repository identity, issue number, optional
+authenticated read parameters, and an optional existing source-bound
+`submission_target`. The caller cannot supply reward amount, reward authority,
+reward evidence, currency conversion, or an as-of timestamp.
 
 The gate reads the canonical issue before and after bounty_preflight. Existing
 preflight already revalidates canonical issue/comment generation, assignment,
@@ -21,6 +22,37 @@ The receipt hashes both the consumed issue generation and the complete safe
 preflight result. Verification is intentionally not historical self-replay:
 verify_live_cash_receipt performs a new live GitHub evaluation and requires the
 current receipt to match exactly.
+
+## Explicit delivery repository
+
+For a bounty whose sponsor directs delivery to another repository, pass the
+existing four-field `submission_target` record (`repository`, `source_url`,
+`source_content_sha256`, and `instruction_excerpt`). Its source must identify
+the canonical bounty issue or one of that issue's comments. The existing
+validator checks this record before any provider read; no target is inferred.
+
+Both live-cash APIs accept `submission_target=`. An evaluation with a target
+adds only `source.submission_target_sha256` to its receipt, using SHA-256 of
+the validated record's JSON with sorted keys, compact separators, and ASCII
+escaping. The instruction excerpt is not copied into the receipt or summary.
+`verify_live_cash_receipt` requires the same explicit target for that receipt;
+a missing or different target returns false before a provider reread. Calls
+without a target retain the existing receipt shape and verification behavior.
+
+The direct CLI accepts the same explicit JSON file:
+
+```bash
+python -m concierge.bounty_live_cash_admission owner/bounties 17 \
+  --submission-target submission-target.json --json
+```
+
+`revenue_dispatch.qualify_available_live_revenue_intake` and its CLI also accept
+the target (`submission_target=` / `--submission-target`). The dispatcher
+passes one validated copy to both initial revenue intake and the final
+live-cash preflight, and requires the returned receipt's target digest to
+match. Existing availability and economic receipt requirements still apply.
+This preserves delivery-repository competition context throughout dispatch;
+it does not create a claim, contribution, award, or payment.
 
 ## Dollar routes
 
