@@ -55,9 +55,119 @@ also receipt-bound. Re-running an unchanged snapshot later therefore changes its
 age/receipt and eventually removes it from ACTIVE/MAYBE until source evidence is
 refreshed.
 
+## Capture a shortlist once
+
+Save the issues selected by the collector in `shortlist.json`, replacing the
+example repository and issue numbers with the actual work pool:
+
+```json
+[
+  {"repo": "OWNER/REPO", "number": 123},
+  {"repo": "OWNER/REPO", "number": 456}
+]
+```
+
+The collector also accepts `{"candidates": [...]}`. It deduplicates the same
+repository and issue before any provider reads, ignoring repository-name case.
+The input file is limited to 1 MiB and 1,000 rows; each row contains only `repo`
+and `number`.
+
+```bash
+python -m concierge.bounty_capture_batch shortlist.json \
+  --output-dir capture-run --max-issues 25 --max-pages 10 \
+  --max-requests 100 --json
+
+python -m concierge.bounty_supply capture-run/supply.json \
+  --evaluated-at CURRENT_OFFSET_AWARE_TIME --json
+```
+
+Replace `CURRENT_OFFSET_AWARE_TIME` with the actual current offset-aware
+ISO-8601 time, such as `2026-10-04T10:00:00+00:00` when that is the current time.
+The first command reads GitHub serially through one shared HTTP session. The
+second routes only the saved evidence and makes no provider requests.
+
+`capture-run` must be a new directory. The collector creates it with mode 0700
+and saves the canonical `shortlist.json` before provider reads. Each completed
+private capture is written with mode 0600 as the run progresses. Its outputs are:
+
+| Output | Use |
+| --- | --- |
+| `shortlist.json` | Immutable canonical input saved before provider reads |
+| Individual capture files | Retain each issue's completed evidence as the run progresses |
+| `summary.json` | Safe final manifest of completed work and remaining coverage |
+| `supply.json` | Final list of completed captures accepted by the offline supply router |
+| `remaining.json` | Final list of failed, incomplete or unattempted issues for the next explicit run |
+
+`--max-issues` bounds the unique issues attempted in this run; excess issues stay
+in `remaining.json`. `--max-pages` bounds each paginated traversal, not total
+requests: related-PR reads can still require many GETs even at `--max-pages 1`.
+`--max-requests` supplies the strict total budget, counting actual HTTP GET
+attempts. It defaults to 100 and accepts 1–10,000. Exhaustion stops with
+`REQUEST_LIMIT` before another call; the current incomplete issue and all
+unattempted issues remain in `remaining.json`.
+
+The collector also stops on a rate limit, transport error or provider failure.
+Completed captures are retained. Handled provider/transport failures and Ctrl+C
+still write the final summary, supply and remaining files. It neither retries automatically nor
+schedules a later run. When the provider is ready, resume only the remaining
+shortlist into a new directory:
+
+```bash
+python -m concierge.bounty_capture_batch capture-run/remaining.json \
+  --output-dir capture-run-next --max-issues 25 --max-pages 10 \
+  --max-requests 100 --json
+```
+
+A hard kill can leave only `shortlist.json` and the individual captures already
+written; the final three files may be absent. Compare the saved shortlist with
+completed capture files to recover the unfinished subset before the next run.
+
+Batch exit 0 means the entire shortlist was collected, including any completed
+HOLD or REJECT results. Exit 2 means partial collection or invalid input; Ctrl+C
+returns 130. Invalid input can be rejected before an output directory is created.
+Check `summary.json` before handing off a run. A partial
+`supply.json` can route its completed captures, but covers only that subset;
+zero ACTIVE rows do not establish an empty work queue.
+
+Captures preserve the final preflight disposition, conditional checks, reduced
+assignment evidence, source generations and actual provider-read interval.
+Offline replay checks those same decisions before routing. Freshness begins at
+the first provider read, and a saved HOLD or REJECT cannot become ACTIVE by
+replaying only its baseline inputs. Exporting, resuming or routing does not
+refresh an earlier capture's clock; collect it again when its evidence expires.
+
+The capture files and `supply.json` contain source prose needed for replay. Keep
+them in trusted custody and share the reduced routing result or safe summary
+for coordination. Content digests detect changes but do not authenticate an
+untrusted source. Existing assignment, qualification and routing policy remains
+in effect; collection completion does not authorize a claim or establish payment.
+
+### Capture one issue
+
+For a single issue, the existing preflight command can write the same evidence:
+
+```bash
+python -m concierge.bounty_preflight OWNER/REPO ISSUE_NUMBER \
+  --capture issue-capture.json --json
+python -m concierge.bounty_supply issue-capture.json \
+  --evaluated-at CURRENT_OFFSET_AWARE_TIME --json
+```
+
+The parent directory must exist; `--capture` creates a new mode-0600 regular file
+and never overwrites an existing path. Single-issue preflight uses different
+exit semantics from the batch collector: 0 for ACTIONABLE, 2 for HOLD and 3 for
+REJECT. All three completed results can produce a capture; a provider failure
+produces no completed capture. Python callers use
+`preflight_bounty(..., include_capture=True)` and keep its private `capture`
+value out of ordinary logs.
+
 ## Input contract
 
-Each candidate is a normalized snapshot accepted by
+The CLI accepts the native captures produced above, individually or in the
+batch collector's `supply.json`. It replays their final preflight checks before
+applying the routing policy.
+
+Legacy candidates remain supported as normalized snapshots accepted by
 `bounty_qualification.qualify_dispatch`, plus:
 
 - `repo`: canonical `owner/repository` slug;
@@ -127,9 +237,10 @@ raw issue bodies and comments are never copied into persisted route rows.
 
 ## Provider-pressure workflow
 
-1. Capture canonical issue/PR/reward evidence once and stamp `observed_at`.
-2. Store or hand off the normalized snapshot.
-3. Route offline with an explicit current `evaluated_at`.
+1. Collect the selected shortlist once with `bounty_capture_batch`.
+2. Check `summary.json` for coverage and retain `remaining.json` for any later run.
+3. Route `supply.json` offline with an explicit current `evaluated_at` and share
+   the reduced routing results with builders.
 4. Work only fresh `ACTIVE` rows after a collision check.
 5. Send fresh `MAYBE` rows to the saving pile, not the build queue.
 6. When evidence ages out, refresh canonical source instead of replaying old state.

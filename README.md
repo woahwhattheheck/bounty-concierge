@@ -150,48 +150,60 @@ Full contract: [docs/BROWSE.md](docs/BROWSE.md).
 
 ### Capture final preflight for offline routing
 
-Run the live preflight once and save its final evidence in a new private file:
+One collector can capture a shortlist for builders to route offline. Save
+`shortlist.json` as a list of `{"repo": "OWNER/REPO", "number": 123}` entries
+using the actual repositories and issue numbers, then run:
 
 ```bash
-python -m concierge.bounty_preflight OWNER/REPO ISSUE_NUMBER --capture issue-capture.json --json
-python -m concierge.bounty_supply issue-capture.json --evaluated-at CURRENT_OFFSET_AWARE_TIME --json
+python -m concierge.bounty_capture_batch shortlist.json \
+  --output-dir capture-run --max-issues 25 --max-pages 10 \
+  --max-requests 100 --json
+python -m concierge.bounty_supply capture-run/supply.json \
+  --evaluated-at CURRENT_OFFSET_AWARE_TIME --json
 ```
 
-Replace the repository, issue number and evaluation time with the actual issue
-and current offset-aware ISO-8601 time. The first command reads GitHub; the second
-uses only the saved file. Preflight exits 0 for ACTIONABLE, 2 for HOLD and 3 for
-REJECT. A completed HOLD or REJECT still produces a capture, so do not discard it
-because the preflight exit status is nonzero. Provider failures produce no
-completed capture. `--capture` creates a regular file exclusively with mode 0600;
-its parent directory must exist and an existing path is never overwritten.
+Use the actual current offset-aware ISO-8601 evaluation time. The batch command
+deduplicates issues and reuses one serial HTTP session; offline routing makes no
+provider requests. `--max-pages` bounds pagination; `--max-requests` counts actual
+HTTP GET attempts and stops before exceeding its budget (default 100, range
+1–10,000). The input limit is 1 MiB and 1,000 rows, each containing only `repo`
+and `number`.
 
-The capture binds the exact baseline qualification inputs, maintainer authority
-text, reduced assignment proof, initial issue/comment generations, both audit
-checks, final qualification, policy and provider-read interval. Offline replay
-recomputes the gates in the same conditional order and checks the saved final
-result. A required missing check cannot count as passed. A saved HOLD or REJECT
-cannot become ACTIVE or MAYBE through baseline requalification. Assignment to the
-operator is recognized only after the live same-token authenticated-user read;
-an asserted login never authorizes it. Authentication tokens and raw identity
-fields are omitted.
+The new private output directory starts with an immutable `shortlist.json` and
+retains each completed capture as it is written. On completion, handled provider
+or transport failure, or Ctrl+C, it writes `supply.json`, a safe `summary.json` manifest and
+`remaining.json`. Check coverage: exit 0 means collection completed, including
+HOLD/REJECT results; exit 2 means partial or invalid input; Ctrl+C returns 130.
+`REQUEST_LIMIT` leaves the current incomplete issue and unattempted rows for the
+next run. There are no automatic retries or schedules. Resume explicitly into a
+new directory:
 
-Supply freshness starts immediately before the first actual provider read, not
-at export or replay. Completion is recorded after the last successful read;
-evaluating before completion also fails closed. Replaying a capture never moves
-its observation time. The existing 900-second default freshness window, $50
-ACTIVE floor, $10 MAYBE floor and acceptance-text safety gate still apply. The
-saturation threshold must match the captured policy. Conflicting captures for
-one issue remain held, or pruned when either contains a terminal rejection.
+```bash
+python -m concierge.bounty_capture_batch capture-run/remaining.json \
+  --output-dir capture-run-next --max-issues 25 --max-pages 10 \
+  --max-requests 100 --json
+```
 
-The file contains source prose needed by the safety checks. Keep it under trusted
-local custody; publish only the reduced routing result. Its digest binds contents
-and detects corruption, but is not a GitHub signature and does not authenticate
-a capture supplied by an untrusted party. The normal preflight JSON/summary stays
-unchanged; Python callers explicitly requesting `include_capture=True` must keep
-the returned `capture` value out of ordinary logs. Routed rows contain reduced
-decisions, generation commitments and receipts, never captured source prose.
-Existing raw snapshots and retained discovery-index inputs remain supported;
-they do not acquire capture provenance from an export timestamp.
+A hard kill may prevent final summary/supply/remaining files from being written;
+recover unfinished issues from the saved shortlist and completed capture files.
+A partial `supply.json` covers only its completed subset. Captures retain their
+actual provider-read clocks and final preflight decisions; replay does not make
+old evidence fresh. Keep source captures private and share the reduced routing
+result with builders.
+
+For one issue, use the existing single-capture command:
+
+```bash
+python -m concierge.bounty_preflight OWNER/REPO ISSUE_NUMBER \
+  --capture issue-capture.json --json
+python -m concierge.bounty_supply issue-capture.json \
+  --evaluated-at CURRENT_OFFSET_AWARE_TIME --json
+```
+
+Single-issue preflight exits 0 for ACTIONABLE, 2 for HOLD and 3 for REJECT; all
+three completed outcomes can write a capture. The parent directory must exist,
+and the capture path must be new. See the [supply router guide](docs/BOUNTY_SUPPLY_ROUTER.md#capture-a-shortlist-once)
+for input, output, freshness and resume details.
 
 The live `mine` command waits for its managed child and returns that child's exit
 code. A child terminated by a signal returns `128 + signal`; stopping with Ctrl+C
