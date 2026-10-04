@@ -427,14 +427,56 @@ def format_summary(audit: dict[str, Any]) -> str:
     )
 
 
+def _load_audit_batch(source: str) -> list[dict[str, Any]]:
+    """Read and validate the whole bounded shortlist before any provider call."""
+    limit = 1024 * 1024
+    if source == "-":
+        raw = getattr(sys.stdin, "buffer", sys.stdin).read(limit + 1)
+    else:
+        with open(source, "rb") as stream:
+            raw = stream.read(limit + 1)
+    if isinstance(raw, str):
+        raw = raw.encode("utf-8")
+    if len(raw) > limit:
+        raise ValueError("batch input exceeds 1 MiB")
+
+    def reject_constant(value: str) -> None:
+        raise ValueError(f"batch input contains non-JSON constant {value}")
+
+    payload = json.loads(raw, parse_constant=reject_constant)
+    if isinstance(payload, dict) and set(payload) == {"candidates"}:
+        payload = payload["candidates"]
+    if not isinstance(payload, list):
+        raise ValueError('batch input must be a list or an exact {"candidates": [...]} object')
+    for index, row in enumerate(payload, 1):
+        if not isinstance(row, dict):
+            raise ValueError(f"batch row {index} must be an object")
+        repo, number = row.get("repo"), row.get("number")
+        if (not isinstance(repo, str)
+                or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9_.-]+", repo) is None
+                or repo.split("/")[1] in {".", ".."}):
+            raise ValueError(f"batch row {index} repo must be an owner/name repository")
+        if type(number) is not int or number < 1:
+            raise ValueError(f"batch row {index} number must be a positive integer")
+        if row.get("submission_target") is not None:
+            validate_submission_target(
+                row["submission_target"], f"https://github.com/{repo}/issues/{number}"
+            )
+    return payload
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Run a one-issue canonical audit from the command line."""
+    """Run a canonical audit for one issue or a retained shortlist."""
     parser = argparse.ArgumentParser(
         prog="python -m concierge.bounty_audit",
         description="Cross-check a bounty issue against canonical linked GitHub PR state.",
     )
-    parser.add_argument("repo", help="Repository in owner/name form")
-    parser.add_argument("issue", type=int, help="Bounty issue number")
+    parser.add_argument("repo", nargs="?", help="Repository in owner/name form")
+    parser.add_argument("issue", nargs="?", type=int, help="Bounty issue number")
+    parser.add_argument(
+        "--batch", metavar="FILE",
+        help="Audit a JSON shortlist up to 1 MiB; use - to read standard input",
+    )
     parser.add_argument(
         "--max-pages", type=int, default=10,
         help="Maximum pages per GitHub search/comment read (default: 10); incomplete reads exit 2",
@@ -446,34 +488,48 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    target = None
-    if args.submission_target is not None:
+    if args.batch is not None:
+        if args.repo is not None or args.issue is not None or args.submission_target is not None:
+            parser.error("--batch cannot be combined with repo, issue or --submission-target")
         try:
-            target = validate_submission_target(
-                json.loads(args.submission_target.read_text(encoding="utf-8")),
-                f"https://github.com/{args.repo}/issues/{args.issue}",
-            )
-        except (OSError, ValueError) as exc:
+            rows = _load_audit_batch(args.batch)
+        except (OSError, ValueError, RecursionError) as exc:
             parser.error(str(exc))
-    result = audit_bounty(
-        args.repo, args.issue, max_pages=args.max_pages, submission_target=target
-    )
+        result = audit_bounties(rows, max_pages=args.max_pages)
+        audits = [row["canonical_audit"] for row in result]
+    else:
+        if args.repo is None or args.issue is None:
+            parser.error("repo and issue are required unless --batch is supplied")
+        target = None
+        if args.submission_target is not None:
+            try:
+                target = validate_submission_target(
+                    json.loads(args.submission_target.read_text(encoding="utf-8")),
+                    f"https://github.com/{args.repo}/issues/{args.issue}",
+                )
+            except (OSError, ValueError) as exc:
+                parser.error(str(exc))
+        result = audit_bounty(
+            args.repo, args.issue, max_pages=args.max_pages, submission_target=target
+        )
+        audits = [result]
     if args.json:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
-        print(format_summary(result))
-        for pr in result["linked_prs"]:
-            status = "merged" if pr["merged"] else pr["state"]
-            draft = " draft" if pr["draft"] else ""
-            identity = f"{pr['repository']}#{pr['number']}" if "repository" in pr else f"#{pr['number']}"
-            metadata = " ".join(
-                f"{key}={pr[key]}"
-                for key in ("author_login", "head_repository", "head_ref", "head_sha")
-                if pr.get(key) is not None
-            )
-            suffix = f" [{metadata}]" if metadata else ""
-            print(f"  PR {identity}: {status}{draft} - {pr['title']} - {pr['url']}{suffix}")
-    if result["search_truncated"]:
+        for audit in audits:
+            print(format_summary(audit))
+            for pr in audit["linked_prs"]:
+                status = "merged" if pr["merged"] else pr["state"]
+                draft = " draft" if pr["draft"] else ""
+                identity = f"{pr['repository']}#{pr['number']}" if "repository" in pr else f"#{pr['number']}"
+                metadata = " ".join(
+                    f"{key}={pr[key]}"
+                    for key in ("author_login", "head_repository", "head_ref", "head_sha")
+                    if pr.get(key) is not None
+                )
+                suffix = f" [{metadata}]" if metadata else ""
+                print(f"  PR {identity}: {status}{draft} - {pr['title']} - {pr['url']}{suffix}")
+    if any(audit["search_truncated"] for audit in audits):
         print(
             "PARTIAL: GitHub search or comment history is incomplete; "
             "collected evidence is retained, but this is not a complete census. "
