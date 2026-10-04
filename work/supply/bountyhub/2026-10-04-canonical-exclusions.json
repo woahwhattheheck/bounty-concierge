@@ -48,5 +48,10 @@
     "reason": "The retained delivery records work/high-value/fluxer-3/snapshot.json and work/high-value/fluxer-3/SOURCE_REFRESH.md (captured 2026-09-19) bind the Events bounty's full-stack contract to fluxerapp/fluxer. That recorded delivery repository's current policy prohibits LLM-authored submissions without upstream write access; the authenticated woahwhattheheck account has pull access but no push permission. Exclude new automated upstream-submission intake through this recorded route; preserve existing branches, claims and private/fork work. No fresh issue-state or payment outcome is asserted.",
     "source_url": "https://github.com/fluxerapp/fluxer/blob/main/.github/LLM_USAGE_POLICY.md",
     "observed_at": "2026-10-04T12:29:17Z"
+  },
+  "SPLURT-Station/S.P.L.U.R.T-tg#115": {
+    "reason": "The canonical issue is closed with state_reason completed (closed at 2025-04-09T19:06:53Z).",
+    "source_url": "https://github.com/SPLURT-Station/S.P.L.U.R.T-tg/issues/115",
+    "observed_at": "2026-10-04T12:52:53Z"
   }
 }
