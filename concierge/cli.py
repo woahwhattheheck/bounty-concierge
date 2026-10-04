@@ -819,23 +819,22 @@ def _cmd_wallet_migrate(args):
 
 def _cmd_status(args):
     """Handle the 'status' subcommand."""
-    from concierge.wallet_helper import validate_wallet_name
+    from concierge.payout_tracker import (
+        _validate_wallet_id,
+        check_status,
+        format_payout_status,
+    )
 
-    wallet = args.wallet
-    if not wallet:
-        print("Error: --wallet is required for status checks.", file=sys.stderr)
-        sys.exit(1)
-
-    valid, msg = validate_wallet_name(wallet)
-    if not valid:
-        print(f"Error: {msg}", file=sys.stderr)
-        sys.exit(1)
+    # Reading an existing identifier is distinct from registering a new name.
+    wallet = _validate_wallet_id(args.wallet)
 
     if args.dry_run:
-        print(f"[dry-run] Would check payout status for wallet: {wallet}")
+        _print_dry_run_plan(
+            args, "status", {"wallet": wallet},
+            ["Read complete wallet history and derive pending transfers"],
+            ["pending", "history"],
+        )
         return
-
-    from concierge.payout_tracker import check_status, format_payout_status
 
     pending, history = check_status(wallet)
 
