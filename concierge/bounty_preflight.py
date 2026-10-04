@@ -1138,6 +1138,8 @@ def preflight_bounty(
     operator_login: str | None = None,
     include_capture: bool = False,
     submission_target: dict[str, str] | None = None,
+    submission_method: str | None = None,
+    submission_policy_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return an operator-safe paid-work preflight result for one issue.
 
@@ -1161,6 +1163,9 @@ def preflight_bounty(
         submission_target = validate_submission_target(
             submission_target, f"https://github.com/{repo}/issues/{number}"
         )
+    if submission_method is not None and not isinstance(submission_method, str):
+        raise ValueError("submission_method must be a string when provided")
+    submission_policy_context = deepcopy(submission_policy_context)
     # Keep one connection pool across context, audit and generation reads. The
     # captured-issue adapter below forwards through this same owned session.
     # Caller-supplied sessions retain their existing lifetime and ownership.
@@ -1176,6 +1181,8 @@ def preflight_bounty(
                 operator_login=operator_login,
                 include_capture=include_capture,
                 submission_target=submission_target,
+                submission_method=submission_method,
+                submission_policy_context=submission_policy_context,
             )
 
     capture_session = CaptureSession(session) if include_capture else None
@@ -1225,12 +1232,18 @@ def preflight_bounty(
     initial_audit_marker = _audit_dispatch_marker(audit)
 
     snapshot = {
+        "repo": repo,
+        "submission_target": audit.get("submission_target"),
         "title": context["title"],
         "body": context["body"],
         "labels": context["labels"],
         "attempt_count": context["attempt_count"],
         "canonical_audit": audit,
     }
+    if submission_method is not None:
+        snapshot["submission_method"] = submission_method
+    if submission_policy_context is not None:
+        snapshot["submission_policy_context"] = submission_policy_context
     qualification = qualify_dispatch(
         snapshot,
         saturation_threshold=saturation_threshold,
@@ -1339,6 +1352,8 @@ def preflight_bounty(
             max_pages=max_pages,
             saturation_threshold=saturation_threshold,
             submission_target=submission_target,
+            submission_method=submission_method,
+            submission_policy_context=submission_policy_context,
         )
     return result
 
@@ -1391,6 +1406,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--json", action="store_true", help="Emit full safe JSON result")
     parser.add_argument(
+        "--submission-method",
+        help="Declare automated_upstream_submission to evaluate supplied repository policy",
+    )
+    parser.add_argument(
+        "--submission-policy-context", type=Path,
+        help="Retained source/role observation JSON; adds no provider reads",
+    )
+    parser.add_argument(
         "--capture",
         type=Path,
         help="Write a new private capture file for offline supply routing; never overwrite",
@@ -1398,6 +1421,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
+        submission_policy_context = (
+            json.loads(args.submission_policy_context.read_text(encoding="utf-8"))
+            if args.submission_policy_context is not None else None
+        )
         if args.capture is not None:
             _admit_capture_destination(args.capture)
         target = None
@@ -1414,6 +1441,8 @@ def main(argv: list[str] | None = None) -> int:
             operator_login=args.operator_login,
             include_capture=args.capture is not None,
             submission_target=target,
+            submission_method=args.submission_method,
+            submission_policy_context=submission_policy_context,
         )
         if args.capture is not None:
             capture = result.pop("capture")
