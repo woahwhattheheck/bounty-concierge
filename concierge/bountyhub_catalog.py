@@ -242,7 +242,7 @@ def fetch_catalog(*, max_pages: int = 10, max_details: int = 50,
 
     for page in range(1, max_pages + 1):
         try:
-            payload = _get(session, API, report, page=page)
+            payload = _get(session, API, report, page=page, limit=100)
             if (not isinstance(payload, dict) or not isinstance(payload.get("data"), list)
                     or type(payload.get("hasNextPage")) is not bool):
                 raise ValueError("invalid catalog page")

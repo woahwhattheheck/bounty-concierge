@@ -14,8 +14,9 @@ python -m concierge.bountyhub_catalog collect \
 ```
 
 The collector uses one `requests.Session`, reads ascending numbered pages from
-`https://api.bountyhub.dev/api/bounties`, and follows the returned `hasNextPage`
-flag. It then reads pledge/claim details only for nonterminal listings whose
+`https://api.bountyhub.dev/api/bounties` with `page=N&limit=100`, and follows the
+returned `hasNextPage` flag. Each page requests up to 100 listings; `--max-pages`
+still bounds the number of catalog requests. It then reads pledge/claim details only for nonterminal listings whose
 advertised total can reach the selected funding floor. The default floor is
 $50. The page and detail bounds are independent; no retry, sleep, watcher,
 schedule, claim, proposal, account change or other provider write is performed.
@@ -118,6 +119,14 @@ seconds in the shared cloud harness. Seven issue targets met the reported funded
 floor before GitHub/claim preflight. These are dated observations and one measured
 run, not current availability, a latency guarantee or earnings. Re-exporting its
 shortlist requires zero provider reads and preserves the recorded interval.
+
+The explicit `limit=100` query was executed against the public API on October 4,
+2026 at 07:18 UTC with `max_pages=1, max_details=0`: one catalog GET returned all
+26 retained listing IDs, with `catalog_complete=true`, in 6.043 seconds. This
+reduces the list traversal from three requests to one for that observed catalog.
+No pledge details were reread, so `details_complete` and overall `complete`
+remained false. This is a request-count observation, not a full-collection latency
+comparison or a refreshed funded shortlist.
 
 ```bash
 python -m concierge.bountyhub_catalog targets \
