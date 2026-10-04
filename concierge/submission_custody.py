@@ -640,7 +640,8 @@ def _replay(events: list[dict[str, Any]], as_of: datetime) -> dict[str, Any]:
             sid = event["submission_id"]
             if sid in candidates:
                 _fail("SUBMISSION_ID_CONFLICT")
-            identity = (event["source_url"], event["artifact_revision"])
+            # Compare GitHub identities without changing recorded URL bytes.
+            identity = (event["source_url"].casefold(), event["artifact_revision"])
             if identity in identity_keys:
                 _fail("SOURCE_REVISION_CONFLICT")
             identity_keys[identity] = sid
@@ -730,7 +731,7 @@ def _replay(events: list[dict[str, Any]], as_of: datetime) -> dict[str, Any]:
                 _fail("SUPERSESSION_CHAIN_INVALID")
             if event["old_submission_digest"] != old["submission_digest"] or event["new_submission_digest"] != new["submission_digest"]:
                 _fail("SUPERSESSION_DIGEST_MISMATCH")
-            if old["source_url"] != new["source_url"]:
+            if old["source_url"].casefold() != new["source_url"].casefold():
                 _fail("SUPERSESSION_SOURCE_MISMATCH")
             if new["artifact_revision"] <= old["artifact_revision"]:
                 _fail("SUPERSESSION_REVISION_NOT_FORWARD")
