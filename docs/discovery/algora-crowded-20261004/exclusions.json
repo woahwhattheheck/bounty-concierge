@@ -8,5 +8,15 @@
     "reason": "Avoid another same-scope PGlite type-generation implementation: matching PR86 was OPEN and unmerged at head c03496b821b6abcabf39034f74d0848632e8fb86. Open-PR search also returned 85 and 84. This is a duplicate-work observation, not an award, funding or eligibility decision; changes to an existing PR remain separate.",
     "source_url": "https://github.com/seveibar/pgstrap/pull/86",
     "observed_at": "2026-10-04T13:27:36Z"
+  },
+  "BAWES-Universe/workadventure-universe#3": {
+    "reason": "Avoid another same-scope PWA branding implementation: matching PR397 was OPEN and unmerged at head c1d72f9ef3ed810b861ac46fdeb580ea20a5b48d, targeting universe. Its stated scope covers the manifest, icons and HTML metadata requested by issue3. Issue comments also contain a separate contributor-proposed US$25 milestone, not a sponsor award. This observation establishes overlap, not acceptance or implementation quality; helping an existing contribution remains separate.",
+    "source_url": "https://github.com/BAWES-Universe/workadventure-universe/pull/397",
+    "observed_at": "2026-10-04T13:59:10Z"
+  },
+  "tscircuit/file-server#149": {
+    "reason": "Do not treat the contributor's proposed US$15 as an approved fixed bounty. The OPEN issue contains a complete patch and regression tests for four file/event consistency defects and asks whether the sponsor would consider that price or sponsorship credit; the observed issue has zero comments and no funding label. Avoid independently rebuilding the supplied patch on that proposed price alone. Revisit if a sponsor approves funding or requests distinct work; this is not a platform-wide restriction.",
+    "source_url": "https://github.com/tscircuit/file-server/issues/149",
+    "observed_at": "2026-10-04T13:59:10Z"
   }
 }
