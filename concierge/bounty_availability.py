@@ -243,6 +243,8 @@ def _terminal_signals(text: str) -> tuple[str, ...]:
     for line in _candidate_lines(text):
         for clause in _assertive_clauses(line):
             for code, pattern in _RULES:
+                if code in found:
+                    continue
                 offset = 0
                 while (match := pattern.search(clause, offset)) is not None:
                     context_start = max(0, match.start() - 40)
@@ -254,6 +256,9 @@ def _terminal_signals(text: str) -> tuple[str, ...]:
                         context = clause[context_start:start] + clause[end : match.end()]
                     if not _NEGATION_RE.search(context):
                         found.add(code)
+                        # Later clauses cannot remove a signal already found.
+                        if len(found) == len(_RULES):
+                            return tuple(sorted(found))
                         break
                     # A negated earlier match must not hide a later assertion.
                     # Resume after its start: bounded patterns may overlap.
