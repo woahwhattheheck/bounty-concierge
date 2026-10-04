@@ -56,8 +56,8 @@ revenue.
 
 ## Generation and privacy fences
 
-Availability is read twice from the canonical issue-comments endpoint. Every
-comment generation marker binds:
+A CLEAR result requires two complete reads from the canonical issue-comments
+endpoint. Every comment generation marker binds:
 
 - comment id;
 - user identity internally (not emitted);
@@ -84,8 +84,8 @@ returns or raises, including an early HOLD for a closed issue. Argument
 validation runs before the session is allocated. Callers that supply a session
 keep ownership and can reuse it for later checks.
 
-Each check still performs the same live reads and generation comparisons. For
-101 comments across two pages, six GETs share one connection pool instead of
+Complete checks still perform the same live reads and generation comparisons.
+For 101 comments across two pages, six GETs share one connection pool instead of
 creating six separate pools. There is no added cache, retry, or delay.
 
 Local HTTP/1.1 replay against baseline `73e3b4f` measured six accepted TCP
@@ -97,6 +97,26 @@ closed-issue, and comment-drift cases; provider-error behavior and session
 cleanup also matched. Caller-supplied sessions remained open across successful,
 early-return, and error paths. This measures local connection reuse, not live
 GitHub latency or rate-limit savings.
+
+## Stop after an incomplete first traversal
+
+If the first comment traversal reaches `max_pages` without a short terminal
+page, the guard immediately returns `HOLD / COMMENT_HISTORY_TRUNCATED` with
+`dispatch=false`. It does not repeat that already-incomplete traversal or
+request a final issue snapshot. No later response could make the first
+traversal complete, and a later HTTP error must not erase this known result.
+The receipt's `issue_state` is the initial validated observation, not a claim
+that the issue state was reread after truncation. Signal evidence stays empty;
+partial comments are not treated as complete availability or payout evidence.
+
+With `max_pages=10` and ten full pages, this reduces one check from 22 GETs to
+11. With `max_pages=1` and one full page, it reduces four GETs to two. Exactly
+100 comments at a one-page bound still produce HOLD, not CLEAR: the missing
+terminal page is not inferred from the issue's declared comment count.
+Complete histories, second-traversal truncation, generation comparisons,
+comment validation, closed-issue handling and session ownership are unchanged.
+These counts describe the request path, not a measurement of live provider
+latency or cash saved.
 
 ## Non-authority
 

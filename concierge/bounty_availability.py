@@ -383,6 +383,15 @@ def inspect_bounty_availability(
     comments_before, truncated_before = _read_comments(
         repo, number, token, session=session, max_pages=max_pages
     )
+    if truncated_before:
+        # A second traversal cannot make this first generation complete. Keep
+        # the known HOLD without spending quota or risking a later HTTP error.
+        return _safe_hold(
+            repo=repo,
+            number=number,
+            code="COMMENT_HISTORY_TRUNCATED",
+            issue_state=before_marker[2],
+        )
     comments_after, truncated_after = _read_comments(
         repo, number, token, session=session, max_pages=max_pages
     )
@@ -398,7 +407,7 @@ def inspect_bounty_availability(
         else None
     )
 
-    if truncated_before or truncated_after:
+    if truncated_after:
         return _safe_hold(
             repo=repo,
             number=number,
