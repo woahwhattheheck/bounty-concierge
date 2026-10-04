@@ -217,6 +217,12 @@ reached, or retry the source read; a partial census cannot establish that no
 additional competing PRs or expiry comments exist. A complete census does not
 establish claim eligibility, an award, or payment.
 
+Python callers of `audit_bounties()` reuse one completed audit for repeated
+repository/issue pairs within that invocation. Repository spelling is matched
+exactly and issue numbers use the existing integer conversion. Every input row
+keeps its original metadata and order, with an independent nested audit. A later
+invocation performs fresh reads; partial-read signals and errors remain intact.
+
 ---
 
 ## Platform Links

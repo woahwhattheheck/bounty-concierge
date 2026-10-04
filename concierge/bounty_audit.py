@@ -12,6 +12,7 @@ import argparse
 import json
 import re
 import sys
+from copy import deepcopy
 from typing import Any
 
 import requests
@@ -272,7 +273,7 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
 
 
 def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, session: Any = requests, max_pages: int = 10) -> list[dict[str, Any]]:
-    """Return bounty records enriched with a nested ``canonical_audit`` field."""
+    """Enrich rows, reading each exact repository/issue once per invocation."""
     if session is requests:
         with requests.Session() as owned_session:
             return audit_bounties(
@@ -280,15 +281,21 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
             )
 
     audited = []
+    audit_by_issue: dict[tuple[str, int], dict[str, Any]] = {}
     for bounty in bounties:
         row = dict(bounty)
-        row["canonical_audit"] = audit_bounty(
-            row["repo"],
-            int(row["number"]),
-            token,
-            session=session,
-            max_pages=max_pages,
-        )
+        key = (row["repo"], int(row["number"]))
+        if key not in audit_by_issue:
+            audit_by_issue[key] = audit_bounty(
+                key[0],
+                key[1],
+                token,
+                session=session,
+                max_pages=max_pages,
+            )
+        # Each row owns its nested report. A caller editing one scout's result
+        # must not alter another row or the evidence reused later in this batch.
+        row["canonical_audit"] = deepcopy(audit_by_issue[key])
         audited.append(row)
     return audited
 
