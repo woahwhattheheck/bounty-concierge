@@ -275,7 +275,7 @@ def _normalize_event(
 ) -> dict[str, Any]:
     if type(raw) is not dict:
         raise LedgerInputError("event must be an object")
-    if set(raw) < {"event_id", "kind", "source"}:
+    if not {"event_id", "kind", "source"}.issubset(raw):
         raise LedgerInputError("event must contain event_id, kind, and source")
     event_id = _token(raw["event_id"], field="event.event_id")
     kind = raw["kind"]
@@ -384,9 +384,15 @@ def _transfer_summaries(
         last_status: Optional[str] = None
         last_time: Optional[str] = None
         seen_same_time: dict[str, str] = {}
+        source_statuses: dict[str, str] = {}
         for row in ordered:
             when = row["source"]["observed_at"]
             status = row["status"]
+            source_sha = row["source"]["source_sha256"]
+            prior_source_status = source_statuses.get(source_sha)
+            if prior_source_status is not None and prior_source_status != status:
+                raise LedgerInputError(f"transfer {transfer_id} has conflicting states for identical source bytes")
+            source_statuses[source_sha] = status
             prior_at_time = seen_same_time.get(when)
             if prior_at_time is not None and prior_at_time != status:
                 raise LedgerInputError(f"transfer {transfer_id} has conflicting states at {when}")
