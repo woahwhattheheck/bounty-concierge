@@ -37,6 +37,34 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _emit_json(value: Any, destination: Path | None) -> None:
+    """Keep stdout compatible or replace a named file only after a complete write."""
+    text = json.dumps(value, indent=2, sort_keys=True) + "\n"
+    if destination is None:
+        print(text, end="")
+        return
+    temporary: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", newline="\n", dir=destination.parent,
+            prefix=f".{destination.name}.", suffix=".tmp", delete=False,
+        ) as output:
+            temporary = output.name
+            output.write(text)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, destination)
+    except OSError as exc:
+        raise ValueError("cannot write the output file") from exc
+    finally:
+        if temporary is not None:
+            try:
+                os.unlink(temporary)
+            except OSError:
+                # A failed cleanup must not obscure the write failure or interrupt.
+                pass
+
+
 def _amount(value: Any) -> Decimal:
     if not isinstance(value, str) or not _MONEY.fullmatch(value):
         raise ValueError("amount must be a nonnegative bounded decimal string")
@@ -520,34 +548,6 @@ def resume_catalog(snapshot: dict[str, Any], *, max_details: int = 50,
     }
     report["shortlist"] = select_targets(report, minimum, include_promised=include_promised)
     return report
-
-
-def _emit_json(value: Any, destination: Path | None) -> None:
-    """Keep stdout compatible or replace a named file only after a complete write."""
-    text = json.dumps(value, indent=2, sort_keys=True) + "\n"
-    if destination is None:
-        print(text, end="")
-        return
-    temporary: str | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", newline="\n", dir=destination.parent,
-            prefix=f".{destination.name}.", suffix=".tmp", delete=False,
-        ) as output:
-            temporary = output.name
-            output.write(text)
-            output.flush()
-            os.fsync(output.fileno())
-        os.replace(temporary, destination)
-    except OSError as exc:
-        raise ValueError("cannot write the output file") from exc
-    finally:
-        if temporary is not None:
-            try:
-                os.unlink(temporary)
-            except OSError:
-                # A failed cleanup must not obscure the write failure or interrupt.
-                pass
 
 
 def main(argv: list[str] | None = None) -> int:

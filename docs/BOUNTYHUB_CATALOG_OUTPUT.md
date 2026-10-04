@@ -59,7 +59,7 @@ failure; interruption; invalid input; missing parent; complete-target exit 0;
 and JSON encoding/newline parity. No live catalog scan, hosted execution,
 full-repository suite, Windows execution or earnings claim.
 
-The executed catalog blob is `d9b6c6452278e98d9529649772e0cffd7a6265a4`.
+The executed catalog blob is `4358f9c87ae78016e53b6bca7b268d616278ad4e`.
 This isolated source change was built on existing source artifact commit
 `4f5bc01a9b6d6b91d5937d9743ed3608f9003ebc`, run `37199760399`, artifact
 `11302078522`. Its branch intentionally uses that ancestor so a normal
