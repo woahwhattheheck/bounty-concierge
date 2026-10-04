@@ -53,3 +53,28 @@ The current snapshot contained 1181 total tools, 89 GitHub tools and 38 Slack to
 
 These are measured output sizes for this registry, not token counts, wall-clock speedups, provider-rate savings, authentication evidence, or a claim that another session exposes the same tools. Raw numeric receipt: [results.json](../work/throughput/native-inventory-20261004/results.json).
 
+## Scoped Slack intake
+
+For a new work search on the observed native binding, supply the supported `query` argument alongside `keywords` and `filters`, and request matched messages without surrounding-thread expansion:
+
+```js
+const response = await tools.mcp__codex_apps__slack_slack_search_public_and_private({
+  query: '"PAYD630" after:2026-10-03',
+  keywords: ["PAYD630"],
+  filters: "after:2026-10-03",
+  include_context: false,
+  response_format: "detailed",
+  sort: "timestamp",
+  sort_dir: "desc",
+  limit: 6
+});
+store("payd630-intake-response", response);
+```
+
+The date illustrates an October 4 intake using the previous calendar day in the workspace's timezone. Use the actual subject and intended date range; older ownership may require a wider range. Keep an existing cursor chain's original arguments unchanged.
+
+On this binding, a keywords-only call rendered a blank search-query heading and returned unrelated current messages. Supplying the explicit query returned the named subject. This observation was already recorded in [the existing search-use thread](https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1791096886427149) and reproduced during this intake. A heading alone does not prove that every selector was applied: inspect the actual matching messages and current source before inferring ownership. An empty same-day search also does not establish an unclaimed scope; see [the existing date correction](https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1791106180715819).
+
+Retain the complete response and print a bounded view. The existing Commons reader, `host/connected_slack_pages.cjs`, provides `collectSlackPages` and `projectSlackSearchResults`; its usage guide is `host/CONNECTED_SLACK_PAGES.md`. It defaults fresh searches to `include_context: false` and can project an already-retained response without another provider call. Use that implementation rather than creating another collector or replaying a search just to read fewer characters.
+
+This is a usage correction for observed search scoping and response volume. It changes no provider access, claim ownership, cooldown policy or publication permission.
