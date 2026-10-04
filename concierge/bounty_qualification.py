@@ -152,8 +152,8 @@ _PRIVATE_CONTEXT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 
 
 _PRIVATE_CONTEXT_START_RE = re.compile(
-    # Every signal above starts with one of these words. Keep the alternatives
-    # with the signal patterns so texts with no possible start need one scan.
+    # Every signal above starts with one of these words. Scan once for candidate
+    # offsets, then anchor the unchanged signal patterns at those positions.
     r"\b(?:system|developer|private|hidden|session|runtime|model|full|"
     r"conversation|chat|complete|entire|verbatim|everything)\b",
     re.IGNORECASE,
@@ -346,6 +346,19 @@ def _nonnegative_int(value: Any, name: str) -> int | None:
     return value
 
 
+def _private_context_signals(texts: list[str]) -> list[str]:
+    """Find all existing signals without rescanning each whole text per pattern."""
+    found: set[str] = set()
+    for text in texts:
+        for start in _PRIVATE_CONTEXT_START_RE.finditer(text):
+            for name, pattern in _PRIVATE_CONTEXT_PATTERNS:
+                if name not in found and pattern.match(text, start.start()):
+                    found.add(name)
+            if len(found) == len(_PRIVATE_CONTEXT_PATTERNS):
+                return sorted(found)
+    return sorted(found)
+
+
 def _canonical_audit(snapshot: dict[str, Any]) -> tuple[dict[str, Any], bool]:
     if "canonical_audit" not in snapshot or snapshot["canonical_audit"] is None:
         return {}, False
@@ -407,15 +420,7 @@ def qualify_dispatch(
         advertised_rtc_rewards = set()
         rtc_reward_source = None
 
-    private_signal_types = sorted(
-        {
-            name
-            for text in texts
-            if _PRIVATE_CONTEXT_START_RE.search(text)
-            for name, pattern in _PRIVATE_CONTEXT_PATTERNS
-            if pattern.search(text)
-        }
-    )
+    private_signal_types = _private_context_signals(texts)
     already_rewarded = any(_REWARDED_LABEL_RE.search(label) for label in labels)
     policy_label_categories = _policy_label_categories(labels)
 
