@@ -24,12 +24,13 @@ import requests
 
 from concierge import _active_claim_portfolio_core as _core
 from concierge.bounty_index import _header_integer, _retry_after_seconds
+from concierge.submission_packet import SubmissionPacketInputError, validate_submission_target
 
 SCHEMA = "active-claim-portfolio/v2"
 _LIVE_REQUIRED = frozenset(
     {"repo", "number", "sponsor_key", "worker_id", "reward_currency", "reward_minor"}
 )
-_LIVE_OPTIONAL = frozenset({"listing_url"})
+_LIVE_OPTIONAL = frozenset({"listing_url", "submission_target"})
 _REPLAY_REQUIRED = frozenset(
     {
         "repo", "number", "sponsor_key", "worker_id", "observed_at",
@@ -118,7 +119,7 @@ def _validate_live_candidate(value: Any) -> Dict[str, Any]:
             raise ActiveClaimPortfolioError("candidate.listing_url is invalid")
         if _core._SECRET_RE.search(listing):
             raise ActiveClaimPortfolioError("candidate.listing_url appears to contain secret material")
-    return {
+    result = {
         "repo": repo,
         "number": number,
         "sponsor_key": sponsor,
@@ -127,15 +128,25 @@ def _validate_live_candidate(value: Any) -> Dict[str, Any]:
         "reward_minor": reward,
         "listing_url": listing,
     }
+    if "submission_target" in value:
+        try:
+            result["submission_target"] = validate_submission_target(
+                value["submission_target"], f"https://github.com/{repo}/issues/{number}"
+            )
+        except SubmissionPacketInputError as exc:
+            raise ActiveClaimPortfolioError(str(exc)) from exc
+    return result
 
 
 def _qualify_live_authority(
-    repo: str, number: int, listing_url: Optional[str], max_pages: int
+    repo: str, number: int, listing_url: Optional[str], max_pages: int,
+    *, submission_target: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     from concierge.revenue_intake import qualify_live_revenue_intake
 
+    target_kwargs = {"submission_target": submission_target} if submission_target is not None else {}
     return qualify_live_revenue_intake(
-        repo, number, listing_url=listing_url, max_pages=max_pages
+        repo, number, listing_url=listing_url, max_pages=max_pages, **target_kwargs
     )
 
 
@@ -440,8 +451,8 @@ def compile_live_active_claim_portfolio(
     as_of_dt = _core._parse_utc(as_of, "as_of")
     for event in canonical_events:
         _core._normalize_event(event, as_of_dt)
-    cache: Dict[Tuple[str, int, Optional[str]], Tuple[Dict[str, Any], Dict[str, Any], List[str]]] = {}
-    # Availability is issue-scoped; qualification also depends on the listing.
+    cache: Dict[Tuple[str, int, Optional[str], Optional[str]], Tuple[Dict[str, Any], Dict[str, Any], List[str]]] = {}
+    # Availability is issue-scoped; qualification also depends on listing/target.
     # max_pages is fixed for this invocation. Never reuse observations across
     # compilations or cache raised read failures for a different listing.
     availability_cache: Dict[Tuple[str, int], Dict[str, Any]] = {}
@@ -450,7 +461,12 @@ def compile_live_active_claim_portfolio(
     rate_limited = False
 
     for item in validated:
-        key = (item["repo"], item["number"], item["listing_url"])
+        source_key = (item["repo"], item["number"], item["listing_url"])
+        target = item.get("submission_target")
+        target_digest = None if target is None else hashlib.sha256(json.dumps(
+            target, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        ).encode("utf-8")).hexdigest()
+        key = (*source_key, target_digest)
         issue_key = (item["repo"], item["number"])
         if key not in cache:
             codes: List[str] = []
@@ -459,7 +475,8 @@ def compile_live_active_claim_portfolio(
                 codes.append("LIVE_QUALIFICATION_NOT_ATTEMPTED_RATE_LIMIT")
             else:
                 try:
-                    qualification = _qualify_live_authority(*key, max_pages)
+                    target_kwargs = {"submission_target": target} if target is not None else {}
+                    qualification = _qualify_live_authority(*source_key, max_pages, **target_kwargs)
                     if not isinstance(qualification, dict):
                         raise TypeError("qualification authority returned non-object")
                 except Exception as exc:
@@ -489,6 +506,10 @@ def compile_live_active_claim_portfolio(
                     if _provider_rate_limited(exc):
                         rate_limited = True
                         codes.append("LIVE_PROVIDER_RATE_LIMITED")
+            if target_digest is not None:
+                # Bind the explicit delivery scope into the existing authority
+                # generation without retaining the sponsor's instruction text.
+                qualification = {**qualification, "submission_target_sha256": target_digest}
             cache[key] = (qualification, availability, codes)
         qualification, availability, codes = cache[key]
         bound_qualification, reward_codes = _bind_live_reward(item, qualification)
