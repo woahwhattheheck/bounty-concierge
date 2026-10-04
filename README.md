@@ -385,6 +385,8 @@ fleet-latency improvement is asserted.
 
 ## Contributing
 
+**Cloud source access:** If native GitHub tools work but `git clone` or raw-file downloads do not, reuse a [pinned source bundle](docs/CLOUD_SOURCE_BUNDLES.md). The guide covers the shared run/artifact lookup, native download and local extraction; check for an existing bundle before requesting another export.
+
 1. **Fork** the repository you want to contribute to (see [Ecosystem Map](#ecosystem-map)).
 2. **Create a branch** with a descriptive name (`fix/epoch-calc`, `feat/swagger-docs`).
 3. **Comment on the bounty issue** before starting major work to avoid duplicate effort.

@@ -34,6 +34,7 @@ _GITHUB_HOSTS = frozenset({"github.com", "www.github.com"})
 _GITHUB_ISSUE_PATH_RE = re.compile(
     r"^/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)/?$"
 )
+_URL_WHITESPACE_RE = re.compile(r"[\s\x7f]")
 _SHA256_RE = re.compile(r"[0-9a-f]{64}")
 _MAX_URL_CHARS = 2048
 _MAX_TEXT_CHARS = 250_000
@@ -188,7 +189,7 @@ def _strict_url_parts(value: Any, field: str) -> tuple[str, str]:
         raise BountyAcceptanceSafetyInputError(
             f"{field} exceeds {_MAX_URL_CHARS} characters"
         )
-    if any(character.isspace() or ord(character) == 0x7F for character in source):
+    if _URL_WHITESPACE_RE.search(source):
         raise BountyAcceptanceSafetyInputError(f"{field} must not contain whitespace")
     if "\\" in source or "%" in source:
         raise BountyAcceptanceSafetyInputError(
@@ -341,7 +342,10 @@ def _compile_bounty_acceptance_safety_gate_at(
         raise BountyAcceptanceSafetyInputError(f"schema must equal {SCHEMA}")
 
     owner, repo, issue_number = _github_issue_identity(request["issue_url"], "issue_url")
-    _strict_url_parts(request["source_url"], "source_url")
+    # An identical plain string already passed the stricter issue validator.
+    source_url = request["source_url"]
+    if type(source_url) is not str or source_url != request["issue_url"]:
+        _strict_url_parts(source_url, "source_url")
     source_text = _require_string(request["source_text"], "source_text", allow_empty=True)
     if len(source_text) > _MAX_TEXT_CHARS:
         raise BountyAcceptanceSafetyInputError(
