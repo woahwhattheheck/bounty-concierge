@@ -17,6 +17,7 @@ person has been paid or that revenue has been earned.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
 from dataclasses import dataclass
 import hashlib
 import json
@@ -88,12 +89,50 @@ def _headers(token: str | None) -> dict[str, str]:
     return headers
 
 
+_COMMENT_LINK_RE = re.compile(
+    r'\s*<[^<>\s]+>\s*;\s*rel\s*=\s*'
+    r'(?:"(?P<quoted>[A-Za-z]+(?:\s+[A-Za-z]+)*)"|(?P<plain>[A-Za-z]+))'
+    r'\s*(?:,|$)',
+    re.IGNORECASE,
+)
+
+
+def _comment_page_has_next(response: Any, payload: Any) -> bool:
+    """Read GitHub pagination metadata, never a provider-supplied destination.
+
+    Minimal injected transports without headers retain the old length fallback.
+    An actual response with no Link header is GitHub's terminal-page signal.
+    """
+    if not isinstance(payload, list):
+        raise BountyAvailabilityError("GitHub issue comments response was not a list")
+    headers = getattr(response, "headers", None)
+    if not isinstance(headers, Mapping):
+        return len(payload) >= 100
+    raw = next((value for key, value in headers.items()
+                if isinstance(key, str) and key.casefold() == "link"), None)
+    if raw is None:
+        return False
+    if not isinstance(raw, str) or not raw.strip() or raw.rstrip().endswith(","):
+        raise BountyAvailabilityError("GitHub comment pagination header was malformed")
+    position = 0
+    has_next = False
+    while position < len(raw):
+        match = _COMMENT_LINK_RE.match(raw, position)
+        if match is None:
+            raise BountyAvailabilityError("GitHub comment pagination header was malformed")
+        relations = (match.group("quoted") or match.group("plain")).lower().split()
+        has_next = has_next or "next" in relations
+        position = match.end()
+    return has_next
+
+
 def _get_json(
     session: Any,
     url: str,
     *,
     headers: dict[str, str],
     params: dict[str, Any] | None = None,
+    comment_page: bool = False,
 ) -> Any:
     try:
         response = session.get(url, headers=headers, params=params, timeout=15)
@@ -103,11 +142,14 @@ def _get_json(
             f"GitHub request failed for {url}: {exc}"
         ) from exc
     try:
-        return response.json()
+        payload = response.json()
     except (TypeError, ValueError) as exc:
         raise BountyAvailabilityError(
             f"GitHub response was not valid JSON for {url}"
         ) from exc
+    if comment_page:
+        return payload, _comment_page_has_next(response, payload)
+    return payload
 
 
 def _object(value: Any, context: str) -> dict[str, Any]:
@@ -269,11 +311,12 @@ def _read_comments(
     url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
     evidence: list[_CommentEvidence] = []
     for page in range(1, max_pages + 1):
-        payload = _get_json(
+        payload, has_next = _get_json(
             session,
             url,
             headers=headers,
             params={"per_page": 100, "page": page},
+            comment_page=True,
         )
         if not isinstance(payload, list):
             raise BountyAvailabilityError(
@@ -285,7 +328,7 @@ def _read_comments(
                     "GitHub issue comments response contained a malformed item"
                 )
             evidence.append(_comment_evidence(item))
-        if len(payload) < 100:
+        if not has_next:
             return tuple(evidence), False
     return tuple(evidence), True
 
