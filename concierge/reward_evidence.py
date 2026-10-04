@@ -39,6 +39,21 @@ _GENERAL_INDICATOR_PATTERN = re.compile(
 
 _MAX_EXCERPT_LENGTH = 120
 _MAX_MENTIONS = 5
+_MAX_SOURCE_CAVEATS = 3
+
+# These are source-text hints, not an eligibility decision. A quoted old closure
+# or an unaccepted fee proposal must never override a current sponsor offer.
+_SOURCE_CAVEAT_PATTERN = re.compile(
+    r"(?P<closed>\b(?:bounty(?: program(?:me)?)?|program(?:me)?|campaign|"
+    r"challenge|submissions|applications|claims)\s{1,16}"
+    r"(?:is|are|has been|have been)\s{1,16}(?:now\s{1,16})?"
+    r"(?:closed|withdrawn|cancelled|canceled|expired)\b)|"
+    r"(?P<proposal>\b(?:proposed\s{1,16}(?:bounty|milestone|fee|payment)|"
+    r"(?:funding|bounty)\s{1,16}(?:proposal|inquiry)|"
+    r"not\s{1,16}(?:an?\s{1,16})?(?:approved|confirmed)\s{1,16}bounty|"
+    r"not\s{1,16}a\s{1,16}bounty\s{1,16}I\s{1,16}am\s{1,16}offering)\b)",
+    re.IGNORECASE,
+)
 
 
 def _sanitize_single_line(text: str) -> str:
@@ -56,6 +71,27 @@ def _make_excerpt(text: str, match_start: int, match_end: int, max_len: int = _M
     if len(clean) > max_len:
         return clean[:max_len - 3] + "..."
     return clean
+
+
+def _source_caveats(title: str, body: str) -> Dict[str, Any]:
+    """Retain bounded, unverified caveats even far from the first amount.
+
+    Detection is deliberately lexical and incomplete. Keep matching source
+    context visible; do not infer who wrote it, its currency, or current truth.
+    """
+    caveats = []
+    seen = set()
+    for source, text in (("title", title), ("body", body)):
+        for match in _SOURCE_CAVEAT_PATTERN.finditer(text):
+            excerpt = _make_excerpt(text, match.start(), match.end())
+            key = (match.lastgroup, excerpt)
+            if key in seen:
+                continue
+            seen.add(key)
+            caveats.append({"kind": match.lastgroup, "source": source, "excerpt": excerpt})
+            if len(caveats) >= _MAX_SOURCE_CAVEATS:
+                return {"source_caveats": caveats}
+    return {"source_caveats": caveats} if caveats else {}
 
 
 def _currency_amount_start(text: str, end: int, floor: int) -> Optional[int]:
@@ -115,6 +151,7 @@ def extract_reward_evidence(title: str, body: str) -> Dict[str, Any]:
     """
     safe_title = title or ""
     safe_body = body or ""
+    caveat_fields = _source_caveats(safe_title, safe_body)
 
     # Pass 1: Look for primary RTC pattern in title first, then body
     rtc_matches: List[Dict[str, Any]] = []
@@ -164,6 +201,7 @@ def extract_reward_evidence(title: str, body: str) -> Dict[str, Any]:
             "excerpt": excerpt,
             "mentions": additional_mentions,
             "evidence_kind": "rtc_exact",
+            **caveat_fields,
         }
 
     # Pass 2: Look for unconfirmed amounts, dollar amounts, or general rewards
@@ -193,6 +231,7 @@ def extract_reward_evidence(title: str, body: str) -> Dict[str, Any]:
             "excerpt": excerpt,
             "mentions": general_matches[1:],
             "evidence_kind": "unconfirmed_text",
+            **caveat_fields,
         }
 
     # Pass 3: No match
@@ -204,6 +243,7 @@ def extract_reward_evidence(title: str, body: str) -> Dict[str, Any]:
         "excerpt": fallback_excerpt,
         "mentions": [],
         "evidence_kind": "no_match",
+        **caveat_fields,
     }
 
 
@@ -309,4 +349,13 @@ def reward_context(row: Dict[str, Any]) -> str:
                  for item in mentions[:_MAX_MENTIONS] if isinstance(item, str)]
         if shown:
             parts.append("Other mentions: " + "; ".join(shown))
+    caveats = evidence.get("source_caveats")
+    if isinstance(caveats, list):
+        for caveat in caveats[:_MAX_SOURCE_CAVEATS]:
+            text = caveat.get("excerpt") if isinstance(caveat, dict) else None
+            if isinstance(text, str) and text:
+                # Bound stored input before sanitizing, as well as the output.
+                text = _sanitize_single_line(text[:_MAX_EXCERPT_LENGTH])[:_MAX_EXCERPT_LENGTH]
+                if text:
+                    parts.append("Source caveat (unverified): " + text)
     return " | ".join(parts) if parts else "No retained excerpt. Inspect the source issue."
