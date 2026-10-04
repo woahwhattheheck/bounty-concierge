@@ -1387,6 +1387,40 @@ def _admit_capture_destination(path: Path) -> None:
         os.close(parent_fd)
 
 
+def _http_error_result(error: BaseException) -> dict[str, Any] | None:
+    """Retain bounded provider evidence without exposing request or body text."""
+    from concierge.bounty_index import _header_integer, _retry_after_seconds
+
+    seen: set[int] = set()
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        if isinstance(error, requests.HTTPError):
+            response = error.response
+            # Requests considers error responses falsey even when present.
+            if response is not None:
+                remaining = _header_integer(response.headers, "X-RateLimit-Remaining")
+                retry_after = _retry_after_seconds(response.headers)
+                rate_limited = response.status_code == 429 or (
+                    response.status_code == 403
+                    and (remaining == 0 or retry_after is not None)
+                )
+                return {
+                    "error": (
+                        "GitHub rate limit reached" if rate_limited
+                        else "GitHub HTTP request failed"
+                    ),
+                    "http_status": response.status_code,
+                    "rate_limited": rate_limited,
+                    "retry_after_seconds": retry_after,
+                    "rate_limit_remaining": remaining,
+                    "rate_limit_reset_at": _header_integer(
+                        response.headers, "X-RateLimit-Reset"
+                    ),
+                }
+        error = error.__cause__ or error.__context__
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m concierge.bounty_preflight",
@@ -1488,6 +1522,11 @@ def main(argv: list[str] | None = None) -> int:
         OSError,
         ValueError,
     ) as exc:
+        if args.json:
+            error_result = _http_error_result(exc)
+            if error_result is not None:
+                print(json.dumps(error_result, indent=2, sort_keys=True))
+                return 2
         parser.error(str(exc))
     if args.json:
         print(json.dumps(result, indent=2, sort_keys=True))
