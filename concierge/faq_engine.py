@@ -167,6 +167,41 @@ FAQ_ENTRIES = {
 }
 
 
+
+# Explicit BountyHub questions use its own claim and payout instructions.
+# Official documentation read on 2026-10-04; account state is never inferred.
+_BOUNTYHUB_NAME = re.compile(r"\bbounty[\s_-]*hub\b", re.IGNORECASE)
+_BOUNTYHUB_GUIDE = "https://www.bountyhub.dev/en/docs/claim-bounty"
+_BOUNTYHUB_PAYOUT = (
+    "Open Payouts in your BountyHub dashboard and complete Stripe onboarding "
+    "and any required identity checks. Payout setup, a submitted claim, creator "
+    "acceptance and money received are separate states. Confirm the claim "
+    "decision and actual payout in the dashboard; completing onboarding does "
+    "not establish an award. Guide: " + _BOUNTYHUB_GUIDE
+)
+_BOUNTYHUB_FAQ_ENTRIES = {
+    "how do i claim a bounty": (
+        "Sign in to BountyHub with the same GitHub account that authored your "
+        "PR. Check the listing's requirements and existing claims, then use "
+        "Submit Claim on that listing to attach the PR URL. After a merge, "
+        "refresh the claim for the creator's decision. A creator can also "
+        "accept a fork. Guide: " + _BOUNTYHUB_GUIDE
+    ),
+    "how do payouts work": _BOUNTYHUB_PAYOUT,
+    "how do i set up a wallet": _BOUNTYHUB_PAYOUT,
+    "how do i register a wallet": _BOUNTYHUB_PAYOUT,
+    "how do i get paid": _BOUNTYHUB_PAYOUT,
+    "how do i connect stripe": _BOUNTYHUB_PAYOUT,
+    "what is a funded or promised bounty": (
+        "Review each BountyHub listing's contributions: the platform permits "
+        "advance funding and payment promised after a solution. The displayed "
+        "total can include promises; it does not by itself establish funds "
+        "received or your award. The listing's requirements and the creator's "
+        "acceptance still apply. Source: "
+        "https://www.bountyhub.dev/en/learn-more"
+    ),
+}
+
 # ---------------------------------------------------------------------------
 # Fuzzy matching
 # ---------------------------------------------------------------------------
@@ -349,7 +384,10 @@ def ask_grok(question, context=""):
 def answer(question, use_grok=False):
     """Answer a question using the best available source.
 
-    Resolution order:
+    Explicit BountyHub questions use the platform's sourced FAQ and guide.
+    The local docs and Grok context below serve RustChain questions.
+
+    Resolution order for other questions:
         1. Built-in FAQ (fuzzy match, threshold >= 0.3)
         2. Docs search (if docs directory has .md files)
         3. Grok AI fallback (if use_grok=True and GROK_API_KEY is set)
@@ -362,6 +400,22 @@ def answer(question, use_grok=False):
             "confidence": float,
         }
     """
+
+    if _BOUNTYHUB_NAME.search(question):
+        # The provider name selects the corpus; it is not a topic-match signal.
+        topic = _BOUNTYHUB_NAME.sub("", question)
+        _matched_key, faq_answer, score = fuzzy_match(topic, _BOUNTYHUB_FAQ_ENTRIES)
+        if score >= 0.3 and faq_answer:
+            return {"source": "faq", "answer": faq_answer, "confidence": score}
+        return {
+            "source": "unknown",
+            "answer": (
+                "That BountyHub topic is not in the local FAQ. "
+                "Consult its current documentation: " + _BOUNTYHUB_GUIDE
+            ),
+            "confidence": 0.0,
+        }
+
     # 1. Try FAQ
     matched_key, faq_answer, score = fuzzy_match(question)
     if score >= 0.3 and faq_answer:
