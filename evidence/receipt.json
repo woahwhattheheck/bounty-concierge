@@ -1,0 +1,94 @@
+{
+  "cases": [
+    {
+      "case": "service-8080-listener-3001",
+      "config_map": {
+        "PORT": "3001",
+        "name": "ledger634-payd-backend-config"
+      },
+      "deployment": {
+        "containerPort": 3001,
+        "name": "ledger634-payd-backend"
+      },
+      "ingress_backend_ports": [
+        8080
+      ],
+      "manifest_sha256": "64049368d2cf0dd7fae1cb52164ef8af55e3072c5a9fe4035b4cbdcab707749f",
+      "probe_ports": {
+        "livenessProbe": "http",
+        "readinessProbe": "http",
+        "startupProbe": "http"
+      },
+      "rendered_objects": 8,
+      "result": "pass",
+      "service": {
+        "name": "ledger634-payd-backend",
+        "port": 8080,
+        "targetPort": "http"
+      },
+      "service_selector_matches_pod": true
+    },
+    {
+      "case": "service-8080-listener-4001",
+      "config_map": {
+        "PORT": "4001",
+        "name": "ledger634-payd-backend-config"
+      },
+      "deployment": {
+        "containerPort": 4001,
+        "name": "ledger634-payd-backend"
+      },
+      "ingress_backend_ports": [
+        8080
+      ],
+      "manifest_sha256": "eecd556592aa579e3e384ee322c237b8a5f07afd3e6ab07a4a083ce1705242f0",
+      "probe_ports": {
+        "livenessProbe": "http",
+        "readinessProbe": "http",
+        "startupProbe": "http"
+      },
+      "rendered_objects": 8,
+      "result": "pass",
+      "service": {
+        "name": "ledger634-payd-backend",
+        "port": 8080,
+        "targetPort": "http"
+      },
+      "service_selector_matches_pod": true
+    }
+  ],
+  "controller_sha": "a7abe7dd93273e4fb2d6d6dbeb00f3b412b8d66b",
+  "deployment_blob": "c47947dda4708079e7c876b9fc632748c4fc2d9e",
+  "failed": 0,
+  "fixture": "Documented RENDER_ONLY_NOT_A_SIGNING_KEY file and backend Ingress path override8080; no real credential.",
+  "helm": "v3.22.0+g144ca65",
+  "passed": 2,
+  "python": "3.12.3",
+  "pyyaml": "6.0.2",
+  "run_id": "37208208627",
+  "runner_os": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+  "schema": "payd634-listener-helm-render/v1",
+  "scope": "Two actual complete-chart renders. No Kubernetes deployment, application test suite, or production source changes.",
+  "source_repository": "woahwhattheheck/PayD",
+  "source_sha": "fd4960e766ccd804ac7a0f99f788efde511a45b1",
+  "values_file": "charts/payd/values-staging.yaml",
+  "job_id": 111453777592,
+  "run_url": "https://github.com/woahwhattheheck/bounty-concierge/actions/runs/37208208627",
+  "existing_publication_operation": "PAYD634-CURRENT-DESCRIPTION-HARBOR6907",
+  "artifact": {
+    "id": 11305039315,
+    "size_in_bytes": 6143,
+    "reported_digest": "sha256:1119952e1f2c9022d2655f94b33f35c5bcc367e8bc363e0752a959757247d450",
+    "expires_at": "2026-10-11T14:09:34Z",
+    "downloaded": false
+  },
+  "first_attempt": {
+    "run_id": 37208015675,
+    "job_id": 111453195518,
+    "controller_sha": "0d814c0c1301a8209bab1175fabc1bfa52cb3fbf",
+    "outcome": "setup_failure",
+    "reason": "The staging refresh-secret input was omitted; the existing chart guard rejected the invocation before either listener case rendered. The successor controller supplies the documented render-only fixture."
+  },
+  "production_changes": 0,
+  "reward_status": "Conditional GrantFox / Maybe Rewarded; award and payment unconfirmed"
+}
