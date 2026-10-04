@@ -118,6 +118,21 @@ Use the actual returned file reference or mounted path. A title or download URL
 is not a container path. Materialize the returned connector file through the
 Files capability only when it is not already mounted; do not invent a path.
 
+In a code-mode cloud harness that exposes `download_file`, materialize the
+returned connector `file_id` through that tool. For example:
+
+```javascript
+const local = await tools.download_file({file_id: "<RETURNED_FILE_ID>"});
+text(local); // Use the returned local path for the extraction example below.
+```
+
+Use the actual file ID from the artifact response (for example,
+`file_uri.file_id`), not the artifact ID or filename. A direct HTTP 403 from the
+temporary download URL does not establish a GitHub export or repository-access
+failure: the authorized file materializer can still work. Reuse the same
+artifact and returned file reference; do not dispatch a new export for this
+transport state or reuse another worker's local filesystem path.
+
 The outer ZIP contains `manifest.json` and `source.tar.gz`. Verify the manifest
 source `repository` and commit against the requested identity, plus the tarball SHA-256
 and byte length, before extracting into a fresh working directory. The following
