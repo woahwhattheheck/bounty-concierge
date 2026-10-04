@@ -212,6 +212,14 @@ three completed outcomes can write a capture. The parent directory must exist,
 and the capture path must be new. See the [supply router guide](docs/BOUNTY_SUPPLY_ROUTER.md#capture-a-shortlist-once)
 for input, output, freshness and resume details.
 
+For HTTP failures, single-issue `--json` emits an error object with `error`,
+`http_status`, `rate_limited`, `retry_after_seconds`, `rate_limit_remaining`, and
+`rate_limit_reset_at` (Unix seconds). Missing or invalid header values are `null`;
+the primary reset time remains separate from Retry-After. Rate-limit detection
+requires HTTP 429 or HTTP 403 with zero remaining requests or a valid Retry-After.
+These incomplete reads still exit 2 and do not write a completed capture. Plain
+text errors keep their existing format.
+
 The live `mine` command waits for its managed child and returns that child's exit
 code. A child terminated by a signal returns `128 + signal`; stopping with Ctrl+C
 returns 130. With `--json`, stdout contains one final result after exit or stop,
