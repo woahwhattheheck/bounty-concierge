@@ -16,6 +16,7 @@ import argparse
 from copy import deepcopy
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 from typing import Any
@@ -38,7 +39,11 @@ from concierge.credential_safety import (
     apply_credential_gate,
     credential_gate_signal_types,
 )
-from concierge.secure_output import create_exclusive_regular
+from concierge.secure_output import (
+    SecureOutputError,
+    create_exclusive_regular,
+    open_verified_parent,
+)
 
 
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
@@ -1312,6 +1317,19 @@ def format_summary(result: dict[str, Any]) -> str:
     )
 
 
+def _admit_capture_destination(path: Path) -> None:
+    """Reject known-invalid paths before reads; final creation stays exclusive."""
+    parent_fd, leaf = open_verified_parent(path)
+    try:
+        try:
+            os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        raise SecureOutputError(f"refusing to overwrite or follow output path: {path}")
+    finally:
+        os.close(parent_fd)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m concierge.bounty_preflight",
@@ -1340,6 +1358,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
+        if args.capture is not None:
+            _admit_capture_destination(args.capture)
         result = preflight_bounty(
             args.repo,
             args.issue,
@@ -1357,6 +1377,7 @@ def main(argv: list[str] | None = None) -> int:
         BountyAuditError,
         QualificationInputError,
         CaptureInputError,
+        SecureOutputError,
         OSError,
         ValueError,
     ) as exc:
