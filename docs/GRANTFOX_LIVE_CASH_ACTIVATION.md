@@ -9,6 +9,9 @@ The GrantFox execution path has strong but separate controls:
 - `bounty_live_cash_admission` re-reads canonical GitHub state and admits only
   fixed USD economics, routing `$25+` to `main_bounty_queue`, `$10-24.99` to the
   saving pile, and non-fixed/unverified/stale work to HOLD/REJECT.
+- GrantFox is a green platform under Bryce's October 4 instruction, with a
+  `$15` active-work minimum. Its composition therefore also accepts qualifying
+  cash receipts from the generic saving pile.
 
 Without a final composition step, a lifecycle receipt can be operationally
 actionable while the same issue's economics are unverified, below the active
@@ -27,16 +30,18 @@ The receipts must identify the exact same `owner/repo#issue`.
 An active GrantFox lifecycle disposition is preserved only when the live cash
 receipt simultaneously proves all of:
 
-- `disposition == ACTIVE_REVIEW`;
-- `route == main_bounty_queue`;
+- either the `ACTIVE_REVIEW` / `main_bounty_queue` pair or the
+  `PILE_SAVE_UP` / `bounty_pile_10_49` pair;
 - `currency == USD`;
 - `fixed_semantics == true`; and
-- `fixed_amount >= 25`.
+- `fixed_amount >= 15`.
 
-`$10-24.99` receipts therefore remain in the existing `bounty_pile_10_49` route;
-the route identifier is retained for compatibility. These receipts cannot be
-promoted into active GrantFox work. Non-fixed rewards, token rewards, stale
-receipts, identity mismatches, and canonical source changes fail closed.
+`$15-24.99` saving-pile receipts can preserve the GrantFox lifecycle disposition.
+The original cash disposition and route remain in the output and nested evidence;
+the composition records `required_active_floor_usd: "15"`. It does not rewrite a
+generic cash receipt or lower another platform's floor. `$10-14.99` receipts stay
+below GrantFox's minimum. Non-fixed rewards, token rewards, stale receipts,
+identity mismatches, and canonical source changes fail closed.
 
 GrantFox lifecycle HOLD states dominate economics: cash cannot make a blocked
 provider/source/dependency/lifecycle path actionable.

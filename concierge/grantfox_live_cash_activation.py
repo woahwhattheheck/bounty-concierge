@@ -5,7 +5,8 @@ The GrantFox lifecycle stack intentionally keeps provider/source/dependency
 evidence separate from canonical bounty economics. This module joins those
 surfaces at dispatch time. A lifecycle receipt is actionable only when the same
 GitHub issue also has a *currently re-verified* fixed-USD admission of at least
-$25 routed to ``main_bounty_queue``.
+$15. Bryce marked GrantFox green, so qualifying saving-pile receipts
+also meet its active floor; their original cash route remains in the evidence.
 
 This module is advisory-only. It does not apply to GrantFox, mutate GitHub,
 submit pull requests, contact sponsors, move funds, or grant any provider-side
@@ -31,7 +32,7 @@ SCHEMA = "grantfox-live-cash-activation/v1"
 RECEIPT_SCHEMA = "grantfox-live-cash-activation-receipt/v1"
 ACTIVE_CASH_DISPOSITION = "ACTIVE_REVIEW"
 ACTIVE_CASH_ROUTE = "main_bounty_queue"
-ACTIVE_USD_FLOOR = Decimal("25")
+ACTIVE_USD_FLOOR = Decimal("15")
 PASSTHROUGH = frozenset(
     {
         "APPLY_ELIGIBLE",
@@ -200,6 +201,29 @@ def _cash_projection(receipt: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _cash_economic_reasons(
+    cash_view: dict[str, Any], amount: Decimal | None
+) -> list[str]:
+    """Apply GrantFox's floor to an already verified canonical cash view."""
+    reasons: list[str] = []
+    route_pair = (cash_view["disposition"], cash_view["route"])
+    if route_pair not in {
+        (ACTIVE_CASH_DISPOSITION, ACTIVE_CASH_ROUTE),
+        ("PILE_SAVE_UP", "bounty_pile_10_49"),
+    }:
+        if cash_view["disposition"] != ACTIVE_CASH_DISPOSITION:
+            reasons.append("LIVE_CASH_NOT_ACTIVE_REVIEW")
+        if cash_view["route"] != ACTIVE_CASH_ROUTE:
+            reasons.append("LIVE_CASH_NOT_MAIN_BOUNTY_QUEUE")
+    if cash_view["currency"] != "USD":
+        reasons.append("LIVE_CASH_NOT_FIXED_USD")
+    if not cash_view["fixed_semantics"]:
+        reasons.append("LIVE_CASH_NOT_FIXED_SEMANTICS")
+    if amount is None or amount < ACTIVE_USD_FLOOR:
+        reasons.append("LIVE_CASH_BELOW_ACTIVE_FLOOR")
+    return reasons
+
+
 def compile_live_cash_activation(
     request: dict[str, Any],
     token: str | None = None,
@@ -266,24 +290,8 @@ def compile_live_cash_activation(
 
     cash_view = _cash_projection(cash)
     amount = cash_view.pop("_amount")
-    reasons: list[str] = []
-    economics_active = True
-
-    if cash_view["disposition"] != ACTIVE_CASH_DISPOSITION:
-        economics_active = False
-        reasons.append("LIVE_CASH_NOT_ACTIVE_REVIEW")
-    if cash_view["route"] != ACTIVE_CASH_ROUTE:
-        economics_active = False
-        reasons.append("LIVE_CASH_NOT_MAIN_BOUNTY_QUEUE")
-    if cash_view["currency"] != "USD":
-        economics_active = False
-        reasons.append("LIVE_CASH_NOT_FIXED_USD")
-    if not cash_view["fixed_semantics"]:
-        economics_active = False
-        reasons.append("LIVE_CASH_NOT_FIXED_SEMANTICS")
-    if amount is None or amount < ACTIVE_USD_FLOOR:
-        economics_active = False
-        reasons.append("LIVE_CASH_BELOW_ACTIVE_FLOOR")
+    reasons = _cash_economic_reasons(cash_view, amount)
+    economics_active = not reasons
 
     if activation_disposition in ACTIVATION_HOLDS:
         disposition = "HOLD_GRANTFOX_ACTIVATION"
@@ -332,7 +340,7 @@ def compile_live_cash_activation(
             "currency": cash_view["currency"],
             "fixed_amount": cash_view["fixed_amount"],
             "fixed_semantics": cash_view["fixed_semantics"],
-            "required_active_floor_usd": "25",
+            "required_active_floor_usd": str(ACTIVE_USD_FLOOR),
         },
         "activation": {
             "disposition": activation_disposition,
@@ -426,7 +434,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m concierge.grantfox_live_cash_activation",
         description=(
-            "Compose GrantFox activation with live canonical >=$25 fixed-USD "
+            "Compose GrantFox activation with live canonical >=$15 fixed-USD "
             "admission. Verification re-reads GitHub."
         ),
     )
