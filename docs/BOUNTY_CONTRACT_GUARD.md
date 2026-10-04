@@ -24,6 +24,13 @@ identity, normalized public metadata, and SHA-256 fingerprints. This is enough
 to detect movement without turning the receipt into a second mutable copy of the
 bounty text.
 
+Repository names follow GitHub's case-insensitive owner/repository identity:
+`microg/gmscore` and `microg/GmsCore` identify the same source. A provider's
+canonical capitalization does not signal contract drift. URL hosts, endpoint
+paths, issue numbers, and stable source metadata still have to match. Receipts
+retain the requested repository spelling, so existing receipt validation and
+subsequent verification use the same source representation.
+
 ## Capture after dispatch approval
 
 Run the normal bounty preflight first. Once a human has approved dispatch, but
