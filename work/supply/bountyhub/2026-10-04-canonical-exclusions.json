@@ -18,5 +18,20 @@
     "reason": "The canonical issue is closed as not_planned and locked (closed 2026-07-14), although the retained BountyHub listing records it as open.",
     "source_url": "https://github.com/azerothcore/azerothcore-wotlk/issues/22571",
     "observed_at": "2026-10-04T12:26:27Z"
+  },
+  "moorcheh-ai/memanto#1852": {
+    "reason": "Existing owned submission https://github.com/moorcheh-ai/memanto/pull/2024 remains open at head 2894052fa74bdb66924d60ff3ee303fb6d1536f2. Continue the original submission; exclude only duplicate fresh intake.",
+    "source_url": "https://github.com/moorcheh-ai/memanto/pull/2024",
+    "observed_at": "2026-10-04T12:25:33Z"
+  },
+  "SPLURT-Station/S.P.L.U.R.T-tg#76": {
+    "reason": "The canonical issue is closed with state_reason completed (closed at 2025-04-01T07:23:10Z).",
+    "source_url": "https://github.com/SPLURT-Station/S.P.L.U.R.T-tg/issues/76",
+    "observed_at": "2026-10-04T12:25:33Z"
+  },
+  "SPLURT-Station/S.P.L.U.R.T-tg#31": {
+    "reason": "The canonical issue is closed with state_reason completed (closed at 2026-09-30T03:12:32Z).",
+    "source_url": "https://github.com/SPLURT-Station/S.P.L.U.R.T-tg/issues/31",
+    "observed_at": "2026-10-04T12:25:33Z"
   }
 }
