@@ -22,8 +22,7 @@ from concierge.secure_output import (
 )
 
 
-# Bound additional retained raw bytes; parsed captures are already in grouped.
-_REPLAY_CACHE_BYTES = 1024 * 1024
+# Bound cache metadata; parsed captures are already retained in grouped.
 _REPLAY_CACHE_ENTRIES = 128
 
 
@@ -75,10 +74,10 @@ def recover_batch(source_run: str | Path, output_dir: str | Path) -> dict[str, A
 
     grouped: dict[tuple[str, int], list[tuple[dict[str, Any], dict[str, Any]]]] = {}
     items: list[dict[str, Any]] = []
-    # Key by exact file bytes, never the unverified receipt or issue identity.
+    # Hash every file byte locally, never the supplied receipt or issue identity.
+    # Fixed-size keys allow large duplicates without retaining their raw bytes.
     # Successful replay is deterministic within this recovery invocation.
     replayed: OrderedDict[bytes, tuple[dict[str, Any], dict[str, Any]]] = OrderedDict()
-    replayed_bytes = 0
     for path in capture_paths:
         item: dict[str, Any] = {
             "capture_file": path.name, "status": "RECOVERY_ERROR", "request_count": 0,
@@ -92,7 +91,8 @@ def recover_batch(source_run: str | Path, output_dir: str | Path) -> dict[str, A
             create_exclusive_regular(output / path.name, raw, mode=0o600)
             item["retained"] = True
             try:
-                cached = replayed.get(raw)
+                key = hashlib.sha256(raw).digest()
+                cached = replayed.get(key)
                 if cached is None:
                     capture = json.loads(raw)
                     _, qualification, _ = replay_capture(
@@ -100,7 +100,7 @@ def recover_batch(source_run: str | Path, output_dir: str | Path) -> dict[str, A
                     )
                 else:
                     capture, qualification = cached
-                    replayed.move_to_end(raw)
+                    replayed.move_to_end(key)
                 identity = capture["repo"], capture["number"]
                 row = indexed.get(identity)
                 if row is None:
@@ -120,15 +120,10 @@ def recover_batch(source_run: str | Path, output_dir: str | Path) -> dict[str, A
                         item["submission_repository"] = target["repository"]
                         item["submission_target_sha256"] = capture_digest(target)
                     grouped.setdefault(identity, []).append((capture, item))
-                    if cached is None and len(raw) <= _REPLAY_CACHE_BYTES:
-                        while replayed and (
-                            replayed_bytes + len(raw) > _REPLAY_CACHE_BYTES
-                            or len(replayed) >= _REPLAY_CACHE_ENTRIES
-                        ):
-                            old_raw, _ = replayed.popitem(last=False)
-                            replayed_bytes -= len(old_raw)
-                        replayed[raw] = (capture, qualification)
-                        replayed_bytes += len(raw)
+                    if cached is None:
+                        if len(replayed) >= _REPLAY_CACHE_ENTRIES:
+                            replayed.popitem(last=False)
+                        replayed[key] = (capture, qualification)
             except (json.JSONDecodeError, UnicodeError) as exc:
                 item["error"] = {
                     "code": "CAPTURE_JSON_ERROR", "error_type": type(exc).__name__,
