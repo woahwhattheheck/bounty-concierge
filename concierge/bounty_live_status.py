@@ -277,7 +277,19 @@ def _provider_cooldown(response: Any, captured_at: datetime) -> dict[str, Any] |
         reset_delay = max(0, math.ceil(int(reset) - captured_at.timestamp()))
         delay = max(delay or 0, reset_delay)
     if status != 429 and not primary_exhausted and delay is None:
-        return None  # A permission-denied 403 is not evidence of quota exhaustion.
+        # Secondary limits can arrive without quota or retry headers. Classify
+        # only GitHub's explicit error message; a permission 403 stays separate.
+        parse_json = getattr(response, "json", None)
+        try:
+            payload = parse_json() if callable(parse_json) else None
+        except (TypeError, ValueError):
+            payload = None
+        message = payload.get("message") if isinstance(payload, dict) else None
+        if not isinstance(message, str) or not any(
+            phrase in message.casefold()
+            for phrase in ("secondary rate limit", "rate limit exceeded")
+        ):
+            return None
 
     retry_not_before = None
     if delay is not None:
