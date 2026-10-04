@@ -1,0 +1,102 @@
+{
+  "python": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "before_blob": "036a76fa0fe7025daf829304f6bcf34cff59ad62",
+  "after_blob": "1e582873984a561b64427fef8d4afa891f5b21d7",
+  "repeats_per_sample": 200,
+  "alternating_pairs": 7,
+  "scope": "complete compiler including receipt serialization/hash; warm retained synthetic snapshots; no network",
+  "workloads": [
+    {
+      "carriers": 1,
+      "receipts_equal": true,
+      "receipt_sha256": "559810bd350154f7b6b9cce8d0a3937ec64d7720f11c5397ea76e91d4b2696d3",
+      "samples_ms": {
+        "before": [
+          5.618223,
+          5.659675,
+          5.831976,
+          5.784204,
+          5.619154,
+          6.071729,
+          5.657151
+        ],
+        "after": [
+          5.35211,
+          4.705621,
+          4.716919,
+          4.604619,
+          4.5662,
+          4.582505,
+          4.585529
+        ]
+      },
+      "medians_ms": {
+        "before": 5.659675,
+        "after": 4.604619
+      },
+      "reduction_percent": 18.64163578297341
+    },
+    {
+      "carriers": 10,
+      "receipts_equal": true,
+      "receipt_sha256": "94cbceaa368a3cff802a6310eb6a543fe6b63101302991d7cfa1c38830dfaa9a",
+      "samples_ms": {
+        "before": [
+          21.434969,
+          22.115809,
+          22.137162,
+          22.339388,
+          22.462404,
+          21.697657,
+          23.690402
+        ],
+        "after": [
+          16.854907,
+          16.685391,
+          15.390792,
+          16.376153,
+          16.661945,
+          16.434282,
+          16.22138
+        ]
+      },
+      "medians_ms": {
+        "before": 22.137162,
+        "after": 16.434282
+      },
+      "reduction_percent": 25.761567810724795
+    },
+    {
+      "carriers": 100,
+      "receipts_equal": true,
+      "receipt_sha256": "dc4b3448b4a768b1fc268b68e57ad97134f1e53f5c0fbc049c4b40deb769d90c",
+      "samples_ms": {
+        "before": [
+          182.658851,
+          196.445615,
+          205.033481,
+          193.817238,
+          192.965869,
+          196.649541,
+          201.733855
+        ],
+        "after": [
+          139.005822,
+          147.277095,
+          143.19638,
+          148.015592,
+          146.70538,
+          145.092231,
+          147.115556
+        ]
+      },
+      "medians_ms": {
+        "before": 196.445615,
+        "after": 146.70538
+      },
+      "reduction_percent": 25.320104498132988
+    }
+  ],
+  "diagnostic_parity": true
+}
