@@ -23,62 +23,9 @@ import sys
 
 from concierge import __version__
 from concierge import config
-from concierge import pow_miners
-from concierge.bounty_index import aggregate, fetch_bounties, fetch_bounties_report
-from concierge.reward_evidence import (
-    _sanitize_single_line,
-    reward_context,
-    reward_filter_value,
-    reward_sort_key,
-    reward_summary,
-)
-from concierge.faq_engine import answer as faq_answer
-from concierge.wallet_helper import (
-    check_wallet_exists,
-    get_active_miners,
-    get_all_holders,
-    get_balance,
-    get_epoch_info,
-    get_holder_stats,
-    get_pending_transfers,
-    register_wallet_guide,
-    validate_wallet_name,
-)
-from concierge.payout_tracker import check_status, format_payout_status
-from concierge.skill_matcher import recommend
-from concierge.migration_journal import get_attempt, prepare_migration
-from concierge.wallet_migration import continue_migration
-from concierge.discord_bridge import (
-    already_migrated,
-    get_discord_balance,
-    get_migration_history,
-    list_discord_holders,
-)
 
-# Optional modules -- degrade gracefully if missing or broken.
-try:
-    from concierge.engagement import (
-        star_all_ecosystem_repos,
-        check_devto_articles,
-        DevtoLookupError,
-        saascity_upvote,
-        SaaSCityError,
-        SAASCITY_API_BASE,
-        SAASCITY_LISTINGS,
-    )
-except ImportError:
-    star_all_ecosystem_repos = None
-    check_devto_articles = None
-    DevtoLookupError = None
-    saascity_upvote = None
-    SaaSCityError = None
-    SAASCITY_API_BASE = None
-    SAASCITY_LISTINGS = {}
-
-try:
-    from concierge.announcer import format_announcement
-except ImportError:
-    format_announcement = None
+# Import command dependencies when their handler needs them. Package bootstrap
+# and the entrypoint's claim/payment boundaries still run before CLI dispatch.
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +61,12 @@ def _truncate(text, width):
 
 def _print_bounty_table(bounties, show_evidence=False):
     """Print source mentions without rounding them or calling unknown zero."""
+    from concierge.reward_evidence import (
+        _sanitize_single_line,
+        reward_context,
+        reward_summary,
+    )
+
     if not bounties:
         print("No bounty rows displayed for these filters and display limit.")
         return
@@ -222,6 +175,8 @@ def _browse_repos(args):
 
 def _filter_bounties(bounties, args):
     """Filter numeric RTC mentions, keeping unknown distinct from explicit zero."""
+    from concierge.reward_evidence import reward_filter_value, reward_sort_key
+
     filtered = list(bounties)
     if args.skill:
         skill_lower = args.skill.lower()
@@ -413,6 +368,8 @@ def _cmd_browse(args):
         _cmd_browse_index(args, repos)
         return
 
+    from concierge.bounty_index import fetch_bounties_report
+
     try:
         report = fetch_bounties_report(repos=repos, max_pages=args.max_pages)
     except ValueError as exc:
@@ -477,6 +434,8 @@ def _cmd_faq(args):
         )
         return
 
+    from concierge.faq_engine import answer as faq_answer
+
     result = faq_answer(question, use_grok=args.grok)
 
     if args.json:
@@ -491,6 +450,16 @@ def _cmd_faq(args):
 
 def _cmd_wallet(args):
     """Handle the 'wallet' subcommand."""
+    from concierge.wallet_helper import (
+        get_active_miners,
+        get_all_holders,
+        get_balance,
+        get_epoch_info,
+        get_holder_stats,
+        register_wallet_guide,
+        validate_wallet_name,
+    )
+
     action = args.wallet_action
 
     if not action:
@@ -661,6 +630,7 @@ def _cmd_wallet(args):
 def _cmd_wallet_migrate(args):
     """Handle the 'wallet migrate' subcommand."""
     from concierge import config as _cfg
+    from concierge.wallet_helper import validate_wallet_name
 
     # Select the same mode as the live handler, before any retained or remote read.
     if args.dry_run:
@@ -707,6 +677,15 @@ def _cmd_wallet_migrate(args):
                 steps, ["prior_migration", "balance_rtc", "amount_rtc", "outcome"],
             )
         return
+
+    from concierge.migration_journal import get_attempt, prepare_migration
+    from concierge.wallet_migration import continue_migration
+    from concierge.discord_bridge import (
+        already_migrated,
+        get_discord_balance,
+        get_migration_history,
+        list_discord_holders,
+    )
 
     # --- history ---
     if args.history:
@@ -806,6 +785,8 @@ def _cmd_wallet_migrate(args):
 
 def _cmd_status(args):
     """Handle the 'status' subcommand."""
+    from concierge.wallet_helper import validate_wallet_name
+
     wallet = args.wallet
     if not wallet:
         print("Error: --wallet is required for status checks.", file=sys.stderr)
@@ -820,6 +801,8 @@ def _cmd_status(args):
         print(f"[dry-run] Would check payout status for wallet: {wallet}")
         return
 
+    from concierge.payout_tracker import check_status, format_payout_status
+
     pending, history = check_status(wallet)
 
     if args.json:
@@ -832,6 +815,26 @@ def _cmd_status(args):
 
 def _cmd_engage(args):
     """Handle the 'engage' subcommand."""
+    # Optional modules retain their existing unavailable-command behavior.
+    try:
+        from concierge.engagement import (
+            star_all_ecosystem_repos,
+            check_devto_articles,
+            DevtoLookupError,
+            saascity_upvote,
+            SaaSCityError,
+            SAASCITY_API_BASE,
+            SAASCITY_LISTINGS,
+        )
+    except ImportError:
+        star_all_ecosystem_repos = None
+        check_devto_articles = None
+        DevtoLookupError = None
+        saascity_upvote = None
+        SaaSCityError = None
+        SAASCITY_API_BASE = None
+        SAASCITY_LISTINGS = {}
+
     if args.star_repos:
         if star_all_ecosystem_repos is None:
             print(
@@ -960,6 +963,8 @@ def _cmd_mine(args):
     if args.pow != "warthog":
         print("Error: only --pow warthog is supported at this time.", file=sys.stderr)
         sys.exit(1)
+
+    from concierge import pow_miners
 
     if args.dry_run:
         if args.detect_only:
@@ -1123,12 +1128,20 @@ def _cmd_announce(args):
             ["bounties", "source_completeness", "announcement_content"],
         )
         return
+    try:
+        from concierge.announcer import format_announcement
+    except ImportError:
+        format_announcement = None
+
     if format_announcement is None:
         print(
             "Error: announcer module is not available.",
             file=sys.stderr,
         )
         sys.exit(1)
+
+    from concierge.bounty_index import fetch_bounties
+    from concierge.reward_evidence import reward_sort_key
 
     bounties = fetch_bounties()
     bounties.sort(key=reward_sort_key, reverse=True)
@@ -1159,6 +1172,8 @@ def _cmd_claim(args):
     wallet = args.wallet
 
     if wallet is not None:
+        from concierge.wallet_helper import validate_wallet_name
+
         valid, msg = validate_wallet_name(wallet)
         if not valid:
             print(f"Error: {msg}", file=sys.stderr)
