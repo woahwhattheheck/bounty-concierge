@@ -38,6 +38,21 @@ on an error. The collector keeps the same request order, 15-second timeout,
 cache validation and rate-limit handling; it does not add parallel reads or
 background work.
 
+The collector reuses each issue's extracted reward evidence for `reward_rtc`,
+avoiding a second RTC scan of the same title and body. Its existing zero fallback
+and reward-evidence fields remain intact. A loopback replay of the retained 266
+issues produced identical complete reports apart from observation clocks, with
+266 redundant parser calls removed and 11 HTTP reads in both versions. Seven
+alternating measured pairs gave median process CPU of 133.723 ms before and
+127.023 ms after; wall time was 134.581 ms and 128.208 ms. These local measurements
+include the replay server, not live GitHub or fleet latency. Raw samples and
+source/input digests are in
+[results.json](../work/throughput/index-rtc-reuse-20261004/results.json). Reproduce
+from the repository root with
+`python -B work/throughput/index-rtc-reuse-20261004/measure.py`; the baseline commit
+must be available locally. The replay uses that commit's retained index and
+reconstructs provider page envelopes without external requests.
+
 ## Filter one retained collection offline
 
 Workers can apply the ordinary browse filters to an existing index or saved live

@@ -272,8 +272,10 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                                                "labels": [{"name": name} for name in normalized["labels"]],
                                                "created_at": normalized["created_at"]})
                         title, body, labels = normalized["title"], normalized["body"], normalized["labels"]
-                        reward = parse_reward(title, body)
                         reward_evidence = extract_reward_evidence(title, body)
+                        reward = reward_evidence["amount_rtc"]
+                        if reward is None:
+                            reward = 0.0
                         report["bounties"].append({
                             "repo": repo, **normalized, "reward_rtc": reward,
                             "difficulty": estimate_difficulty(title, labels, reward),
