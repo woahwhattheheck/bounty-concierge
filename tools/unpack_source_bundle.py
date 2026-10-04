@@ -144,10 +144,23 @@ def unpack_bundle(
                         counts["available_regular_files"] += 1
                         counts["available_file_bytes"] += member.size
                     selected = not selectors
-                    for selector in selectors:
-                        if relative == selector or relative.startswith(selector + "/"):
-                            matched[selector] = True
-                            selected = True
+                    if (
+                        len(selectors) > 1
+                        and len(selectors) > relative.count("/") + 1
+                    ):
+                        # Walk ancestors only when fewer than the requested paths.
+                        # Mark all matches so overlapping selections count.
+                        ancestor = relative
+                        while ancestor:
+                            if ancestor in matched:
+                                matched[ancestor] = True
+                                selected = True
+                            ancestor = ancestor.rpartition("/")[0]
+                    else:
+                        for selector in selectors:
+                            if relative == selector or relative.startswith(selector + "/"):
+                                matched[selector] = True
+                                selected = True
                     if selected:
                         source.extract(member, destination, filter="data")
                         if member.isfile():
