@@ -185,6 +185,11 @@ from an arbitrary saved URL. Existing `COMPLETE` details are not fetched again;
 only active listings meeting the original floor with unresolved details consume
 the new 0-100 request budget. A completed input or zero budget opens no session.
 
+Early v1 reports can omit `page_size`. Because `resume` reads no catalog pages,
+it accepts those reports without guessing their historical page size, and keeps
+the field absent through subsequent resumes. A recorded page size must still be
+an integer from 1 through 100.
+
 Within that budget, `resume` visits untouched details (`NOT_REQUESTED`,
 `NOT_ATTEMPTED`, or `DETAIL_LIMIT`) before previous `READ_FAILED` or
 `INVALID_DETAIL` rows. This prevents an earlier broken listing from consuming
