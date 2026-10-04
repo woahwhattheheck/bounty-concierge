@@ -1,0 +1,69 @@
+name: One-page BountyHub catalog receipt
+on:
+  push:
+    branches: [quarry42/rust-grpc44]
+    paths: [.github/workflows/quarry42-bountyhub-catalog.yml]
+permissions:
+  contents: read
+concurrency:
+  group: quarry42-bountyhub-catalog
+  cancel-in-progress: false
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Fetch one public page without credentials or retries
+        shell: bash
+        run: |
+          mkdir -p out
+          python3 - <<'PY'
+          import datetime, hashlib, json, urllib.error, urllib.parse, urllib.request
+          from pathlib import Path
+          params = {
+              'page': '1', 'limit': '50',
+              'filters': json.dumps({'solved': False}, separators=(',', ':')),
+              'sort': json.dumps([{'orderBy': 'totalAmount', 'order': 'desc'}], separators=(',', ':')),
+          }
+          url = 'https://api.bountyhub.dev/api/bounties?' + urllib.parse.urlencode(params)
+          receipt = {'operation': 'WO-BH-CATALOG-C7B4-20261004', 'url': url,
+              'requested_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'page': 1, 'limit': 50, 'status': None, 'hasNextPage': None,
+              'row_count': None, 'complete_catalog': False}
+          try:
+              req = urllib.request.Request(url, headers={'User-Agent': 'TJLabs-Bounty-Intake/1.0', 'Accept': 'application/json'})
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  receipt['status'] = response.status
+                  receipt['headers'] = {key: response.headers.get(key) for key in ['Content-Type', 'Date', 'Retry-After', 'ETag']}
+                  raw = response.read(2097153)
+              if len(raw) > 2097152:
+                  raise ValueError('Response exceeds two MiB; not a complete retained response')
+              Path('out/catalog-page1.json').write_bytes(raw)
+              receipt['sha256'] = hashlib.sha256(raw).hexdigest()
+              data = json.loads(raw)
+              if not isinstance(data, dict) or not isinstance(data.get('data'), list):
+                  raise ValueError('Unexpected catalog response schema')
+              receipt['row_count'] = len(data['data'])
+              receipt['hasNextPage'] = data.get('hasNextPage')
+              columns = ['id', 'title', 'htmlURL', 'repositoryFullName', 'issueNumber', 'issueState', 'totalAmount', 'solved', 'claimed', 'createdAt']
+              Path('out/intake-rows.json').write_text(json.dumps([{key: row.get(key) for key in columns} for row in data['data']], indent=2) + '\n')
+          except urllib.error.HTTPError as exc:
+              receipt['status'] = exc.code
+              receipt['error'] = str(exc)
+              receipt['retry_after'] = exc.headers.get('Retry-After')
+              Path('out/error-response.txt').write_bytes(exc.read(65536))
+          except Exception as exc:
+              receipt['error'] = str(exc)
+          finally:
+              receipt['completed_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+              Path('out/receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+              print(json.dumps(receipt, indent=2))
+          if 'error' in receipt:
+              raise SystemExit(1)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bountyhub-page1-${{ github.sha }}
+          path: out/
+          retention-days: 7
