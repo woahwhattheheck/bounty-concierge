@@ -15,6 +15,10 @@
 | `--report` | Print one JSON object with rows and completion metadata |
 | `--dry-run` | Print the intended read. No network call |
 
+Skill filtering is case-insensitive and treats `docs`/`documentation` and
+`ci-cd`/`ci/cd` as equivalent in both live and offline browse. Other names remain
+literal indexed skills, and offline `filters.skill` retains the supplied selector.
+
 ## Exit
 
 | Code | When |
