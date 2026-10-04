@@ -1,0 +1,114 @@
+{
+  "after_blob": "820f0e432d923442882bcbd05465212b1524da09",
+  "before_blob": "cc78fff3f030c8d222030a4355201978e7b5cf2d",
+  "cases": {
+    "after": {
+      "hook_http_error": {
+        "available_pool_slots": 1,
+        "body_buffered": true,
+        "cooldown_body_preserved": true,
+        "followup_succeeded": true,
+        "link_preserved": false,
+        "original_error": "HTTPError",
+        "payload": null,
+        "request_count": 2,
+        "response_closed": true,
+        "same_tcp_connection": true
+      },
+      "invalid_json": {
+        "available_pool_slots": 1,
+        "body_buffered": true,
+        "followup_succeeded": true,
+        "link_preserved": false,
+        "original_error": "JSONDecodeError",
+        "payload": null,
+        "request_count": 2,
+        "response_closed": true,
+        "same_tcp_connection": true
+      },
+      "streamed_http_error": {
+        "available_pool_slots": 1,
+        "body_buffered": true,
+        "cooldown_body_preserved": true,
+        "followup_succeeded": true,
+        "link_preserved": false,
+        "original_error": "HTTPError",
+        "payload": null,
+        "request_count": 2,
+        "response_closed": true,
+        "same_tcp_connection": true
+      },
+      "success": {
+        "available_pool_slots": 1,
+        "body_buffered": true,
+        "followup_succeeded": true,
+        "link_preserved": true,
+        "original_error": null,
+        "payload": {
+          "ok": true
+        },
+        "request_count": 2,
+        "response_closed": true,
+        "same_tcp_connection": true
+      }
+    },
+    "before": {
+      "hook_http_error": {
+        "available_pool_slots": 0,
+        "body_buffered": false,
+        "cooldown_body_preserved": true,
+        "followup_succeeded": null,
+        "link_preserved": false,
+        "original_error": "HTTPError",
+        "payload": null,
+        "request_count": 1,
+        "response_closed": false,
+        "same_tcp_connection": null
+      },
+      "invalid_json": {
+        "available_pool_slots": 1,
+        "body_buffered": true,
+        "followup_succeeded": true,
+        "link_preserved": false,
+        "original_error": "JSONDecodeError",
+        "payload": null,
+        "request_count": 2,
+        "response_closed": true,
+        "same_tcp_connection": true
+      },
+      "streamed_http_error": {
+        "available_pool_slots": 0,
+        "body_buffered": false,
+        "cooldown_body_preserved": true,
+        "followup_succeeded": null,
+        "link_preserved": false,
+        "original_error": "HTTPError",
+        "payload": null,
+        "request_count": 1,
+        "response_closed": false,
+        "same_tcp_connection": null
+      },
+      "success": {
+        "available_pool_slots": 1,
+        "body_buffered": true,
+        "followup_succeeded": true,
+        "link_preserved": true,
+        "original_error": null,
+        "payload": {
+          "ok": true
+        },
+        "request_count": 2,
+        "response_closed": true,
+        "same_tcp_connection": true
+      }
+    }
+  },
+  "compatibility": {
+    "failed_drain_and_close_preserve_cause": true,
+    "frozen_response_without_close": true
+  },
+  "python": "3.12.3",
+  "requests": "2.32.5",
+  "scope": "Exact production helper; real loopback HTTP only, no live GitHub or claim actions.",
+  "urllib3": "2.7.0"
+}
