@@ -30,6 +30,11 @@ from concierge.submission_packet import validate_submission_target
 
 
 _REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
+_ISSUE_API = re.compile(
+    r"https://api\.github\.com/(?:repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
+    r"|repositories/[1-9][0-9]*)/issues/[1-9][0-9]*\Z",
+    re.IGNORECASE,
+)
 _MAX_INPUT_BYTES = 1024 * 1024
 _MAX_CANDIDATES = 1000
 
@@ -104,8 +109,12 @@ class _BatchSession:
         self.rate_limit_reset_at: int | None = None
         self.failure: dict[str, Any] | None = None
         self.request_url: str | None = None
+        self.request_origin_url: str | None = None
+        self.issue_request = False
 
     def get(self, url: str, **kwargs: Any) -> Any:
+        self.request_origin_url = url
+        self.issue_request = _ISSUE_API.fullmatch(url) is not None
         if isinstance(self.session, requests.Session) and kwargs.get("allow_redirects", True):
             return self._get_with_redirects(url, **kwargs)
         return self._request(self.session.get, url, **kwargs)
@@ -121,6 +130,12 @@ class _BatchSession:
         self.request_count += 1
         # Keep endpoint identity private for issue-local failure isolation.
         self.request_url = target if isinstance(target, str) else getattr(target, "url", None)
+        # Only issue-to-issue redirects may retain issue-local error handling.
+        # Once a hop leaves that scope, later redirects cannot restore it.
+        self.issue_request = self.issue_request and (
+            isinstance(self.request_url, str)
+            and _ISSUE_API.fullmatch(self.request_url) is not None
+        )
         try:
             response = send(target, **kwargs)
         except requests.RequestException as exc:
@@ -350,8 +365,9 @@ def collect_batch(
                 issue_error = error["code"] == "PREFLIGHT_ERROR" or (
                     error["code"] == "HTTP_ERROR"
                     and error["http_status"] in {404, 410}
-                    and transport.request_url is not None
-                    and transport.request_url.casefold() == (
+                    and transport.issue_request
+                    and transport.request_origin_url is not None
+                    and transport.request_origin_url.casefold() == (
                         f"https://api.github.com/repos/{row['repo']}/issues/{row['number']}"
                     ).casefold()
                 )
