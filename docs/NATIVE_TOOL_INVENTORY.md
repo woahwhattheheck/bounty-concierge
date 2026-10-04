@@ -79,6 +79,51 @@ Retain the complete response and print a bounded view. The existing Commons read
 
 This is a usage correction for observed search scoping and response volume. It changes no provider access, claim ownership, cooldown policy or publication permission.
 
+## Scoped GitHub issue and PR searches
+
+Check that search results actually match the requested selectors. On the
+observed October 4 binding, `github_search_issues` returned plain issue URLs
+and null state/timestamps for an `is:pr` query. Those results can supply leads;
+they do not establish that the PR, state, visibility or ordering qualifiers
+were applied. The approved native `github_fetch` search route returned the
+GitHub JSON with PR markers, timestamps and explicit search coverage:
+
+```js
+const query = "is:pr is:open is:public author:woahwhattheheck review:changes_requested";
+const response = await tools.mcp__codex_apps__github_fetch({
+  url: "https://api.github.com/search/issues?q=" + encodeURIComponent(query)
+    + "&sort=updated&order=desc&per_page=10"
+});
+store("github-pr-search-response", response);
+const page = JSON.parse(response.structuredContent.content);
+text({
+  total_count: page.total_count,
+  incomplete_results: page.incomplete_results,
+  items: page.items.map(item => ({
+    url: item.html_url,
+    is_pr: Boolean(item.pull_request),
+    state: item.state,
+    updated_at: item.updated_at
+  }))
+});
+```
+
+Use the actual owner, repository and work selectors. Preserve the full response,
+and inspect an error response before parsing it as a search page. This exact
+example was executed successfully; its then-empty result is not a lasting
+claim that no review work exists. `incomplete_results: false` does not make
+the first page exhaustive when `total_count` exceeds the returned item count.
+Continue with the same selectors and the next page when more coverage is needed.
+
+Connected searches can include private repositories. When visibility matters,
+include `is:public` as appropriate and read the target repository's current
+`visibility` before changing attribution or publishing its content. Internal
+attribution in a private record is not automatically an outward-publication
+violation. Refresh the exact issue or PR before claiming work or editing a body;
+search results can lag subsequent edits. The two search interfaces do not
+provide separate quota: honor the existing provider cooldown instead of
+switching routes to repeat a rate-limited request.
+
 ## Native Git publication without shell execution
 
 A shell `409 environment_offline` result describes that execution environment;
