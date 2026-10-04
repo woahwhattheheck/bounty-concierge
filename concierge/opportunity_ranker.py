@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from concierge.revenue_intake import qualify_revenue_intake
-from concierge.skill_matcher import match_skills
+from concierge.skill_matcher import _bounty_text, _score_text, _skill_patterns
 
 
 class OpportunityRankInputError(ValueError):
@@ -217,6 +217,7 @@ def rank_opportunities(
 
     eligible: list[dict[str, Any]] = []
     excluded: list[dict[str, Any]] = []
+    skill_patterns = None
 
     for index, candidate in enumerate(candidates):
         if type(candidate) is not dict:
@@ -275,7 +276,15 @@ def rank_opportunities(
             continue
 
         try:
-            skill_score = Decimal(str(match_skills(snapshot, skills)))
+            text = _bounty_text(snapshot) if skills else ""
+            if not text.strip():
+                skill_score = Decimal(0)
+            else:
+                # Prepare once per ranking, after eligibility/estimate checks.
+                # Never cache across calls: catalog edits remain visible.
+                if skill_patterns is None:
+                    skill_patterns = _skill_patterns(skills)
+                skill_score = Decimal(str(_score_text(text, skill_patterns)))
         except (InvalidOperation, TypeError, ValueError):
             excluded.append(_excluded(index, source=source, code="SKILL_SCORE_INVALID"))
             continue
