@@ -1,6 +1,5 @@
 """Focused regression checks for snapshot-consistent swarm reservation reads."""
 import base64
-from datetime import timezone
 import importlib.util
 import json
 from pathlib import Path
