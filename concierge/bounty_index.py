@@ -13,11 +13,13 @@ import sys
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from functools import lru_cache
+from time import time
 
 import requests
 
 from concierge.config import GITHUB_TOKEN, REPOS
 from concierge.bounty_cache import PageCache, same_validator
+from concierge.github_cooldown import CooldownStateError, GitHubCooldown, cooldown_deadline
 from concierge.reward_evidence import extract_reward_evidence, reward_summary
 
 
@@ -112,7 +114,46 @@ def _retry_after_seconds(headers):
         return None
 
 
-def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=None):
+def _shared_cooldown_blocks(cooldown, report, source):
+    """Check immediately before each GET; never hold a store lock during HTTP."""
+    if cooldown is None:
+        return False
+    try:
+        deadline = cooldown.deadline()
+    except CooldownStateError:
+        report["cooldown_state_error"] = True
+        source["status"] = "COOLDOWN_STATE_ERROR"
+        return True
+    now = time()
+    if deadline is None or deadline <= now:
+        return False
+    report.update(rate_limited=True, retry_after_seconds=math.ceil(deadline - now),
+                  shared_cooldown_until_epoch=deadline)
+    source["status"] = ("RATE_LIMITED_BEFORE_NEXT_PAGE" if source["pages_fetched"]
+                        else "NOT_ATTEMPTED_SHARED_COOLDOWN")
+    return True
+
+
+def _share_quota_deadline(cooldown, report, source, remaining, retry_after, reset_at):
+    """Publish a throttle without mistaking an unrelated primary reset for it."""
+    if cooldown is None:
+        return
+    try:
+        if retry_after is None and not (remaining == 0 and reset_at is not None):
+            cooldown.extend_unknown_secondary()
+        else:
+            cooldown.extend(cooldown_deadline(
+                retry_seconds=retry_after, retry_at=None, reset_at=reset_at,
+                primary_exhausted=remaining == 0,
+            ))
+    except CooldownStateError:
+        # Retain the response and any admitted rows, but stop further HTTP.
+        report["cooldown_state_error"] = True
+        source["cooldown_state_error"] = True
+
+
+def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=None,
+                          cooldown_path=None):
     """Read live sources once, retaining completion and safe error information.
 
     No retries or sleeps are performed. A rate-limit response, or exhausted
@@ -127,6 +168,12 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
     ``cache_dir`` (or CONCIERGE_BOUNTY_CACHE) enables conditional page reads.
     Cached rows are used only after a matching provider 304; errors never serve
     stale rows. Pass False to disable an environment-configured cache.
+
+    ``cooldown_path`` (or CONCIERGE_BOUNTY_COOLDOWN) shares quota deadlines
+    through the existing GitHubCooldown store. Workers must use the same private
+    file and credential. Every page checks the store; a store error defers HTTP
+    rather than silently bypassing it. No waiting or automatic retries are added.
+    Pass False to disable an environment-configured cooldown for this call.
     """
     if type(max_pages) is not int or not 1 <= max_pages <= 1000:
         raise ValueError("max_pages must be an integer between 1 and 1000")
@@ -164,9 +211,18 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
               "rate_limited": False, "retry_after_seconds": None,
               "rate_limit_reset_at": None, "repositories": sources, "bounties": []}
 
+    if cooldown_path is None:
+        cooldown_path = os.environ.get("CONCIERGE_BOUNTY_COOLDOWN")
+    cooldown = None
+    if cooldown_path is not False and cooldown_path is not None and cooldown_path != "":
+        cooldown = GitHubCooldown(cooldown_path, token)
+
     authentication_failed = False
     with requests.Session() as session:
         for source in sources:
+            if report.get("cooldown_state_error"):
+                source["status"] = "NOT_ATTEMPTED_COOLDOWN_ERROR"
+                continue
             if report["rate_limited"]:
                 source["status"] = "NOT_ATTEMPTED_RATE_LIMIT"
                 continue
@@ -185,7 +241,10 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                     source["cache"]["errors"] += int(cache_error)
                     if cached is not None:
                         request_headers["If-None-Match"] = cached["etag"]
-                        source["cache"]["conditional_requests"] += 1
+                if _shared_cooldown_blocks(cooldown, report, source):
+                    break
+                if cached is not None:
+                    source["cache"]["conditional_requests"] += 1
                 hook_http_error = False
                 try:
                     response = session.get(api_url, headers=request_headers, params=params, timeout=15)
@@ -215,6 +274,10 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                             error = {}
                         message = error.get("message", "") if isinstance(error, dict) else ""
                         throttled = isinstance(message, str) and "rate limit" in message.casefold()
+                    if throttled or remaining == 0:
+                        _share_quota_deadline(
+                            cooldown, report, source, remaining, retry_after, reset_at,
+                        )
                     if throttled:
                         report.update(rate_limited=True, retry_after_seconds=retry_after,
                                       rate_limit_reset_at=reset_at)
@@ -311,20 +374,24 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                         source["response_cleanup_error_type"] = type(exc).__name__
                         source["response_cleanup_errors"] = source.get("response_cleanup_errors", 0) + 1
 
+    for source in sources:
+        if source.get("cooldown_state_error") and source["status"] == "COMPLETE":
+            source["status"] = "COOLDOWN_STATE_ERROR"
     report["updated_at"] = datetime.now(timezone.utc).isoformat()
     report["complete"] = all(row["status"] == "COMPLETE" for row in sources)
     report["total_count"] = len(report["bounties"])
     return report
 
 
-def fetch_bounties(repos=None, token=None, *, cache_dir=None):
+def fetch_bounties(repos=None, token=None, *, cache_dir=None, cooldown_path=None):
     """Return the familiar bounty list only after all sources finish.
 
     Incomplete reads raise BountyFetchIncompleteError rather than impersonating
     an empty/full queue. The existing browse CLI handles this as a nonzero exit.
     Call fetch_bounties_report() for deliberately partial diagnostic results.
     """
-    report = fetch_bounties_report(repos=repos, token=token, cache_dir=cache_dir)
+    report = fetch_bounties_report(repos=repos, token=token, cache_dir=cache_dir,
+                                   cooldown_path=cooldown_path)
     if not report["complete"]:
         raise BountyFetchIncompleteError(report)
     return report["bounties"]
@@ -452,9 +519,10 @@ def tag_skills(title, body):
 # Aggregation & formatting
 # ---------------------------------------------------------------------------
 
-def aggregate(repos=None, token=None, *, cache_dir=None):
+def aggregate(repos=None, token=None, *, cache_dir=None, cooldown_path=None):
     """Return a complete sorted index, with explicit source traversal metadata."""
-    report = fetch_bounties_report(repos=repos, token=token, cache_dir=cache_dir)
+    report = fetch_bounties_report(repos=repos, token=token, cache_dir=cache_dir,
+                                   cooldown_path=cooldown_path)
     if not report["complete"]:
         raise BountyFetchIncompleteError(report)
     report["bounties"].sort(key=lambda b: b["reward_rtc"], reverse=True)
