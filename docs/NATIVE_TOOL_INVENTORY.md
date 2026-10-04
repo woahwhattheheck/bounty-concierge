@@ -78,3 +78,83 @@ On this binding, a keywords-only call rendered a blank search-query heading and 
 Retain the complete response and print a bounded view. The existing Commons reader, `host/connected_slack_pages.cjs`, provides `collectSlackPages` and `projectSlackSearchResults`; its usage guide is `host/CONNECTED_SLACK_PAGES.md`. It defaults fresh searches to `include_context: false` and can project an already-retained response without another provider call. Use that implementation rather than creating another collector or replaying a search just to read fewer characters.
 
 This is a usage correction for observed search scoping and response volume. It changes no provider access, claim ownership, cooldown policy or publication permission.
+
+## Native Git publication without shell execution
+
+A shell `409 environment_offline` result describes that execution environment;
+it does not establish that connected GitHub reads or writes are unavailable.
+When the native tools still work, use their actual schemas directly. Keep the
+complete desired UTF-8 file contents and their original source responses in
+code-mode state or an existing retrievable source packet. A local path, patch
+summary, hash, or commit label cannot reconstruct missing file bytes. Recover
+the exact source before writing if those strings are no longer available.
+
+### Read the parent commit's actual tree
+
+On the observed binding, `github_fetch_commit` normalizes commit metadata and
+can omit the tree SHA. The approved `github_fetch` Git-data route returns the
+provider JSON unchanged inside `structuredContent.content`:
+
+```js
+const repository = "OWNER/REPOSITORY";
+const branchPath = "EXISTING/BRANCH".split("/").map(encodeURIComponent).join("/");
+const refResponse = await tools.mcp__codex_apps__github_fetch({
+  url: "https://api.github.com/repos/" + repository + "/git/ref/heads/" + branchPath
+});
+const parent = JSON.parse(refResponse.structuredContent.content).object.sha;
+const commitResponse = await tools.mcp__codex_apps__github_fetch({
+  url: "https://api.github.com/repos/" + repository + "/git/commits/" + parent
+});
+const baseTree = JSON.parse(commitResponse.structuredContent.content).tree.sha;
+store("publication-base", { repository, parent, baseTree });
+```
+
+Replace the repository and existing branch with the actual target. A commit SHA
+and its tree SHA are distinct objects; pass the returned `tree.sha` as the base
+tree. For example, the [raw commit read](https://api.github.com/repos/woahwhattheheck/bounty-concierge/git/commits/0d77d025582531f74c2c6f1803fdd7efb4209bb6)
+performed for this guide returned tree `22448cad0e53da0938a1e7009c3d04c77ab7e9b6`.
+That is a historical observation, not the current branch head.
+
+### Publish complete file contents
+
+The full tool names below have prefix `mcp__codex_apps__github_`. Replace
+uppercase values with actual target data and returned SHAs; `FULL_TEXT` means
+the complete retained string, not a filesystem path. These are argument
+objects, not a new client or automatic retry loop.
+
+| Tool suffix | Supported arguments |
+| --- | --- |
+| `create_blob` | `{"repository_full_name":"OWNER/REPOSITORY","content":"FULL_TEXT","encoding":"utf-8"}` |
+| `create_tree` | `{"repository_full_name":"OWNER/REPOSITORY","base_tree_sha":"BASE_TREE_SHA","tree_elements":[{"path":"docs/example.md","mode":"100644","type":"blob","sha":"BLOB_SHA"}]}` |
+| `create_commit` | `{"repository_full_name":"OWNER/REPOSITORY","message":"Describe the source change","parent_sha":"PARENT_COMMIT_SHA","tree_sha":"NEW_TREE_SHA"}` |
+| `update_ref` | `{"repository_full_name":"OWNER/REPOSITORY","branch_name":"EXISTING/BRANCH","sha":"NEW_COMMIT_SHA","force":false}` |
+
+Create a blob for each complete file, collect their actual returned SHAs into
+one tree, then create one commit with the observed parent. Supplying
+`base_tree_sha` preserves paths outside those entries. Preserve the existing
+file modes; `100644` above is a regular non-executable text file. These object
+writes do not publish a branch change until `update_ref` succeeds.
+
+Read the current ref and affected file preimages before advancing it. If another
+writer changed the branch, compose the intended edits onto that current source
+and tree. Do not replace a newer file with an old complete string. The native
+`update_ref` schema has no expected-old-SHA argument: `force:false` requires a
+fast-forward but is not an atomic compare-and-swap against the earlier read.
+Retain a rejected or uncertain write's actual result and reconcile the branch
+before another attempt.
+
+For one existing UTF-8 file, the shorter Contents route is sufficient: read it
+with `fetch_file`, then call `update_file` with
+`{"repository_full_name":"OWNER/REPOSITORY","path":"docs/example.md","branch":"EXISTING/BRANCH","sha":"CURRENT_FILE_BLOB_SHA","content":"FULL_TEXT","message":"Describe the source change"}`.
+The wrapper encodes the text; do not pre-encode it. Its `sha` is the current
+file blob, not a commit or tree. Keep same-path updates sequential. The separate
+`create_file` action accepts a new path on an existing branch.
+
+Read the resulting branch or original PR head and the affected files at the
+returned commit. Compare the complete content or expected blob SHAs and retain
+the actual publication result. A local executor failure supplies no compilation
+or runtime result; carry forward existing source-bound validation without
+claiming a new run. Native tool availability also does not remove repository
+permissions, publication decisions, response-size/UTF-8 limits on
+`github_fetch`, or provider cooldowns. Keep existing author, branch, PR and
+operation custody when continuing the same work.
