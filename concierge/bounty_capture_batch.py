@@ -103,6 +103,7 @@ class _BatchSession:
         self.retry_after_at: str | None = None
         self.rate_limit_reset_at: int | None = None
         self.failure: dict[str, Any] | None = None
+        self.request_url: str | None = None
 
     def get(self, url: str, **kwargs: Any) -> Any:
         if isinstance(self.session, requests.Session) and kwargs.get("allow_redirects", True):
@@ -118,6 +119,8 @@ class _BatchSession:
             self.failure = {"code": "REQUEST_LIMIT"}
             raise requests.RequestException("batch request budget reached; remaining reads deferred")
         self.request_count += 1
+        # Keep endpoint identity private for issue-local failure isolation.
+        self.request_url = target if isinstance(target, str) else getattr(target, "url", None)
         try:
             response = send(target, **kwargs)
         except requests.RequestException as exc:
@@ -346,8 +349,11 @@ def collect_batch(
                 # budgets still stop the run instead of multiplying failures.
                 issue_error = error["code"] == "PREFLIGHT_ERROR" or (
                     error["code"] == "HTTP_ERROR"
-                    and 400 <= error["http_status"] < 500
-                    and error["http_status"] not in {401, 429}
+                    and error["http_status"] in {404, 410}
+                    and transport.request_url is not None
+                    and transport.request_url.casefold() == (
+                        f"https://api.github.com/repos/{row['repo']}/issues/{row['number']}"
+                    ).casefold()
                 )
                 if not issue_error:
                     stop_reason = error["code"]

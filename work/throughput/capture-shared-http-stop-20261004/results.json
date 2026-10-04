@@ -1,0 +1,140 @@
+{
+  "python": "3.12.14",
+  "requests": "2.34.2",
+  "candidate_blob": "13fa7e3349192fe880b0094e8b173573ea42d0db",
+  "cases": {
+    "search403": {
+      "before": {
+        "request_count": 75,
+        "attempted_count": 25,
+        "captured_count": 0,
+        "remaining_count": 25,
+        "stop_reason": "ITEM_ERRORS",
+        "rate_limited": false,
+        "retry_after_seconds": null,
+        "rate_limit_reset_at": null
+      },
+      "after": {
+        "request_count": 3,
+        "attempted_count": 1,
+        "captured_count": 0,
+        "remaining_count": 25,
+        "stop_reason": "HTTP_ERROR",
+        "rate_limited": false,
+        "retry_after_seconds": null,
+        "rate_limit_reset_at": null
+      }
+    },
+    "pull404": {
+      "before": {
+        "request_count": 8,
+        "attempted_count": 2,
+        "captured_count": 0,
+        "remaining_count": 2,
+        "stop_reason": "ITEM_ERRORS",
+        "rate_limited": false,
+        "retry_after_seconds": null,
+        "rate_limit_reset_at": null
+      },
+      "after": {
+        "request_count": 4,
+        "attempted_count": 1,
+        "captured_count": 0,
+        "remaining_count": 2,
+        "stop_reason": "HTTP_ERROR",
+        "rate_limited": false,
+        "retry_after_seconds": null,
+        "rate_limit_reset_at": null
+      }
+    },
+    "issue404": {
+      "before": {
+        "request_count": 4,
+        "attempted_count": 2,
+        "captured_count": 1,
+        "remaining_count": 1,
+        "stop_reason": "ITEM_ERRORS",
+        "rate_limited": false,
+        "retry_after_seconds": null,
+        "rate_limit_reset_at": null
+      },
+      "after": {
+        "request_count": 4,
+        "attempted_count": 2,
+        "captured_count": 1,
+        "remaining_count": 1,
+        "stop_reason": "ITEM_ERRORS",
+        "rate_limited": false,
+        "retry_after_seconds": null,
+        "rate_limit_reset_at": null
+      }
+    },
+    "issue410": {
+      "before": {
+        "request_count": 4,
+        "attempted_count": 2,
+        "captured_count": 1,
+        "remaining_count": 1,
+        "stop_reason": "ITEM_ERRORS",
+        "rate_limited": false,
+        "retry_after_seconds": null,
+        "rate_limit_reset_at": null
+      },
+      "after": {
+        "request_count": 4,
+        "attempted_count": 2,
+        "captured_count": 1,
+        "remaining_count": 1,
+        "stop_reason": "ITEM_ERRORS",
+        "rate_limited": false,
+        "retry_after_seconds": null,
+        "rate_limit_reset_at": null
+      }
+    },
+    "cooldown429": {
+      "before": {
+        "request_count": 1,
+        "attempted_count": 1,
+        "captured_count": 0,
+        "remaining_count": 2,
+        "stop_reason": "RATE_LIMITED",
+        "rate_limited": true,
+        "retry_after_seconds": 7,
+        "rate_limit_reset_at": 1893456000
+      },
+      "after": {
+        "request_count": 1,
+        "attempted_count": 1,
+        "captured_count": 0,
+        "remaining_count": 2,
+        "stop_reason": "RATE_LIMITED",
+        "rate_limited": true,
+        "retry_after_seconds": 7,
+        "rate_limit_reset_at": 1893456000
+      }
+    },
+    "redirect404": {
+      "before": {
+        "request_count": 4,
+        "attempted_count": 2,
+        "captured_count": 0,
+        "remaining_count": 2,
+        "stop_reason": "ITEM_ERRORS",
+        "rate_limited": false,
+        "retry_after_seconds": null,
+        "rate_limit_reset_at": null
+      },
+      "after": {
+        "request_count": 2,
+        "attempted_count": 1,
+        "captured_count": 0,
+        "remaining_count": 2,
+        "stop_reason": "HTTP_ERROR",
+        "rate_limited": false,
+        "retry_after_seconds": null,
+        "rate_limit_reset_at": null
+      }
+    }
+  },
+  "baseline_blob": "089af58810d54ad4ca5689eae17df76969e26ccb"
+}
