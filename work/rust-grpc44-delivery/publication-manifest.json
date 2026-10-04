@@ -1,0 +1,22 @@
+{
+  "operation_id": "QUARRY42-RUSTGRPC44-PUBLISH",
+  "attempt_operation_id": "QUARRY42-RUSTGRPC44-PUBLISH-attempt",
+  "source_owner": "QUARRY-42",
+  "upstream_repository": "tailcallhq/rust-grpc",
+  "issue_number": 44,
+  "payout_identity": "woahwhattheheck",
+  "advertised_bounty_usd": 50,
+  "award_or_payment_confirmed": false,
+  "source_base": "e5faeec6e9d833ecf5d46da718d3d0b5e2b9e542",
+  "validation_run": 37242196793,
+  "validation_job": 111552975327,
+  "validation_handoff_sha": "e5204b6aa8d4acc62999f54d443a6a1d3abc3fa3",
+  "validation_result": "success",
+  "implementation_patch_sha256": "2b1050c26edf9ac1cdc261385f34cb0989ec45fa3b6148a1810a27e55dfa3ee0",
+  "demo_sha256": "31bef0ecc1013832db97b9084caacbf369c916127fe83a59323d4c1659cce6d9",
+  "demo_description": "40-second checked-code and recorded-CI walkthrough, not live production footage",
+  "publication_state": "not_submitted",
+  "last_publication_run": 37242694417,
+  "last_publication_result": "identity_read_rate_limited_before_any_write",
+  "provider_reset_utc": "2026-10-04T23:32:14Z"
+}

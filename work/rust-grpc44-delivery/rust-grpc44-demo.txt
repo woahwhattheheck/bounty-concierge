@@ -1,0 +1,55 @@
+Current compatible dependencies
+Versions from the validated Cargo.lock
+Tonic / tonic-prost / reflection     0.14.6
+Prost                              0.14.4
+OpenTelemetry / SDK / OTLP           0.33.0
+Shuttle runtime                     0.57.0
+Tracing OpenTelemetry               0.34.0
+Tonic tracing middleware            0.42.1
+
+One aligned telemetry stack; refreshed lockfile.
+News RPC implementations and protobuf schema retained.
+
+Protobuf generation and server transport
+Actual snippets from the checked source
+    tonic_prost_build::configure()
+        .file_descriptor_set_path(out_dir.join("news_descriptor.bin"))
+        .compile_protos(&["news.proto"], &["."])
+        .expect("Failed to compile news.proto");
+
+        TonicServer::builder()
+            .layer(server::OtelGrpcLayer::default())
+            .add_service(NewsServiceServer::new(self))
+            .add_service(service)
+            .serve(addr)
+            .await
+            .map_err(anyhow::Error::from)?;
+
+Current OpenTelemetry APIs
+Actual exporter/provider migration
+    let exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_tonic()
+        .with_endpoint("https://api.honeycomb.io:443")
+        .with_metadata(metadata)
+        .build()?;
+
+    let provider = SdkTracerProvider::builder()
+        .with_resource(resource)
+        .with_batch_exporter(exporter)
+        .build();
+
+Recorded CI result: SUCCESS
+Recorded on 2026-10-04; not live terminal or deployed-service footage
+cargo fmt --all -- --check
+  PASS
+
+cargo test --locked --all-features
+  PASS - existing repository test
+
+cargo clippy --locked --all-targets --all-features -- -D warnings
+  PASS
+
+Run 37242196793  /  job 111552975327
+Completed 2026-10-04T23:02:55Z
+No production deployment or paid telemetry calls were made.
+

@@ -1,0 +1,236 @@
+use std::sync::{Arc, Mutex};
+
+use anyhow::Result;
+use opentelemetry::{global, trace::TracerProvider, KeyValue};
+use opentelemetry_otlp::{WithExportConfig, WithTonicConfig};
+use opentelemetry_sdk::{propagation::TraceContextPropagator, trace::SdkTracerProvider, Resource};
+use tonic::{metadata::MetadataMap, transport::Server as TonicServer, Response, Status};
+use tonic_tracing_opentelemetry::middleware::server;
+
+use news::news_service_server::NewsService;
+use news::news_service_server::NewsServiceServer;
+use news::{MultipleNewsId, News, NewsId, NewsList};
+use shuttle_runtime::Service;
+use tracing_subscriber::layer::SubscriberExt;
+
+pub mod news {
+    tonic::include_proto!("news"); // The package name specified in your .proto
+    pub(crate) const FILE_DESCRIPTOR_SET: &[u8] =
+        tonic::include_file_descriptor_set!("news_descriptor");
+}
+
+#[derive(Debug, Default)]
+pub struct MyNewsService {
+    news: Arc<Mutex<Vec<News>>>, // Using a simple vector to store news items in memory
+}
+
+impl MyNewsService {
+    fn new() -> MyNewsService {
+        let news = vec![
+            News {
+                id: 1,
+                title: "Note 1".into(),
+                body: "Content 1".into(),
+                post_image: "Post image 1".into(),
+                status: 0,
+            },
+            News {
+                id: 2,
+                title: "Note 2".into(),
+                body: "Content 2".into(),
+                post_image: "Post image 2".into(),
+                status: 1,
+            },
+            News {
+                id: 3,
+                title: "Note 3".into(),
+                body: "Content 3".into(),
+                post_image: "Post image 3".into(),
+                status: 1,
+            },
+            News {
+                id: 4,
+                title: "Note 4".into(),
+                body: "Content 4".into(),
+                post_image: "Post image 4".into(),
+                status: 1,
+            },
+            News {
+                id: 5,
+                title: "Note 5".into(),
+                body: "Content 5".into(),
+                post_image: "Post image 5".into(),
+                status: 1,
+            },
+        ];
+        MyNewsService {
+            news: Arc::new(Mutex::new(news)),
+        }
+    }
+}
+
+#[tonic::async_trait]
+impl NewsService for MyNewsService {
+    async fn get_all_news(
+        &self,
+        _request: tonic::Request<()>,
+    ) -> std::result::Result<Response<NewsList>, Status> {
+        let lock = self.news.lock().unwrap();
+        let reply = NewsList { news: lock.clone() };
+        Ok(Response::new(reply))
+    }
+
+    async fn get_news(
+        &self,
+        request: tonic::Request<NewsId>,
+    ) -> std::result::Result<Response<News>, Status> {
+        let id = request.into_inner().id;
+        let lock = self.news.lock().unwrap();
+        let item = lock.iter().find(|&n| n.id == id).cloned();
+        match item {
+            Some(news) => Ok(Response::new(news)),
+            None => Err(Status::not_found("News not found")),
+        }
+    }
+
+    async fn get_multiple_news(
+        &self,
+        request: tonic::Request<MultipleNewsId>,
+    ) -> std::result::Result<Response<NewsList>, Status> {
+        let ids = request
+            .into_inner()
+            .ids
+            .into_iter()
+            .map(|id| id.id)
+            .collect::<Vec<_>>();
+        let lock = self.news.lock().unwrap();
+        let news_items: Vec<News> = lock
+            .iter()
+            .filter(|n| ids.contains(&n.id))
+            .cloned()
+            .collect();
+        Ok(Response::new(NewsList { news: news_items }))
+    }
+
+    async fn delete_news(
+        &self,
+        request: tonic::Request<NewsId>,
+    ) -> std::result::Result<Response<()>, Status> {
+        let id = request.into_inner().id;
+        let mut lock = self.news.lock().unwrap();
+        let len_before = lock.len();
+        lock.retain(|news| news.id != id);
+        let len_after = lock.len();
+
+        if len_before == len_after {
+            Err(Status::not_found("News not found"))
+        } else {
+            let x = Response::new(());
+            Ok(x)
+        }
+    }
+
+    async fn edit_news(
+        &self,
+        request: tonic::Request<News>,
+    ) -> std::result::Result<Response<News>, Status> {
+        let new_news = request.into_inner();
+        let mut lock = self.news.lock().unwrap();
+        if let Some(news) = lock.iter_mut().find(|n| n.id == new_news.id) {
+            news.title = new_news.title.clone();
+            news.body = new_news.body.clone();
+            news.post_image = new_news.post_image.clone();
+            return Ok(Response::new(new_news));
+        }
+        Err(Status::not_found("News not found"))
+    }
+
+    async fn add_news(
+        &self,
+        request: tonic::Request<News>,
+    ) -> std::result::Result<Response<News>, Status> {
+        let mut news = request.into_inner();
+        let mut lock = self.news.lock().unwrap();
+        let new_id = lock.iter().map(|n| n.id).max().unwrap_or(0) + 1; // Simple ID generation
+        news.id = new_id;
+        lock.push(news.clone());
+        Ok(Response::new(news))
+    }
+}
+
+fn init_tracer() -> Result<()> {
+    global::set_text_map_propagator(TraceContextPropagator::new());
+
+    let resource = Resource::builder()
+        .with_service_name("rust-grpc")
+        .with_attribute(KeyValue::new("service.version", "test"))
+        .build();
+
+    let mut metadata = MetadataMap::new();
+    let mut api_key: tonic::metadata::MetadataValue<tonic::metadata::Ascii> =
+        std::env::var("HONEYCOMB_API_KEY")?.parse()?;
+    api_key.set_sensitive(true);
+    metadata.insert("x-honeycomb-team", api_key);
+
+    let exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_tonic()
+        .with_endpoint("https://api.honeycomb.io:443")
+        .with_metadata(metadata)
+        .build()?;
+
+    let provider = SdkTracerProvider::builder()
+        .with_resource(resource)
+        .with_batch_exporter(exporter)
+        .build();
+
+    let tracer = provider.tracer("tracing");
+    let trace_layer = tracing_opentelemetry::layer()
+        .with_location(false)
+        .with_threads(false)
+        .with_tracer(tracer);
+
+    let subscriber = tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(trace_layer);
+
+    tracing::subscriber::set_global_default(subscriber)?;
+
+    global::set_tracer_provider(provider);
+
+    Ok(())
+}
+
+#[shuttle_runtime::main]
+async fn shuttle_main() -> Result<impl Service, shuttle_runtime::Error> {
+    if std::env::var("HONEYCOMB_API_KEY").is_ok() {
+        init_tracer()?;
+    } else {
+        tracing_subscriber::fmt::init();
+    }
+
+    let news_service = MyNewsService::new();
+
+    Ok(news_service)
+}
+
+#[async_trait::async_trait]
+impl Service for MyNewsService {
+    async fn bind(self, addr: std::net::SocketAddr) -> Result<(), shuttle_runtime::Error> {
+        let service = tonic_reflection::server::Builder::configure()
+            .register_encoded_file_descriptor_set(news::FILE_DESCRIPTOR_SET)
+            .build_v1alpha()
+            .map_err(anyhow::Error::from)?;
+
+        println!("NewsService server listening on {}", addr);
+
+        TonicServer::builder()
+            .layer(server::OtelGrpcLayer::default())
+            .add_service(NewsServiceServer::new(self))
+            .add_service(service)
+            .serve(addr)
+            .await
+            .map_err(anyhow::Error::from)?;
+
+        Ok(())
+    }
+}

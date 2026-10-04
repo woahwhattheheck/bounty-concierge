@@ -1,0 +1,20 @@
+rust-grpc v0.1.0 (/home/runner/work/bounty-concierge/bounty-concierge/source)
+├── anyhow v1.0.104
+├── async-trait v0.1.92 (proc-macro)
+├── opentelemetry v0.33.0
+├── opentelemetry-otlp v0.33.0
+├── opentelemetry_sdk v0.33.0
+├── prost v0.14.4
+├── shuttle-runtime v0.57.0
+├── tokio v1.53.2
+├── tonic v0.14.6
+├── tonic-prost v0.14.6
+├── tonic-reflection v0.14.6
+├── tonic-tracing-opentelemetry v0.42.1
+├── tracing v0.1.44
+├── tracing-opentelemetry v0.34.0
+└── tracing-subscriber v0.3.23
+[build-dependencies]
+└── tonic-prost-build v0.14.6
+[dev-dependencies]
+└── gh-workflow v0.9.0

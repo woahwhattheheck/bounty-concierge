@@ -1,0 +1,40 @@
+{
+  "source_repository": "tailcallhq/rust-grpc",
+  "base_sha": "e5faeec6e9d833ecf5d46da718d3d0b5e2b9e542",
+  "handoff_sha": "e5204b6aa8d4acc62999f54d443a6a1d3abc3fa3",
+  "run_id": "37242196793",
+  "files": {
+    "Cargo.toml": {
+      "sha256": "9767942c5b2931557979e438f1e7af54e78c05a3bcdb3b9246b46d44130bf798",
+      "git_blob": "67b55662c66dbdfc12a451853c0ace8d75072e1a"
+    },
+    "Cargo.lock": {
+      "sha256": "5b2545d5802b340e981d9f5b8493c8a63ef9b7c88f50181110348869e8f07dfe",
+      "git_blob": "5acf5863a3d1065a7802a47569c5d9f48781867b"
+    },
+    "build.rs": {
+      "sha256": "830fcb662086fc2a2d64b42e80c81310af9acda3dcf5104bf2ab63797bf5a8fa",
+      "git_blob": "0ba045ca25a572f259c39e259983a2666b7a2020"
+    },
+    "src/main.rs": {
+      "sha256": "67764029047cf64de9901cd57b99d75501edac3ea6fd631519c65ab4425d6dd3",
+      "git_blob": "85c541b122353dd33398488549e659aeb6993471"
+    },
+    "README.md": {
+      "sha256": "9a687b2e0d9af342f204b9de56e76e6b7d09eb86c2cd65c2f5272b2005de39a8",
+      "git_blob": "07b78650d4ea0e63211192694e4b13dba8798879"
+    },
+    ".github/workflows/ci.yml": {
+      "sha256": "27f9f289273672c1bead3e4d87606e7f95f513a77f755e1c36640e2504ac2f9f",
+      "git_blob": "438233467eb96952157c8c9bb3f89bc07e53ae4f"
+    },
+    "tests/ci.rs": {
+      "sha256": "84c2e190ba7c715a2f6620454fdf1a72865ac146377801093f926d4007544525",
+      "git_blob": "d2e6be785abe447e35ecbc37ca4439bd044e01c3"
+    },
+    "news.proto": {
+      "sha256": "ccdafff5685f881113095bcb8a0e2874233767539788ceee6c5d4143ac95f9a9",
+      "git_blob": "7864a0a53cc185186514e3a9efadcf16cc54ae98"
+    }
+  }
+}
