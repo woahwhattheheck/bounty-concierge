@@ -212,24 +212,28 @@ def select_targets(report: dict[str, Any], minimum_funded_usd: str = "50.00") ->
     }
 
 
-def fetch_catalog(*, max_pages: int = 10, max_details: int = 50,
+def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int = 100,
                   minimum_total_usd: str = "50.00", session: Any = None) -> dict[str, Any]:
     """Collect once with bounded reads; retain partial progress and never retry."""
     if type(max_pages) is not int or not 1 <= max_pages <= 100:
         raise ValueError("max_pages must be between 1 and 100")
     if type(max_details) is not int or not 0 <= max_details <= 100:
         raise ValueError("max_details must be between 0 and 100")
+    if type(page_size) is not int or not 1 <= page_size <= 100:
+        raise ValueError("page_size must be between 1 and 100")
     floor = _amount(minimum_total_usd)
     if session is None:
         with requests.Session() as owned:
             return fetch_catalog(max_pages=max_pages, max_details=max_details,
-                                 minimum_total_usd=minimum_total_usd, session=owned)
+                                 page_size=page_size, minimum_total_usd=minimum_total_usd,
+                                 session=owned)
     report: dict[str, Any] = {
         "schema": SCHEMA, "source_url": API, "started_at": _now(),
         "completed_at": None, "complete": False, "catalog_complete": False,
         "details_complete": True, "pages_fetched": 0, "details_fetched": 0,
         "requests_made": 0, "minimum_total_usd": _money(floor),
-        "max_pages": max_pages, "max_details": max_details, "rate_limited": False,
+        "max_pages": max_pages, "max_details": max_details, "page_size": page_size,
+        "rate_limited": False,
         "retry_after_seconds": None, "errors": [], "listings": [],
     }
     seen: set[str] = set()
@@ -242,7 +246,7 @@ def fetch_catalog(*, max_pages: int = 10, max_details: int = 50,
 
     for page in range(1, max_pages + 1):
         try:
-            payload = _get(session, API, report, page=page)
+            payload = _get(session, API, report, page=page, limit=page_size)
             if (not isinstance(payload, dict) or not isinstance(payload.get("data"), list)
                     or type(payload.get("hasNextPage")) is not bool):
                 raise ValueError("invalid catalog page")
@@ -301,6 +305,7 @@ def main(argv: list[str] | None = None) -> int:
     collect = commands.add_parser("collect", help="Read the public catalog and selected pledge details")
     collect.add_argument("--max-pages", type=int, default=10)
     collect.add_argument("--max-details", type=int, default=50)
+    collect.add_argument("--page-size", type=int, default=100)
     collect.add_argument("--min-funded-usd", default="50.00")
     targets = commands.add_parser("targets", help="Export targets from a retained catalog with no provider reads")
     targets.add_argument("snapshot", type=Path)
@@ -309,6 +314,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "collect":
             result = fetch_catalog(max_pages=args.max_pages, max_details=args.max_details,
+                                   page_size=args.page_size,
                                    minimum_total_usd=args.min_funded_usd)
             complete = result["shortlist"]["source_complete"]
         else:
