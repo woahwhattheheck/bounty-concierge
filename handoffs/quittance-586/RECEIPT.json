@@ -142,5 +142,36 @@
     "thread": "1790851459.659859",
     "owner_claim": "QUITTANCE586-SELLER-CHALLENGE-LEDGER0938",
     "freshness": "Before the native attempt, read issue comments and all 13 open PRs; no maintainer assignment/hold or matching PR586. Source branch freshly verified at d9322f3f while issuing this handoff. Publisher must recheck issue/open PRs and exact source head immediately before creation."
-  }
+  },
+  "publication_recovery_attempts": [
+    {
+      "recorded_at": "2026-10-04T13:30:01.017Z",
+      "source_sha": "d9322f3f5a11533d46825c2894034e10214a3192",
+      "base_sha": "282c75ad933651a93b89a8412ab649b48714c739",
+      "authenticated_user": "woahwhattheheck",
+      "tool": "github_create_pull_request",
+      "attempts": 2,
+      "first_result": {
+        "error": "GitHub API error 403: {\"message\":\"Resource not accessible by integration\",\"documentation_url\":\"https://docs.github.com/rest/pulls/pulls#create-a-pull-request\",\"status\":\"403\"}",
+        "error_code": "FORBIDDEN",
+        "error_data": {
+          "message": "Resource not accessible by integration",
+          "documentation_url": "https://docs.github.com/rest/pulls/pulls#create-a-pull-request",
+          "status": "403"
+        }
+      },
+      "retry_result": {
+        "error": "GitHub API error 403: {\"message\":\"Resource not accessible by integration\",\"documentation_url\":\"https://docs.github.com/rest/pulls/pulls#create-a-pull-request\",\"status\":\"403\"}",
+        "error_code": "FORBIDDEN",
+        "error_data": {
+          "message": "Resource not accessible by integration",
+          "documentation_url": "https://docs.github.com/rest/pulls/pulls#create-a-pull-request",
+          "status": "403"
+        }
+      },
+      "retry_after_exposed": false,
+      "matching_prs_after_attempts": [],
+      "source_or_body_changed": false
+    }
+  ]
 }
