@@ -1,0 +1,68 @@
+{
+  "scope": "Local/shared-filesystem bounty-index publication. Not a provider request-budget or payout claim.",
+  "baseline_blob": "e20b118ea3566c71245942f8ecfdda7c017ae325",
+  "fixed_blob": "ba4666b7b04fe3f287615bea8726f5a6991f88b9",
+  "environment": {
+    "python": "3.13.5",
+    "system": "Linux",
+    "harness": "4bacc616a308"
+  },
+  "baseline_exit": 1,
+  "fixed_exit": 0,
+  "baseline": {
+    "workers": [
+      {
+        "label": "new",
+        "outcome": "published",
+        "collector_calls": 1
+      },
+      {
+        "label": "old",
+        "outcome": "published",
+        "collector_calls": 1
+      }
+    ],
+    "final_title": "old",
+    "final_started_at": "2026-10-04T08:00:00+00:00",
+    "temporary_residue": []
+  },
+  "fixed": {
+    "workers": [
+      {
+        "label": "new",
+        "outcome": "published",
+        "collector_calls": 1
+      },
+      {
+        "label": "old",
+        "outcome": "BountyIndexSupersededError",
+        "collector_calls": 1
+      }
+    ],
+    "final_title": "new",
+    "final_started_at": "2026-10-04T08:01:00+00:00",
+    "temporary_residue": []
+  },
+  "additional_local_checks": {
+    "passed": 9,
+    "checks": [
+      "canonical case variants and complete original metadata preserved",
+      "superseded CLI exit 3 preserves exact newer bytes",
+      "UTC-aware ordering allows a later read with a different offset",
+      "legacy export timestamp does not masquerade as source freshness",
+      "replace failure retains last-good bytes and removes temporary file",
+      "invalid source interval cannot replace the saved index",
+      "incomplete collection remains rejected",
+      "canonical issue identity validation remains intact",
+      "collection completes before publication lock acquisition"
+    ]
+  },
+  "network": "Collector responses were controlled in each child process. No HTTP request was issued. Each child invoked the collector exactly once.",
+  "windows": "Windows msvcrt branch not executed in this Linux harness. Empty-file byte locking follows the documented past-EOF contract; no unlocked initialization write.",
+  "ordering": "Later started_at wins; updated_at breaks ties. Times must be timezone-aware. Cooperative writers must use the same output path and filesystem with working advisory locks.",
+  "commands": [
+    "python work/validation/2026-10-04-index-publication-4bac/reproduce.py",
+    "python -m py_compile concierge/bounty_index_publish.py"
+  ],
+  "windows_lock_reference": "https://docs.python.org/3/library/msvcrt.html#msvcrt.locking"
+}
