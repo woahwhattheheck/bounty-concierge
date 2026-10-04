@@ -145,8 +145,10 @@ Successful complete collection/selection exits 0. A page/detail bound, HTTP or
 transport failure, malformed payload, repeated listing during pagination, or
 unresolved selected funding exits 2. Collected rows remain in the JSON report;
 an interrupted or failed traversal is not an empty queue. HTTP failures stop
-further reads. A 429, or 403 carrying `Retry-After`, records rate limiting, and
-numeric/date retry guidance is retained without automatically retrying.
+further reads except for 404/410 detail removals, which leave that detail
+unresolved while allowing later details within the same budget. A 429, or 403
+carrying `Retry-After`, records rate limiting, and numeric/date retry guidance is
+retained without automatically retrying.
 
 `catalog_complete` and `details_complete` distinguish the two acquisition phases.
 `shortlist.source_complete` additionally records whether selected funding is
@@ -181,6 +183,18 @@ URLs are reconstructed from the canonical API and validated UUIDs, never followe
 from an arbitrary saved URL. Existing `COMPLETE` details are not fetched again;
 only active listings meeting the original floor with unresolved details consume
 the new 0-100 request budget. A completed input or zero budget opens no session.
+
+Within that budget, `resume` visits untouched details (`NOT_REQUESTED`,
+`NOT_ATTEMPTED`, or `DETAIL_LIMIT`) before previous `READ_FAILED` or
+`INVALID_DETAIL` rows. This prevents an earlier broken listing from consuming
+every one-request resume while later listings remain unread. A failure deferred
+by the budget or a stop keeps its failure status, rather than becoming a new
+`DETAIL_LIMIT`/`NOT_ATTEMPTED` row. Previously failed details can still be retried
+when the explicit resume budget reaches them. This prioritizes first reads;
+it does not promise round-robin retries among multiple persistently failing
+rows. No listing is dropped or reordered in the retained report, and an
+unresolved failure still makes the result partial.
+
 The existing detail reader still continues past 404/410 removals and stops on
 other HTTP/transport failures; no automatic retry loop, sleep or schedule is added.
 Any recorded `Retry-After` prevents early resumption, measured conservatively
