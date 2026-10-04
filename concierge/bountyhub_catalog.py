@@ -653,6 +653,8 @@ def main(argv: list[str] | None = None) -> int:
     refresh = commands.add_parser("refresh", help="Refresh explicit known listing details without catalog pages")
     refresh.add_argument("snapshot", type=Path)
     refresh.add_argument("--listing-id", action="append", required=True, dest="listing_ids")
+    refresh.add_argument("--max-requests", type=int,
+                         help="HTTP request allowance, 0-100; defaults to the distinct listing count")
     refresh.add_argument("--previous-refresh", type=Path,
                          help="Last targeted-refresh receipt; enforces its Retry-After cooldown")
     for command in (collect, targets):
@@ -683,6 +685,7 @@ def main(argv: list[str] | None = None) -> int:
             result = refresh_listings(
                 _load(args.snapshot), args.listing_ids,
                 previous_refresh=_load(args.previous_refresh) if args.previous_refresh else None,
+                max_requests=args.max_requests,
             )
             complete = result["complete"]
         elif args.command == "resume":

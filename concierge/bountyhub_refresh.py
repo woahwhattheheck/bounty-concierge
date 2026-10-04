@@ -23,11 +23,13 @@ SCHEMA = "bountyhub-target-refresh/v1"
 
 def refresh_listings(snapshot: dict[str, Any], listing_ids: list[str], *,
                      previous_refresh: dict[str, Any] | None = None,
+                     max_requests: int | None = None,
                      session: Any = None) -> dict[str, Any]:
-    """Make at most one detail GET per distinct requested identity (maximum 100).
+    """Refresh known details within an explicit 0-100 HTTP request allowance.
 
     Input is a fully traversed retained catalog, not a source of fresh funding.
     Pass the last refresh receipt on subsequent calls to enforce its cooldown.
+    The default allowance is one request per distinct identity; redirects count.
     The caller owns a supplied Session; all requests use the existing transport.
     """
     # Early v1 reports omitted page_size. No page reads occur here: use only
@@ -41,6 +43,10 @@ def refresh_listings(snapshot: dict[str, Any], listing_ids: list[str], *,
     if any(not isinstance(item, str) or not catalog._ID.fullmatch(item) for item in listing_ids):
         raise ValueError("invalid listing identity")
     selected = list(dict.fromkeys(listing_ids))
+    if max_requests is None:
+        max_requests = len(selected)
+    if type(max_requests) is not int or not 0 <= max_requests <= 100:
+        raise ValueError("max_requests must be between 0 and 100")
     rows = {row["listing_id"]: row for row in retained["listings"]}
     if any(item not in rows for item in selected):
         raise ValueError("requested listing is absent from the retained catalog")
@@ -89,14 +95,14 @@ def refresh_listings(snapshot: dict[str, Any], listing_ids: list[str], *,
         "scope": "requested_listing_ids_only",
         "started_at": started_at, "completed_at": None,
         "requested_listing_ids": selected, "input_listing_count": len(listing_ids),
-        "requests_made": 0, "details_fetched": 0,
+        "request_limit": max_requests, "requests_made": 0, "details_fetched": 0,
         "rate_limited": False, "retry_after_seconds": None,
         "details_complete": True, "complete": False,
         "records": [], "errors": [],
     }
     fresh_rows: list[dict[str, Any]] = []
     stopped = False
-    with requests.Session() if session is None else nullcontext(session) as client:
+    with requests.Session() if session is None and max_requests else nullcontext(session) as client:
         for listing_id in selected:
             expected = rows[listing_id]
             record: dict[str, Any] = {
@@ -106,7 +112,7 @@ def refresh_listings(snapshot: dict[str, Any], listing_ids: list[str], *,
                 "listing": None,
             }
             report["records"].append(record)
-            if stopped:
+            if stopped or report["requests_made"] >= max_requests:
                 report["details_complete"] = False
                 continue
             record["started_at"] = catalog._now()
@@ -162,6 +168,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("snapshot", type=Path)
     parser.add_argument("--listing-id", action="append", required=True, dest="listing_ids")
+    parser.add_argument("--max-requests", type=int,
+                        help="HTTP request allowance, 0-100; defaults to the distinct listing count")
     parser.add_argument("--previous-refresh", type=Path,
                         help="Last receipt for this catalog; enforces its Retry-After cooldown")
     args = parser.parse_args(argv)
@@ -169,6 +177,7 @@ def main(argv: list[str] | None = None) -> int:
         result = refresh_listings(
             _load(args.snapshot), args.listing_ids,
             previous_refresh=_load(args.previous_refresh) if args.previous_refresh else None,
+            max_requests=args.max_requests,
         )
         print(json.dumps(result, indent=2, sort_keys=True))
         if not result["complete"]:
