@@ -34,6 +34,8 @@ All timestamps are canonical UTC seconds (`YYYY-MM-DDTHH:MM:SSZ`). Money is posi
 
 Transfer IDs and payout-ticket IDs cannot be reused across merged work items. A transfer may have multiple observations only when amount/currency are stable and state progresses monotonically (`PENDING` → `CONFIRMING` → one terminal `CONFIRMED` or `FAILED`). Terminal conflicts/regressions fail closed.
 
+Repeated captures of identical source bytes must report the same status for each transfer; a later observation time does not establish a changed transfer state.
+
 The existing `data/reward_settlement_ledger.synthetic.json` fixture is synthetic and asserts no real sponsor, payment, or revenue fact. The separate [GrantFox example](../examples/grantfox-recognition-20261003/README.md) contains actual public provider comments and merged-PR records.
 
 ## Noncash provider recognition
