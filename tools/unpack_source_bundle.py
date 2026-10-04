@@ -123,6 +123,10 @@ def unpack_bundle(
             seen: set[str] = set()
             with tarfile.open(fileobj=archive, mode="r|gz") as source:
                 for member in source:
+                    # Python 3.12 retains TarInfo objects even in stream mode.
+                    # Extraction below uses this member directly; seen retains
+                    # duplicate detection without keeping the archive index.
+                    source.members.clear()
                     name = _path(member.name)
                     if name in seen:
                         raise ValueError(f"duplicate archive path: {name}")
@@ -207,4 +211,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

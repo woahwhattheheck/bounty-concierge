@@ -27,9 +27,9 @@ No provider calls, source export, installs, general test suite, or CI execution 
 | --- | --- |
 | Released baseline | `1ba52712f06fe5303214231fe5e4a589889d56ac` |
 | Executed baseline | `f09d519b4419701b1e70589ea69312f651e94371` |
-| Executed and published candidate | `62bcc86ac7819e8afe83830c7fb2a5835863b518` |
+| Isolated executed selector variant | `62bcc86ac7819e8afe83830c7fb2a5835863b518` |
 
-The executed baseline differs from the released baseline only by one additional terminal LF introduced when saving the measurement copy. The candidate is published byte-for-byte as executed. Full source SHA-256 digests, every timing sample, fixture ZIP digests, output counts, and rejection results are in [receipt.json](receipt.json). [measure.py](measure.py) constructs and removes the same deterministic fixtures; it deliberately uses tmpfs for both fixture storage and the unpacker's temporary archive spool.
+The executed baseline differs from the released baseline only by one additional terminal LF introduced when saving the measurement copy. The isolated selector variant is retained byte-for-byte as executed at [fa737c6](https://github.com/woahwhattheheck/bounty-concierge/blob/fa737c695d31c44f80ffa38b09f1f98e88655900/tools/unpack_source_bundle.py). The production source also retains the independently landed TarInfo cache cleanup from [ff45d85](https://github.com/woahwhattheheck/bounty-concierge/commit/ff45d85a7d963cdae9f6426a27bcc451fcd72c09). The selector hunk is identical; the combined source was not remeasured, so the table above describes the selector change in isolation. Full source SHA-256 digests, every timing sample, fixture ZIP digests, output counts, and rejection results are in [receipt.json](receipt.json). [measure.py](measure.py) constructs and removes the same deterministic fixtures; it deliberately uses tmpfs for both fixture storage and the unpacker's temporary archive spool.
 
 To reproduce from a local Git checkout containing the source objects, create the exact source copies:
 

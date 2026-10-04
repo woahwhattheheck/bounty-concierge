@@ -3,6 +3,7 @@
 
 Only allowlisted listing fields and aggregate pledge/claim counts leave this
 module. A funded listing is discovery evidence, not our assignment or payment.
+Named-file checkpoint examples: docs/BOUNTYHUB_CATALOG_OUTPUT.md.
 """
 
 from __future__ import annotations
@@ -14,9 +15,11 @@ from decimal import Decimal
 from email.utils import parsedate_to_datetime
 import json
 import math
+import os
 from pathlib import Path
 import re
 import sys
+import tempfile
 from typing import Any
 
 import requests
@@ -33,6 +36,34 @@ _REPO = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9_.-]+\Z")
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _emit_json(value: Any, destination: Path | None) -> None:
+    """Keep stdout compatible or replace a named file only after a complete write."""
+    text = json.dumps(value, indent=2, sort_keys=True) + "\n"
+    if destination is None:
+        print(text, end="")
+        return
+    temporary: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", newline="\n", dir=destination.parent,
+            prefix=f".{destination.name}.", suffix=".tmp", delete=False,
+        ) as output:
+            temporary = output.name
+            output.write(text)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, destination)
+    except OSError as exc:
+        raise ValueError("cannot write the output file") from exc
+    finally:
+        if temporary is not None:
+            try:
+                os.unlink(temporary)
+            except OSError:
+                # A failed cleanup must not obscure the write failure or interrupt.
+                pass
 
 
 def _amount(value: Any) -> Decimal:
@@ -634,6 +665,11 @@ def main(argv: list[str] | None = None) -> int:
             "--include-promised", action="store_true",
             help="Include resolved PROMISED pledges with funded pledges when applying the reward floor",
         )
+    for command in commands.choices.values():
+        command.add_argument(
+            "--output", type=Path,
+            help="Atomically replace this JSON file instead of writing to stdout; parent must exist",
+        )
     args = parser.parse_args(argv)
     try:
         if args.command == "collect":
@@ -685,7 +721,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "targets":
             # The existing batch preflight accepts this exact envelope. Keep
             # observation/funding evidence in the original catalog report.
-            print(json.dumps({"candidates": result["targets"]}, indent=2, sort_keys=True))
+            _emit_json({"candidates": result["targets"]}, args.output)
             basis = (
                 f" reward_basis={result['reward_basis']} minimum_reward_usd={result['minimum_reward_usd']}"
                 if args.include_promised else ""
@@ -705,7 +741,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"candidates={len(result['targets'])}{basis}", file=sys.stderr,
             )
         else:
-            print(json.dumps(result, indent=2, sort_keys=True))
+            _emit_json(result, args.output)
         if not complete:
             selected = result.get("shortlist", result)
             basis = "funded plus promised" if selected.get("reward_basis") else "funded"
