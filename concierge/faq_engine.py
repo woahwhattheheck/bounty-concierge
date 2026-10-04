@@ -5,6 +5,7 @@ Provides instant answers for common RustChain bounty questions using a
 built-in knowledge base, doc search, and optional LLM escalation.
 """
 
+from functools import lru_cache
 import os
 import re
 import sys
@@ -226,6 +227,19 @@ def _keywords(text):
     return set(_normalise(text).split()) - _QUESTION_WORDS
 
 
+@lru_cache(maxsize=256)
+def _cached_normalised_faq_key(key):
+    return _normalise(key)
+
+
+def _normalised_faq_key(key):
+    """Reuse only bounded plain-string keys, never questions or answers."""
+    if type(key) is str and len(key) <= 512:
+        return _cached_normalised_faq_key(key)
+    # Long keys and observable string subclasses retain direct normalization.
+    return _normalise(key)
+
+
 def fuzzy_match(question, entries=None):
     """Find the best FAQ match for a question using word-overlap scoring.
 
@@ -248,7 +262,7 @@ def fuzzy_match(question, entries=None):
 
     # Exact questions win even if a shorter FAQ shares all its topic words.
     for key, answer in entries.items():
-        if _normalise(key) == normalised_question:
+        if _normalised_faq_key(key) == normalised_question:
             return (key, answer, 1.0)
 
     q_words = _keywords(question)
@@ -261,7 +275,7 @@ def fuzzy_match(question, entries=None):
     best_overlap = 0
 
     for key, answer in entries.items():
-        key_words = _keywords(key)
+        key_words = set(_normalised_faq_key(key).split()) - _QUESTION_WORDS
         if not key_words:
             continue
 
