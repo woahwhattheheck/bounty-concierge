@@ -28,6 +28,7 @@ _GITHUB_HOSTS = frozenset({"github.com", "www.github.com"})
 _ISSUE_RE = re.compile(r"^/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)/?$")
 _PR_RE = re.compile(r"^/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/pull/([1-9][0-9]*)/?$")
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+_URL_SPACE_RE = re.compile(r"[\s\x7f]")
 _MAX_URL_CHARS = 2048
 _AUTHORITY = {
     "advisory_only": True,
@@ -59,7 +60,7 @@ def _strict_url(value: Any, field: str) -> tuple[str, str]:
     raw = _require_string(value, field)
     if len(raw) > _MAX_URL_CHARS:
         raise GrantFoxCarrierCensusInputError(f"{field} exceeds {_MAX_URL_CHARS} characters")
-    if any(ch.isspace() or ord(ch) == 0x7F for ch in raw):
+    if _URL_SPACE_RE.search(raw):
         raise GrantFoxCarrierCensusInputError(f"{field} must not contain whitespace")
     if "\\" in raw or "%" in raw or "?" in raw or "#" in raw:
         raise GrantFoxCarrierCensusInputError(f"{field} must be canonical and unaliased")
