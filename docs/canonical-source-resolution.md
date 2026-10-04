@@ -25,6 +25,30 @@ canonical issue.
 concierge-discover listing.json --json
 ```
 
+If the canonical instructions specify a separate submission repository, pass
+the existing explicit submission-target record alongside the discovery listing:
+
+```bash
+concierge-discover listing.json --submission-target submission-target.json --json
+```
+
+The target file must contain a JSON object with these four fields:
+
+| Field | Value |
+| --- | --- |
+| `repository` | The submission repository in `owner/name` form. |
+| `source_url` | The canonical source URL supporting that submission instruction. |
+| `source_content_sha256` | The SHA-256 digest of the supporting source content. |
+| `instruction_excerpt` | The source excerpt identifying the submission repository. |
+
+The API accepts the same record as the optional `submission_target` keyword of
+`qualify_discovered_revenue_intake`. The bridge forwards an explicitly supplied
+record to live intake, whose existing preflight validates its source binding
+before network reads. It never discovers or infers a submission target from the
+listing. Omitting the option retains the existing behavior; JSON `null`, arrays,
+and other non-object target files are rejected. The concise summary does not echo
+the instruction excerpt.
+
 Resolution precedence is deliberate:
 
 1. A clean `https://github.com/<owner>/<repo>/issues/<n>` or
