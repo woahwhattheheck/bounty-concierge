@@ -1,0 +1,205 @@
+{
+  "method": "Actual public capture_contract/verify_contract over real HTTP/1.1 on localhost; no GitHub requests, synthetic latency, or retries.",
+  "cases": [
+    {
+      "implementation": "before",
+      "comments": 100,
+      "max_pages": 1,
+      "scenario": "stable",
+      "requests": 2,
+      "comment_requests": 1,
+      "status": "LIVE_EVIDENCE_INCOMPLETE"
+    },
+    {
+      "implementation": "after",
+      "comments": 100,
+      "max_pages": 1,
+      "scenario": "stable",
+      "requests": 5,
+      "comment_requests": 2,
+      "status": "OK"
+    },
+    {
+      "implementation": "before",
+      "comments": 100,
+      "max_pages": 2,
+      "scenario": "stable",
+      "requests": 7,
+      "comment_requests": 4,
+      "status": "OK"
+    },
+    {
+      "implementation": "after",
+      "comments": 100,
+      "max_pages": 2,
+      "scenario": "stable",
+      "requests": 5,
+      "comment_requests": 2,
+      "status": "OK"
+    },
+    {
+      "implementation": "before",
+      "comments": 1000,
+      "max_pages": 10,
+      "scenario": "stable",
+      "requests": 11,
+      "comment_requests": 10,
+      "status": "LIVE_EVIDENCE_INCOMPLETE"
+    },
+    {
+      "implementation": "after",
+      "comments": 1000,
+      "max_pages": 10,
+      "scenario": "stable",
+      "requests": 23,
+      "comment_requests": 20,
+      "status": "OK"
+    },
+    {
+      "implementation": "before",
+      "comments": 1000,
+      "max_pages": 11,
+      "scenario": "stable",
+      "requests": 25,
+      "comment_requests": 22,
+      "status": "OK"
+    },
+    {
+      "implementation": "after",
+      "comments": 1000,
+      "max_pages": 11,
+      "scenario": "stable",
+      "requests": 23,
+      "comment_requests": 20,
+      "status": "OK"
+    },
+    {
+      "implementation": "before",
+      "comments": 101,
+      "max_pages": 2,
+      "scenario": "stable",
+      "requests": 7,
+      "comment_requests": 4,
+      "status": "OK"
+    },
+    {
+      "implementation": "after",
+      "comments": 101,
+      "max_pages": 2,
+      "scenario": "stable",
+      "requests": 7,
+      "comment_requests": 4,
+      "status": "OK"
+    },
+    {
+      "implementation": "before",
+      "comments": 101,
+      "max_pages": 1,
+      "scenario": "stable",
+      "requests": 2,
+      "comment_requests": 1,
+      "status": "LIVE_EVIDENCE_INCOMPLETE"
+    },
+    {
+      "implementation": "after",
+      "comments": 101,
+      "max_pages": 1,
+      "scenario": "stable",
+      "requests": 2,
+      "comment_requests": 1,
+      "status": "LIVE_EVIDENCE_INCOMPLETE"
+    },
+    {
+      "implementation": "before",
+      "comments": 0,
+      "max_pages": 1,
+      "scenario": "stable",
+      "requests": 5,
+      "comment_requests": 2,
+      "status": "OK"
+    },
+    {
+      "implementation": "after",
+      "comments": 0,
+      "max_pages": 1,
+      "scenario": "stable",
+      "requests": 5,
+      "comment_requests": 2,
+      "status": "OK"
+    },
+    {
+      "implementation": "after",
+      "comments": 100,
+      "max_pages": 1,
+      "scenario": "same_second_edit",
+      "requests": 5,
+      "comment_requests": 2,
+      "status": "LIVE_GENERATION_UNSTABLE"
+    },
+    {
+      "implementation": "after",
+      "comments": 101,
+      "max_pages": 2,
+      "scenario": "foreign_host",
+      "requests": 2,
+      "comment_requests": 1,
+      "status": "LIVE_EVIDENCE_INVALID"
+    },
+    {
+      "implementation": "after",
+      "comments": 101,
+      "max_pages": 2,
+      "scenario": "foreign_repo",
+      "requests": 2,
+      "comment_requests": 1,
+      "status": "LIVE_EVIDENCE_INVALID"
+    },
+    {
+      "implementation": "after",
+      "comments": 101,
+      "max_pages": 2,
+      "scenario": "malformed_link",
+      "requests": 2,
+      "comment_requests": 1,
+      "status": "LIVE_EVIDENCE_INVALID"
+    },
+    {
+      "implementation": "after",
+      "comments": 100,
+      "max_pages": 1,
+      "scenario": "stable",
+      "requests": 5,
+      "comment_requests": 2,
+      "status": "LIVE_EVIDENCE_INCOMPLETE",
+      "expected_comments": 101
+    },
+    {
+      "implementation": "after",
+      "comments": 101,
+      "max_pages": 2,
+      "scenario": "numeric_alias",
+      "requests": 7,
+      "comment_requests": 4,
+      "status": "OK"
+    },
+    {
+      "implementation": "after",
+      "comments": 100,
+      "max_pages": 2,
+      "scenario": "stable",
+      "requests": 7,
+      "comment_requests": 4,
+      "status": "OK",
+      "headerless_transport": true
+    }
+  ],
+  "verification": {
+    "implementation": "after",
+    "comments": 100,
+    "max_pages": 1,
+    "scenario": "stable",
+    "requests": 5,
+    "comment_requests": 2,
+    "status": "UNCHANGED"
+  }
+}

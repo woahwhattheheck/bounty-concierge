@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import Any
 import re
+from urllib.parse import parse_qs, urlsplit
 
 import requests
 
@@ -314,6 +315,43 @@ def _issue_generation_marker(issue: dict[str, Any], repo: str, number: int) -> s
         }
     )
 
+def _comment_page_has_next(metadata: dict[str, Any], url: str, page: int) -> bool | None:
+    """Read pagination evidence without following a provider-supplied URL."""
+    if "link" not in metadata:
+        return None
+    value = metadata["link"]
+    if value is None or value == "":
+        return False
+    if not isinstance(value, str):
+        raise BountyContractEvidenceError("LIVE_EVIDENCE_INVALID", "GitHub comment Link header was malformed")
+    expected = urlsplit(url)
+    issue_path = expected.path.split("/issues/", 1)[1]
+    relations: set[str] = set()
+    for entry in re.split(r",\s*(?=<)", value):
+        match = re.fullmatch(r'\s*<([^<>\s]+)>\s*;\s*rel="(next|prev|first|last)"\s*', entry)
+        if match is None or match[2] in relations:
+            raise BountyContractEvidenceError("LIVE_EVIDENCE_INVALID", "GitHub comment Link header was malformed")
+        relations.add(match[2])
+        try:
+            target = urlsplit(match[1])
+            query = parse_qs(target.query, strict_parsing=True)
+        except ValueError as exc:
+            raise BountyContractEvidenceError("LIVE_EVIDENCE_INVALID", "GitHub comment pagination target was malformed") from exc
+        # GitHub may emit the numeric /repositories/<id>/ alias in Link. It is
+        # evidence only: subsequent GETs still use the caller's canonical repo.
+        allowed_path = target.path == expected.path or re.fullmatch(
+            rf"/repositories/[1-9][0-9]*/issues/{re.escape(issue_path)}", target.path
+        )
+        target_page = query.get("page", [])
+        if (target.scheme != expected.scheme or target.netloc != expected.netloc
+                or target.fragment or not allowed_path
+                or set(query) != {"page", "per_page"} or query["per_page"] != ["100"]
+                or len(target_page) != 1 or re.fullmatch(r"[1-9][0-9]*", target_page[0]) is None
+                or (match[2] == "next" and target_page != [str(page + 1)])):
+            raise BountyContractEvidenceError("LIVE_EVIDENCE_INVALID", "GitHub comment pagination target was inconsistent")
+    return "next" in relations
+
+
 def _fetch_comments(
     session: Any,
     repo: str,
@@ -325,11 +363,13 @@ def _fetch_comments(
     url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
     comments: list[dict[str, Any]] = []
     for page in range(1, max_pages + 1):
+        metadata: dict[str, Any] = {}
         payload = _get_json(
             session,
             url,
             headers=headers,
             params={"per_page": 100, "page": page},
+            response_metadata=metadata,
         )
         if not isinstance(payload, list):
             raise BountyContractEvidenceError(
@@ -344,7 +384,8 @@ def _fetch_comments(
             raise BountyContractEvidenceError(
                 "LIVE_EVIDENCE_INCOMPLETE", "GitHub issue comment evidence exceeded limit"
             )
-        if len(payload) < 100:
+        has_next = _comment_page_has_next(metadata, url, page)
+        if has_next is False or (has_next is None and len(payload) < 100):
             _comment_generation(comments)
             return comments
     raise BountyContractEvidenceError(

@@ -46,6 +46,22 @@ The receipt is emitted only when issue authority fields and the exact comment
 ID/update generation remain stable throughout the read. A truncated, malformed,
 or moving generation fails closed.
 
+Comment pagination uses GitHub's `Link` completion evidence, so a full final
+page does not require an extra empty request or falsely exceed `--max-pages`.
+Both comment reads and the final issue comment-count check still run. Pagination
+targets are validated but never followed; requests retain the canonical issue
+URL. Injected transports without response headers retain the page-size fallback.
+See GitHub's [pagination response contract](https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api)
+for omitted single-page links and the `next` relation.
+
+The [focused HTTP proof](../work/throughput/contract-pagination-20261004/proof.py)
+and its [recorded results](../work/throughput/contract-pagination-20261004/results.json)
+exercise the public capture and verify calls through a local HTTP/1.1 server.
+Run `PYTHONPATH=. python work/throughput/contract-pagination-20261004/proof.py`
+from a checkout retaining baseline commit `4ec4bee4b75fc1db313e183b343457a536286144`.
+The complete 100-comment capture uses 5 GETs instead of 7; this is a request-count
+measurement, not a live GitHub latency measurement.
+
 The contract fingerprint covers:
 
 - canonical repository, issue number, GitHub database ID, node ID, and creation

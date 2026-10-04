@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from datetime import datetime, timezone
 import hashlib
@@ -132,6 +133,7 @@ def _get_json(
     *,
     headers: dict[str, str],
     params: dict[str, Any] | None = None,
+    response_metadata: dict[str, Any] | None = None,
 ) -> Any:
     response: Any = None
     try:
@@ -145,11 +147,18 @@ def _get_json(
             ) from exc
         raise BountyContractError(f"GitHub request failed for {url}: {exc}") from exc
     try:
-        return response.json()
+        payload = response.json()
     except (TypeError, ValueError) as exc:
         raise BountyContractEvidenceError(
             "LIVE_EVIDENCE_INVALID", f"GitHub response was not valid JSON for {url}"
         ) from exc
+    # Keep the payload-only return contract. Older injected transports may not
+    # expose headers; callers can distinguish that from an absent Link header.
+    if response_metadata is not None:
+        response_headers = getattr(response, "headers", None)
+        if isinstance(response_headers, Mapping):
+            response_metadata["link"] = response_headers.get("Link", response_headers.get("link"))
+    return payload
 
 def _bounded_text(value: Any, field: str, *, allow_none: bool = False) -> str:
     if value is None and allow_none:
