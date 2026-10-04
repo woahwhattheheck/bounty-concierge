@@ -1,0 +1,170 @@
+{
+  "after_blob": "6cae66425b427cfaa1edfe82a9b8513b4fc3957e",
+  "before_blob": "563a560f7890191fb3b7dd7cf6116aa33ad583d4",
+  "controls": {
+    "identical_result_sha256": "a0fa9935f4d1d195eba1e52ac163bbae09aec7a5b1a9c131d6599abd2937c3d3",
+    "median_seconds": {
+      "after": 0.0004202230011287611,
+      "before": 0.0006067440008337144
+    },
+    "median_speed_ratio": 1.4438619475943468,
+    "repeats": 1,
+    "rows": 23,
+    "seconds": {
+      "after": [
+        0.0004202230011287611
+      ],
+      "before": [
+        0.0006067440008337144
+      ]
+    }
+  },
+  "corpus_blob": "55db0fb591d45713e02152ff018c3cca63dd644e",
+  "limits": [
+    "Synthetic whitespace cases expose parser backtracking; they are not observed provider failures.",
+    "Retained corpus results are local qualification only, not current bounty eligibility.",
+    "Same-process alternating samples; no fleet, network, payment, CLI, or full-suite claim."
+  ],
+  "long_valid_declaration": {
+    "identical_result_sha256": "7c07043ba452ee9dfdb48b8b9b6d962973553af91729e60c39f09fb86ee96225",
+    "median_seconds": {
+      "after": 0.00029046700001345016,
+      "before": 0.00030283600062830374
+    },
+    "median_speed_ratio": 1.0425831526964537,
+    "repeats": 3,
+    "rows": 1,
+    "seconds": {
+      "after": [
+        0.00029046700001345016,
+        0.0002719889998843428,
+        0.00045405400305753574
+      ],
+      "before": [
+        0.00030124400291242637,
+        0.00030283600062830374,
+        0.000304999000945827
+      ]
+    }
+  },
+  "missing_amount_space_gap": {
+    "128": {
+      "identical_result_sha256": "e2c2ee4125b5745ad34c567ecb9d2cf92ba7311ae7e6c52e6965f623badbc297",
+      "median_seconds": {
+        "after": 6.397600009222515e-05,
+        "before": 0.010745249001047341
+      },
+      "median_speed_ratio": 167.95749946163303,
+      "repeats": 3,
+      "rows": 1,
+      "seconds": {
+        "after": [
+          0.00018369600002188236,
+          4.9353999202139676e-05,
+          6.397600009222515e-05
+        ],
+        "before": [
+          0.011372072996891802,
+          0.010745249001047341,
+          0.01028973299980862
+        ]
+      }
+    },
+    "256": {
+      "identical_result_sha256": "e2c2ee4125b5745ad34c567ecb9d2cf92ba7311ae7e6c52e6965f623badbc297",
+      "median_seconds": {
+        "after": 0.00014072100020712242,
+        "before": 0.12154834899774869
+      },
+      "median_speed_ratio": 863.7541576512805,
+      "repeats": 3,
+      "rows": 1,
+      "seconds": {
+        "after": [
+          0.00014072100020712242,
+          6.0911999753443524e-05,
+          0.0002505769989511464
+        ],
+        "before": [
+          0.12154834899774869,
+          0.11732495899923379,
+          0.12219730099968729
+        ]
+      }
+    },
+    "512": {
+      "identical_result_sha256": "e2c2ee4125b5745ad34c567ecb9d2cf92ba7311ae7e6c52e6965f623badbc297",
+      "median_seconds": {
+        "after": 0.0001712769990263041,
+        "before": 0.6938654240002506
+      },
+      "median_speed_ratio": 4051.1302039667876,
+      "repeats": 3,
+      "rows": 1,
+      "seconds": {
+        "after": [
+          0.00013753700113738887,
+          0.0001732909986458253,
+          0.0001712769990263041
+        ],
+        "before": [
+          0.7528592749986274,
+          0.6938654240002506,
+          0.5773521580013039
+        ]
+      }
+    },
+    "64": {
+      "identical_result_sha256": "e2c2ee4125b5745ad34c567ecb9d2cf92ba7311ae7e6c52e6965f623badbc297",
+      "median_seconds": {
+        "after": 2.9614999220939353e-05,
+        "before": 0.0014987860013206955
+      },
+      "median_speed_ratio": 50.609017077433364,
+      "repeats": 3,
+      "rows": 1,
+      "seconds": {
+        "after": [
+          3.9288999687414616e-05,
+          2.7451002097222954e-05,
+          2.9614999220939353e-05
+        ],
+        "before": [
+          0.0015575549987261184,
+          0.0014987860013206955,
+          0.0013831319993187208
+        ]
+      }
+    }
+  },
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+  "policy_dependency_blob": "a21fb95159e3ea9e69ee750c124cda518d0c412e",
+  "provider_requests": 0,
+  "python": "3.12.14",
+  "retained_corpus": {
+    "identical_result_sha256": "a6d89659ece78d843c0b9cc97d9a9cc6f1bfa7fdb9a76f02ba0d24c2532b9a47",
+    "median_seconds": {
+      "after": 0.06367436800064752,
+      "before": 0.06128348700076458
+    },
+    "median_speed_ratio": 0.9624514372901413,
+    "repeats": 5,
+    "rows": 266,
+    "seconds": {
+      "after": [
+        0.07499321600334952,
+        0.0595059110019065,
+        0.05919447199994465,
+        0.06595583300077124,
+        0.06367436800064752
+      ],
+      "before": [
+        0.06871474700164981,
+        0.058785887998965336,
+        0.06040066800051136,
+        0.06512081500113709,
+        0.06128348700076458
+      ]
+    }
+  }
+}
