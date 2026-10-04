@@ -222,9 +222,13 @@ Canonical audit fields should include:
 The CLI accepts one snapshot, a list of snapshots, or
 `{"candidates": [...]}`. It also accepts the retained bounty index export
 `{"bounties": [...]}` directly, including `data/bounty_index.json`.
+Saved live or offline `browse --report` / `browse --index` JSON reports are
+accepted through the existing browse decoder, including its row-count and
+coverage checks. Ambiguous `rows` plus `bounties` envelopes are rejected.
 
-Index exports contribute their rows only. Their top-level `updated_at` and
-`total_count` do not supply a row's `observed_at`, canonical audit, or coverage.
+Index exports and browse reports contribute their rows only. Collection times
+and counts do not supply a row's `observed_at`, canonical audit, or coverage.
+The resulting routing counts cover the supplied selection only.
 Discovery rows with missing evidence therefore retain the existing HOLD result;
 the loader does not promote the export into fresh canonical evidence.
 
@@ -237,6 +241,11 @@ python -m concierge.bounty_supply supply.json \
 
 python -m concierge.bounty_supply data/bounty_index.json \
   --evaluated-at 2026-10-03T07:00:00Z --json
+
+concierge browse --index data/bounty_index.json --tier major --limit 5 \
+  --report > selected-bounties.json
+python -m concierge.bounty_supply selected-bounties.json \
+  --evaluated-at CURRENT_OFFSET_AWARE_TIME --json
 ```
 
 ## Deduplication and receipts

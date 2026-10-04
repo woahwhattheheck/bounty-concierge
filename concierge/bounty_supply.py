@@ -629,6 +629,14 @@ def _load_candidates(path: str) -> list[dict[str, Any]]:
         payload = [payload]
     elif isinstance(payload, dict) and "candidates" in payload:
         payload = payload["candidates"]
+    elif isinstance(payload, dict) and "rows" in payload:
+        from concierge.announcer import snapshot_data
+
+        # Reuse browse's report contract without promoting collection times.
+        try:
+            payload = snapshot_data(payload)["rows"]
+        except ValueError as exc:
+            raise SupplyInputError(str(exc)) from exc
     elif isinstance(payload, dict) and "bounties" in payload:
         # Retained index exports wrap discovery rows; their export timestamp
         # and count do not establish canonical evidence for those rows.
@@ -641,7 +649,7 @@ def _load_candidates(path: str) -> list[dict[str, Any]]:
     ):
         raise SupplyInputError(
             "input JSON must be a snapshot, a list of snapshots, or an object "
-            "with a candidates or bounties list"
+            "with a candidates or bounties list, or a saved browse report"
         )
     return payload
 
