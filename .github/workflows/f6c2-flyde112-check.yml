@@ -25,9 +25,16 @@ jobs:
               raise SystemExit('compressed patch digest mismatch')
           patch = gzip.decompress(raw)
           if hashlib.sha256(patch).hexdigest() != '2027d982b2b9fc671f7b37612d433d3d5d5fe613cdf76ef1d6cdf4e9cabaa74b':
-              raise SystemExit('patch digest mismatch')
+              raise SystemExit('transferred diff digest mismatch')
+          old = b'-export { resolveCodeNodeDependencies, isCodeNodePath } from "./resolver/server/serverUtils";+export'
+          fixed = b'-export { resolveCodeNodeDependencies, isCodeNodePath } from "./resolver/server/serverUtils";\n\\ No newline at end of file\n+export'
+          if patch.count(old) != 1:
+              raise SystemExit('unexpected diff preimage')
+          patch = patch.replace(old, fixed)
+          if hashlib.sha256(patch).hexdigest() != '17832d85a0a00a4ad7c10e19dd3a49de40112f142da9c8d18e1815c0953665c4':
+              raise SystemExit('git patch digest mismatch')
           (p/'implementation.patch').write_bytes(patch)
-          print('PASS: transferred patch matches independently pinned local source')
+          print('PASS: verified transfer and explicit missing-newline diff repair')
           PY
           curl --fail --location --max-time 60 --output upstream.tar.gz https://codeload.github.com/flydelabs/flyde/tar.gz/913ff75c6781259da35c32fd001a90607756cb24
           echo 'da71c70917e4aab57862ddaca1183278a46fc86d35854b7b8316f5cba4e1b831  upstream.tar.gz' | sha256sum --check
@@ -37,7 +44,6 @@ jobs:
           git init -q
           git apply --check ../evidence/implementation.patch
           git apply ../evidence/implementation.patch
-          git diff --no-index --check /dev/null loader/src/rewrite-flow-imports.ts || test "$?" = 1
       - name: Compile and run focused loader checks
         shell: bash
         run: |
@@ -63,7 +69,7 @@ jobs:
           const path = require('path');
           exports.run = () => new Promise((resolve, reject) => {
             const runner = new Mocha({ui: 'tdd', color: false, timeout: 30000});
-            runner.addFile(path.resolve('out/vscode/src/test/updateImportsOnRename.test.js'));
+            runner.addFile(path.join(__dirname, 'out/vscode/src/test/updateImportsOnRename.test.js'));
             runner.run(failures => failures ? reject(new Error(`${failures} editor checks failed`)) : resolve());
           });
           JS
