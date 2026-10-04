@@ -20,4 +20,4 @@ The workflow is source-pinned and single-job, so another agent can reuse the evi
 
 ## Status
 
-Published for a real run; no database success is asserted by this initial source commit. Consult the associated workflow run and `report.json` for the observed result.
+Completed: all four checks passed on PostgreSQL 17.11 in run `37189908947`. See [RESULTS.md](RESULTS.md) and the original [report.json](report.json). The executed runner and workflow remain unchanged; this update only retains the observed evidence.
