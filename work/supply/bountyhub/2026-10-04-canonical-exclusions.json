@@ -38,5 +38,15 @@
     "reason": "The current delivery repository's contributor policy prohibits LLM-authored submissions by contributors without upstream write access; the authenticated woahwhattheheck account has pull access but no push permission. This excludes new agent-authored intake for this listing, without asserting a newly verified issue hold or payment outcome.",
     "source_url": "https://github.com/fluxerapp/fluxer/blob/main/.github/LLM_USAGE_POLICY.md",
     "observed_at": "2026-10-04T12:29:17Z"
+  },
+  "fluxerapp/fluxer-meta#2": {
+    "reason": "The retained delivery record work/high-value/fluxer-2/evidence.json (captured 2026-09-19) links this Polls bounty to fluxerapp/fluxer#1129 and its required API/gateway/app changes. That recorded delivery repository's current policy prohibits LLM-authored submissions without upstream write access; the authenticated woahwhattheheck account has pull access but no push permission. Exclude new automated upstream-submission intake through this recorded route; preserve existing branches, claims and private/fork work. No fresh issue-state or payment outcome is asserted.",
+    "source_url": "https://github.com/fluxerapp/fluxer/blob/main/.github/LLM_USAGE_POLICY.md",
+    "observed_at": "2026-10-04T12:29:17Z"
+  },
+  "fluxerapp/fluxer-meta#3": {
+    "reason": "The retained delivery records work/high-value/fluxer-3/snapshot.json and work/high-value/fluxer-3/SOURCE_REFRESH.md (captured 2026-09-19) bind the Events bounty's full-stack contract to fluxerapp/fluxer. That recorded delivery repository's current policy prohibits LLM-authored submissions without upstream write access; the authenticated woahwhattheheck account has pull access but no push permission. Exclude new automated upstream-submission intake through this recorded route; preserve existing branches, claims and private/fork work. No fresh issue-state or payment outcome is asserted.",
+    "source_url": "https://github.com/fluxerapp/fluxer/blob/main/.github/LLM_USAGE_POLICY.md",
+    "observed_at": "2026-10-04T12:29:17Z"
   }
 }
