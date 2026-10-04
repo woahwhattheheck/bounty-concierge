@@ -61,6 +61,7 @@ def qualify_discovered_revenue_intake(
     session: Any = None,
     max_pages: int = 10,
     saturation_threshold: int = 4,
+    submission_target: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Resolve one discovery listing, then refresh canonical state before dispatch.
 
@@ -92,6 +93,8 @@ def qualify_discovered_revenue_intake(
     }
     if session is not None:
         kwargs["session"] = session
+    if submission_target is not None:
+        kwargs["submission_target"] = submission_target
 
     result = qualify_live_revenue_intake(repo, number, **kwargs)
     if not isinstance(result, dict):
@@ -137,6 +140,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("listing", help="listing JSON path, or - for stdin")
     parser.add_argument(
+        "--submission-target",
+        type=Path,
+        help="explicit submission-target JSON object for canonical live intake",
+    )
+    parser.add_argument(
         "--max-pages",
         type=int,
         default=10,
@@ -153,10 +161,17 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         listing = _load_listing(args.listing)
+        submission_target = None
+        if args.submission_target is not None:
+            with args.submission_target.open("r", encoding="utf-8") as handle:
+                submission_target = json.load(handle)
+            if type(submission_target) is not dict:
+                raise RevenueIntakeInputError("submission-target JSON must contain an object")
         result = qualify_discovered_revenue_intake(
             listing,
             max_pages=args.max_pages,
             saturation_threshold=args.saturation_threshold,
+            submission_target=submission_target,
         )
     except (
         OSError,
