@@ -386,7 +386,10 @@ def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int 
 def _instant(value: Any) -> datetime:
     if not isinstance(value, str):
         raise ValueError("missing observation timestamp")
-    instant = datetime.fromisoformat(value)
+    try:
+        instant = datetime.fromisoformat(value)
+    except ValueError:
+        raise ValueError("invalid observation timestamp") from None
     if instant.tzinfo is None:
         raise ValueError("observation timestamp must have a timezone")
     return instant
@@ -534,6 +537,17 @@ def resume_catalog(snapshot: dict[str, Any], *, max_details: int = 50,
     return report
 
 
+def _input_error_message(exc: Exception) -> str:
+    """Explain input failures without echoing file contents or input paths."""
+    if isinstance(exc, json.JSONDecodeError):
+        return f"invalid JSON at line {exc.lineno}, column {exc.colno}"
+    if isinstance(exc, OSError):
+        return "cannot read the input file"
+    if isinstance(exc, KeyError):
+        return "missing a required catalog field"
+    return str(exc)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -628,7 +642,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"PARTIAL: retained rows do not establish a complete {basis} shortlist", file=sys.stderr)
         return 0 if complete else 2
     except (OSError, ValueError, KeyError) as exc:
-        print(f"bountyhub-catalog: {type(exc).__name__}", file=sys.stderr)
+        print(f"bountyhub-catalog: {type(exc).__name__}: {_input_error_message(exc)}", file=sys.stderr)
         return 2
 
 
