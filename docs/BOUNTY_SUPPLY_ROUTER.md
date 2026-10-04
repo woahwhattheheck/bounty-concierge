@@ -172,15 +172,25 @@ Recovery does not use the old summary, refresh evidence or make provider reads.
 
 Within one recovery invocation, byte-identical captures can reuse a successful
 parse and replay after their shortlist identity and submission target match.
-The cache keys are the exact file bytes, not a claimed receipt digest or issue
-number. It retains at most 1 MiB of raw keys and 128 successful entries, evicting
-the least recently used entries. Oversized files, invalid captures and captures
-outside the shortlist are not cached. Every file is still read and copied;
-changed bytes are validated again, conflicting observations remain errors,
-and a new invocation starts without cached validation. No observation time,
-qualification, output schema or file protection is changed.
+The cache keys are locally computed SHA-256 fingerprints of every file byte,
+not a supplied receipt digest or issue number. It retains at most 128 successful
+entries with 32-byte keys (4 KiB of digest payload at capacity), evicting the least
+recently used entry. Parsed captures are already retained for output grouping;
+raw file contents are no longer retained as cache keys. Files over 1 MiB can
+therefore reuse successful replay without enlarging the key budget. Invalid
+captures and captures outside the shortlist are not cached. Every file is still
+read and copied; changed bytes are fingerprinted again, conflicting observations
+remain errors, and a new invocation starts without cached validation. No
+observation time, qualification, output schema or file protection is changed.
 
-A [bounded hosted comparison](https://github.com/woahwhattheheck/bounty-concierge/actions/runs/37190068830)
+The [large-capture comparison](../work/throughput/recovery-fingerprint-20261004/README.md)
+records seven focused cases with identical non-clock outputs and zero provider
+requests. Four identical 1,282,529-byte synthetic captures required one replay
+instead of four; median recovery was 570.533 ms instead of 2264.547 ms across
+three alternating before/after pairs. These are local workload measurements,
+not a fleet-wide speedup or evidence of current bounty eligibility.
+
+An earlier [bounded hosted comparison](https://github.com/woahwhattheheck/bounty-concierge/actions/runs/37190068830)
 on October 4, 2026 used the real package and synthetic closed/non-reward captures.
 For 100 identical files, replay calls fell from 100 to 1 and median recovery time
 from 0.2078 to 0.0512 seconds across five repetitions. For 100 unique issues,
@@ -188,7 +198,9 @@ all 100 still replayed (0.2190 versus 0.2165 seconds, three repetitions).
 All 12 cases preserved outputs apart from the recovery run's clock fields;
 the comparison attempted no network access. These are workload-specific results,
 not measured fleet throughput. The [pinned comparison script](https://github.com/woahwhattheheck/bounty-concierge/blob/0fded9a52f272f043142bb7d1650fbc34267fec6/measure_recovery.py)
-includes source-blob guards, altered-byte/conflict cases and both cache bounds.
+includes source-blob guards, altered-byte/conflict cases and the former raw-key
+cache bounds. Its oversized-entry/byte-budget expectations describe that earlier
+implementation, not the current fixed-size-key cache.
 
 The recovery output directory must be new, and retains the collector's private
 directory/file modes. Exit 0 means every issue has a valid recovered capture;
