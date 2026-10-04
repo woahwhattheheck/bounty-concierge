@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 import stat
+import tempfile
 from typing import Any
 
 import requests
@@ -146,21 +147,27 @@ def _emit(value: dict[str, Any], path: str | None, *, pretty: bool) -> None:
         print(text)
         return
     target = Path(path)
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    flags |= getattr(os, "O_NOFOLLOW", 0)
-    flags |= getattr(os, "O_BINARY", 0)
-    fd = os.open(target, flags, 0o600)
+    # Stage a private, complete file on the destination filesystem. A failed
+    # write or fsync must not occupy the final name and prevent a safe retry.
+    fd, staged = tempfile.mkstemp(prefix=".bounty-contract-", dir=target.parent)
     try:
-        if not stat.S_ISREG(os.fstat(fd).st_mode):
-            raise OSError("output path is not a regular file")
-        handle = os.fdopen(fd, "w", encoding="utf-8", newline="\n")
-    except BaseException:
-        os.close(fd)
-        raise
-    with handle:
-        handle.write(text + "\n")
-        handle.flush()
-        os.fsync(handle.fileno())
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise OSError("output path is not a regular file")
+            handle = os.fdopen(fd, "w", encoding="utf-8", newline="\n")
+        except BaseException:
+            os.close(fd)
+            raise
+        with handle:
+            handle.write(text + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        # link is create-exclusive, unlike replace/rename: concurrent writers
+        # and existing files or symlinks cannot replace a prior receipt.
+        # Unsupported filesystems fail without an unsafe overwrite fallback.
+        os.link(staged, target)
+    finally:
+        os.unlink(staged)
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
