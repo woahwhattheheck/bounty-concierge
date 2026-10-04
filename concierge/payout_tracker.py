@@ -114,6 +114,8 @@ def _pending_from_history(items: List[dict]) -> List[dict]:
 def _terminal_text(value) -> str:
     """Render an untrusted field without raw terminal-control characters."""
     text = str(value)
+    if text.isprintable():
+        return text
     escaped: list[str] = []
     for char in text:
         if char.isprintable():
