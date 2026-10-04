@@ -84,9 +84,10 @@ returns or raises, including an early HOLD for a closed issue. Argument
 validation runs before the session is allocated. Callers that supply a session
 keep ownership and can reuse it for later checks.
 
-Complete checks still perform the same live reads and generation comparisons.
-For 101 comments across two pages, six GETs share one connection pool instead of
-creating six separate pools. There is no added cache, retry, or delay.
+Complete checks still perform both live history traversals and generation
+comparisons. For 101 comments across two pages, six GETs share one connection
+pool instead of creating six separate pools. There is no added cache, retry,
+or delay.
 
 Local HTTP/1.1 replay against baseline `73e3b4f` measured six accepted TCP
 connections before this change and one after it, with six requests in both
@@ -100,8 +101,8 @@ GitHub latency or rate-limit savings.
 
 ## Stop after an incomplete first traversal
 
-If the first comment traversal reaches `max_pages` without a short terminal
-page, the guard immediately returns `HOLD / COMMENT_HISTORY_TRUNCATED` with
+If the first comment traversal reaches `max_pages` while another page remains,
+the guard immediately returns `HOLD / COMMENT_HISTORY_TRUNCATED` with
 `dispatch=false`. It does not repeat that already-incomplete traversal or
 request a final issue snapshot. No later response could make the first
 traversal complete, and a later HTTP error must not erase this known result.
@@ -109,14 +110,73 @@ The receipt's `issue_state` is the initial validated observation, not a claim
 that the issue state was reread after truncation. Signal evidence stays empty;
 partial comments are not treated as complete availability or payout evidence.
 
-With `max_pages=10` and ten full pages, this reduces one check from 22 GETs to
-11. With `max_pages=1` and one full page, it reduces four GETs to two. Exactly
-100 comments at a one-page bound still produce HOLD, not CLEAR: the missing
-terminal page is not inferred from the issue's declared comment count.
-Complete histories, second-traversal truncation, generation comparisons,
-comment validation, closed-issue handling and session ownership are unchanged.
-These counts describe the request path, not a measurement of live provider
-latency or cash saved.
+With `max_pages=10` and ten pages still advertising a next page, this reduces
+one check from 22 GETs to 11. With `max_pages=1` and a nonterminal first page,
+it reduces four GETs to two. Minimal injected transports without response
+headers retain the older length-based fallback: a full page at the bound still
+means HOLD. Completeness is never inferred from the declared comment count.
+Second-traversal truncation, generation comparisons, comment validation,
+closed-issue handling and session ownership are unchanged. These counts
+describe the request path, not live provider latency or cash saved.
+
+## Provider pagination, including full terminal pages
+
+GitHub's comment response headers now determine whether another page remains.
+A `Link` relation containing `next` continues the traversal even when the page
+has fewer than 100 rows. A response with no `Link` header, or a valid pagination
+header containing only other relations, ends it even when the page is full.
+This follows GitHub's documented [REST pagination contract](https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api).
+
+Only GitHub's pagination link syntax is accepted; malformed supplied headers
+raise the existing `BountyAvailabilityError` rather than establish completeness.
+Link destinations are not followed: requests stay on the canonical comments
+endpoint with sequential numeric pages. Header-less minimal injected
+transports retain the length fallback described above. There is no new retry,
+sleep, cache, concurrency gate, permission, or operator step.
+
+A complete 100-comment history can therefore fit `--max-pages 1`. It still
+needs both comment traversals, matching before/after issue generations,
+matching comment generations and counts, unique comment IDs, and no terminal
+maintainer signal before returning CLEAR. A 101-comment history at that same
+bound remains HOLD after two GETs.
+
+### Measured loopback replay, October 4, 2026
+
+The complete source module was executed with Python 3.13.5 and Requests 2.32.5
+against a synthetic HTTP/1.1 server on 127.0.0.1. Baseline source blob:
+`5e92de31093aa58dd100a4b8d5d6ecd817accf84`; candidate source blob:
+`26203721782586a13e6aa2e0b3e3d5934b094888`.
+
+| Synthetic history | Before | After | Outcome |
+| --- | ---: | ---: | --- |
+| Exactly 100 comments, terminal page | 6 GETs | 4 GETs | Same complete receipt; 33.3% fewer requests |
+| Exactly 200 comments, terminal second page | 8 GETs | 6 GETs | Same complete receipt; 25% fewer requests |
+| 100 comments, max-pages 1 | 2 GETs, HOLD | 4 GETs, CLEAR | False truncation removed; both scans now complete |
+| 200 comments, max-pages 2 | 3 GETs, HOLD | 6 GETs, CLEAR | False truncation removed; both scans now complete |
+| 101 comments, max-pages 1 | 2 GETs | 2 GETs | Same truncated HOLD |
+| Short first page with explicit next | 4 GETs, count mismatch | 6 GETs, CLEAR | Remaining comments now read |
+
+The replay checks 18 candidate scenarios and two metadata-free fallback
+assertions, plus 16 baseline scenarios. Outside the three intentional
+pagination corrections, complete returned receipts matched. Closed issues,
+maintainer closure, comment/issue drift, count mismatch and duplicate IDs still
+hold; HTTP 429 stops without retry; malformed headers fail; a foreign next URL
+is never requested. The script prints source hashes, actual request paths,
+counts and receipts for independent inspection:
+
+```bash
+python tools/replay_availability_pagination.py
+# Optional historical comparison, with the exact baseline source:
+git show bf59b8289f6a52903fe8727baf89b96b747be299:concierge/bounty_availability.py > /tmp/availability-before.py
+python tools/replay_availability_pagination.py --source /tmp/availability-before.py --baseline
+```
+
+Only deployment token configuration was replaced with `None`; no classifier or
+reader implementation was substituted. The unrelated package policy bootstrap
+was not imported. These are local request-count and behavior measurements, not
+live GitHub latency, fleet-wide quota savings, installed-CLI integration,
+provider acceptance or revenue measurements. No provider or account calls,
+new dependencies, CI jobs or owner-PC execution were used for this replay.
 
 ## Non-authority
 
