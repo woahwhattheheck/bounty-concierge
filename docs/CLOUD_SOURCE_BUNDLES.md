@@ -133,6 +133,17 @@ failure: the authorized file materializer can still work. Reuse the same
 artifact and returned file reference; do not dispatch a new export for this
 transport state or reuse another worker's local filesystem path.
 
+For a reusable command instead of copying the extraction recipe, use
+[`tools/unpack_source_bundle.py`](../tools/unpack_source_bundle.py) with Python
+3.12+. It runs standalone without a checkout or package installation; a worker
+can fetch that one script through the native connector. Supply the actual
+mounted ZIP, expected source repository/commit and a fresh destination. Repeat
+`--path` to materialize selected files or directories, or omit it for all source.
+See [the command guide](SOURCE_BUNDLE_UNPACK.md) for invocation and the executed
+artifact receipt. Selection reduces filesystem writes, not download bytes; the
+complete archive is still verified and scanned. This does not replace live
+head/claim checks or change how source exports are requested.
+
 The outer ZIP contains `manifest.json` and `source.tar.gz`. Verify the manifest
 source `repository` and commit against the requested identity, plus the tarball SHA-256
 and byte length, before extracting into a fresh working directory. The following
