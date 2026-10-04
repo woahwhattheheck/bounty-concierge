@@ -29,6 +29,7 @@ from concierge.bountyhub_exclusions import normalize_exclusions, unique_exclusio
 
 API = "https://api.bountyhub.dev/api/bounties"
 SCHEMA = "bountyhub-catalog/v1"
+_REFRESH_SCHEMA = "bountyhub-target-refresh/v1"
 _MONEY = re.compile(r"[0-9]{1,12}(?:\.[0-9]{1,2})?\Z")
 _ID = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\Z")
 _REPO = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9_.-]+\Z")
@@ -272,13 +273,80 @@ def _unique_target_fields(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def _refresh_target_source(report: dict[str, Any]) -> dict[str, Any]:
+    """Expose only completed records from an explicitly bounded refresh receipt."""
+    requested, records = report.get("requested_listing_ids"), report.get("records")
+    if (report.get("scope") != "requested_listing_ids_only"
+            or report.get("catalog_refreshed") is not False
+            or not isinstance(requested, list) or not 1 <= len(requested) <= 100
+            or any(not isinstance(item, str) or not _ID.fullmatch(item) for item in requested)
+            or len(set(requested)) != len(requested)
+            or not isinstance(records, list) or len(records) != len(requested)):
+        raise ValueError("invalid retained refresh scope")
+    started, completed = _instant(report.get("started_at")), _instant(report.get("completed_at"))
+    source_started = _instant(report.get("source_started_at"))
+    source_completed = _instant(report.get("source_completed_at"))
+    observed = _instant(report.get("catalog_observed_through"))
+    if not source_started <= observed <= source_completed <= started <= completed:
+        raise ValueError("invalid retained refresh observation interval")
+    rows = []
+    all_complete = True
+    for listing_id, record in zip(requested, records):
+        if not isinstance(record, dict) or record.get("listing_id") != listing_id:
+            raise ValueError("refresh records disagree with requested listing identities")
+        repo, number = record.get("repo"), record.get("number")
+        if (not isinstance(repo, str) or not _REPO.fullmatch(repo)
+                or repo.split("/")[1] in {".", ".."}
+                or type(number) is not int or number < 1
+                or record.get("source_url") != f"{API}/{listing_id}"):
+            raise ValueError("invalid retained refresh record identity")
+        status, row = record.get("status"), record.get("listing")
+        if status == "NOT_ATTEMPTED":
+            if record.get("started_at") is not None or record.get("completed_at") is not None:
+                raise ValueError("unattempted refresh record has observation times")
+        else:
+            row_started = _instant(record.get("started_at"))
+            row_completed = _instant(record.get("completed_at"))
+            if not started <= row_started <= row_completed <= completed:
+                raise ValueError("invalid retained refresh record interval")
+        if status == "COMPLETE":
+            if (not isinstance(row, dict) or row.get("funding_status") != "COMPLETE"
+                    or row.get("listing_id") != listing_id
+                    or not isinstance(row.get("repo"), str)
+                    or row["repo"].casefold() != repo.casefold()
+                    or row.get("number") != number
+                    or row.get("source_url") != record["source_url"]):
+                raise ValueError("refresh detail disagrees with its requested record")
+            rows.append(row)
+        elif status in ("READ_FAILED", "INVALID_DETAIL", "NOT_ATTEMPTED") and row is None:
+            all_complete = False
+        else:
+            raise ValueError("invalid retained refresh record outcome")
+    if _boolean(report, "details_complete") != all_complete:
+        raise ValueError("refresh coverage disagrees with retained records")
+    complete = _boolean(report, "complete")
+    if complete and not all_complete:
+        raise ValueError("partial refresh cannot claim complete coverage")
+    return {
+        "schema": _REFRESH_SCHEMA, "listings": rows, "complete": complete,
+        "started_at": report["started_at"], "completed_at": report["completed_at"],
+        "catalog_observed_through": report["catalog_observed_through"],
+        "source_schema": _REFRESH_SCHEMA, "source_scope": report["scope"],
+        "requested_listing_count": len(requested),
+        "source_catalog_started_at": report["source_started_at"],
+        "source_catalog_completed_at": report["source_completed_at"],
+    }
+
+
 def select_targets(report: dict[str, Any], minimum_funded_usd: str = "15.00", *,
                    include_promised: bool = False,
                    submission_targets: dict[str, Any] | None = None,
                    excluded_issues: dict[str, Any] | None = None) -> dict[str, Any]:
     """Reduce a retained report without refreshing its time or making requests."""
-    if not isinstance(report, dict) or report.get("schema") != SCHEMA or not isinstance(report.get("listings"), list):
-        raise ValueError("expected a bountyhub-catalog/v1 report")
+    if isinstance(report, dict) and report.get("schema") == _REFRESH_SCHEMA:
+        report = _refresh_target_source(report)
+    elif not isinstance(report, dict) or report.get("schema") != SCHEMA or not isinstance(report.get("listings"), list):
+        raise ValueError("expected a bountyhub catalog or target-refresh report")
     delivery = _submission_target_map(submission_targets)
     exclusions = normalize_exclusions(excluded_issues)
     floor = _amount(minimum_funded_usd)
@@ -333,6 +401,11 @@ def select_targets(report: dict[str, Any], minimum_funded_usd: str = "15.00", *,
     if "catalog_observed_through" in report:
         result["catalog_observed_through"] = report["catalog_observed_through"]
         result["catalog_refreshed"] = False
+    if report["schema"] == _REFRESH_SCHEMA:
+        result.update({key: report[key] for key in (
+            "source_schema", "source_scope", "requested_listing_count",
+            "source_catalog_started_at", "source_catalog_completed_at",
+        )})
     if include_promised:
         del result["minimum_funded_usd"]
         result.update(reward_basis="reported_funded_plus_promised", minimum_reward_usd=_money(floor))
@@ -379,7 +452,11 @@ def _fill_details(session: Any, report: dict[str, Any], floor: Decimal, max_deta
             report["details_complete"] = False
             # A listing removed after catalog collection does not invalidate
             # later listings. Its failed read still consumes the detail budget.
-            stopped = exc.code != "HTTP_ERROR" or exc.status not in {404, 410}
+            # Respect a requested cooldown even for a missing listing.
+            stopped = (
+                (exc.retry_after is not None and exc.retry_after > 0)
+                or exc.code != "HTTP_ERROR" or exc.status not in {404, 410}
+            )
         except ValueError:
             row["funding_status"] = "INVALID_DETAIL"
             report["errors"].append({"phase": "detail", "listing_id": row["listing_id"], "code": "INVALID_DETAIL"})
@@ -632,7 +709,7 @@ def main(argv: list[str] | None = None) -> int:
     collect.add_argument("--max-pages", type=int, default=10)
     collect.add_argument("--max-details", type=int, default=50)
     collect.add_argument("--page-size", type=int, default=100)
-    targets = commands.add_parser("targets", help="Export targets from a retained catalog with no provider reads")
+    targets = commands.add_parser("targets", help="Export targets from a retained catalog or refresh with no provider reads")
     targets.add_argument("snapshot", type=Path)
     targets.add_argument(
         "--submission-target-map", type=Path,
@@ -728,6 +805,11 @@ def main(argv: list[str] | None = None) -> int:
             )
             if "catalog_observed_through" in result:
                 basis += f" catalog_refreshed=false catalog_observed_through={result['catalog_observed_through']}"
+            if "source_scope" in result:
+                basis += (f" source_scope={result['source_scope']}"
+                          f" requested_listing_count={result['requested_listing_count']}"
+                          f" source_catalog_started_at={result['source_catalog_started_at']}"
+                          f" source_catalog_completed_at={result['source_catalog_completed_at']}")
             if args.submission_target_map is not None:
                 basis += f" mapped_submission_targets={sum('submission_target' in row for row in result['targets'])}"
             if args.exclude_issues is not None:

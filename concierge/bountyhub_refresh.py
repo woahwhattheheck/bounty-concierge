@@ -120,7 +120,11 @@ def refresh_listings(snapshot: dict[str, Any], listing_ids: list[str], *,
                 record["status"] = "READ_FAILED"
                 catalog._record_failure(report, exc, "detail", listing_id=listing_id)
                 report["details_complete"] = False
-                stopped = exc.code != "HTTP_ERROR" or exc.status not in {404, 410}
+                # Respect a requested cooldown even for a missing listing.
+                stopped = (
+                    (exc.retry_after is not None and exc.retry_after > 0)
+                    or exc.code != "HTTP_ERROR" or exc.status not in {404, 410}
+                )
             except ValueError:
                 record["status"] = "INVALID_DETAIL"
                 report["errors"].append({

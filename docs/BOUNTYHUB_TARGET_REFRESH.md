@@ -38,7 +38,10 @@ its observation end, including when the next selection differs. A receipt must
 reference the same source catalog digest. The initial catalog's cooldown is also
 honored. HTTP 429 and other shared failures stop later requests; 404/410 removal
 and invalid detail data remain explicit partial outcomes while independent rows
-continue. There are no automatic retries, sleeps, watchers or background tasks.
+continue. A 404/410 carrying a positive `Retry-After` still stops later reads;
+resume only after its cooldown. Missing or zero retry guidance retains normal
+per-listing continuation. There are no automatic retries, sleeps, watchers or
+background tasks.
 
 This is **not a cross-process lock or global rate limiter**. Keep one designated
 collector for overlapping work, share its latest receipt and honor any broader
@@ -77,8 +80,25 @@ Input errors name their cause on stderr, such as `invalid listing identity`,
 the saved cooldown before invoking the command again. Invalid JSON includes its
 line and column; diagnostics do not echo file contents, paths or malformed timestamps.
 Inspect a partial receipt before routing its successful candidates. The receipt
-is not input to `catalog targets` or `catalog resume`, and it does not refresh a
-GitHub preflight. Preserve it alongside any explicitly selected issue shortlist.
+can be reduced by the existing `targets` exporter without another provider read:
+
+```bash
+concierge bountyhub targets refresh-01.json > shortlist.json
+concierge capture-batch shortlist.json --output-dir capture-run --json
+```
+
+The exporter reselects only successful fresh detail records in the requested
+scope, using its normal reward-floor options. It ignores the receipt's cached
+`candidates` list and never substitutes old catalog rows for failed or unattempted
+reads. Its existing `--submission-target-map FILE` and `--exclude-issues FILE`
+options apply to these rows as well. The output remains the exact `candidates`
+envelope accepted by `capture-batch`; source times, original catalog times and
+requested-only coverage appear on stderr. A partial receipt retains exit 2 even
+when it contains a usable subset; inspect that subset before starting capture.
+An omitted requested record or conflicting detail identity is invalid input.
+
+Keep the original receipt beside the shortlist. It is still not input to
+`catalog resume`, and exporting targets does not refresh a GitHub preflight.
 
 Equivalent entrypoints are `python -m concierge.bountyhub_catalog refresh ...`,
 `python -m concierge.bountyhub_refresh ...`, and
