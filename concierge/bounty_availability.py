@@ -138,6 +138,13 @@ def _get_json(
         response = session.get(url, headers=headers, params=params, timeout=15)
         response.raise_for_status()
     except requests.RequestException as exc:
+        failed_response = getattr(exc, "response", None)
+        if failed_response is not None:
+            try:
+                failed_response.close()
+            except Exception:
+                # Cleanup must not replace the provider failure or its cause.
+                pass
         raise BountyAvailabilityError(
             f"GitHub request failed for {url}: {exc}"
         ) from exc
