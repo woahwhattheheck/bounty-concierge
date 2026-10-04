@@ -265,6 +265,7 @@ def _cmd_browse_index(args, repos):
     payload = _read_snapshot(args.index, parse_float=float)
     snapshot = snapshot_data(payload)
     rows = snapshot["rows"]
+    input_count = len(rows)
     for index, row in enumerate(rows):
         if not row.get("repo") or row.get("number") is None:
             raise ValueError(f"bounties[{index}] needs repo and number for browsing")
@@ -277,6 +278,16 @@ def _cmd_browse_index(args, repos):
         rows = [row for row in rows if row["repo"].casefold() in wanted]
     filtered = _filter_bounties(rows, args)
     displayed = filtered[:args.limit]
+    previous = snapshot.get("selection", {})
+    selection = {
+        "input_count": input_count,
+        "filtered_out_count": input_count - len(filtered),
+        "omitted_by_limit_count": len(filtered) - len(displayed),
+        "prior_filtered_out_count": (previous.get("prior_filtered_out_count", 0)
+                                     + previous.get("filtered_out_count", 0)),
+        "prior_omitted_by_limit_count": (previous.get("prior_omitted_by_limit_count", 0)
+                                         + previous.get("omitted_by_limit_count", 0)),
+    }
     source = snapshot["source"]
     source.pop("rows_selected")
     source.pop("preview_limit")
@@ -290,6 +301,7 @@ def _cmd_browse_index(args, repos):
         "filtered_count": len(filtered),
         "displayed_count": len(displayed),
         "display_limit": args.limit,
+        "selection": selection,
         "filters": {"repos": repos, "skill": args.skill, "tier": args.tier,
                     "min_rtc": args.min_rtc, "max_rtc": args.max_rtc},
     }
@@ -304,9 +316,18 @@ def _cmd_browse_index(args, repos):
             f"{source['rows_in_snapshot']}; omitted by the saved display limit "
             f"{source['omitted_from_snapshot']}."
         )
+        print(
+            f"Current file retained {input_count} rows; previous local filters excluded "
+            f"{selection['prior_filtered_out_count']}; previous local display limits omitted "
+            f"{selection['prior_omitted_by_limit_count']}."
+        )
         print(source["note"])
         _print_bounty_table(displayed, show_evidence=getattr(args, "evidence", False))
         print(f"Showing {len(displayed)} of {len(filtered)} matching retained rows.")
+        print(
+            f"Current filters excluded {selection['filtered_out_count']} rows; "
+            f"current display limit omitted {selection['omitted_by_limit_count']} matches."
+        )
     if source["complete"] is False:
         sys.exit(2)
 
@@ -1210,7 +1231,7 @@ def _build_parser():
     # --- browse ---
     p_browse = sub.add_parser("browse", help="List and filter open bounties")
     _add_common_flags(p_browse)
-    p_browse.add_argument("--index", help="Filter a retained index or saved live browse --report without network access")
+    p_browse.add_argument("--index", help="Filter a retained index or live/offline browse report without network access")
     p_browse.add_argument("--repo", nargs="+", help="Filter by repo (short name or owner/repo)")
     p_browse.add_argument("--skill", help="Filter by required skill")
     p_browse.add_argument("--tier", choices=["micro", "standard", "major", "critical"],

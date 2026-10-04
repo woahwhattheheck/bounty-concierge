@@ -196,7 +196,44 @@ def snapshot_data(payload: dict) -> dict:
         raise ValueError("snapshot rows must be a list")
     # Validate the whole supplied set, not merely the rows selected for preview.
     rows = _normalized_bounties(rows)
-    if is_report:
+    offline = payload.get("mode") == "offline"
+    metadata = payload.get("source") if offline else payload
+    if not isinstance(metadata, dict):
+        raise ValueError("offline snapshot source must be an object")
+    selection = None
+    if offline:
+        if not is_report or metadata.get("kind") not in {"browse_report", "cached_index"}:
+            raise ValueError("offline snapshot must retain its original source kind and rows")
+        collected = _snapshot_count(metadata, "collected_count")
+        filtered = _snapshot_count(metadata, "filtered_count")
+        retained = _snapshot_count(metadata, "rows_in_snapshot")
+        omitted = _snapshot_count(metadata, "omitted_from_snapshot")
+        matching = _snapshot_count(payload, "filtered_count")
+        displayed = _snapshot_count(payload, "displayed_count")
+        limit = _snapshot_count(payload, "display_limit")
+        if (not collected >= filtered >= retained or filtered - retained != omitted
+                or displayed != len(rows) or displayed != min(matching, limit)):
+            raise ValueError("offline snapshot row counts are inconsistent")
+        # The first shipped offline envelope had no selection counters. It can
+        # only represent one local stage, whose counts follow from its source.
+        selection = payload.get("selection")
+        if selection is None:
+            selection = {"input_count": retained,
+                         "filtered_out_count": retained - matching,
+                         "omitted_by_limit_count": matching - displayed,
+                         "prior_filtered_out_count": 0,
+                         "prior_omitted_by_limit_count": 0}
+        if not isinstance(selection, dict):
+            raise ValueError("offline snapshot selection must be an object")
+        selection = {key: _snapshot_count(selection, key) for key in (
+            "input_count", "filtered_out_count", "omitted_by_limit_count",
+            "prior_filtered_out_count", "prior_omitted_by_limit_count")}
+        if (selection["input_count"] + selection["prior_filtered_out_count"]
+                + selection["prior_omitted_by_limit_count"] != retained
+                or selection["input_count"] - selection["filtered_out_count"] != matching
+                or matching - selection["omitted_by_limit_count"] != displayed):
+            raise ValueError("offline snapshot selection counts are inconsistent")
+    elif is_report:
         collected = _snapshot_count(payload, "collected_count")
         filtered = _snapshot_count(payload, "filtered_count")
         displayed = _snapshot_count(payload, "displayed_count")
@@ -204,35 +241,40 @@ def snapshot_data(payload: dict) -> dict:
             raise ValueError("browse snapshot row counts are inconsistent")
         if not isinstance(payload.get("complete"), bool):
             raise ValueError("browse snapshot complete must be a boolean")
+        retained = displayed
     else:
         collected = _snapshot_count(payload, "total_count")
         if collected != len(rows):
             raise ValueError("index total_count must match its row list")
-        filtered = displayed = len(rows)
+        filtered = retained = displayed = len(rows)
 
-    complete = payload.get("complete")
+    complete = metadata.get("complete")
     if complete is not None and not isinstance(complete, bool):
         raise ValueError("snapshot complete must be a boolean when supplied")
-    updated_at = payload.get("updated_at")
+    if offline and metadata["kind"] == "browse_report" and not isinstance(complete, bool):
+        raise ValueError("offline browse source complete must be a boolean")
+    updated_at = metadata.get("updated_at")
     _parse_index_timestamp(updated_at)
-    started_at = payload.get("started_at")
+    started_at = metadata.get("started_at")
     if started_at is not None:
         started = _parse_index_timestamp(started_at)
         if started > _parse_index_timestamp(updated_at):
             raise ValueError("snapshot collection interval ends before it starts")
     coverage = "reported_complete" if complete is True else "partial" if complete is False else "unspecified"
-    return {
+    if offline and metadata.get("coverage") != coverage:
+        raise ValueError("offline snapshot coverage disagrees with its source")
+    result = {
         "source": {
-            "kind": "browse_report" if is_report else "cached_index",
+            "kind": metadata["kind"] if offline else "browse_report" if is_report else "cached_index",
             "coverage": coverage,
             "complete": complete,
             "started_at": started_at,
             "updated_at": updated_at,
             "collected_count": collected,
             "filtered_count": filtered,
-            "rows_in_snapshot": displayed,
+            "rows_in_snapshot": retained,
             "rows_selected": len(rows),
-            "omitted_from_snapshot": filtered - displayed,
+            "omitted_from_snapshot": filtered - retained,
             "preview_limit": None,
             "note": (
                 "Retained file only; no live read, freshness check, source authentication, "
@@ -242,6 +284,12 @@ def snapshot_data(payload: dict) -> dict:
         },
         "rows": rows,
     }
+    if offline:
+        for key in ("repositories", "rate_limited", "retry_after_seconds", "rate_limit_reset_at"):
+            if key in metadata:
+                result["source"][key] = metadata[key]
+        result["selection"] = selection
+    return result
 
 
 def format_snapshot(payload: dict, limit: int = 10) -> dict:
@@ -253,13 +301,17 @@ def format_snapshot(payload: dict, limit: int = 10) -> dict:
     source = snapshot["source"]
     source["rows_selected"] = len(selected)
     source["preview_limit"] = limit
-    return {"source": source, "previews": _format_validated_announcement(selected)}
+    result = {"source": source, "previews": _format_validated_announcement(selected)}
+    if "selection" in snapshot:
+        source["rows_in_file"] = len(snapshot["rows"])
+        result["selection"] = snapshot["selection"]
+    return result
 
 
 def main(argv=None) -> int:
     """Offline preview entrypoint. Never invokes the publication dispatcher."""
     parser = argparse.ArgumentParser(description="Preview one retained bounty snapshot without network access")
-    parser.add_argument("--index", required=True, help="Saved index JSON or concierge browse --report JSON")
+    parser.add_argument("--index", required=True, help="Saved index JSON or live/offline concierge browse report JSON")
     parser.add_argument("--format", choices=("json", "short", "medium", "long"), default="json")
     parser.add_argument("--limit", type=int, default=10, help="Select the first 0-1000 rows in retained order (default: 10)")
     args = parser.parse_args(argv)
@@ -278,8 +330,18 @@ def main(argv=None) -> int:
         print(f"Updated: {source['updated_at']}; started: {source['started_at'] or 'not supplied'}")
         print(
             f"Collected: {source['collected_count']}; filtered: {source['filtered_count']}; "
-            f"rows in file: {source['rows_in_snapshot']}; selected: {source['rows_selected']}"
+            f"rows in file: {source.get('rows_in_file', source['rows_in_snapshot'])}; "
+            f"selected: {source['rows_selected']}"
         )
+        if "selection" in result:
+            selection = result["selection"]
+            print(
+                f"Original snapshot retained {source['rows_in_snapshot']} rows, with "
+                f"{source['omitted_from_snapshot']} source display omissions; local filters "
+                f"excluded {selection['prior_filtered_out_count'] + selection['filtered_out_count']}; "
+                f"local display limits omitted "
+                f"{selection['prior_omitted_by_limit_count'] + selection['omitted_by_limit_count']}."
+            )
         print(source["note"])
         print()
         print(result["previews"][args.format] or "No candidate rows selected.")
