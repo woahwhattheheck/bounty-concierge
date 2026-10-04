@@ -1,0 +1,49 @@
+name: PayD 634 listener Helm render
+on:
+  push:
+    branches:
+      - validation/payd634-listener-helm-ledger0938
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: review
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: woahwhattheheck/PayD
+          ref: fd4960e766ccd804ac7a0f99f788efde511a45b1
+          path: source
+          persist-credentials: false
+      - name: Install the existing Helm version and YAML parser
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence tools
+          curl --fail --silent --show-error --location https://get.helm.sh/helm-v3.22.0-linux-amd64.tar.gz --output helm-v3.22.0-linux-amd64.tar.gz
+          curl --fail --silent --show-error --location https://get.helm.sh/helm-v3.22.0-linux-amd64.tar.gz.sha256sum --output evidence/helm.sha256sum
+          sha256sum --check evidence/helm.sha256sum
+          tar -xzf helm-v3.22.0-linux-amd64.tar.gz -C tools linux-amd64/helm
+          tools/linux-amd64/helm version --short | tee evidence/helm-version.txt
+          python3 -m venv .review-venv
+          .review-venv/bin/python -m pip install --disable-pip-version-check --no-cache-dir PyYAML==6.0.2
+      - name: Render both listener configurations from the complete staging chart
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C source rev-parse HEAD)" = "fd4960e766ccd804ac7a0f99f788efde511a45b1"
+          tools/linux-amd64/helm template ledger634 source/charts/payd --namespace staging --values source/charts/payd/values-staging.yaml --set backend.service.port=8080 > evidence/service-8080-listener-3001.yaml
+          tools/linux-amd64/helm template ledger634 source/charts/payd --namespace staging --values source/charts/payd/values-staging.yaml --set backend.service.port=8080 --set-string backend.config.PORT=4001 > evidence/service-8080-listener-4001.yaml
+          .review-venv/bin/python review/scripts/payd634_listener_render.py | tee evidence/acceptance.log
+          git -C source diff --exit-code
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: payd634-listener-helm-render
+          path: evidence/
+          retention-days: 7
