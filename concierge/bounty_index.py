@@ -186,13 +186,19 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                     if cached is not None:
                         request_headers["If-None-Match"] = cached["etag"]
                         source["cache"]["conditional_requests"] += 1
+                hook_http_error = False
                 try:
                     response = session.get(api_url, headers=request_headers, params=params, timeout=15)
                 except requests.RequestException as exc:
-                    source["status"] = "TRANSPORT_ERROR"
-                    # Exception text may contain request details. Retain only its type.
-                    source["error_type"] = type(exc).__name__
-                    break
+                    # Response hooks can raise before Session.get returns. Error
+                    # Responses are falsey, so retain them with an explicit None check.
+                    response = exc.response if isinstance(exc, requests.HTTPError) else None
+                    if response is None:
+                        source["status"] = "TRANSPORT_ERROR"
+                        # Exception text may contain request details. Retain only its type.
+                        source["error_type"] = type(exc).__name__
+                        break
+                    hook_http_error = True
 
                 try:
                     status = response.status_code
@@ -218,7 +224,7 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                     if remaining == 0:
                         report.update(rate_limited=True, retry_after_seconds=retry_after,
                                       rate_limit_reset_at=reset_at)
-                    if status not in (200, 304):
+                    if hook_http_error or status not in (200, 304):
                         if status == 401 and "Authorization" in headers:
                             authentication_failed = True
                         source["status"] = "HTTP_ERROR"
