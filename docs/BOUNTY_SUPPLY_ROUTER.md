@@ -151,6 +151,26 @@ submission target. Truncated, invalid or conflicting captures are reported;
 their issues remain unfinished while other valid captures can be recovered.
 Recovery does not use the old summary, refresh evidence or make provider reads.
 
+Within one recovery invocation, byte-identical captures can reuse a successful
+parse and replay after their shortlist identity and submission target match.
+The cache keys are the exact file bytes, not a claimed receipt digest or issue
+number. It retains at most 1 MiB of raw keys and 128 successful entries, evicting
+the least recently used entries. Oversized files, invalid captures and captures
+outside the shortlist are not cached. Every file is still read and copied;
+changed bytes are validated again, conflicting observations remain errors,
+and a new invocation starts without cached validation. No observation time,
+qualification, output schema or file protection is changed.
+
+A [bounded hosted comparison](https://github.com/woahwhattheheck/bounty-concierge/actions/runs/37190068830)
+on October 4, 2026 used the real package and synthetic closed/non-reward captures.
+For 100 identical files, replay calls fell from 100 to 1 and median recovery time
+from 0.2078 to 0.0512 seconds across five repetitions. For 100 unique issues,
+all 100 still replayed (0.2190 versus 0.2165 seconds, three repetitions).
+All 12 cases preserved outputs apart from the recovery run's clock fields;
+the comparison attempted no network access. These are workload-specific results,
+not measured fleet throughput. The [pinned comparison script](https://github.com/woahwhattheheck/bounty-concierge/blob/0fded9a52f272f043142bb7d1650fbc34267fec6/measure_recovery.py)
+includes source-blob guards, altered-byte/conflict cases and both cache bounds.
+
 The recovery output directory must be new, and retains the collector's private
 directory/file modes. Exit 0 means every issue has a valid recovered capture;
 exit 2 means remaining issues, recovery errors or invalid input. Read the
