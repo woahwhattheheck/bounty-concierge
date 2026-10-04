@@ -196,11 +196,16 @@ def recommend(
     Each returned dict is the original bounty dict with an extra
     ``match_score`` key (float, 0.0--1.0). Keyword patterns are prepared once
     for this call, so later catalog changes remain visible on the next call.
+    Stop once limit perfect matches determine the stable result; no later
+    score can exceed 1.0. Empty skills select the all-zero input prefix.
     """
     if limit <= 0 or not bounties:
         return []
 
     patterns = _skill_patterns(skills)
+    if not patterns:
+        # Every score is zero; stable ranking is exactly the input prefix.
+        return [dict(bounty, match_score=0.0) for bounty in bounties[:limit]]
     if limit >= len(bounties):
         scored_all = [
             dict(bounty, match_score=(
@@ -211,10 +216,17 @@ def recommend(
         scored_all.sort(key=lambda bounty: bounty["match_score"], reverse=True)
         return scored_all
 
-    scored = (
-        (_score_text(_bounty_text(bounty), patterns) if patterns else 0.0, bounty)
-        for bounty in bounties
-    )
+    def scored_until_full():
+        full_matches = 0
+        for bounty in bounties:
+            score = _score_text(_bounty_text(bounty), patterns)
+            yield score, bounty
+            if score == 1.0:
+                full_matches += 1
+                # No later row can beat 1.0, and equal scores keep input order.
+                if full_matches == limit:
+                    break
+
     # nlargest keeps input order for equal scores and retains only limit rows.
-    selected = nlargest(limit, scored, key=lambda item: item[0])
+    selected = nlargest(limit, scored_until_full(), key=lambda item: item[0])
     return [dict(bounty, match_score=score) for score, bounty in selected]
