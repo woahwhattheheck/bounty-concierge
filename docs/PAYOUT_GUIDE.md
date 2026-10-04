@@ -127,6 +127,13 @@ places (1 RTC = 1,000,000 units).
 concierge wallet balance YOUR_WALLET_NAME
 ```
 
+Balance reads require a response for the requested `miner_id` and a finite
+numeric `balance_rtc`. The existing integer `amount_i64` fallback remains
+supported when `balance_rtc` is absent. Zero balances remain valid. Mismatched
+identifiers, missing amounts, booleans, numeric strings and nonfinite values
+return an error and CLI exit 1; provider errors are preserved. Valid responses
+retain their original fields.
+
 For pending transfers and recent history, use `concierge status --wallet
 YOUR_WALLET_NAME`. This reads all required history pages through one HTTP
 session, then returns pending transfers plus the original first page. The

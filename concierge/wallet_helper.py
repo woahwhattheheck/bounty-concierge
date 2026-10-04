@@ -124,17 +124,34 @@ def check_wallet_exists(name):
 
 
 def get_balance(name):
-    """Return the RTC balance for a given wallet / miner ID.
+    """Return validated RTC balance data for the requested wallet / miner ID.
 
-    Args:
-        name: The miner or wallet identifier string.
-
-    Returns:
-        Parsed JSON dict from the node, e.g.
-        ``{"miner_id": "...", "balance_rtc": 42.5}``
-        or an error dict on failure.
+    Valid responses retain their original fields. The response must identify
+    the requested miner and contain a finite numeric balance_rtc, or the
+    existing integer amount_i64 compatibility field when balance_rtc is absent.
+    Provider errors pass through unchanged; malformed data returns an error dict.
     """
-    return _get("/balance", params={"miner_id": name})
+    result = _get("/balance", params={"miner_id": name})
+    if isinstance(result, dict) and "error" in result:
+        return result
+    if (
+        not isinstance(result, dict)
+        or type(result.get("miner_id")) is not str
+        or result["miner_id"] != name
+    ):
+        return {"error": "Node returned malformed wallet balance data"}
+
+    try:
+        if "balance_rtc" in result:
+            valid_amount = _finite_number(result["balance_rtc"])
+        else:
+            amount = result.get("amount_i64")
+            valid_amount = type(amount) is int and _finite_number(amount)
+    except OverflowError:
+        valid_amount = False
+    if not valid_amount:
+        return {"error": "Node returned malformed wallet balance data"}
+    return result
 
 
 def get_pending_transfers(name):
