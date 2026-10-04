@@ -270,7 +270,9 @@ class GitHub:
             )
         return sha
 
-    def read_state(\n        self, branch: str, *, ref: str | None = None\n    ) -> tuple[dict[str, Any], str]:
+    def read_state(
+        self, branch: str, *, ref: str | None = None
+    ) -> tuple[dict[str, Any], str]:
         response = self.request(
             "GET",
             f"/contents/{STATE_PATH}",
