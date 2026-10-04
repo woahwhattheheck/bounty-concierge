@@ -31,6 +31,9 @@ _REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
 _AUDIT_FIELDS = frozenset(
     {"issue_state", "open_pr_count", "stale_listing_signal", "search_truncated"}
 )
+_PR_ATTRIBUTION_FIELDS = frozenset(
+    {"author_login", "head_repository", "head_ref", "head_sha"}
+)
 _CAPTURE_FIELDS = frozenset(
     {
         "schema", "repo", "number", "issue_url", "policy", "observation",
@@ -272,6 +275,47 @@ def _reduce_audit(value: Any) -> dict[str, Any]:
     return dict(_audit({key: value[key] for key in sorted(_AUDIT_FIELDS)}, "canonical audit"))
 
 
+def _pr_identities(value: Any) -> list[dict[str, Any]]:
+    if type(value) is not list:
+        raise CaptureInputError("linked_prs must be a list")
+    seen: set[tuple[str, int]] = set()
+    for row in value:
+        _object(row, _PR_ATTRIBUTION_FIELDS | {"repository", "number"}, "linked PR")
+        repo, number, _ = _identity(row["repository"], row["number"])
+        if row["repository"] != repo or (repo, number) in seen:
+            raise CaptureInputError("linked PR identity must be canonical and unique")
+        seen.add((repo, number))
+        for key in _PR_ATTRIBUTION_FIELDS:
+            item = row[key]
+            if item is not None:
+                _string(item, f"linked PR {key}")
+                if item != item.strip() or any(
+                    ord(character) < 32 or ord(character) == 127 for character in item
+                ):
+                    raise CaptureInputError(f"linked PR {key} contains padding or control characters")
+        if row["head_repository"] is not None:
+            _identity(row["head_repository"], 1)
+        if row["head_sha"] is not None and re.fullmatch(
+            r"(?:[0-9a-f]{40}|[0-9a-f]{64})", row["head_sha"]
+        ) is None:
+            raise CaptureInputError("linked PR head_sha must be a full Git object id")
+    return value
+
+
+def _project_pr_identities(audit: dict[str, Any], repo: str) -> list[dict[str, Any]]:
+    rows = audit["linked_prs"]
+    if type(rows) is not list or any(type(row) is not dict for row in rows):
+        raise CaptureInputError("canonical audit linked_prs must contain objects")
+    projected = []
+    for row in rows:
+        pr_repo, number, _ = _identity(row.get("repository", repo), row.get("number"))
+        projected.append({
+            "repository": pr_repo, "number": number,
+            **{key: row.get(key) for key in sorted(_PR_ATTRIBUTION_FIELDS)},
+        })
+    return _pr_identities(sorted(projected, key=lambda row: (row["repository"], row["number"])))
+
+
 def _markers(value: Any, name: str) -> list[list[Any]]:
     if type(value) is not list:
         raise CaptureInputError(f"{name} must contain complete comment generation markers")
@@ -310,6 +354,7 @@ def _comment_binding(comment: dict[str, Any]) -> str:
 def _validate_observation(
     value: Any, repo: str, number: int, principal: str,
     *, submission_target: dict[str, str] | None = None,
+    linked_prs: list[dict[str, Any]] | None = None,
 ) -> None:
     observation = _object(
         value, {"started_at", "completed_at", "request_count", "source_urls"}, "observation"
@@ -346,6 +391,9 @@ def _validate_observation(
         raise CaptureInputError("capture omits required issue, comment, or audit source reads")
     if ("/user" in seen_paths) != (principal == "AUTHENTICATED_SAME_TOKEN"):
         raise CaptureInputError("authenticated read basis and source reads disagree")
+    for row in linked_prs or []:
+        if f"/repos/{row['repository']}/pulls/{row['number']}" not in seen_paths:
+            raise CaptureInputError("linked PR identity lacks its observed detail endpoint")
 
 
 def _validate_capture(capture: Any, saturation_threshold: int) -> dict[str, Any]:
@@ -376,7 +424,7 @@ def _validate_capture(capture: Any, saturation_threshold: int) -> dict[str, Any]
     baseline_fields = {"title", "body", "labels", "attempt_count", "canonical_audit"}
     if type(value["baseline"]) is dict:
         baseline_fields.update(
-            set(value["baseline"]) & {"submission_method", "submission_policy_context"}
+            set(value["baseline"]) & {"submission_method", "submission_policy_context", "linked_prs"}
         )
     baseline = _object(value["baseline"], baseline_fields, "baseline")
     _string(baseline["title"], "title", empty=True)
@@ -388,6 +436,7 @@ def _validate_capture(capture: Any, saturation_threshold: int) -> dict[str, Any]
         raise CaptureInputError("baseline labels must use canonical ordering")
     _integer(baseline["attempt_count"], "attempt_count")
     initial_audit = _audit(baseline["canonical_audit"], "baseline.canonical_audit")
+    linked_prs = _pr_identities(baseline["linked_prs"]) if "linked_prs" in baseline else None
 
     assignment = _object(
         value["assignment"],
@@ -407,7 +456,8 @@ def _validate_capture(capture: Any, saturation_threshold: int) -> dict[str, Any]
     if assigned and principal != "AUTHENTICATED_SAME_TOKEN":
         raise CaptureInputError("operator assignment lacks same-token authenticated read evidence")
     _validate_observation(
-        value["observation"], repo, number, principal, submission_target=submission_target
+        value["observation"], repo, number, principal, submission_target=submission_target,
+        linked_prs=linked_prs,
     )
 
     generation = _object(
@@ -701,6 +751,10 @@ def make_capture(
         result["baseline"]["submission_method"] = submission_method
     if submission_policy_context is not None:
         result["baseline"]["submission_policy_context"] = submission_policy_context
+    if "linked_prs" in audit:
+        # Attribution is retained evidence, separate from the four gate fields.
+        # Missing provider fields remain unknown, including deleted head forks.
+        result["baseline"]["linked_prs"] = _project_pr_identities(audit, canonical_repo)
     result["generation"]["issue_projection_sha256"] = capture_digest(_issue_projection(result))
     result = _json_copy(result)
     result["receipt_sha256"] = capture_digest(result)
