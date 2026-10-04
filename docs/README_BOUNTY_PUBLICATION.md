@@ -26,6 +26,63 @@ An indexed amount can be a campaign pool, maximum, or extractor estimate. It is 
 
 The existing 36-hour cache-age and five-minute future-skew limits are unchanged. With freshness enabled, an old snapshot produces a stale warning instead of rows. Invalid timestamps and structurally invalid snapshots stop publication. Missing/null `bounties` is not treated as an empty successful collection; an explicit empty array is supported. When supplied, `total_count` must equal the complete list length. Duplicate JSON keys, duplicate repository/issue identities, invalid row types and non-finite or negative reward values are rejected.
 
+## Bounded display selection
+
+The renderer validates the complete collection, then retains only the requested
+best rows for display instead of sorting the complete collection twice. The
+ranking and Markdown output are unchanged. Decimal ordering uses an exact sign
+change rather than context-rounded unary arithmetic; a low-precision caller must
+not collapse distinct indexed amounts. A zero display limit still validates all
+input rows. This changes local selection work, not provider requests, freshness,
+claim eligibility, or payment policy.
+
+An offline Python 3.13.5 comparison of the complete `render_table` call used seven
+alternating before/after pairs after warmup, with `top_n=10`. The retained input
+was `data/bounty_index.json` at `4f5bc01a9b6d6b91d5937d9743ed3608f9003ebc`
+(SHA-256 `9a1c190a7172554423a3511fce874dfed99039a64806c0babb05ded8a8c7e6c2`).
+The larger inputs repeated its rows with unique synthetic issue identities;
+they are not additional live offers.
+
+| Input | Before median CPU ms | After median CPU ms |
+|---|---:|---:|
+| Retained 266 rows | 0.874002 | 0.644480 |
+| Synthetic 10,000 rows | 18.834531 | 16.986840 |
+| Synthetic 50,000 rows | 150.217890 | 93.130993 |
+
+All compared tables were byte-identical. Separate direct calls covered limits
+0, 1, 10, the full retained size and beyond it; precision-two Decimal ordering,
+mixed numeric types and stable ties; and complete invalid/duplicate-row rejection
+even with a zero limit. These are local renderer observations, not a whole-repo
+suite, deployment, provider-quota reduction or measured fleet speedup.
+
+The original renderer blob is `cbdf87fdc3b69f0e298901c2a45e7b1ad05f2e31`;
+the measured replacement is `1a672b23fb7b56a6c5840e4f1e33c09824d3bfdc`.
+To repeat the retained-input measurement from a checkout containing the change:
+
+```sh
+git show e15dddbb2a252991880c258c0ff77549b398ed90:concierge/readme_sync.py > /tmp/readme-before.py
+git show 4f5bc01a9b6d6b91d5937d9743ed3608f9003ebc:data/bounty_index.json > /tmp/readme-index.json
+PYTHONPATH="$PWD" python - <<'PY'
+import importlib.util, json, statistics, time
+from decimal import Decimal
+from concierge import readme_sync as after
+spec = importlib.util.spec_from_file_location("readme_before", "/tmp/readme-before.py")
+before = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(before)
+with open("/tmp/readme-index.json", encoding="utf-8") as stream:
+    rows = json.load(stream, parse_float=Decimal)["bounties"]
+assert before.render_table(rows, 10) == after.render_table(rows, 10)
+samples = {"before": [], "after": []}
+for iteration in range(7):
+    pair = [("before", before), ("after", after)]
+    for name, module in pair if iteration % 2 == 0 else pair[::-1]:
+        start = time.process_time_ns()
+        module.render_table(rows, 10)
+        samples[name].append((time.process_time_ns() - start) / 1e6)
+print({name: statistics.median(values) for name, values in samples.items()})
+PY
+```
+
 ## Publication and recovery
 
 Only the sentinel-delimited section is regenerated. Titles are shortened before Markdown escaping, preserving table structure and literal text. Original index bytes are never rewritten by this command.
