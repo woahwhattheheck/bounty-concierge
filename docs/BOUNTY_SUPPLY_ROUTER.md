@@ -126,6 +126,12 @@ has been attempted but some failed, the partial summary reports `ITEM_ERRORS`.
 `attempted_count` and `failed_count` distinguish these failures from unattempted
 work. The existing issue and request budgets still apply to all attempts.
 
+`remaining.json` places unattempted issues before attempted failures, preserving
+input order within each group. A later bounded run can therefore reach untouched
+issues instead of repeatedly spending its entire budget on the same early failure.
+Failed rows remain available for retry; the original summary, item order and
+observation times stay unchanged. This ordering does not clear a provider cooldown.
+
 Rate limits, HTTP 401 authentication errors, server errors, transport failures,
 output failures and interruption still stop the run. Handled failures and Ctrl+C
 retain completed captures and write the final summary, supply and remaining files

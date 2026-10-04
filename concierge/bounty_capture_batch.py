@@ -371,6 +371,10 @@ def collect_batch(
             provider.close()
 
     remaining = [row for row in unique if (row["repo"], row["number"]) not in completed]
+    # Let the next bounded run reach untouched issues before retrying failures.
+    # Stable sorting preserves the original order within both groups.
+    attempted = {(item["repo"], item["number"]) for item in items}
+    remaining.sort(key=lambda row: (row["repo"], row["number"]) in attempted)
     complete = not remaining
     if remaining and stop_reason is None:
         if len(items) == len(unique):
