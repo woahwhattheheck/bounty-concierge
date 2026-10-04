@@ -228,7 +228,11 @@ def compile_grantfox_carrier_census(request: dict[str, Any]) -> dict[str, Any]:
         for c in relevant
         if c["state"] == "closed" and c["process_disposition"] == "closed_unassigned"
     ]
-    other_closed = [c for c in relevant if c["state"] == "closed" and c not in process_closed]
+    other_closed = [
+        c
+        for c in relevant
+        if c["state"] == "closed" and c["process_disposition"] != "closed_unassigned"
+    ]
     reasons: list[str] = []
     if age > max_age:
         reasons.append("CARRIER_CENSUS_STALE")
