@@ -38,7 +38,7 @@ def _generation(directory):
     return names, tuple(markers)
 
 
-def _remember(key, generation, rows, size):
+def _remember(key, generation, rows, size, file_spans):
     global _CACHE_BYTES
     with _LOCK:
         old = _CACHE.pop(key, None)
@@ -48,7 +48,7 @@ def _remember(key, generation, rows, size):
                           or _CACHE_BYTES + size > _MAX_BYTES):
             _, discarded = _CACHE.popitem(last=False)
             _CACHE_BYTES -= discarded[2]
-        _CACHE[key] = (generation, tuple(rows), size)
+        _CACHE[key] = (generation, tuple(rows), size, tuple(file_spans))
         _CACHE_BYTES += size
 
 
@@ -67,6 +67,8 @@ def iter_paragraphs(directory, tokenize):
     ``tokenize`` supplies the caller's matching semantics. Only complete reads of
     an unchanged generation are retained. Oversized corpora continue streaming
     without caching; unreadable files retain the reader's skip behavior.
+    After a corpus change, unchanged files reuse their previous rows in the
+    current filesystem order. Only new or changed files are tokenized again.
     """
     directory = os.path.realpath(directory)
     names, generation = _generation(directory)
@@ -82,30 +84,59 @@ def iter_paragraphs(directory, tokenize):
         yield from rows
         return
 
-    # Include generation/key containers and conservative cache bookkeeping, not
-    # merely input-file lengths: token sets can outweigh the Markdown itself.
-    size = _size(generation) + _size(directory) + sys.getsizeof(()) + 1024
+    # Reuse complete per-file row spans from the previous generation. Marker
+    # equality includes filesystem identity/metadata; changed files are rebuilt.
+    reusable = {}
+    if generation is not None and cached is not None:
+        start = 0
+        for marker, (end, row_bytes) in zip(cached[0], cached[3]):
+            reusable[marker] = (start, end, row_bytes)
+            start = end
+
+    # Include generation/key containers plus retained span metadata in the same
+    # bounded byte budget; token sets can outweigh the Markdown itself.
+    size = (_size(generation) + _size(directory) + 2 * sys.getsizeof(()) + 1024
+            + len(names) * (sys.getsizeof((0, 0)) + 2 * sys.getsizeof(0)
+                            + _POINTER_BYTES))
     retained = [] if generation is not None and size <= _MAX_BYTES else None
-    for name in names:
-        try:
-            with open(os.path.join(directory, name), "r", encoding="utf-8",
-                      errors="replace") as stream:
-                content = stream.read()
-        except OSError:
-            retained = None
-            continue
-        for paragraph in _paragraphs(content):
-            paragraph = paragraph.strip()
-            if len(paragraph) < 20:
-                continue
-            row = (paragraph, frozenset(tokenize(paragraph)))
+    file_spans = []
+    for index, name in enumerate(names):
+        span = reusable.get(generation[index]) if generation is not None else None
+        row_bytes = 0
+        if span is not None:
+            row_bytes = span[2]
             if retained is not None:
-                size += _size(row) + _POINTER_BYTES
+                size += row_bytes
+                if size > _MAX_BYTES:
+                    retained = None
+            file_rows = (cached[1][pos] for pos in range(span[0], span[1]))
+        else:
+            try:
+                with open(os.path.join(directory, name), "r", encoding="utf-8",
+                          errors="replace") as stream:
+                    content = stream.read()
+            except OSError:
+                retained = None
+                continue
+            file_rows = (
+                (paragraph, frozenset(tokenize(paragraph)))
+                for paragraph in (part.strip() for part in _paragraphs(content))
+                if len(paragraph) >= 20
+            )
+
+        for row in file_rows:
+            if retained is not None:
+                if span is None:
+                    row_size = _size(row) + _POINTER_BYTES
+                    row_bytes += row_size
+                    size += row_size
                 if size > _MAX_BYTES:
                     retained = None
                 else:
                     retained.append(row)
             yield row
+        if retained is not None:
+            file_spans.append((len(retained), row_bytes))
 
     if retained is not None:
         try:
@@ -113,4 +144,4 @@ def iter_paragraphs(directory, tokenize):
         except OSError:
             unchanged = False
         if unchanged:
-            _remember(key, generation, retained, size)
+            _remember(key, generation, retained, size, file_spans)
