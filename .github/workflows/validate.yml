@@ -1,0 +1,69 @@
+name: Commitlabs 1942 focused timer acceptance
+on:
+  push:
+    branches: [validation/commitlabs-1942-timer-quartz47]
+permissions:
+  contents: read
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: controller
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: Commitlabs-Org/Commitlabs-Frontend
+          ref: 0d847032ef5862806cbb678f0bca93b6be44fb17
+          path: probe
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /src/lib/backend/idempotency.ts
+            /src/lib/backend/kv.ts
+            /src/lib/backend/__tests__/idempotency.test.ts
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Prepare isolated declared-version unit runner
+        run: |
+          set -eu
+          mkdir -p evidence tools
+          git -C probe rev-parse HEAD | tee evidence/source.txt
+          test "$(git -C probe hash-object src/lib/backend/idempotency.ts)" = 554a8a2b36ae0243cfdf6b86195c6ca51d3364da
+          test "$(git -C probe hash-object src/lib/backend/__tests__/idempotency.test.ts)" = 4cf5936c22c558dbbbd5c3e077684374479c1a54
+          printf '{"private":true}' > tools/package.json
+          npm install --prefix tools --ignore-scripts --no-audit --no-fund --save-exact vitest@2.1.9 @vitest/coverage-v8@2.1.9
+          ln -s ../tools/node_modules probe/node_modules
+          cp controller/idempotency.cleanup.test.ts probe/src/lib/backend/__tests__/
+          cp controller/vitest.isolated.config.mjs probe/
+          node --version | tee evidence/node.txt
+          npm ls --prefix tools --depth=0 > evidence/dependencies.txt
+          cp tools/package-lock.json evidence/runner-package-lock.json
+      - name: Baseline and candidate on identical focused cases
+        run: |
+          set -eu
+          cd probe
+          set +e
+          ./node_modules/.bin/vitest run --config vitest.isolated.config.mjs src/lib/backend/__tests__/idempotency.cleanup.test.ts --reporter=json --outputFile=../evidence/baseline.json > ../evidence/baseline.log 2>&1
+          baseline_status=$?
+          set -e
+          echo "$baseline_status" > ../evidence/baseline-exit.txt
+          test "$baseline_status" -eq 1
+          node -e 'const r=require("../evidence/baseline.json");if(r.numTotalTests!==6||r.numFailedTests<1||r.numPendingTests!==0)process.exit(1)'
+          cp ../controller/idempotency.ts src/lib/backend/idempotency.ts
+          git diff -- src/lib/backend/idempotency.ts > ../evidence/product.patch
+          ./node_modules/.bin/vitest run --config vitest.isolated.config.mjs --coverage --reporter=json --outputFile=../evidence/candidate.json > ../evidence/candidate.log 2>&1
+          cp -R coverage ../evidence/
+          cp src/lib/backend/idempotency.ts ../evidence/candidate.ts
+          cp src/lib/backend/__tests__/idempotency.cleanup.test.ts ../evidence/
+          git hash-object src/lib/backend/idempotency.ts > ../evidence/product-blob.txt
+          git hash-object src/lib/backend/__tests__/idempotency.cleanup.test.ts > ../evidence/test-blob.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: commitlabs1942-timer-acceptance
+          path: evidence/
+          retention-days: 7
