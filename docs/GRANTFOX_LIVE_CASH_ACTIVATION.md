@@ -7,11 +7,11 @@ The GrantFox execution path has strong but separate controls:
 - `grantfox_activation_gate` composes provider queue state, source readiness,
   dependency readiness/fulfillment, and application lifecycle continuity.
 - `bounty_live_cash_admission` re-reads canonical GitHub state and admits only
-  fixed USD economics, routing `$25+` to `main_bounty_queue`, `$10-24.99` to the
+  fixed USD economics, routing `$15+` to `main_bounty_queue`, `$10-14.99` to the
   saving pile, and non-fixed/unverified/stale work to HOLD/REJECT.
 - GrantFox is a green platform under Bryce's October 4 instruction, with a
-  `$15` active-work minimum. Its composition therefore also accepts qualifying
-  cash receipts from the generic saving pile.
+  `$15` active-work minimum. Its composition preserves qualifying live-cash
+  receipts and the original provider lifecycle.
 
 Without a final composition step, a lifecycle receipt can be operationally
 actionable while the same issue's economics are unverified, below the active
@@ -36,11 +36,11 @@ receipt simultaneously proves all of:
 - `fixed_semantics == true`; and
 - `fixed_amount >= 15`.
 
-`$15-24.99` saving-pile receipts can preserve the GrantFox lifecycle disposition.
-The original cash disposition and route remain in the output and nested evidence;
-the composition records `required_active_floor_usd: "15"`. It does not rewrite a
-generic cash receipt or lower another platform's floor. `$10-14.99` receipts stay
-below GrantFox's minimum. Non-fixed rewards, token rewards, stale receipts,
+The composition also recognizes the existing saving-pile route for receipts
+that currently re-verify and meet the $15 minimum. The original cash disposition
+and route remain in the output and nested evidence; the composition records
+`required_active_floor_usd: "15"` without rewriting the cash receipt.
+`$10-14.99` receipts stay below GrantFox's minimum. Non-fixed rewards, token rewards, stale receipts,
 identity mismatches, and canonical source changes fail closed.
 
 GrantFox lifecycle HOLD states dominate economics: cash cannot make a blocked

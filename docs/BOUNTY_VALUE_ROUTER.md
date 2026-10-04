@@ -6,9 +6,9 @@ settlement gates.
 
 The checked-in operator policy is `policies/bounty_value_routing_v1.json`:
 
-- **USD / USDC >= 25**: value class `VALUE_50_PLUS`; recommended route
+- **USD / USDC >= 15**: value class `VALUE_50_PLUS`; recommended route
   `bug-bounty`.
-- **USD / USDC >= 10 and < 25**: `PILE_10_49`; recommended route
+- **USD / USDC >= 10 and < 15**: `PILE_10_49`; recommended route
   `bounty-pile-10-49`.
 - **Below 10**: `DROP_UNDER_10`.
 - **No fresh, trusted, issue- or milestone-specific amount**:
@@ -16,7 +16,7 @@ The checked-in operator policy is `policies/bounty_value_routing_v1.json`:
 
 The v1 `VALUE_50_PLUS` / `PILE_10_49` identifiers and queue names are retained
 for compatibility. Their thresholds come from the policy; the current active
-floor is 25, and the pile range is 10 through 24.99.
+floor is 15, and the pile range is 10 through 14.99.
 
 This router intentionally does **not** perform FX, estimate win probability,
 decide claimability, or turn a possible/discretionary reward into a verified
@@ -48,9 +48,9 @@ choosing the largest number.
 
 ## No automatic micro-batch promotion
 
-The `$10-24.99` route is a parking pile, not an alternate way to synthesize a
-larger active bounty. Three $20 items remain three `PILE_10_49` items even
-though their arithmetic sum is $60. Promotion of a bundled pile requires a new
+The `$10-14.99` route is a parking pile, not an alternate way to synthesize a
+larger active bounty. Three $12 items remain three `PILE_10_49` items even
+though their arithmetic sum is $36. Promotion of a bundled pile requires a new
 owner decision and a separately verified bundle contract.
 
 This is deliberately different from `fleet_economic_admission`, which can
@@ -69,8 +69,8 @@ evaluate explicitly compatible batches for profitability after intake.
       "pile_10_49": "bounty-pile-10-49"
     },
     "assets": {
-      "USD": {"active_floor": "25", "pile_floor": "10"},
-      "USDC": {"active_floor": "25", "pile_floor": "10"}
+      "USD": {"active_floor": "15", "pile_floor": "10"},
+      "USDC": {"active_floor": "15", "pile_floor": "10"}
     }
   },
   "evaluated_at": "2026-09-19T23:00:00Z",

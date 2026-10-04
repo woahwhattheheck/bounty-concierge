@@ -239,7 +239,7 @@ def _apply_live_cash_gate(
     repo: str,
     number: int,
 ) -> dict[str, Any]:
-    """Require the source-bound owner 10/25 route before implementation economics."""
+    """Require the source-bound owner 10/15 route before implementation economics."""
     if not isinstance(result, dict) or result.get("dispatch") is not True:
         raise RevenueDispatchError("live cash gate may only inspect a clear dispatch candidate")
     if not isinstance(receipt, dict):
@@ -273,7 +273,7 @@ def _apply_live_cash_gate(
         raise RevenueDispatchError("live cash admission target identity mismatch")
     if source.get("kind") != "LIVE_GITHUB_PREFLIGHT":
         raise RevenueDispatchError("live cash admission source is unsupported")
-    if economics.get("active_floor") != "25" or economics.get("pile_floor") != "10":
+    if economics.get("active_floor") != "15" or economics.get("pile_floor") != "10":
         raise RevenueDispatchError("live cash admission dollar-floor generation mismatch")
     receipt_sha = _require_sha256(
         receipt.get("receipt_sha256"),
@@ -299,7 +299,7 @@ def _apply_live_cash_gate(
             amount = Decimal(fixed_amount)
         except (InvalidOperation, ValueError):
             raise RevenueDispatchError("active live cash amount is malformed") from None
-        if not amount.is_finite() or amount < Decimal("25"):
+        if not amount.is_finite() or amount < Decimal("15"):
             raise RevenueDispatchError("active live cash amount is below the active floor")
 
         promoted = dict(result)
@@ -314,7 +314,7 @@ def _apply_live_cash_gate(
         dispatch_authority = dict(promoted.get("dispatch_authority") or {})
         dispatch_authority.update(
             {
-                "live_cash": "source_bound_owner_25_floor",
+                "live_cash": "source_bound_owner_15_floor",
                 "new_work_dispatch": False,
                 "internal_implementation_only": False,
                 "external_claim_authority": False,
@@ -346,7 +346,7 @@ def _apply_live_cash_gate(
             "severity": "REJECT" if disposition.startswith("REJECT_") else "HOLD",
             "message": (
                 "Source-bound live cash admission did not clear the owner's "
-                "$25 active-work floor."
+                "$15 active-work floor."
             ),
         }
     )
@@ -376,7 +376,7 @@ def _apply_live_cash_gate(
     dispatch_authority = dict(held.get("dispatch_authority") or {})
     dispatch_authority.update(
         {
-            "live_cash": "source_bound_owner_25_floor",
+            "live_cash": "source_bound_owner_15_floor",
             "economics": "not_reached",
             "new_work_dispatch": False,
             "internal_implementation_only": False,
@@ -728,7 +728,7 @@ def qualify_available_live_revenue_intake(
         return result
 
     # Final provider-backed reread: canonical source, fixed cash semantics, and
-    # owner-owned 10/25 routing must still be active before local economics can
+    # owner-owned 10/15 routing must still be active before local economics can
     # authorize implementation.
     try:
         live_cash = evaluate_live_cash_admission(
