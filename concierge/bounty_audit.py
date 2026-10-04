@@ -224,6 +224,7 @@ def audit_bounty(
     _pr_detail_cache: dict[tuple[str, int], dict[str, Any]] | None = None,
     _source_issue_cache: dict[tuple[str, int], dict[str, Any]] | None = None,
     _source_expiry_cache: dict[tuple[str, int], list[dict[str, Any]]] | None = None,
+    _search_cache: dict[tuple[str, int], list[dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     """Audit one GitHub bounty issue against canonical repository signals.
 
@@ -259,6 +260,7 @@ def audit_bounty(
                 _pr_detail_cache=_pr_detail_cache,
                 _source_issue_cache=_source_issue_cache,
                 _source_expiry_cache=_source_expiry_cache,
+                _search_cache=_search_cache,
             )
 
     token = token or GITHUB_TOKEN
@@ -289,22 +291,30 @@ def audit_bounty(
     search_truncated = False
     search_url = "https://api.github.com/search/issues"
     for search_repo in search_repos:
+        query = f"repo:{search_repo} is:pr {number}"
+        # The owning batch fixes the session, token, representation and page size.
+        search_key = (query, max_pages)
+        if _search_cache is not None and search_key in _search_cache:
+            candidates.extend((search_repo, item) for item in deepcopy(_search_cache[search_key]))
+            continue
+        repository_candidates: list[dict[str, Any]] = []
+        repository_truncated = False
         for page in range(1, max_pages + 1):
             payload = _object_payload(
                 _get_json(
                     session,
                     search_url,
                     headers=headers,
-                    params={"q": f"repo:{search_repo} is:pr {number}", "per_page": 100, "page": page},
+                    params={"q": query, "per_page": 100, "page": page},
                 ),
                 f"search in {search_repo} for {repo}#{number}",
             )
             if payload.get("incomplete_results") is True:
-                search_truncated = True
+                repository_truncated = True
             items = payload.get("items", [])
             if not isinstance(items, list) or any(not isinstance(item, dict) for item in items):
                 raise BountyAuditError(f"GitHub search response contained malformed items for {repo}#{number}")
-            candidates.extend((search_repo, item) for item in items)
+            repository_candidates.extend(items)
             if len(items) < 100:
                 break
             # A full final page needs no empty-page request to prove completion.
@@ -313,7 +323,11 @@ def audit_bounty(
                 break
         else:
             # Keep incompleteness from either bounded repository traversal.
-            search_truncated = True
+            repository_truncated = True
+        candidates.extend((search_repo, item) for item in repository_candidates)
+        search_truncated = search_truncated or repository_truncated
+        if _search_cache is not None and not repository_truncated:
+            _search_cache[search_key] = deepcopy(repository_candidates)
 
     exact_candidates: dict[tuple[str, int], tuple[str, dict[str, Any]]] = {}
     for pr_repo, candidate in candidates:
@@ -469,6 +483,7 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
     pr_detail_cache: dict[tuple[str, int], dict[str, Any]] = {}
     source_issue_cache: dict[tuple[str, int], dict[str, Any]] = {}
     source_expiry_cache: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    search_cache: dict[tuple[str, int], list[dict[str, Any]]] = {}
     audit_by_issue: dict[tuple[str, int, str | None], dict[str, Any]] = {}
     unavailable_by_issue: dict[tuple[str, int], BountyAuditError] = {}
     unavailable: list[dict[str, Any]] = []
@@ -503,6 +518,7 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
                     _pr_detail_cache=pr_detail_cache,
                     _source_issue_cache=source_issue_cache,
                     _source_expiry_cache=source_expiry_cache,
+                    _search_cache=search_cache,
                 )
             except BountyAuditError as exc:
                 if (
