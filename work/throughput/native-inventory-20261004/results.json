@@ -1,0 +1,19 @@
+{
+  "observed_at": "2026-10-04",
+  "runtime": "ChatGPT functions.exec V8 code mode; live ALL_TOOLS",
+  "registry_count": 1181,
+  "relevant_count": 127,
+  "github_count": 89,
+  "slack_count": 38,
+  "required_writer_count": 15,
+  "description_matches_in_baseline": 1160,
+  "broad_utf8_bytes": 659255,
+  "summary_utf8_bytes": 1598,
+  "names_utf8_bytes": 7593,
+  "selected_schema_count": 1,
+  "selected_schema_name": "mcp__codex_apps__github_create_tree",
+  "unrelated_provider_names_in_exact_set": 0,
+  "provider_calls": 0,
+  "authorization": "NOT_PROBED_BY_THIS_INSPECTOR",
+  "summary_reduction_percent": 99.76
+}
