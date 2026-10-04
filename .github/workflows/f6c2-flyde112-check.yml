@@ -1,0 +1,121 @@
+name: Flyde 112 editor proof
+on:
+  push:
+    branches: [f6c2/flyde112-source-20261004]
+    paths: [.github/workflows/f6c2-flyde112-check.yml]
+permissions: {}
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Retrieve and verify the exact source packet
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/flyde112-check/evidence"
+          cd "$RUNNER_TEMP/flyde112-check"
+          curl --fail --location --max-time 60 --output evidence/source-packet.json https://raw.githubusercontent.com/woahwhattheheck/bounty-concierge/51bc87c5189bb0006caeff2816637f69c035fb54/work/paid-bounties/flyde112/source-packet.json
+          python3 - <<'PY'
+          import base64, gzip, hashlib, json, pathlib
+          p = pathlib.Path('evidence')
+          data = json.loads((p/'source-packet.json').read_text())
+          raw = base64.b64decode(''.join(data['patch_gzip_base64_chunks']), validate=True)
+          if hashlib.sha256(raw).hexdigest() != 'f39f39357531468b5309f319b8b533343b93c83b33114b5068b0e96bd8a23410':
+              raise SystemExit('compressed patch digest mismatch')
+          patch = gzip.decompress(raw)
+          if hashlib.sha256(patch).hexdigest() != '2027d982b2b9fc671f7b37612d433d3d5d5fe613cdf76ef1d6cdf4e9cabaa74b':
+              raise SystemExit('patch digest mismatch')
+          (p/'implementation.patch').write_bytes(patch)
+          print('PASS: transferred patch matches independently pinned local source')
+          PY
+          curl --fail --location --max-time 60 --output upstream.tar.gz https://codeload.github.com/flydelabs/flyde/tar.gz/913ff75c6781259da35c32fd001a90607756cb24
+          echo 'da71c70917e4aab57862ddaca1183278a46fc86d35854b7b8316f5cba4e1b831  upstream.tar.gz' | sha256sum --check
+          mkdir source
+          tar -xzf upstream.tar.gz --strip-components=1 -C source
+          cd source
+          git init -q
+          git apply --check ../evidence/implementation.patch
+          git apply ../evidence/implementation.patch
+          git diff --no-index --check /dev/null loader/src/rewrite-flow-imports.ts || test "$?" = 1
+      - name: Compile and run focused loader checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/flyde112-check"
+          npm install --prefix tools --ignore-scripts --no-audit --no-fund yaml@2.3.1 typescript@5.5.4 @types/node@20 @types/vscode@1.69.0 @types/mocha@10.0.1 mocha@10.2.0 @vscode/test-electron@2.4.1
+          ln -s "$PWD/tools/node_modules" node_modules
+          ln -s "$PWD/tools/node_modules" source/node_modules
+          python3 - <<'PY'
+          import json, pathlib
+          compiler = {'target':'ES2020','module':'commonjs','moduleResolution':'node','strict':True,'skipLibCheck':True,'rootDir':'source','outDir':'out','types':['node','mocha'],'typeRoots':['tools/node_modules/@types'],'baseUrl':'.','paths':{'@flyde/loader/dist/server':['source/loader/src/rewrite-flow-imports.ts'],'vscode':['tools/node_modules/@types/vscode']}}
+          files = ['loader/src/rewrite-flow-imports.ts','loader/src/rewrite-flow-imports.spec.ts','vscode/src/updateImportsOnRename.ts','vscode/src/test/updateImportsOnRename.test.ts']
+          pathlib.Path('tsconfig.json').write_text(json.dumps({'compilerOptions':compiler,'files':['source/'+f for f in files]}, indent=2))
+          PY
+          ./tools/node_modules/.bin/tsc -p tsconfig.json 2>&1 | tee evidence/compile.log
+          ./tools/node_modules/.bin/mocha out/loader/src/rewrite-flow-imports.spec.js --reporter spec 2>&1 | tee evidence/loader-tests.log
+          mkdir -p out/node_modules/@flyde/loader/dist host-extension
+          printf '%s\n' 'module.exports = require("../../../../loader/src/rewrite-flow-imports.js");' > out/node_modules/@flyde/loader/dist/server.js
+          printf '%s\n' '{"name":"rename-validation-host","publisher":"local-validation","version":"0.0.1","engines":{"vscode":"^1.75.0"},"main":"index.js","activationEvents":[]}' > host-extension/package.json
+          printf '%s\n' 'exports.activate = () => {};' > host-extension/index.js
+          cat > host-suite.cjs <<'JS'
+          const Mocha = require('mocha');
+          const path = require('path');
+          exports.run = () => new Promise((resolve, reject) => {
+            const runner = new Mocha({ui: 'tdd', color: false, timeout: 30000});
+            runner.addFile(path.resolve('out/vscode/src/test/updateImportsOnRename.test.js'));
+            runner.run(failures => failures ? reject(new Error(`${failures} editor checks failed`)) : resolve());
+          });
+          JS
+          cat > host-run.cjs <<'JS'
+          const {runTests} = require('@vscode/test-electron');
+          const path = require('path');
+          const fs = require('fs');
+          runTests({
+            vscodeExecutablePath: fs.readFileSync('vscode-path.txt', 'utf8').trim(),
+            extensionDevelopmentPath: path.resolve('host-extension'),
+            extensionTestsPath: path.resolve('host-suite.cjs'),
+            launchArgs: ['--disable-extensions', '--no-sandbox', '--disable-gpu', '--disable-workspace-trust', '--skip-welcome', '--skip-release-notes'],
+            extensionTestsEnv: {FLYDE_RENAME_DEMO:'1', NODE_PATH:path.resolve('tools/node_modules')}
+          }).catch(error => {console.error(error); process.exitCode=1;});
+          JS
+          node - <<'JS'
+          const {downloadAndUnzipVSCode} = require('@vscode/test-electron');
+          downloadAndUnzipVSCode('stable').then(binary => require('fs').writeFileSync('vscode-path.txt', binary)).catch(e => {console.error(e); process.exitCode=1;});
+          JS
+      - name: Run the actual editor rename and capture it
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/flyde112-check"
+          command -v ffmpeg
+          command -v xvfb-run
+          cat > record.sh <<'SH'
+          #!/usr/bin/env bash
+          set -uo pipefail
+          ffmpeg -hide_banner -loglevel warning -y -f x11grab -video_size 1280x720 -framerate 10 -i "$DISPLAY" -c:v libx264 -preset ultrafast -pix_fmt yuv420p evidence/editor-rename.mp4 >evidence/capture.log 2>&1 &
+          capture=$!
+          node host-run.cjs 2>&1 | tee evidence/editor-tests.log
+          result=${PIPESTATUS[0]}
+          kill -INT "$capture" 2>/dev/null || true
+          wait "$capture" || true
+          exit "$result"
+          SH
+          xvfb-run -a -s '-screen 0 1280x720x24' bash record.sh
+          python3 - <<'PY'
+          import datetime, hashlib, json, pathlib
+          root = pathlib.Path('evidence')
+          source = pathlib.Path('source')
+          files = ['loader/src/index.ts','loader/src/server.ts','loader/src/rewrite-flow-imports.ts','loader/src/rewrite-flow-imports.spec.ts','vscode/package.json','vscode/src/extension.ts','vscode/src/updateImportsOnRename.ts','vscode/src/test/updateImportsOnRename.test.ts']
+          proof = {'upstream':'flydelabs/flyde','base_commit':'913ff75c6781259da35c32fd001a90607756cb24','patch_sha256':hashlib.sha256((root/'implementation.patch').read_bytes()).hexdigest(),'completed_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'scope':'Eight loader cases and one real VS Code host rename/dirty-buffer check. Production functions; isolated loader export binding. Not a full Flyde webview/monorepo build.','files':{f:hashlib.sha256((source/f).read_bytes()).hexdigest() for f in files},'vscode_binary':pathlib.Path('vscode-path.txt').read_text().strip()}
+          (root/'receipt.json').write_text(json.dumps(proof,indent=2)+'\n')
+          PY
+          sha256sum evidence/* > "$RUNNER_TEMP/flyde112-check/checksums.txt"
+          cp checksums.txt evidence/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: flyde112-editor-proof-f6c2
+          path: ${{ runner.temp }}/flyde112-check/evidence
+          retention-days: 7
+          if-no-files-found: error
