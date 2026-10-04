@@ -166,30 +166,33 @@ class BountyPreflightError(RuntimeError):
 
 
 class _CapturedIssueResponse:
-    """Minimal requests-compatible response for one frozen canonical issue."""
+    """Minimal requests-compatible response for frozen canonical evidence."""
 
-    def __init__(self, payload: dict[str, Any]):
+    def __init__(self, payload: Any):
         self._payload = deepcopy(payload)
 
     def raise_for_status(self) -> None:
         return None
 
-    def json(self) -> dict[str, Any]:
+    def json(self) -> Any:
         return deepcopy(self._payload)
 
 
 class _CapturedIssueSession:
-    """Replay one captured issue generation while forwarding all other reads."""
+    """Replay initial issue/comment pages while forwarding all other reads."""
 
     def __init__(
         self,
         session: Any,
         issue_url: str,
         issue_snapshot: dict[str, Any],
+        *,
+        comment_pages: list[list[dict[str, Any]]] | None = None,
     ):
         self._session = session
         self._issue_url = issue_url
         self._issue_snapshot = deepcopy(issue_snapshot)
+        self._comment_pages = deepcopy(comment_pages or [])
 
     def get(
         self,
@@ -201,6 +204,14 @@ class _CapturedIssueSession:
     ) -> Any:
         if url == self._issue_url:
             return _CapturedIssueResponse(self._issue_snapshot)
+        if url == self._issue_url + "/comments" and isinstance(params, dict):
+            page = params.get("page")
+            if (
+                type(page) is int
+                and 1 <= page <= len(self._comment_pages)
+                and params == {"per_page": 100, "page": page}
+            ):
+                return _CapturedIssueResponse(self._comment_pages[page - 1])
         return self._session.get(
             url,
             headers=headers,
@@ -928,6 +939,7 @@ def _collect_issue_context_with_snapshot(
     max_pages: int = 10,
     operator_login: str | None = None,
     include_capture: bool = False,
+    comment_pages: list[list[dict[str, Any]]] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Collect safe context plus the exact canonical issue generation used."""
 
@@ -1046,6 +1058,8 @@ def _collect_issue_context_with_snapshot(
             if external_human and _signals_attempt(body, repo):
                 attempt_signal_count += 1
                 claimant_logins.add(login)
+        if comment_pages is not None:
+            comment_pages.append(deepcopy(payload))
         if len(payload) < 100:
             break
     else:
@@ -1156,6 +1170,7 @@ def preflight_bounty(
     capture_session = CaptureSession(session) if include_capture else None
     if capture_session is not None:
         session = capture_session
+    initial_comment_pages: list[list[dict[str, Any]]] = []
     context, issue_snapshot = _collect_issue_context_with_snapshot(
         repo,
         number,
@@ -1164,6 +1179,7 @@ def preflight_bounty(
         max_pages=max_pages,
         operator_login=operator_login,
         include_capture=include_capture,
+        comment_pages=initial_comment_pages,
     )
     # Repeatedly observing the same partial comments cannot establish complete
     # authority. Reject before audits in both modes; bounded reads remain held
@@ -1181,7 +1197,11 @@ def preflight_bounty(
             "complete comment evidence does not match the issue comment count"
         )
     issue_url = f"https://api.github.com/repos/{repo}/issues/{number}"
-    audit_session = _CapturedIssueSession(session, issue_url, issue_snapshot)
+    # The initial audit uses the same captured generation as context. Later
+    # audit/generation rechecks below continue through the live session.
+    audit_session = _CapturedIssueSession(
+        session, issue_url, issue_snapshot, comment_pages=initial_comment_pages
+    )
     audit = _canonical_audit_snapshot(
         repo,
         number,
