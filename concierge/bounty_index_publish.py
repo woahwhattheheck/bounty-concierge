@@ -10,6 +10,8 @@ before a new index can replace the last-known-good file.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
+from datetime import datetime
 import json
 import os
 from pathlib import Path
@@ -21,6 +23,10 @@ from concierge import bounty_index
 
 class BountyIndexIncompleteError(RuntimeError):
     """The configured source set could not be proven complete."""
+
+
+class BountyIndexSupersededError(RuntimeError):
+    """A later-started complete refresh already owns the published index."""
 
 
 def _fail(message: str, cause: Exception | None = None) -> None:
@@ -96,14 +102,64 @@ def render_index(data) -> str:
     return json.dumps(data, indent=2, default=str) + "\n"
 
 
+def _report_order(report):
+    """Order complete reads by start, then end; export time is not freshness."""
+    if not isinstance(report, dict) or report.get("complete") is not True:
+        return None
+    try:
+        started = datetime.fromisoformat(report["started_at"])
+        finished = datetime.fromisoformat(report["updated_at"])
+        if started.tzinfo is None or finished.tzinfo is None or finished < started:
+            return None
+    except (KeyError, TypeError, ValueError):
+        return None
+    return started, finished
+
+
+@contextmanager
+def _publication_lock(target):
+    """Lock only the final comparison/replacement, never collection or fsync.
+
+    Keep the sidecar inode: unlinking it would split cooperating writers across
+    different locks. The OS releases the lock when a publisher exits or crashes.
+    """
+    lock_path = target.with_name(f".{target.name}.publish.lock")
+    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    with os.fdopen(fd, "r+b") as handle:
+        if os.name == "nt":
+            import msvcrt
+            # Byte-range locks may extend past EOF; avoid an unlocked
+            # initialization write racing another publisher's acquired lock.
+            handle.seek(0)
+            msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            if os.name == "nt":
+                handle.seek(0)
+                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+
+
 def write_index_atomic(output_path, repos=None, token=None):
     """Build completely, fsync, then atomically replace the published index.
 
     Network and schema validation happen before a temporary file is created.
     Any failure before the final ``os.replace`` leaves the last-known-good
-    target untouched and removes temporary residue.
+    target untouched and removes temporary residue. Cooperating publishers use
+    a short per-output lock: the later-started complete read wins even when an
+    earlier collector finishes last. Superseded callers raise explicitly rather
+    than reporting their unpersisted data as published. This is local/shared-file
+    coordination, not a distributed provider quota or an atomic GitHub snapshot.
     """
     data = aggregate_complete(repos=repos, token=token)
+    incoming_order = _report_order(data)
+    if incoming_order is None:
+        _fail("collector report has no valid timezone-aware read interval")
     payload = render_index(data)
     target = Path(output_path)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -120,8 +176,22 @@ def write_index_atomic(output_path, repos=None, token=None):
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temp_name, target)
-        replaced = True
+        with _publication_lock(target):
+            try:
+                with target.open("r", encoding="utf-8") as current_file:
+                    current = json.load(current_file)
+            except (FileNotFoundError, ValueError, UnicodeError):
+                current = None
+            current_order = _report_order(current)
+            # Legacy exports without a source interval can be upgraded, but
+            # their export timestamp must never outrank a validated live read.
+            if current_order is not None and current_order > incoming_order:
+                raise BountyIndexSupersededError(
+                    f"kept read started at {current_order[0].isoformat()}; "
+                    f"discarded read started at {incoming_order[0].isoformat()}"
+                )
+            os.replace(temp_name, target)
+            replaced = True
     finally:
         if not replaced:
             try:
@@ -145,6 +215,9 @@ def main(argv=None) -> int:
 
     try:
         write_index_atomic(args.output)
+    except BountyIndexSupersededError as exc:
+        print(f"[deferred] bounty index superseded: {exc}", file=sys.stderr)
+        return 3
     except BountyIndexIncompleteError as exc:
         print(f"[error] bounty index incomplete: {exc}", file=sys.stderr)
         return 2
