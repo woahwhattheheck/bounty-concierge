@@ -17,13 +17,14 @@ from typing import Any
 import requests
 
 from concierge.bounty_audit import BountyAuditError
-from concierge.bounty_capture import CaptureInputError
+from concierge.bounty_capture import CaptureInputError, capture_digest
 from concierge.bounty_preflight import BountyPreflightError, preflight_bounty
 from concierge.secure_output import (
     SecureOutputError,
     create_exclusive_regular,
     open_verified_parent,
 )
+from concierge.submission_packet import validate_submission_target
 
 
 _REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
@@ -47,10 +48,14 @@ def _shortlist(payload: Any) -> tuple[list[dict[str, Any]], int]:
     if not isinstance(payload, list) or len(payload) > _MAX_CANDIDATES:
         raise ValueError("shortlist must contain at most 1000 repo/number objects")
     unique: list[dict[str, Any]] = []
-    seen: set[tuple[str, int]] = set()
+    seen: dict[tuple[str, int], dict[str, str] | None] = {}
     for row in payload:
-        if not isinstance(row, dict) or set(row) != {"repo", "number"}:
-            raise ValueError("each shortlist row must contain only repo and number")
+        if not isinstance(row, dict) or set(row) not in (
+            {"repo", "number"}, {"repo", "number", "submission_target"},
+        ):
+            raise ValueError(
+                "each shortlist row requires repo/number and an optional submission_target"
+            )
         repo = row["repo"]
         number = row["number"]
         if not isinstance(repo, str) or _REPO.fullmatch(repo.strip()) is None:
@@ -60,10 +65,22 @@ def _shortlist(payload: Any) -> tuple[list[dict[str, Any]], int]:
             raise ValueError("repo must be an owner/repository slug")
         if type(number) is not int or number <= 0:
             raise ValueError("number must be a positive issue number")
+        target = (
+            validate_submission_target(
+                row["submission_target"], f"https://github.com/{repo}/issues/{number}"
+            )
+            if "submission_target" in row else None
+        )
         identity = repo, number
-        if identity not in seen:
-            seen.add(identity)
-            unique.append({"repo": repo, "number": number})
+        if identity in seen:
+            if seen[identity] != target:
+                raise ValueError("conflicting submission_target records for the same issue")
+        else:
+            seen[identity] = target
+            candidate: dict[str, Any] = {"repo": repo, "number": number}
+            if target is not None:
+                candidate["submission_target"] = target
+            unique.append(candidate)
     return unique, len(payload) - len(unique)
 
 
@@ -195,7 +212,13 @@ def collect_batch(
                 stop_reason = "REQUEST_LIMIT"
                 break
             transport.failure = None
-            item = {**row, "status": "FAILED"}
+            item: dict[str, Any] = {
+                "repo": row["repo"], "number": row["number"], "status": "FAILED",
+            }
+            target = row.get("submission_target")
+            if target is not None:
+                item["submission_repository"] = target["repository"]
+                item["submission_target_sha256"] = capture_digest(target)
             requests_before = transport.request_count
             try:
                 result = preflight_bounty(
@@ -203,6 +226,7 @@ def collect_batch(
                     session=transport, max_pages=max_pages,
                     saturation_threshold=saturation_threshold,
                     operator_login=operator_login, include_capture=True,
+                    submission_target=target,
                 )
                 capture = result["capture"]
                 filename = f"capture-{len(captures) + 1:04d}.json"

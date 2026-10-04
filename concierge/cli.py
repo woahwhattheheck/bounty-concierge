@@ -171,7 +171,8 @@ def _print_bounty_table(bounties, show_evidence=False):
 def _cmd_bounty_intake(args):
     """Delegate intake flags, output and exit status to the shared modules."""
     module_args = list(args.intake_args)
-    if args.json:
+    # The catalog always emits JSON; the batch module has an explicit flag.
+    if args.json and args.command == "capture-batch":
         module_args.insert(0, "--json")
     if args.dry_run and not any(flag in module_args for flag in ("-h", "--help")):
         if args.command == "bountyhub":

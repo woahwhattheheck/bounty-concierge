@@ -158,6 +158,18 @@ concierge bountyhub --help
 concierge capture-batch --help
 ```
 
+Collect a bounded catalog when a new source observation is needed, then export
+its issue shortlist without another provider request:
+
+```bash
+concierge bountyhub collect --max-pages 10 --max-details 50 \
+  --min-funded-usd 50.00 > catalog.json
+concierge bountyhub targets catalog.json > shortlist.json
+```
+
+An existing retained catalog can be passed directly to `targets`; its original
+observation times remain attached to the source report.
+
 `bountyhub` delegates to `concierge.bountyhub_catalog`; `capture-batch` delegates
 to `concierge.bounty_capture_batch` in the same process. Each module remains the
 source of its flags, help, output, request limits and exit status. Use the
@@ -165,7 +177,8 @@ source of its flags, help, output, request limits and exit status. Use the
 capture command below. Catalog listing identities and funding observations stay
 in the catalog report; the issue shortlist contains only `repo` and `number`.
 
-Common `--json` and `--dry-run` flags work before or after either command.
+Common `--json` and `--dry-run` flags work before or after either command. Catalog
+output is always JSON; the batch command uses `--json` for its safe summary.
 `--dry-run` prints an argument-only plan without reading the source or creating
 capture files; result counts and eligibility remain unknown. Command-specific
 arguments are validated when the delegated command runs. Other commands still
@@ -189,8 +202,15 @@ Use the actual current offset-aware ISO-8601 evaluation time. The batch command
 deduplicates issues and reuses one serial HTTP session; offline routing makes no
 provider requests. `--max-pages` bounds pagination; `--max-requests` counts actual
 HTTP GET attempts and stops before exceeding its budget (default 100, range
-1–10,000). The input limit is 1 MiB and 1,000 rows, each containing only `repo`
-and `number`.
+1–10,000). The input limit is 1 MiB and 1,000 rows, each requiring `repo` and
+`number` with an optional `submission_target` object. Use the existing target
+record: `repository`, `source_url`, `source_content_sha256`, and
+`instruction_excerpt`; its source must belong to that row's bounty issue.
+Identical target records deduplicate with the issue. Conflicting records for the
+same issue, including an omitted target paired with an explicit one, are rejected
+before output creation or provider reads. Private shortlist, remaining and capture
+files retain the full record for replay and resume. The printable summary includes
+only the target repository and record digest, never its instruction excerpt.
 
 The new private output directory starts with an immutable `shortlist.json` and
 retains each completed capture as it is written. On completion, handled provider
@@ -227,6 +247,14 @@ Single-issue preflight exits 0 for ACTIONABLE, 2 for HOLD and 3 for REJECT; all
 three completed outcomes can write a capture. The parent directory must exist,
 and the capture path must be new. See the [supply router guide](docs/BOUNTY_SUPPLY_ROUTER.md#capture-a-shortlist-once)
 for input, output, freshness and resume details.
+
+For HTTP failures, single-issue `--json` emits an error object with `error`,
+`http_status`, `rate_limited`, `retry_after_seconds`, `rate_limit_remaining`, and
+`rate_limit_reset_at` (Unix seconds). Missing or invalid header values are `null`;
+the primary reset time remains separate from Retry-After. Rate-limit detection
+requires HTTP 429 or HTTP 403 with zero remaining requests or a valid Retry-After.
+These incomplete reads still exit 2 and do not write a completed capture. Plain
+text errors keep their existing format.
 
 The live `mine` command waits for its managed child and returns that child's exit
 code. A child terminated by a signal returns `128 + signal`; stopping with Ctrl+C

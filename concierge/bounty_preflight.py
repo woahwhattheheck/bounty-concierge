@@ -44,6 +44,12 @@ from concierge.secure_output import (
     create_exclusive_regular,
     open_verified_parent,
 )
+from concierge.submission_policy_context import (
+    collect_submission_policy_context,
+    summarize_submission_policy_context,
+    validate_submission_repo,
+    write_submission_policy_context,
+)
 from concierge.submission_packet import validate_submission_target
 
 
@@ -1138,6 +1144,8 @@ def preflight_bounty(
     operator_login: str | None = None,
     include_capture: bool = False,
     submission_target: dict[str, str] | None = None,
+    submission_method: str | None = None,
+    submission_policy_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return an operator-safe paid-work preflight result for one issue.
 
@@ -1161,6 +1169,9 @@ def preflight_bounty(
         submission_target = validate_submission_target(
             submission_target, f"https://github.com/{repo}/issues/{number}"
         )
+    if submission_method is not None and not isinstance(submission_method, str):
+        raise ValueError("submission_method must be a string when provided")
+    submission_policy_context = deepcopy(submission_policy_context)
     # Keep one connection pool across context, audit and generation reads. The
     # captured-issue adapter below forwards through this same owned session.
     # Caller-supplied sessions retain their existing lifetime and ownership.
@@ -1176,6 +1187,8 @@ def preflight_bounty(
                 operator_login=operator_login,
                 include_capture=include_capture,
                 submission_target=submission_target,
+                submission_method=submission_method,
+                submission_policy_context=submission_policy_context,
             )
 
     capture_session = CaptureSession(session) if include_capture else None
@@ -1225,12 +1238,18 @@ def preflight_bounty(
     initial_audit_marker = _audit_dispatch_marker(audit)
 
     snapshot = {
+        "repo": repo,
+        "submission_target": audit.get("submission_target"),
         "title": context["title"],
         "body": context["body"],
         "labels": context["labels"],
         "attempt_count": context["attempt_count"],
         "canonical_audit": audit,
     }
+    if submission_method is not None:
+        snapshot["submission_method"] = submission_method
+    if submission_policy_context is not None:
+        snapshot["submission_policy_context"] = submission_policy_context
     qualification = qualify_dispatch(
         snapshot,
         saturation_threshold=saturation_threshold,
@@ -1339,6 +1358,8 @@ def preflight_bounty(
             max_pages=max_pages,
             saturation_threshold=saturation_threshold,
             submission_target=submission_target,
+            submission_method=submission_method,
+            submission_policy_context=submission_policy_context,
         )
     return result
 
@@ -1366,6 +1387,40 @@ def _admit_capture_destination(path: Path) -> None:
         os.close(parent_fd)
 
 
+def _http_error_result(error: BaseException) -> dict[str, Any] | None:
+    """Retain bounded provider evidence without exposing request or body text."""
+    from concierge.bounty_index import _header_integer, _retry_after_seconds
+
+    seen: set[int] = set()
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        if isinstance(error, requests.HTTPError):
+            response = error.response
+            # Requests considers error responses falsey even when present.
+            if response is not None:
+                remaining = _header_integer(response.headers, "X-RateLimit-Remaining")
+                retry_after = _retry_after_seconds(response.headers)
+                rate_limited = response.status_code == 429 or (
+                    response.status_code == 403
+                    and (remaining == 0 or retry_after is not None)
+                )
+                return {
+                    "error": (
+                        "GitHub rate limit reached" if rate_limited
+                        else "GitHub HTTP request failed"
+                    ),
+                    "http_status": response.status_code,
+                    "rate_limited": rate_limited,
+                    "retry_after_seconds": retry_after,
+                    "rate_limit_remaining": remaining,
+                    "rate_limit_reset_at": _header_integer(
+                        response.headers, "X-RateLimit-Reset"
+                    ),
+                }
+        error = error.__cause__ or error.__context__
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m concierge.bounty_preflight",
@@ -1391,30 +1446,69 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--json", action="store_true", help="Emit full safe JSON result")
     parser.add_argument(
+        "--submission-method",
+        help="Declare automated_upstream_submission to evaluate supplied repository policy",
+    )
+    parser.add_argument(
+        "--submission-policy-context", type=Path,
+        help="Retained source/role observation JSON; adds no provider reads",
+    )
+    parser.add_argument(
         "--capture",
         type=Path,
         help="Write a new private capture file for offline supply routing; never overwrite",
     )
+    parser.add_argument(
+        "--submission-repo", type=validate_submission_repo,
+        help="Explicit actual owner/repository for the optional policy-context export",
+    )
+    parser.add_argument(
+        "--submission-policy-context-out", type=Path,
+        help="Write a separate private advisory policy sidecar; requires --submission-repo",
+    )
     args = parser.parse_args(argv)
+    if (args.submission_repo is None) != (args.submission_policy_context_out is None):
+        parser.error("--submission-repo and --submission-policy-context-out must be used together")
 
     try:
+        submission_policy_context = (
+            json.loads(args.submission_policy_context.read_text(encoding="utf-8"))
+            if args.submission_policy_context is not None else None
+        )
         if args.capture is not None:
             _admit_capture_destination(args.capture)
+        if args.submission_policy_context_out is not None:
+            _admit_capture_destination(args.submission_policy_context_out)
+            if (args.capture is not None and args.capture.absolute()
+                    == args.submission_policy_context_out.absolute()):
+                raise ValueError("capture and policy context require distinct output paths")
         target = None
         if args.submission_target is not None:
             target = validate_submission_target(
                 json.loads(args.submission_target.read_text(encoding="utf-8")),
                 f"https://github.com/{args.repo}/issues/{args.issue}",
             )
-        result = preflight_bounty(
-            args.repo,
-            args.issue,
-            max_pages=args.max_pages,
-            saturation_threshold=args.saturation_threshold,
-            operator_login=args.operator_login,
-            include_capture=args.capture is not None,
-            submission_target=target,
-        )
+        with requests.Session() as session:
+            result = preflight_bounty(
+                args.repo,
+                args.issue,
+                session=session,
+                max_pages=args.max_pages,
+                saturation_threshold=args.saturation_threshold,
+                operator_login=args.operator_login,
+                include_capture=args.capture is not None,
+                submission_target=target,
+                submission_method=args.submission_method,
+                submission_policy_context=submission_policy_context,
+            )
+            if args.submission_policy_context_out is not None:
+                # This uses the same pool after the v1 capture's read interval.
+                # The export does not change the completed qualification/capture.
+                policy_context = collect_submission_policy_context(
+                    args.submission_repo, session=session, token=GITHUB_TOKEN,
+                )
+                write_submission_policy_context(args.submission_policy_context_out, policy_context)
+                result["submission_policy_context"] = summarize_submission_policy_context(policy_context)
         if args.capture is not None:
             capture = result.pop("capture")
             payload = (json.dumps(capture, indent=2, sort_keys=True) + "\n").encode("utf-8")
@@ -1428,6 +1522,11 @@ def main(argv: list[str] | None = None) -> int:
         OSError,
         ValueError,
     ) as exc:
+        if args.json:
+            error_result = _http_error_result(exc)
+            if error_result is not None:
+                print(json.dumps(error_result, indent=2, sort_keys=True))
+                return 2
         parser.error(str(exc))
     if args.json:
         print(json.dumps(result, indent=2, sort_keys=True))
