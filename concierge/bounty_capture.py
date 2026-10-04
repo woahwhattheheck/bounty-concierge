@@ -18,6 +18,8 @@ import re
 from typing import Any
 from urllib.parse import urlsplit
 
+from concierge.submission_packet import SubmissionPacketInputError, validate_submission_target
+
 
 CAPTURE_SCHEMA = "bounty-preflight-capture/v1"
 _ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
@@ -65,6 +67,13 @@ def _object(value: Any, fields: set[str] | frozenset[str], name: str) -> dict[st
     if type(value) is not dict or set(value) != fields:
         raise CaptureInputError(f"{name} has an invalid object schema")
     return value
+
+
+def _submission_target(value: Any, issue_url: str) -> dict[str, str]:
+    try:
+        return validate_submission_target(value, issue_url)
+    except SubmissionPacketInputError as exc:
+        raise CaptureInputError(str(exc)) from exc
 
 
 def _string(value: Any, name: str, *, empty: bool = False) -> str:
@@ -298,7 +307,10 @@ def _comment_binding(comment: dict[str, Any]) -> str:
     )
 
 
-def _validate_observation(value: Any, repo: str, number: int, principal: str) -> None:
+def _validate_observation(
+    value: Any, repo: str, number: int, principal: str,
+    *, submission_target: dict[str, str] | None = None,
+) -> None:
     observation = _object(
         value, {"started_at", "completed_at", "request_count", "source_urls"}, "observation"
     )
@@ -317,11 +329,17 @@ def _validate_observation(value: Any, repo: str, number: int, principal: str) ->
     issue_path = f"/repos/{repo}/issues/{number}"
     allowed = {issue_path, f"{issue_path}/comments", "/search/issues", "/user"}
     seen_paths: set[str] = set()
-    pull_pattern = re.compile(rf"/repos/{re.escape(repo)}/pulls/[1-9][0-9]*\Z")
+    pull_repos = {repo}
+    if submission_target is not None:
+        pull_repos.add(submission_target["repository"].casefold())
+    pull_pattern = re.compile(r"/repos/([^/]+/[^/]+)/pulls/[1-9][0-9]*\Z")
     for url in urls:
         path = urlsplit(_source_url(url)).path.casefold()
-        if path not in allowed and pull_pattern.fullmatch(path) is None:
-            raise CaptureInputError("source endpoint is not bound to the captured issue repository")
+        pull = pull_pattern.fullmatch(path)
+        if path not in allowed and (pull is None or pull[1] not in pull_repos):
+            raise CaptureInputError(
+                "source endpoint is not bound to the captured issue or submission target repository"
+            )
         seen_paths.add(path)
     required = {issue_path, f"{issue_path}/comments", "/search/issues"}
     if not required.issubset(seen_paths):
@@ -331,12 +349,19 @@ def _validate_observation(value: Any, repo: str, number: int, principal: str) ->
 
 
 def _validate_capture(capture: Any, saturation_threshold: int) -> dict[str, Any]:
-    value = _object(capture, _CAPTURE_FIELDS, "capture")
+    fields = _CAPTURE_FIELDS
+    if type(capture) is dict and "submission_target" in capture:
+        fields = fields | {"submission_target"}
+    value = _object(capture, fields, "capture")
     if value["schema"] != CAPTURE_SCHEMA:
         raise CaptureInputError("unsupported capture schema")
     repo, number, issue_url = _identity(value["repo"], value["number"])
     if value["repo"] != repo or value["issue_url"] != issue_url:
         raise CaptureInputError("capture issue identity is not canonical")
+    submission_target = (
+        _submission_target(value["submission_target"], issue_url)
+        if "submission_target" in value else None
+    )
     policy = _object(value["policy"], {"max_pages", "saturation_threshold"}, "policy")
     _integer(policy["max_pages"], "max_pages", minimum=1)
     _integer(policy["saturation_threshold"], "captured saturation_threshold", minimum=1)
@@ -379,7 +404,9 @@ def _validate_capture(capture: Any, saturation_threshold: int) -> dict[str, Any]
         raise CaptureInputError("assignment count and principal check disagree")
     if assigned and principal != "AUTHENTICATED_SAME_TOKEN":
         raise CaptureInputError("operator assignment lacks same-token authenticated read evidence")
-    _validate_observation(value["observation"], repo, number, principal)
+    _validate_observation(
+        value["observation"], repo, number, principal, submission_target=submission_target
+    )
 
     generation = _object(
         value["generation"],
@@ -548,6 +575,8 @@ def replay_capture(
             for comment in authority["maintainer_comments"]
         ],
     }
+    if "submission_target" in value:
+        routing_snapshot["submission_target"] = deepcopy(value["submission_target"])
     semantic = {
         key: item for key, item in value.items()
         if key not in {"observation", "receipt_sha256"}
@@ -569,6 +598,7 @@ def make_capture(
     *, repo: str, number: int, context: dict[str, Any], issue_snapshot: dict[str, Any],
     audit: dict[str, Any], checks: dict[str, Any], qualification: dict[str, Any],
     observation: dict[str, Any], max_pages: int, saturation_threshold: int,
+    submission_target: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Seal a completed online preflight; this function never mints read times."""
     from concierge.bounty_preflight import (
@@ -576,6 +606,8 @@ def make_capture(
     )
 
     canonical_repo, issue_number, issue_url = _identity(repo, number)
+    if submission_target is not None:
+        submission_target = _submission_target(submission_target, issue_url)
     if type(context) is not dict or type(issue_snapshot) is not dict:
         raise CaptureInputError("capture requires completed issue context and snapshot")
     if type(audit) is not dict:
@@ -656,6 +688,8 @@ def make_capture(
         }
     except (KeyError, BountyPreflightError) as exc:
         raise CaptureInputError("preflight capture evidence is incomplete or malformed") from exc
+    if submission_target is not None:
+        result["submission_target"] = submission_target
     result["generation"]["issue_projection_sha256"] = capture_digest(_issue_projection(result))
     result = _json_copy(result)
     result["receipt_sha256"] = capture_digest(result)

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 import re
 import sys
 from copy import deepcopy
@@ -18,6 +19,7 @@ from typing import Any
 import requests
 
 from concierge.config import GITHUB_TOKEN
+from concierge.submission_packet import validate_submission_target
 
 
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
@@ -67,22 +69,32 @@ def _object_payload(value: Any, context: str) -> dict[str, Any]:
     return value
 
 
-def _issue_reference_pattern(repo: str, number: int) -> re.Pattern[str]:
+def _issue_reference_pattern(
+    repo: str, number: int, *, allow_short: bool = True
+) -> re.Pattern[str]:
     owner, name = repo.split("/", 1)
     full_url = rf"https?://github\.com/{re.escape(owner)}/{re.escape(name)}/issues/{number}(?!\w)"
     qualified_ref = rf"(?<![A-Za-z0-9_.-]){re.escape(owner)}/{re.escape(name)}#{number}(?!\w)"
     short_ref = rf"(?<![A-Za-z0-9_.-])#{number}(?!\w)"
-    return re.compile(rf"(?:{full_url}|{qualified_ref}|{short_ref})", re.IGNORECASE)
+    patterns = [full_url, qualified_ref]
+    if allow_short:
+        patterns.append(short_ref)
+    return re.compile("(?:" + "|".join(patterns) + ")", re.IGNORECASE)
 
 
-def references_issue(pr: dict[str, Any], repo: str, number: int) -> bool:
+def references_issue(
+    pr: dict[str, Any], repo: str, number: int, *, pr_repo: str | None = None
+) -> bool:
     """Return True only when a PR title/body explicitly references the issue.
 
     GitHub search is deliberately used only for candidate discovery because a
     bare number search can also match unrelated larger issue numbers or prose.
+    A short #number refers to the PR's own repository, so a foreign PR must use
+    the source issue's full URL or owner/repository#number reference.
     """
     text = f"{pr.get('title') or ''}\n{pr.get('body') or ''}"
-    return bool(_issue_reference_pattern(repo, number).search(text))
+    allow_short = pr_repo is None or pr_repo.casefold() == repo.casefold()
+    return bool(_issue_reference_pattern(repo, number, allow_short=allow_short).search(text))
 
 
 def _competition_level(open_pr_count: int) -> str:
@@ -145,14 +157,24 @@ def _maintainer_expiry_evidence(
     return evidence, True
 
 
-def audit_bounty(repo: str, number: int, token: str | None = None, *, session: Any = requests, max_pages: int = 10) -> dict[str, Any]:
+def audit_bounty(
+    repo: str,
+    number: int,
+    token: str | None = None,
+    *,
+    session: Any = requests,
+    max_pages: int = 10,
+    submission_target: dict[str, str] | None = None,
+) -> dict[str, Any]:
     """Audit one GitHub bounty issue against canonical repository signals.
 
     ``stale_listing_signal`` is intentionally conservative: it is true only
     when the issue is still open and either an explicitly linked PR has already
     merged or a repository maintainer explicitly says that the bounty expired,
     was cancelled, or is no longer offered.  That is a review signal, not proof
-    that the full bounty was satisfied.
+    that the full bounty was satisfied. An existing explicit submission_target
+    adds its delivery repository to the bounded PR census. Issue comments and
+    maintainer authority remain attached to the original bounty repository.
     """
     if "/" not in repo or not repo.split("/", 1)[0] or not repo.split("/", 1)[1]:
         raise ValueError("repo must be in owner/name form")
@@ -160,13 +182,18 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
         raise ValueError("number must be a positive issue number")
     if max_pages <= 0:
         raise ValueError("max_pages must be positive")
+    if submission_target is not None:
+        submission_target = validate_submission_target(
+            submission_target, f"https://github.com/{repo}/issues/{number}"
+        )
 
     # requests.get creates and closes a Session for every call. Keep one pool
     # for this traversal without changing ownership of caller-supplied sessions.
     if session is requests:
         with requests.Session() as owned_session:
             return audit_bounty(
-                repo, number, token, session=owned_session, max_pages=max_pages
+                repo, number, token, session=owned_session, max_pages=max_pages,
+                submission_target=submission_target,
             )
 
     token = token or GITHUB_TOKEN
@@ -179,57 +206,68 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
     if "pull_request" in issue:
         raise ValueError(f"{repo}#{number} is a pull request, not an issue")
 
-    candidates: list[dict[str, Any]] = []
+    search_repos = [repo]
+    if (submission_target is not None
+            and submission_target["repository"].casefold() != repo.casefold()):
+        search_repos.append(submission_target["repository"])
+    cross_repository = len(search_repos) > 1
+    candidates: list[tuple[str, dict[str, Any]]] = []
     search_truncated = False
     search_url = "https://api.github.com/search/issues"
-    for page in range(1, max_pages + 1):
-        payload = _object_payload(
-            _get_json(
-                session,
-                search_url,
-                headers=headers,
-                params={"q": f"repo:{repo} is:pr {number}", "per_page": 100, "page": page},
-            ),
-            f"search for {repo}#{number}",
-        )
-        if payload.get("incomplete_results") is True:
+    for search_repo in search_repos:
+        for page in range(1, max_pages + 1):
+            payload = _object_payload(
+                _get_json(
+                    session,
+                    search_url,
+                    headers=headers,
+                    params={"q": f"repo:{search_repo} is:pr {number}", "per_page": 100, "page": page},
+                ),
+                f"search in {search_repo} for {repo}#{number}",
+            )
+            if payload.get("incomplete_results") is True:
+                search_truncated = True
+            items = payload.get("items", [])
+            if not isinstance(items, list) or any(not isinstance(item, dict) for item in items):
+                raise BountyAuditError(f"GitHub search response contained malformed items for {repo}#{number}")
+            candidates.extend((search_repo, item) for item in items)
+            if len(items) < 100:
+                break
+        else:
+            # Keep incompleteness from either bounded repository traversal.
             search_truncated = True
-        items = payload.get("items", [])
-        if not isinstance(items, list) or any(not isinstance(item, dict) for item in items):
-            raise BountyAuditError(f"GitHub search response contained malformed items for {repo}#{number}")
-        candidates.extend(items)
-        if len(items) < 100:
-            break
-    else:
-        # Search results may be capped by GitHub; make truncation explicit.
-        search_truncated = True
 
-    exact_candidates: dict[int, dict[str, Any]] = {}
-    for candidate in candidates:
+    exact_candidates: dict[tuple[str, int], tuple[str, dict[str, Any]]] = {}
+    for pr_repo, candidate in candidates:
         pr_number = candidate.get("number")
-        if not isinstance(pr_number, int) or not references_issue(candidate, repo, number):
+        if (type(pr_number) is not int or pr_number <= 0
+                or not references_issue(candidate, repo, number, pr_repo=pr_repo)):
             continue
-        exact_candidates[pr_number] = candidate
+        exact_candidates[(pr_repo.casefold(), pr_number)] = (pr_repo, candidate)
 
     linked_prs: list[dict[str, Any]] = []
-    for pr_number in sorted(exact_candidates):
+    for identity in sorted(exact_candidates):
+        pr_repo, candidate = exact_candidates[identity]
+        pr_number = identity[1]
         detail = _object_payload(
             _get_json(
                 session,
-                f"https://api.github.com/repos/{repo}/pulls/{pr_number}",
+                f"https://api.github.com/repos/{pr_repo}/pulls/{pr_number}",
                 headers=headers,
             ),
-            f"pull request {repo}#{pr_number}",
+            f"pull request {pr_repo}#{pr_number}",
         )
-        if not references_issue(detail, repo, number):
+        if not references_issue(detail, repo, number, pr_repo=pr_repo):
+            # Search discovery may lag an edited reference in either repository.
             continue
         merged = bool(detail.get("merged_at"))
         state = detail.get("state") or "unknown"
         linked_prs.append(
             {
                 "number": pr_number,
-                "title": detail.get("title") or exact_candidates[pr_number].get("title") or "",
-                "url": detail.get("html_url") or exact_candidates[pr_number].get("html_url") or "",
+                **({"repository": pr_repo} if cross_repository else {}),
+                "title": detail.get("title") or candidate.get("title") or "",
+                "url": detail.get("html_url") or candidate.get("html_url") or "",
                 "state": state,
                 "draft": bool(detail.get("draft")),
                 "merged": merged,
@@ -258,6 +296,7 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
     return {
         "repo": repo,
         "number": number,
+        **({"submission_target": submission_target} if submission_target is not None else {}),
         "issue_url": issue.get("html_url") or f"https://github.com/{repo}/issues/{number}",
         "issue_state": issue_state,
         "linked_pr_count": len(linked_prs),
@@ -275,7 +314,7 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
 
 
 def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, session: Any = requests, max_pages: int = 10) -> list[dict[str, Any]]:
-    """Enrich rows, reading each exact repository/issue once per invocation."""
+    """Read each exact issue/explicit-target combination once per invocation."""
     if session is requests:
         with requests.Session() as owned_session:
             return audit_bounties(
@@ -283,10 +322,22 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
             )
 
     audited = []
-    audit_by_issue: dict[tuple[str, int], dict[str, Any]] = {}
+    audit_by_issue: dict[tuple[str, int, str | None], dict[str, Any]] = {}
     for bounty in bounties:
         row = dict(bounty)
-        key = (row["repo"], int(row["number"]))
+        repo, number = row["repo"], int(row["number"])
+        target = row.get("submission_target")
+        if target is not None:
+            target = validate_submission_target(
+                target, f"https://github.com/{repo}/issues/{number}"
+            )
+        # Target evidence is part of the report, not just a search hint. Do not
+        # reuse another row's repository scope or retained instruction source.
+        target_key = (
+            json.dumps(target, sort_keys=True, separators=(",", ":"))
+            if target is not None else None
+        )
+        key = (repo, number, target_key)
         if key not in audit_by_issue:
             audit_by_issue[key] = audit_bounty(
                 key[0],
@@ -294,6 +345,7 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
                 token,
                 session=session,
                 max_pages=max_pages,
+                submission_target=target,
             )
         # Each row owns its nested report. A caller editing one scout's result
         # must not alter another row or the evidence reused later in this batch.
@@ -329,9 +381,24 @@ def main(argv: list[str] | None = None) -> int:
         help="Maximum pages per GitHub search/comment read (default: 10); incomplete reads exit 2",
     )
     parser.add_argument("--json", action="store_true", help="Emit full JSON audit")
+    parser.add_argument(
+        "--submission-target", type=Path,
+        help="JSON file containing the existing explicit submission_target record",
+    )
     args = parser.parse_args(argv)
 
-    result = audit_bounty(args.repo, args.issue, max_pages=args.max_pages)
+    target = None
+    if args.submission_target is not None:
+        try:
+            target = validate_submission_target(
+                json.loads(args.submission_target.read_text(encoding="utf-8")),
+                f"https://github.com/{args.repo}/issues/{args.issue}",
+            )
+        except (OSError, ValueError) as exc:
+            parser.error(str(exc))
+    result = audit_bounty(
+        args.repo, args.issue, max_pages=args.max_pages, submission_target=target
+    )
     if args.json:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
@@ -339,7 +406,8 @@ def main(argv: list[str] | None = None) -> int:
         for pr in result["linked_prs"]:
             status = "merged" if pr["merged"] else pr["state"]
             draft = " draft" if pr["draft"] else ""
-            print(f"  PR #{pr['number']}: {status}{draft} - {pr['title']} - {pr['url']}")
+            identity = f"{pr['repository']}#{pr['number']}" if "repository" in pr else f"#{pr['number']}"
+            print(f"  PR {identity}: {status}{draft} - {pr['title']} - {pr['url']}")
     if result["search_truncated"]:
         print(
             "PARTIAL: GitHub search or comment history is incomplete; "
