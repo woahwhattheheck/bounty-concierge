@@ -129,6 +129,29 @@ closed GitHub issue or an exclusive assignment. This shortlist does not establis
 that work is unclaimed, that our account is eligible, or that money has been paid
 to us. Existing issue-level contributors and submission owners retain their work.
 
+Pass `--exclude-issues` to reuse dated canonical issue findings when selecting
+fresh intake targets from a retained catalog. The optional JSON object maps each
+`owner/repo#number` to `reason`, `source_url` (an HTTPS evidence link), and
+`observed_at` (a timezone-aware ISO timestamp). For example:
+
+```bash
+python -m concierge.bountyhub_catalog targets \
+  work/supply/bountyhub/2026-10-04-catalog-56f3.json \
+  --include-promised \
+  --exclude-issues work/supply/bountyhub/2026-10-04-canonical-exclusions.json \
+  > shortlist.json
+```
+
+Exclusions are off unless a file is supplied. The command preserves the exact
+batch-compatible candidates envelope on stdout and reports each excluded issue,
+reason, source and observation time on stderr; programmatic selection also
+returns an `excluded_targets` list. Funding amounts, listing evidence and their
+original observation times stay in the retained report. The example records
+reserved funding and existing submission ownership for three issues; it is dated
+decision evidence, not a refreshed availability check or a hold on continuing an
+existing submission. Update the supplied entries when canonical evidence changes,
+and apply the usual preflight to the remaining targets.
+
 ## Funding reduction
 
 The detail endpoint's `pledges` array already contains the creator's original
