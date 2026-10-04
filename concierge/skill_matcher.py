@@ -133,31 +133,38 @@ def _keyword_matches(text: str, keyword: str) -> bool:
     return re.search(rf"(?<!\w){re.escape(normalized)}(?!\w)", text.casefold()) is not None
 
 
-def _skill_patterns(skills: List[str]) -> List[re.Pattern[str] | None]:
-    """Prepare one token search per requested skill for a recommendation."""
+_SkillPattern = tuple[List[str], re.Pattern[str]]
+
+
+def _skill_patterns(skills: List[str]) -> List[_SkillPattern | None]:
+    """Prepare literal prefilters and one token search per requested skill."""
     patterns = []
     for skill in skills:
         keywords = SKILL_TAGS.get(skill.lower(), [skill.lower()])
-        alternatives = [
-            re.escape(keyword.casefold())
+        normalized_keywords = [
+            keyword.casefold()
             for keyword in keywords
             if isinstance(keyword, str) and keyword.strip()
         ]
+        alternatives = "|".join(re.escape(keyword) for keyword in normalized_keywords)
         patterns.append(
-            re.compile(rf"(?<!\w)(?:{'|'.join(alternatives)})(?!\w)")
-            if alternatives else None
+            (normalized_keywords, re.compile(rf"(?<!\w)(?:{alternatives})(?!\w)"))
+            if normalized_keywords else None
         )
     return patterns
 
 
-def _score_text(text: str, patterns: List[re.Pattern[str] | None]) -> float:
+def _score_text(text: str, patterns: List[_SkillPattern | None]) -> float:
     """Score prepared text without repeating normalization for each keyword."""
     if not patterns or not text.strip():
         return 0.0
     normalized = text.casefold()
+    # Literal presence is necessary; the boundary regex still decides a match.
     matched = sum(
-        pattern is not None and pattern.search(normalized) is not None
-        for pattern in patterns
+        prepared is not None
+        and any(keyword in normalized for keyword in prepared[0])
+        and prepared[1].search(normalized) is not None
+        for prepared in patterns
     )
     return matched / len(patterns)
 
