@@ -373,10 +373,12 @@ def _validate_capture(capture: Any, saturation_threshold: int) -> dict[str, Any]
     if capture_digest(body) != value["receipt_sha256"]:
         raise CaptureInputError("capture consistency digest does not match")
 
-    baseline = _object(
-        value["baseline"],
-        {"title", "body", "labels", "attempt_count", "canonical_audit"}, "baseline",
-    )
+    baseline_fields = {"title", "body", "labels", "attempt_count", "canonical_audit"}
+    if type(value["baseline"]) is dict:
+        baseline_fields.update(
+            set(value["baseline"]) & {"submission_method", "submission_policy_context"}
+        )
+    baseline = _object(value["baseline"], baseline_fields, "baseline")
     _string(baseline["title"], "title", empty=True)
     _string(baseline["body"], "body", empty=True)
     labels = baseline["labels"]
@@ -516,7 +518,10 @@ def replay_capture(
     value = _validate_capture(capture, saturation_threshold)
     baseline = value["baseline"]
     try:
-        qualification = qualify_dispatch(baseline, saturation_threshold=saturation_threshold)
+        qualification = qualify_dispatch(
+            {"repo": value["repo"], "submission_target": value.get("submission_target"), **baseline},
+            saturation_threshold=saturation_threshold,
+        )
     except QualificationInputError as exc:
         raise CaptureInputError("captured baseline cannot be qualified") from exc
 
@@ -599,6 +604,8 @@ def make_capture(
     audit: dict[str, Any], checks: dict[str, Any], qualification: dict[str, Any],
     observation: dict[str, Any], max_pages: int, saturation_threshold: int,
     submission_target: dict[str, str] | None = None,
+    submission_method: str | None = None,
+    submission_policy_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Seal a completed online preflight; this function never mints read times."""
     from concierge.bounty_preflight import (
@@ -690,6 +697,10 @@ def make_capture(
         raise CaptureInputError("preflight capture evidence is incomplete or malformed") from exc
     if submission_target is not None:
         result["submission_target"] = submission_target
+    if submission_method is not None:
+        result["baseline"]["submission_method"] = submission_method
+    if submission_policy_context is not None:
+        result["baseline"]["submission_policy_context"] = submission_policy_context
     result["generation"]["issue_projection_sha256"] = capture_digest(_issue_projection(result))
     result = _json_copy(result)
     result["receipt_sha256"] = capture_digest(result)

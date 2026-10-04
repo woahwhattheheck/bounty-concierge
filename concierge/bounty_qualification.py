@@ -20,6 +20,11 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+from concierge.repository_contribution_policy import (
+    RepositoryPolicyInputError,
+    evaluate_repository_policy,
+)
+
 
 _BODY_BOUNTY_RE = re.compile(
     r"(?im)(?:^|\s)/bounty\s+\$([0-9][0-9,]*(?:\.[0-9]{1,2})?)\b"
@@ -402,6 +407,10 @@ def qualify_dispatch(
     labels = _label_names(snapshot)
     texts, trusted_comment_count, ignored_untrusted_comment_count = _text_values(snapshot)
     audit, audit_complete = _canonical_audit(snapshot)
+    try:
+        repository_policy = evaluate_repository_policy(snapshot)
+    except RepositoryPolicyInputError as exc:
+        raise QualificationInputError(str(exc)) from exc
 
     body_rewards = _advertised_rewards(texts[0])
     title_rewards = _advertised_rewards(title)
@@ -451,6 +460,17 @@ def qualify_dispatch(
     def add(code: str, severity: str, message: str) -> None:
         reasons.append({"code": code, "severity": severity, "message": message})
 
+    if repository_policy is not None and repository_policy["reason_code"] is not None:
+        add(
+            repository_policy["reason_code"],
+            "HOLD",
+            (
+                "Repository policy prohibits the declared automated upstream submission."
+                if repository_policy["status"] == "PROHIBITED_FOR_METHOD"
+                else "The declared automated upstream submission has a role-scoped policy; "
+                "a same-upstream write-role observation is unavailable."
+            ),
+        )
     if private_signal_types:
         add(
             "PRIVATE_CONTEXT_REQUIRED",
@@ -581,6 +601,8 @@ def qualify_dispatch(
             "rtc_reward_source": rtc_reward_source,
             "already_rewarded": already_rewarded,
             "canonical_policy_block_categories": policy_label_categories,
+            **({"repository_contribution_policy": repository_policy}
+               if repository_policy is not None else {}),
             "attempt_count": attempt_count,
             "open_pr_count": open_pr_count,
             "private_context_signal_types": private_signal_types,
