@@ -10,7 +10,8 @@ import stat
 import tempfile
 
 _MAX_BYTES = 8 * 1024 * 1024
-_ETAG = re.compile(r'(?:W/)?"[!#-~]{1,1000}"')
+# RFC 9110 section 8.8.3 permits an empty opaque tag.
+_ETAG = re.compile(r'(?:W/)?"[!#-~]{0,1000}"')
 
 
 def valid_etag(value):
