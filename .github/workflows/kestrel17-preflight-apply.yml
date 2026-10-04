@@ -1,0 +1,42 @@
+name: Apply pinned preflight response repair
+on:
+  push:
+    branches: ["kestrel17/preflight-http-release-20261004"]
+    paths: [".github/workflows/kestrel17-preflight-apply.yml"]
+permissions:
+  contents: write
+concurrency:
+  group: kestrel17-preflight-http-release-20261004
+  cancel-in-progress: false
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: true
+      - name: Install existing runtime dependency
+        run: python -m pip install 'requests==2.32.5' 'urllib3==2.7.0'
+      - name: Apply only the pinned source diff and exercise real loopback transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          target=concierge/bounty_preflight.py
+          receipt=work/throughput/preflight-http-release-20261004
+          test "$(git hash-object "$target")" = cc78fff3f030c8d222030a4355201978e7b5cf2d
+          cp "$target" "$RUNNER_TEMP/preflight-before.py"
+          git apply --check "$receipt/fix.patch"
+          git apply "$receipt/fix.patch"
+          test "$(git hash-object "$target")" = 820f0e432d923442882bcbd05465212b1524da09
+          python "$receipt/replay.py" --baseline-source "$RUNNER_TEMP/preflight-before.py" > "$receipt/results.json"
+          python -m py_compile "$target" "$receipt/replay.py"
+          git diff --check
+          git rm .github/workflows/kestrel17-preflight-apply.yml "$receipt/fix.patch"
+          git add "$target" "$receipt/results.json"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: release preflight HTTP responses without losing cooldown evidence'
+          git push origin HEAD:refs/heads/kestrel17/preflight-http-release-20261004
+          printf 'Published source commit: %s\n' "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
