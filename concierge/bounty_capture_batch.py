@@ -8,11 +8,12 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from itertools import chain
 import json
+import math
 import os
 from pathlib import Path
 import re
 import sys
-from time import monotonic
+from time import monotonic, time
 from typing import Any
 
 import requests
@@ -20,6 +21,8 @@ import requests
 from concierge.bounty_audit import BountyAuditError
 from concierge.bounty_capture import CaptureInputError, capture_digest
 from concierge.bounty_preflight import BountyPreflightError, preflight_bounty
+from concierge.config import GITHUB_TOKEN
+from concierge.github_cooldown import CooldownStateError, GitHubCooldown, cooldown_deadline
 from concierge.secure_output import (
     SecureOutputError,
     create_exclusive_regular,
@@ -99,7 +102,9 @@ def _integer_header(headers: Any, name: str) -> int | None:
 class _BatchSession:
     """Count transport calls and Requests redirect hops before dispatch."""
 
-    def __init__(self, session: Any, max_requests: int) -> None:
+    def __init__(
+        self, session: Any, max_requests: int, cooldown: GitHubCooldown | None = None,
+    ) -> None:
         self.session = session
         self.max_requests = max_requests
         self.request_count = 0
@@ -111,6 +116,9 @@ class _BatchSession:
         self.request_url: str | None = None
         self.request_origin_url: str | None = None
         self.issue_request = False
+        self.cooldown = cooldown
+        self.shared_cooldown_deferred = False
+        self.cooldown_state_error = False
 
     def get(self, url: str, **kwargs: Any) -> Any:
         self.request_origin_url = url
@@ -127,6 +135,20 @@ class _BatchSession:
         if self.request_count >= self.max_requests:
             self.failure = {"code": "REQUEST_LIMIT"}
             raise requests.RequestException("batch request budget reached; remaining reads deferred")
+        if self.cooldown is not None:
+            try:
+                deadline = self.cooldown.deadline()
+            except CooldownStateError:
+                self.cooldown_state_error = True
+                self.failure = {"code": "COOLDOWN_STATE_ERROR"}
+                raise requests.RequestException("shared cooldown unavailable; reads deferred") from None
+            now = time()
+            if deadline is not None and deadline > now:
+                self.rate_limited = True
+                self.shared_cooldown_deferred = True
+                self.retry_after_seconds = math.ceil(deadline - now)
+                self.failure = {"code": "RATE_LIMITED"}
+                raise requests.RequestException("shared provider cooldown active; reads deferred")
         self.request_count += 1
         # Keep endpoint identity private for issue-local failure isolation.
         self.request_url = target if isinstance(target, str) else getattr(target, "url", None)
@@ -246,6 +268,16 @@ class _BatchSession:
                 "code": "RATE_LIMITED" if throttled else "HTTP_ERROR",
                 "http_status": status,
             }
+        if (throttled or remaining == 0) and self.cooldown is not None:
+            try:
+                self.cooldown.extend(cooldown_deadline(
+                    retry_seconds=retry_after, retry_at=retry_at,
+                    reset_at=self.rate_limit_reset_at, primary_exhausted=remaining == 0,
+                ))
+            except CooldownStateError:
+                # Keep the actual response and provider evidence. This batch
+                # is already stopped; report that sharing its stop failed.
+                self.cooldown_state_error = True
 
 
 def _write_json(path: Path, value: Any) -> None:
@@ -276,12 +308,15 @@ def collect_batch(
     max_requests: int = 100,
     saturation_threshold: int = 4,
     operator_login: str | None = None,
+    cooldown_file: str | Path | None = None,
 ) -> dict[str, Any]:
     """Save each completed preflight immediately; return a safe coverage summary.
 
     A caller-supplied session remains caller-owned. Otherwise exactly one
     requests.Session is created and closed for the entire batch. There are no
     automatic retries, sleeps, provider writes, or offline freshness changes.
+    An optional cooldown_file shares observed quota deadlines across invocations;
+    omitting it preserves per-batch-only pacing and performs no state-file I/O.
     """
     unique, duplicate_count = _shortlist(candidates)
     _positive(max_issues, "max_issues", _MAX_CANDIDATES)
@@ -295,6 +330,10 @@ def collect_batch(
     if session is not None and not callable(getattr(session, "get", None)):
         raise ValueError("session must provide get")
 
+    cooldown = (
+        GitHubCooldown(cooldown_file, token or GITHUB_TOKEN)
+        if cooldown_file is not None else None
+    )
     output = Path(output_dir)
     parent_fd, leaf = open_verified_parent(output)
     try:
@@ -305,7 +344,7 @@ def collect_batch(
     _write_json(output / "shortlist.json", {"candidates": unique})
     owned = session is None
     provider = requests.Session() if owned else session
-    transport = _BatchSession(provider, max_requests)
+    transport = _BatchSession(provider, max_requests, cooldown)
     started = _now()
     timer = monotonic()
     captures: list[dict[str, Any]] = []
@@ -414,6 +453,11 @@ def collect_batch(
         "remaining_count": len(remaining),
         "request_count": transport.request_count,
         "rate_limited": transport.rate_limited,
+        "shared_cooldown": {
+            "enabled": cooldown_file is not None,
+            "deferred": transport.shared_cooldown_deferred,
+            "state_error": transport.cooldown_state_error,
+        },
         "retry_after_seconds": transport.retry_after_seconds,
         "retry_after_at": transport.retry_after_at,
         "rate_limit_reset_at": transport.rate_limit_reset_at,
@@ -442,6 +486,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-requests", type=int, default=100, help="Maximum actual GET attempts in this run")
     parser.add_argument("--saturation-threshold", type=int, default=4)
     parser.add_argument("--operator-login", help="Optional identity assertion; existing authentication rules apply")
+    parser.add_argument(
+        "--cooldown-file", type=Path,
+        help="Opt-in shared SQLite quota deadline file; requires an existing private parent directory",
+    )
     parser.add_argument("--json", action="store_true", help="Print the safe collection summary")
     args = parser.parse_args(argv)
     try:
@@ -456,7 +504,7 @@ def main(argv: list[str] | None = None) -> int:
             json.loads(raw), args.output_dir, max_issues=args.max_issues,
             max_pages=args.max_pages, max_requests=args.max_requests,
             saturation_threshold=args.saturation_threshold,
-            operator_login=args.operator_login,
+            operator_login=args.operator_login, cooldown_file=args.cooldown_file,
         )
     except (OSError, ValueError, SecureOutputError) as exc:
         parser.error(str(exc))

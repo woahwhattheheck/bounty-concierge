@@ -1,0 +1,57 @@
+{
+  "atomic_extensions": {
+    "maximum_retained": true,
+    "process_workers": 3,
+    "writers": 6
+  },
+  "boundary": "Real production capture/preflight/Requests + local HTTP and SQLite. No GitHub request, cloud-wide coordination, latency or paid completion claim.",
+  "composition_parent": {
+    "batch_blob": "9b1b525504944e59add8fc66a42fc1f32cea9f3e",
+    "commit": "d8ccaaeb4a823f455d04f10caa0557ec232e5d00",
+    "secure_output_blob": "a0e8953fc8cad9ab62c0b2708325875c4c5e0573"
+  },
+  "credential_isolation_gets": 1,
+  "deadline_policy": "delta, HTTP-date-derived timestamp, primary-reset maximum, secondary reset isolation, 60s fallback",
+  "default_off": {
+    "capture_runs": 25,
+    "deferred_runs": 0,
+    "reported_gets": 25,
+    "retained_candidates_per_run": 25,
+    "wire_gets": 25
+  },
+  "executed_at": "2026-10-04T12:21:47.430248+00:00",
+  "executed_git_blobs": {
+    "concierge/bounty_audit.py": "6961270db8626ffccc1ceefa19b8f6f9ce8a2605",
+    "concierge/bounty_capture_batch.py": "9a0672f50378a344ab180f02ba0a7866c4225e94",
+    "concierge/bounty_preflight.py": "39b88636710fa907c5e41c70b5eca81fc92dfaf6",
+    "concierge/github_cooldown.py": "5e167b3f8837b56b36061eec1eeacb8aa8827242",
+    "concierge/secure_output.py": "a0e8953fc8cad9ab62c0b2708325875c4c5e0573",
+    "work/throughput/capture-shared-cooldown-20261004/replay.py": "12792abb9dc34d1cea75cf02724b9204ece2f982"
+  },
+  "expired_deadline_gets": 1,
+  "http_date_response": "persisted",
+  "invalid_store": {
+    "remaining": 25,
+    "stop": "COOLDOWN_STATE_ERROR",
+    "wire_gets": 0
+  },
+  "ordinary_403_gets": 2,
+  "runtime": {
+    "python": "3.13.5",
+    "requests": "2.32.5",
+    "sqlite": "3.46.1"
+  },
+  "shared": {
+    "capture_runs": 25,
+    "deferred_runs": 24,
+    "reported_gets": 1,
+    "retained_candidates_per_run": 25,
+    "wire_gets": 1
+  },
+  "source_bundle": {
+    "artifact_id": 11298566560,
+    "commit": "261f6f866b20e4a3b6433f4ba6bf1ac130e72b92",
+    "repository": "woahwhattheheck/bounty-concierge"
+  },
+  "successful_last_quota_gets": 1
+}
