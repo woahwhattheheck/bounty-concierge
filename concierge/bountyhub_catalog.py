@@ -178,6 +178,8 @@ def _detail(value: Any, expected: dict[str, Any]) -> dict[str, Any]:
 def _retry_after(value: str | None) -> int | None:
     if not value:
         return None
+    # HTTP field values may carry surrounding optional SP/HTAB padding.
+    value = value.strip(" \t")
     if value.isascii() and value.isdigit() and len(value) <= 12:
         return int(value)
     try:
