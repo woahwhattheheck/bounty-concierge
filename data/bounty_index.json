@@ -1,6 +1,74 @@
 {
-  "updated_at": "2026-10-03T11:09:06.118481+00:00",
-  "total_count": 266,
+  "started_at": "2026-10-04T06:46:18.705028+00:00",
+  "complete": true,
+  "rate_limited": false,
+  "retry_after_seconds": null,
+  "rate_limit_reset_at": null,
+  "repositories": [
+    {
+      "repo": "Scottcjn/rustchain-bounties",
+      "status": "COMPLETE",
+      "pages_fetched": 3,
+      "bounty_count": 245,
+      "http_status": 200
+    },
+    {
+      "repo": "Scottcjn/Rustchain",
+      "status": "COMPLETE",
+      "pages_fetched": 1,
+      "bounty_count": 18,
+      "http_status": 200
+    },
+    {
+      "repo": "Scottcjn/bottube",
+      "status": "COMPLETE",
+      "pages_fetched": 1,
+      "bounty_count": 3,
+      "http_status": 200
+    },
+    {
+      "repo": "Scottcjn/beacon-skill",
+      "status": "COMPLETE",
+      "pages_fetched": 1,
+      "bounty_count": 0,
+      "http_status": 200
+    },
+    {
+      "repo": "Scottcjn/ram-coffers",
+      "status": "COMPLETE",
+      "pages_fetched": 1,
+      "bounty_count": 0,
+      "http_status": 200
+    },
+    {
+      "repo": "Scottcjn/claude-code-power8",
+      "status": "COMPLETE",
+      "pages_fetched": 1,
+      "bounty_count": 0,
+      "http_status": 200
+    },
+    {
+      "repo": "Scottcjn/nvidia-power8-patches",
+      "status": "COMPLETE",
+      "pages_fetched": 1,
+      "bounty_count": 0,
+      "http_status": 200
+    },
+    {
+      "repo": "Scottcjn/llama-cpp-power8",
+      "status": "COMPLETE",
+      "pages_fetched": 1,
+      "bounty_count": 0,
+      "http_status": 200
+    },
+    {
+      "repo": "Scottcjn/grazer-skill",
+      "status": "COMPLETE",
+      "pages_fetched": 1,
+      "bounty_count": 0,
+      "http_status": 200
+    }
+  ],
   "bounties": [
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -433,7 +501,8 @@
       "labels": [
         "help wanted",
         "bounty",
-        "security"
+        "security",
+        "claimed"
       ],
       "created_at": "2026-04-04T03:03:17Z",
       "reward_rtc": 133.0,
@@ -2035,7 +2104,8 @@
       "body": "## Bounty: 25 RTC\n\nPort and package the RustChain miner client to a platform we don't yet ship cleanly (e.g., a vintage/exotic target: SPARC/Solaris, MIPS/IRIX, classic Mac OS via legacy toolchain, BSD, or an ARM SBC), including a working build recipe, a systemd/launchd/equivalent persistence unit, and a README that leads with the verify-before-trust commands (--dry-run / --show-payload / --test-only). The miner must attest honestly (no fingerprint fabrication). SUBMISSION GRAMMAR: One PR titled 'miner-port: <platform>'. Body must include build steps, the platform's detected device family, evidence of a successful attestation against a test node (logs/screenshot), and the persistence unit.\n\n### Acceptance criteria\nACCEPT if: build instructions reproduce on the target, the client attests honestly and is detected as the correct device family, a persistence unit is included, and the README opens with verification commands. REJECT if it fabricates or hardcodes a hardware class/multiplier, omits build steps, or provides no evidence of a real attestation.\n\n---\n*Reward paid in RTC to your canonical wallet on accepted submission (one bounty per PR). Open to humans and autonomous agents. Posted from the Elyan Labs quad-brain ecosystem review.*",
       "url": "https://github.com/Scottcjn/rustchain-bounties/issues/12788",
       "labels": [
-        "bounty"
+        "bounty",
+        "claimed"
       ],
       "created_at": "2026-06-01T16:18:30Z",
       "reward_rtc": 25.0,
@@ -6464,7 +6534,8 @@
       "labels": [
         "bounty",
         "easy",
-        "community"
+        "community",
+        "claimed"
       ],
       "created_at": "2026-03-20T15:32:02Z",
       "reward_rtc": 2.0,
@@ -8042,7 +8113,8 @@
       "labels": [
         "good first issue",
         "bounty",
-        "micro"
+        "micro",
+        "claimed"
       ],
       "created_at": "2026-09-05T23:48:51Z",
       "reward_rtc": 0.1,
@@ -8222,5 +8294,7 @@
         "evidence_kind": "rtc_exact"
       }
     }
-  ]
+  ],
+  "updated_at": "2026-10-04T06:46:22.661141+00:00",
+  "total_count": 266
 }
