@@ -265,7 +265,9 @@ For HTTP failures, single-issue `--json` emits an error object with `error`,
 `http_status`, `rate_limited`, `retry_after_seconds`, `rate_limit_remaining`, and
 `rate_limit_reset_at` (Unix seconds). Missing or invalid header values are `null`;
 the primary reset time remains separate from Retry-After. Rate-limit detection
-requires HTTP 429 or HTTP 403 with zero remaining requests or a valid Retry-After.
+recognizes HTTP 429, or HTTP 403 with zero remaining requests, a valid Retry-After,
+or a JSON `message` containing "rate limit" (including secondary limits while
+primary quota remains). Provider message text is never included in the output.
 These incomplete reads still exit 2 and do not write a completed capture. Plain
 text errors keep their existing format.
 

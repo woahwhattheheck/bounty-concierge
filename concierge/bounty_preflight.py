@@ -1448,6 +1448,13 @@ def _http_error_result(error: BaseException) -> dict[str, Any] | None:
                     response.status_code == 403
                     and (remaining == 0 or retry_after is not None)
                 )
+                if response.status_code == 403 and not rate_limited:
+                    try:
+                        payload = response.json()
+                    except (TypeError, ValueError):
+                        payload = {}
+                    message = payload.get("message", "") if isinstance(payload, dict) else ""
+                    rate_limited = isinstance(message, str) and "rate limit" in message.casefold()
                 return {
                     "error": (
                         "GitHub rate limit reached" if rate_limited
