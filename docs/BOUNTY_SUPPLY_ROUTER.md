@@ -15,17 +15,23 @@ and unsafe private-context requirements.
 
 | Route | Fresh fixed USD evidence | Operational meaning |
 | --- | ---: | --- |
-| `ACTIVE` | `>= $25` | Eligible for the main work queue after normal collision checks |
-| `MAYBE` | `$10 <= reward < $25` | Save only in `#bounty-pile-10-49`; do not consume active build capacity |
+| `ACTIVE` | `>= $15` | Eligible for the main work queue after normal collision checks |
+| `MAYBE` | `$10 <= reward < $15` | Save only in `#bounty-pile-10-49`; do not consume active build capacity |
 | `PRUNE` | `< $10` | Disregard for paid-work dispatch |
 | `HOLD` | stale/incomplete/ambiguous or no trustworthy fixed USD floor | Refresh source/terms; do not infer value |
 
-The **$25 ACTIVE / $10 MAYBE floors are fixed owner policy**, not caller
+The **$15 ACTIVE / $10 MAYBE floors are fixed owner policy**, not caller
 configuration. API calls that attempt to override either floor fail closed, and
 the CLI does not expose floor override flags.
 
 The existing `bounty-pile-10-49` queue name remains for compatibility; its current
-range is $10 through $24.99.
+range is $10 through $14.99.
+
+The owner authorizes $15+ work on GREEN platforms. `ACTIVE` establishes
+source-qualified queue eligibility only. It does not establish a GREEN payer,
+our claimant/payee eligibility, required assignment, or a payment route. Those
+existing conditions and current submission ownership still apply before work
+or submission.
 
 A qualification-level `REJECT` is routed to `PRUNE`/suppression. A
 qualification-level `HOLD` stays `HOLD`. Fresh otherwise-actionable rows also
@@ -337,7 +343,8 @@ raw issue bodies and comments are never copied into persisted route rows.
 2. Check `summary.json` for coverage and retain `remaining.json` for any later run.
 3. Route `supply.json` offline with an explicit current `evaluated_at` and share
    the reduced routing results with builders.
-4. Work only fresh `ACTIVE` rows after a collision check.
+4. Work only fresh `ACTIVE` rows with the existing GREEN payer, claimant/payment
+   and assignment conditions satisfied, after a collision check.
 5. Send fresh `MAYBE` rows to the saving pile, not the build queue.
 6. When evidence ages out, refresh canonical source instead of replaying old state.
 7. Re-capture canonical evidence again before a real claim/submission if the
