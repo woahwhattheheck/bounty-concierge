@@ -32,7 +32,8 @@ a **PARTIAL object**, not a success-shaped list, and the exit code is 2:
     "message": "GitHub request failed ...",
     "http_status": 429,
     "retry_after": "60",
-    "rate_limit_reset": null
+    "rate_limit_reset": null,
+    "rate_limit_remaining": 0
   }
 }
 ```
@@ -53,6 +54,14 @@ stay with their rows. Completed rows retain their existing truncation flags;
 HTTP response. They are raw provider values, not a calculated retry schedule.
 An ordinary 403 is not automatically classified as a rate limit. Timeouts and
 invalid JSON may have no HTTP or cooldown metadata.
+
+`rate_limit_remaining` retains the parsed `X-RateLimit-Remaining` integer from
+that same failed response. Zero remains zero; an absent or non-integer header
+is `null`. This observation does not authorize a retry or change stop/cooldown
+behavior. An actual Requests HTTP 429 response over loopback produced one GET
+and retained status 429, Retry-After `60`, reset `1791116400`, and remaining `0`
+through the real JSON reader and partial-report builder. No live provider call
+or additional request occurred in that execution.
 
 Without `--json`, completed audit summaries are printed and stderr describes
 the partial result. Use JSON when a reusable remaining shortlist is needed.
@@ -84,7 +93,8 @@ contains:
         "message": "GitHub request failed ...",
         "http_status": 404,
         "retry_after": null,
-        "rate_limit_reset": null
+        "rate_limit_reset": null,
+        "rate_limit_remaining": null
       }
     }
   ],
