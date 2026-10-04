@@ -312,7 +312,8 @@ def fetch_bounties(repos=None, token=None, *, cache_dir=None):
 # ---------------------------------------------------------------------------
 
 _RTC_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9_.,])"
+    # Match the amount's Unicode digit class at the boundary too.
+    r"(?<![A-Za-z\d_.,])"
     r"((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)"
     r"[ \t]*RTC\b",
     re.IGNORECASE,
