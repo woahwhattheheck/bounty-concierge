@@ -61,3 +61,14 @@ The nightly workflow continues to use `concierge.bounty_index_publish` for compl
 identity-checked, atomic replacement of `data/bounty_index.json`, followed by the
 existing fresh-index README update. This change does not replace that publisher,
 add a second publication mechanism, dispatch a workflow, or change reward parsing.
+
+The published index retains the validated collector report: `started_at`,
+`updated_at`, `complete`, per-repository page counts and statuses, rate-limit
+metadata, `total_count`, and the sorted `bounties`. Its timestamps describe the
+actual provider read interval; sorting or writing the file does not refresh
+them. Offline consumers can therefore reuse the index's recorded coverage
+without fetching the sources again. Older indexes that omit this metadata stay
+readable with unspecified coverage; an export timestamp does not fill that gap.
+`fetch_complete_bounties()` continues to return only the validated row list for
+existing Python callers. Both APIs use the same complete-read and canonical
+identity validation, and a failed publication leaves the previous file intact.
