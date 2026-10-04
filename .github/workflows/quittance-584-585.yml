@@ -1,4 +1,4 @@
-name: Quittance webhook and claimable acceptance
+name: Quittance webhook backend catalog
 on:
   push:
     branches:
@@ -6,129 +6,48 @@ on:
 permissions:
   contents: read
 jobs:
-  acceptance:
+  backend:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: quittance
-          POSTGRES_DB: quittance_ci
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d quittance_ci"
-          --health-interval 5s --health-timeout 5s --health-retries 12
     env:
       NODE_ENV: test
       STELLAR_NETWORK: TESTNET
       STELLAR_HORIZON_URL: http://127.0.0.1:1
-      NEXT_PUBLIC_API_URL: http://127.0.0.1:3001/api
-      NEXT_PUBLIC_STELLAR_NETWORK: TESTNET
     steps:
       - uses: actions/checkout@v4
         with:
           repository: woahwhattheheck/Quittance0
-          ref: 977da14c031f00f6ab7e3a7d5f9aef00104f9351
-          path: q584
-          persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
-          repository: woahwhattheheck/Quittance0
-          ref: 66f18e99a62c8373b5e487100d99f49368e2576f
-          path: q585
+          ref: 77b18245e9d694a3b0a09900e36b2ecd3618b1c1
+          path: source
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Install canonical backend dependencies once
-        id: backend_deps
+      - name: Canonical install
+        working-directory: source/backend
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p evidence
-          node --version | tee evidence/node-version.txt
-          npm --version | tee evidence/npm-version.txt
-          git -C q584 rev-parse HEAD > evidence/q584-head.txt
-          git -C q585 rev-parse HEAD > evidence/q585-head.txt
-          cmp q584/backend/package.json q585/backend/package.json
-          cmp q584/backend/package-lock.json q585/backend/package-lock.json
-          cd q584/backend
-          npm ci --no-audit --no-fund 2>&1 | tee "$GITHUB_WORKSPACE/evidence/backend-install.log"
-          ln -s "$GITHUB_WORKSPACE/q584/backend/node_modules" "$GITHUB_WORKSPACE/q585/backend/node_modules"
-      - name: Backend typecheck
-        if: always() && steps.backend_deps.outcome == 'success'
-        working-directory: q584/backend
+          mkdir -p "$GITHUB_WORKSPACE/evidence"
+          node --version | tee "$GITHUB_WORKSPACE/evidence/node-version.txt"
+          npm --version | tee "$GITHUB_WORKSPACE/evidence/npm-version.txt"
+          git rev-parse HEAD > "$GITHUB_WORKSPACE/evidence/source-head.txt"
+          npm ci --no-audit --no-fund 2>&1 | tee "$GITHUB_WORKSPACE/evidence/install.log"
+      - name: Typecheck
+        working-directory: source/backend
         shell: bash
         run: |
           set -o pipefail
-          npm run typecheck 2>&1 | tee "$GITHUB_WORKSPACE/evidence/q584-backend-typecheck.log"
-      - name: Webhook delivery and PostgreSQL acceptance
-        if: always() && steps.backend_deps.outcome == 'success'
-        working-directory: q584/backend
-        env:
-          DATABASE_URL: postgresql://postgres:quittance@localhost:5432/quittance_ci
+          npm run typecheck 2>&1 | tee "$GITHUB_WORKSPACE/evidence/typecheck.log"
+      - name: Full backend catalog
+        working-directory: source/backend
         shell: bash
         run: |
           set -o pipefail
-          node --import tsx --test --test-concurrency=1 tests/webhook-delivery.test.ts tests/webhook-postgres.integration.test.ts 2>&1 | tee "$GITHUB_WORKSPACE/evidence/q584-acceptance.log"
-      - name: Claimable event PostgreSQL concurrency and restart
-        if: always() && steps.backend_deps.outcome == 'success'
-        working-directory: q585/backend
-        env:
-          DATABASE_URL: postgresql://postgres:quittance@localhost:5432/quittance_ci
-        shell: bash
-        run: |
-          set -o pipefail
-          node --import tsx --test tests/claimable-event-postgres.integration.test.ts 2>&1 | tee "$GITHUB_WORKSPACE/evidence/q585-postgres.log"
-      - name: Existing backend catalog
-        if: always() && steps.backend_deps.outcome == 'success'
-        working-directory: q584/backend
-        shell: bash
-        run: |
-          set -o pipefail
-          npm test 2>&1 | tee "$GITHUB_WORKSPACE/evidence/q584-backend-catalog.log"
-      - name: Install canonical frontend dependencies
-        if: always()
-        id: frontend_deps
-        working-directory: q584/frontend
-        shell: bash
-        run: |
-          set -o pipefail
-          npm ci --no-audit --no-fund 2>&1 | tee "$GITHUB_WORKSPACE/evidence/frontend-install.log"
-      - name: Frontend lint
-        if: always() && steps.frontend_deps.outcome == 'success'
-        working-directory: q584/frontend
-        shell: bash
-        run: |
-          set -o pipefail
-          npm run lint 2>&1 | tee "$GITHUB_WORKSPACE/evidence/q584-frontend-lint.log"
-      - name: Frontend typecheck
-        if: always() && steps.frontend_deps.outcome == 'success'
-        working-directory: q584/frontend
-        shell: bash
-        run: |
-          set -o pipefail
-          npm run typecheck 2>&1 | tee "$GITHUB_WORKSPACE/evidence/q584-frontend-typecheck.log"
-      - name: Existing frontend catalog and new seller panel
-        if: always() && steps.frontend_deps.outcome == 'success'
-        working-directory: q584/frontend
-        shell: bash
-        run: |
-          set -o pipefail
-          npm test 2>&1 | tee "$GITHUB_WORKSPACE/evidence/q584-frontend-catalog.log"
-      - name: Shared contract catalog
-        if: always()
-        working-directory: q584
-        shell: bash
-        run: |
-          set -o pipefail
-          node --test "tests/**/*.test.mjs" 2>&1 | tee "$GITHUB_WORKSPACE/evidence/q584-shared.log"
+          npm test 2>&1 | tee "$GITHUB_WORKSPACE/evidence/backend-catalog.log"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: quittance-584-585-acceptance
+          name: quittance-584-backend-catalog
           path: evidence/
           retention-days: 7
