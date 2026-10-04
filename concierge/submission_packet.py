@@ -278,9 +278,10 @@ def _validate_portfolio(portfolio: Any) -> list[dict[str, Any]]:
             raise SubmissionPacketInputError("selected portfolio rows must be objects")
         source = row.get("canonical_source_url")
         _strict_github_url(source, "issue")
-        if source in seen:
+        source_key = source.casefold()
+        if source_key in seen:
             raise SubmissionPacketInputError("portfolio contains duplicate canonical sources")
-        seen.add(source)
+        seen.add(source_key)
         reward = _positive_decimal_text(row.get("advertised_reward_usd"), "advertised_reward_usd")
         row_authority = row.get("authority")
         if (
@@ -304,21 +305,22 @@ def build_submission_packet(portfolio: Any, evidence: Any) -> dict[str, Any]:
     if type(evidence) is not list or len(evidence) > max(len(selected), 1) + 128:
         raise SubmissionPacketInputError("evidence must be a bounded list")
 
-    selected_by_source = {row["canonical_source_url"]: row for row in selected}
+    # GitHub owner/repository identity ignores case; retain URL bytes in packets.
+    selected_by_source = {row["canonical_source_url"].casefold(): row for row in selected}
     evidence_by_source: dict[str, dict[str, Any]] = {}
     for raw in evidence:
         if type(raw) is not dict:
             raise SubmissionPacketInputError("evidence entries must be objects")
         source = raw.get("canonical_source_url")
         _strict_github_url(source, "issue")
-        selected_row = selected_by_source.get(source, {})
+        selected_row = selected_by_source.get(source.casefold(), {})
         bound = _bind_evidence(raw, selected_row.get("submission_target"))
-        source = bound["canonical_source_url"]
+        source = bound["canonical_source_url"].casefold()
         if source in evidence_by_source:
             raise SubmissionPacketInputError("duplicate evidence for canonical source")
         evidence_by_source[source] = bound
 
-    selected_sources = {row["canonical_source_url"] for row in selected}
+    selected_sources = set(selected_by_source)
     extras = sorted(set(evidence_by_source) - selected_sources)
     if extras:
         raise SubmissionPacketInputError("evidence contains an unselected canonical source")
@@ -326,7 +328,7 @@ def build_submission_packet(portfolio: Any, evidence: Any) -> dict[str, Any]:
     packets: list[dict[str, Any]] = []
     for row in selected:
         source = row["canonical_source_url"]
-        bound = evidence_by_source.get(source)
+        bound = evidence_by_source.get(source.casefold())
         reasons: list[str] = []
         if bound is None:
             reasons.append("EVIDENCE_MISSING")
