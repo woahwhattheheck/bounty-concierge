@@ -164,7 +164,7 @@ its issue shortlist without another provider request:
 
 ```bash
 concierge bountyhub collect --max-pages 10 --max-details 50 \
-  --min-funded-usd 50.00 > catalog.json
+  --min-funded-usd 25.00 > catalog.json
 concierge bountyhub targets catalog.json > shortlist.json
 ```
 

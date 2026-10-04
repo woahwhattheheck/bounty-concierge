@@ -177,7 +177,7 @@ def _get(session: Any, url: str, report: dict[str, Any], **params: Any) -> Any:
         response.close()
 
 
-def select_targets(report: dict[str, Any], minimum_funded_usd: str = "50.00", *,
+def select_targets(report: dict[str, Any], minimum_funded_usd: str = "25.00", *,
                    include_promised: bool = False) -> dict[str, Any]:
     """Reduce a retained report without refreshing its time or making requests."""
     if not isinstance(report, dict) or report.get("schema") != SCHEMA or not isinstance(report.get("listings"), list):
@@ -227,7 +227,7 @@ def select_targets(report: dict[str, Any], minimum_funded_usd: str = "50.00", *,
 
 
 def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int = 100,
-                  minimum_total_usd: str = "50.00", include_promised: bool = False,
+                  minimum_total_usd: str = "25.00", include_promised: bool = False,
                   session: Any = None) -> dict[str, Any]:
     """Collect once with bounded reads; retain partial progress and never retry."""
     if type(max_pages) is not int or not 1 <= max_pages <= 100:
@@ -329,9 +329,9 @@ def main(argv: list[str] | None = None) -> int:
     targets.add_argument("snapshot", type=Path)
     for command in (collect, targets):
         command.add_argument(
-            "--min-funded-usd", "--min-reward-usd", dest="min_funded_usd", default="50.00",
+            "--min-funded-usd", "--min-reward-usd", dest="min_funded_usd", default="25.00",
             help="Minimum USD in the selected reward basis: funded by default, funded plus promised "
-                 "with --include-promised (default: 50.00)",
+                 "with --include-promised (default: 25.00)",
         )
         command.add_argument(
             "--include-promised", action="store_true",
