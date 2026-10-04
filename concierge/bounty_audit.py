@@ -43,7 +43,17 @@ _MAINTAINER_EXPIRY_PATTERNS = (
 
 
 class BountyAuditError(RuntimeError):
-    """Raised when canonical GitHub state cannot be read reliably."""
+    """Unreliable GitHub state, optionally retaining an interrupted batch.
+
+    ``partial_report`` contains only audits that returned before the failure;
+    the failed and later rows remain unaudited. Library callers still receive
+    this exception rather than a success-shaped partial list.
+    """
+
+    partial_report: dict[str, Any] | None = None
+    http_status: int | None = None
+    retry_after: str | None = None
+    rate_limit_reset: str | None = None
 
 
 def _headers(token: str | None) -> dict[str, str]:
@@ -65,7 +75,17 @@ def _get_json(
         response = session.get(url, headers=headers, params=params, timeout=15)
         response.raise_for_status()
     except requests.RequestException as exc:
-        raise BountyAuditError(f"GitHub request failed for {url}: {exc}") from exc
+        error = BountyAuditError(f"GitHub request failed for {url}: {exc}")
+        failed_response = getattr(exc, "response", None)
+        status = getattr(failed_response, "status_code", None)
+        error.http_status = status if type(status) is int else None
+        failed_headers = getattr(failed_response, "headers", None)
+        if isinstance(failed_headers, Mapping):
+            retry_after = failed_headers.get("Retry-After", failed_headers.get("retry-after"))
+            reset = failed_headers.get("X-RateLimit-Reset", failed_headers.get("x-ratelimit-reset"))
+            error.retry_after = retry_after if isinstance(retry_after, str) else None
+            error.rate_limit_reset = reset if isinstance(reset, str) else None
+        raise error from exc
     try:
         payload = response.json()
     except (TypeError, ValueError) as exc:
@@ -365,6 +385,9 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
 
     Canonical PR details are shared within this batch when distinct issues link
     the same PR. Later invocations and standalone audits perform fresh reads.
+    A provider/evidence failure stops immediately and raises BountyAuditError
+    with completed rows and a remaining shortlist in ``partial_report``. It
+    neither retries the failed read nor calls the provider for later rows.
     """
     if session is requests:
         with requests.Session() as owned_session:
@@ -391,15 +414,41 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
         )
         key = (repo.casefold(), number, target_key)
         if key not in audit_by_issue:
-            audit_by_issue[key] = audit_bounty(
-                repo,
-                key[1],
-                token,
-                session=session,
-                max_pages=max_pages,
-                submission_target=target,
-                _pr_detail_cache=pr_detail_cache,
-            )
+            try:
+                audit_by_issue[key] = audit_bounty(
+                    repo,
+                    key[1],
+                    token,
+                    session=session,
+                    max_pages=max_pages,
+                    submission_target=target,
+                    _pr_detail_cache=pr_detail_cache,
+                )
+            except BountyAuditError as exc:
+                # Keep the caller's original exception contract, but do not
+                # lose finished work when a later source read fails. A cached
+                # input audit must never masquerade as a newly observed result.
+                remaining = [
+                    {key: value for key, value in candidate.items() if key != "canonical_audit"}
+                    for candidate in bounties[len(audited):]
+                ]
+                exc.partial_report = {
+                    "status": "PARTIAL",
+                    "input_count": len(bounties),
+                    "audited_count": len(audited),
+                    "remaining_count": len(remaining),
+                    "failed_row": len(audited) + 1,
+                    "rows": deepcopy(audited),
+                    "remaining_candidates": deepcopy(remaining),
+                    "error": {
+                        "type": "BountyAuditError",
+                        "message": str(exc),
+                        "http_status": exc.http_status,
+                        "retry_after": exc.retry_after,
+                        "rate_limit_reset": exc.rate_limit_reset,
+                    },
+                }
+                raise
         # Each row owns its nested report. A caller editing one scout's result
         # must not alter another row or the evidence reused later in this batch.
         row["canonical_audit"] = deepcopy(audit_by_issue[key])
@@ -475,7 +524,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("issue", nargs="?", type=int, help="Bounty issue number")
     parser.add_argument(
         "--batch", metavar="FILE",
-        help="Audit a JSON shortlist up to 1 MiB; use - to read standard input",
+        help="Audit a JSON shortlist up to 1 MiB; use - for stdin; provider failures retain partial output and exit 2",
     )
     parser.add_argument(
         "--max-pages", type=int, default=10,
@@ -487,6 +536,7 @@ def main(argv: list[str] | None = None) -> int:
         help="JSON file containing the existing explicit submission_target record",
     )
     args = parser.parse_args(argv)
+    partial_report = None
 
     if args.batch is not None:
         if args.repo is not None or args.issue is not None or args.submission_target is not None:
@@ -495,8 +545,15 @@ def main(argv: list[str] | None = None) -> int:
             rows = _load_audit_batch(args.batch)
         except (OSError, ValueError, RecursionError) as exc:
             parser.error(str(exc))
-        result = audit_bounties(rows, max_pages=args.max_pages)
-        audits = [row["canonical_audit"] for row in result]
+        try:
+            result = audit_bounties(rows, max_pages=args.max_pages)
+            audits = [row["canonical_audit"] for row in result]
+        except BountyAuditError as exc:
+            if exc.partial_report is None:
+                raise
+            partial_report = exc.partial_report
+            result = partial_report
+            audits = [row["canonical_audit"] for row in partial_report["rows"]]
     else:
         if args.repo is None or args.issue is None:
             parser.error("repo and issue are required unless --batch is supplied")
@@ -529,6 +586,24 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 suffix = f" [{metadata}]" if metadata else ""
                 print(f"  PR {identity}: {status}{draft} - {pr['title']} - {pr['url']}{suffix}")
+    if partial_report is not None:
+        error = partial_report["error"]
+        print(
+            f"PARTIAL: retained {partial_report['audited_count']} of "
+            f"{partial_report['input_count']} input rows; stopped at row "
+            f"{partial_report['failed_row']}. {partial_report['remaining_count']} "
+            f"rows still need an audit. {error['message']}",
+            file=sys.stderr,
+        )
+        if error["retry_after"] is not None or error["rate_limit_reset"] is not None:
+            print(
+                f"Provider cooldown metadata: Retry-After={error['retry_after']!r}; "
+                f"X-RateLimit-Reset={error['rate_limit_reset']!r}. "
+                "Respect the provider cooldown before retrying remaining_candidates; "
+                "no retry was made.",
+                file=sys.stderr,
+            )
+        return 2
     if any(audit["search_truncated"] for audit in audits):
         print(
             "PARTIAL: GitHub search or comment history is incomplete; "
