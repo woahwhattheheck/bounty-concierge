@@ -1,22 +1,26 @@
 name: Export source bundle
-run-name: Source bundle ${{ inputs.source_sha || github.ref_name }}
+run-name: Source bundle ${{ inputs.source_repository || github.repository }} ${{ inputs.source_sha || github.ref_name }}
 
 on:
   push:
-    branches: ["source-bundle/request-*"]
+    branches: ["source-bundle/request-*", "source-bundle/repository-**"]
     paths: [".github/source-bundle-request.json"]
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Full lowercase commit SHA in this repository (reuse an existing artifact first)
+        description: Full lowercase commit SHA (reuse an existing artifact first)
         required: true
+        type: string
+      source_repository:
+        description: Optional public owner/repository; defaults to this repository
+        required: false
         type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: source-bundle-${{ inputs.source_sha || github.ref_name }}
+  group: source-bundle-${{ inputs.source_repository || github.repository }}-${{ inputs.source_sha || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -29,18 +33,57 @@ jobs:
         shell: bash
         env:
           REQUESTED_SOURCE: ${{ inputs.source_sha || github.ref_name }}
+          REQUESTED_REPOSITORY: ${{ inputs.source_repository }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
-          SOURCE_SHA="${REQUESTED_SOURCE#source-bundle/request-}"
-          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo 'source_sha must be a full lowercase 40-character commit SHA' >&2
-            exit 1
-          fi
-          printf 'sha=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.request
+
+          requested = os.environ["REQUESTED_SOURCE"]
+          home = os.environ["GITHUB_REPOSITORY"].lower()
+          repository = (os.environ.get("REQUESTED_REPOSITORY") or home).lower()
+          cross = re.fullmatch(r"source-bundle/repository-([^/]+)/([^/]+)/([0-9a-f]{40})", requested)
+          if cross:
+              repository = f"{cross[1]}/{cross[2]}"
+              sha = cross[3]
+          else:
+              sha = requested.removeprefix("source-bundle/request-")
+          if not re.fullmatch(r"[0-9a-f]{40}", sha):
+              raise SystemExit("source_sha must be a full lowercase 40-character commit SHA")
+          if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,38}/[a-z0-9_.-]{1,100}", repository):
+              raise SystemExit("source_repository must be a lowercase GitHub owner/repository")
+          owner, name = repository.split("/")
+          if name in {".", ".."}:
+              raise SystemExit("invalid source repository name")
+          # Never copy a private repository into another repository's artifact
+          # audience. Do not add a cross-repository credential or auth fallback.
+          if repository != home:
+              request = urllib.request.Request(
+                  f"https://api.github.com/repos/{repository}",
+                  headers={"Accept": "application/vnd.github+json",
+                           "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                           "User-Agent": "source-bundle-exporter"},
+              )
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  metadata = json.load(response)
+              if (metadata.get("private") is not False
+                      or metadata.get("visibility") != "public"
+                      or metadata.get("full_name", "").lower() != repository):
+                  raise SystemExit("cross-repository source must be an explicitly public matching repository")
+          # Owner names cannot contain underscores, so this separator is
+          # unambiguous even when the repository name itself contains them.
+          artifact = f"source-{sha}" if repository == home else f"source-{owner}__{name}-{sha}"
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"sha={sha}\nrepository={repository}\nartifact={artifact}\n")
+          PY
 
       - name: Check out the requested commit without retained credentials
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          repository: ${{ steps.source.outputs.repository }}
           ref: ${{ steps.source.outputs.sha }}
           persist-credentials: false
           fetch-depth: 1
@@ -51,6 +94,7 @@ jobs:
         shell: bash
         env:
           SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          SOURCE_REPOSITORY: ${{ steps.source.outputs.repository }}
         run: |
           python - <<'PY'
           import hashlib
@@ -76,7 +120,8 @@ jobs:
                   digest.update(chunk)
           manifest = {
               "schema": "github-source-bundle/v1",
-              "repository": os.environ["GITHUB_REPOSITORY"],
+              "repository": os.environ["SOURCE_REPOSITORY"],
+              "exporter_repository": os.environ["GITHUB_REPOSITORY"],
               "commit_sha": actual,
               "tree_sha": subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], text=True).strip(),
               "run_id": os.environ["GITHUB_RUN_ID"],
@@ -98,7 +143,7 @@ jobs:
         id: upload
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: source-${{ steps.source.outputs.sha }}
+          name: ${{ steps.source.outputs.artifact }}
           path: ${{ runner.temp }}/source-bundle/
           if-no-files-found: error
           compression-level: 0

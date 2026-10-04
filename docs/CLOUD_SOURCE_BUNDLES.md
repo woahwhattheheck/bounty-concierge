@@ -8,11 +8,20 @@ This is source transport, not a build result, bounty claim, payment check or
 current-state cache. Refresh the relevant live claim and GitHub head before
 editing or publishing. The export never executes code from the requested commit.
 
+The same exporter supports its own repository and explicitly public repositories
+on GitHub. Cross-repository requests verify public visibility before checkout;
+private/internal sources, missing visibility, renamed identities and access
+failures stop the export. No extra credential, permission bypass or owner-PC
+copy is supported. Normal same-repository use is unchanged.
+
 ## Reuse before requesting
 
 Resolve the exact 40-character lowercase commit SHA needed for the task. Search
-repository artifact metadata for the name `source-<SHA>` using the native GitHub
-`fetch` action on this endpoint:
+artifact metadata in the **exporter** repository using the native GitHub `fetch`
+action. For its own source, keep the existing name `source-<SHA>`. For another
+repository, lowercase its owner/name and use
+`source-<owner>__<repository>-<SHA>`. The repository component matters: different
+forks can contain the same commit. For example:
 
 ```text
 https://api.github.com/repos/woahwhattheheck/bounty-concierge/actions/artifacts?name=source-<SHA>&per_page=20
@@ -22,19 +31,26 @@ Reuse an unexpired artifact from the source-bundle workflow with that identity.
 Share its run ID, artifact ID and commit SHA in the existing work thread. An
 artifact has seven-day retention; it is not permanent storage. Do not dispatch
 one export per worker, or export every advancing main commit without a task.
+Replace the `name` query value with the full repository-scoped name for a
+cross-repository request; do not search only by SHA and infer the source repo.
 
 ## Request using native connector writes
 
-The workflow accepts a manual `workflow_dispatch` in the GitHub UI, or this
-connector-only path when a workflow-dispatch action is unavailable:
+The workflow accepts a manual `workflow_dispatch` in the GitHub UI with
+`source_sha` and optional `source_repository` (blank means the exporter repo),
+or this connector-only path when a workflow-dispatch action is unavailable:
 
 1. Create branch `source-bundle/request-<SHA>` from `main` with
    `GitHub.create_branch`. The base must contain
-   `.github/workflows/source_bundle.yml`.
+   `.github/workflows/source_bundle.yml`. For another public repository use
+   `source-bundle/repository-<owner>/<repository>/<SHA>` instead, with lowercase
+   owner/repository. Both request branches live in the exporter repository.
 2. On that branch, create `.github/source-bundle-request.json` with
    `GitHub.create_file`, containing `{"requested_sha":"<SHA>"}`.
-   The filename change triggers the workflow. The SHA in the validated branch
-   name is the source identity; the JSON is only an explicit request record.
+   For another repository include `"source_repository":"<owner>/<repository>"`
+   alongside `requested_sha`. The filename change triggers the workflow. The
+   validated branch name supplies the source identity; the JSON is only an
+   explicit request record, not an unchecked checkout instruction.
 3. Record the resulting request commit SHA. Read its push run through
    `GitHub.fetch` on
    `/repos/woahwhattheheck/bounty-concierge/actions/runs?head_sha=<REQUEST_COMMIT>&event=push&per_page=5`
@@ -50,7 +66,27 @@ The push trigger applies only to the request branches and the request-record
 path. Ordinary pushes, pull requests and scheduled activity do not export
 archives. The workflow has read-only repository permissions, a five-minute
 ceiling, shallow checkout and no retained Git credentials. Same-request
-concurrency does not cancel a running export.
+concurrency does not cancel a running export. Cross-repository requests add one
+read of the target's GitHub metadata, not a catalog traversal or background poll.
+
+### Cross-repository example
+
+For `woahwhattheheck/RemitFlow-Backend` commit
+`6c013e9d5873d72416bbb2ff66459d97baf689fb`, the canonical request branch is:
+
+```text
+source-bundle/repository-woahwhattheheck/remitflow-backend/6c013e9d5873d72416bbb2ff66459d97baf689fb
+```
+
+The artifact name is:
+
+```text
+source-woahwhattheheck__remitflow-backend-6c013e9d5873d72416bbb2ff66459d97baf689fb
+```
+
+Use an existing successful request/artifact when present. The JSON request is
+`{"source_repository":"woahwhattheheck/remitflow-backend","requested_sha":"6c013e9d5873d72416bbb2ff66459d97baf689fb"}`.
+No workflow needs to be installed in the source repository.
 
 ## Download through the connector
 
@@ -59,11 +95,11 @@ After a successful run, call:
 ```text
 GitHub.fetch_workflow_run_artifacts(
     repo_full_name="woahwhattheheck/bounty-concierge",
-    run_id=<RUN_ID>, name="source-<SHA>")
+    run_id=<RUN_ID>, name="<EXACT_ARTIFACT_NAME>")
 
 GitHub.download_workflow_artifact(
     repo_full_name="woahwhattheheck/bounty-concierge",
-    artifact_id=<ARTIFACT_ID>, file_name="source-<SHA>.zip")
+    artifact_id=<ARTIFACT_ID>, file_name="<EXACT_ARTIFACT_NAME>.zip")
 ```
 
 Use the actual returned file reference or mounted path. A title or download URL
@@ -71,7 +107,7 @@ is not a container path. Materialize the returned connector file through the
 Files capability only when it is not already mounted; do not invent a path.
 
 The outer ZIP contains `manifest.json` and `source.tar.gz`. Verify the manifest
-repository and commit against the requested identity, plus the tarball SHA-256
+source `repository` and commit against the requested identity, plus the tarball SHA-256
 and byte length, before extracting into a fresh working directory. The following
 Python example works with a tarfile implementation that supports the `data`
 extraction filter; it performs no network requests and executes no source code:
@@ -86,11 +122,12 @@ import zipfile
 
 zip_path = Path("REPLACE_WITH_RETURNED_LOCAL_ZIP_PATH")
 expected_sha = "REPLACE_WITH_REQUESTED_40_CHARACTER_SHA"
+expected_repository = "REPLACE_WITH_LOWERCASE_OWNER/REPOSITORY"
 destination = Path("fresh-source-workdir")
 with zipfile.ZipFile(zip_path) as bundle:
     manifest = json.loads(bundle.read("manifest.json"))
     if (manifest.get("schema") != "github-source-bundle/v1"
-            or manifest.get("repository") != "woahwhattheheck/bounty-concierge"
+            or manifest.get("repository", "").lower() != expected_repository
             or manifest.get("commit_sha") != expected_sha):
         raise ValueError("source identity mismatch")
     archive = bundle.read("source.tar.gz")
@@ -102,6 +139,11 @@ with zipfile.ZipFile(zip_path) as bundle:
         source.extractall(destination, filter="data")
 print(destination / "source")
 ```
+
+New manifests distinguish the source `repository` from `exporter_repository`,
+which owns the run and artifact. Existing v1 same-repository manifests without
+`exporter_repository` remain usable; never substitute exporter identity for the
+expected source identity.
 
 The inner tar preserves executable modes, symlinks and tracked dotfiles that an
 ordinary outer artifact ZIP may not. This is a `git archive` export: repository
