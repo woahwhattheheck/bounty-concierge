@@ -1,0 +1,39 @@
+name: Validate rust-grpc PR77
+
+on:
+  push:
+    branches:
+      - validation/rust-grpc44-pr77-sol56-20261004
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout runner repo
+        uses: actions/checkout@v4
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Clone candidate
+        run: git clone --depth 1 --branch agent/update-outdated-dependencies https://github.com/dracco736-blip/rust-grpc.git rust-grpc
+      - name: Versions
+        working-directory: rust-grpc
+        run: |
+          rustc --version
+          cargo --version
+          protoc --version
+          git rev-parse HEAD
+      - name: Format
+        working-directory: rust-grpc
+        run: cargo fmt --all -- --check
+      - name: Check
+        working-directory: rust-grpc
+        run: cargo check --all-targets --all-features
+      - name: Test
+        working-directory: rust-grpc
+        run: cargo test --all-features
+      - name: Clippy
+        working-directory: rust-grpc
+        run: cargo clippy --all-targets --all-features -- -D warnings
