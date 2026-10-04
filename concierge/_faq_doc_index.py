@@ -52,6 +52,15 @@ def _remember(key, generation, rows, size):
         _CACHE_BYTES += size
 
 
+def _paragraphs(content):
+    """Split lazily without retaining a second complete copy of the corpus."""
+    start = 0
+    for separator in re.finditer(r"\n\s*\n", content):
+        yield content[start:separator.start()]
+        start = separator.end()
+    yield content[start:]
+
+
 def iter_paragraphs(directory, tokenize):
     """Yield (paragraph, tokens), reloading changed, added or removed Markdown.
 
@@ -85,7 +94,7 @@ def iter_paragraphs(directory, tokenize):
         except OSError:
             retained = None
             continue
-        for paragraph in re.split(r"\n\s*\n", content):
+        for paragraph in _paragraphs(content):
             paragraph = paragraph.strip()
             if len(paragraph) < 20:
                 continue
