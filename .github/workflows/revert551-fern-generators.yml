@@ -10,7 +10,7 @@ jobs:
     timeout-minutes: 15
     env:
       FERN_NO_VERSION_REDIRECTION: 'true'
-      EVIDENCE: ${{ runner.temp }}/revert551-fern
+      EVIDENCE: /tmp/revert551-fern
     steps:
       - uses: actions/checkout@v4
         with:
@@ -102,6 +102,6 @@ jobs:
         if: always()
         with:
           name: revert551-pinned-fern-interfaces
-          path: ${{ runner.temp }}/revert551-fern
+          path: /tmp/revert551-fern
           retention-days: 7
           if-no-files-found: error
