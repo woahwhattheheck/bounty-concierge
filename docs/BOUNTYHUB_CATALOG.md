@@ -147,7 +147,7 @@ batch-compatible candidates envelope on stdout and reports each excluded issue,
 reason, source and observation time on stderr; programmatic selection also
 returns an `excluded_targets` list. Funding amounts, listing evidence and their
 original observation times stay in the retained report. The example records
-reserved funding and existing submission ownership for three issues; it is dated
+reserved funding, existing submission ownership and closures for seven issues; it is dated
 decision evidence, not a refreshed availability check or a hold on continuing an
 existing submission. Update the supplied entries when canonical evidence changes,
 and apply the usual preflight to the remaining targets.
