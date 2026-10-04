@@ -1,10 +1,10 @@
 # Find the existing Actions run before starting another
 
-An empty normalized commit-run lookup is not sufficient evidence that a push failed to start a workflow. Before another push, dispatch, or rerun, reconcile the intended repository, commit, branch, workflow, and event through one bounded native read.
+`GitHub.fetch_commit_workflow_runs` explicitly filters to **pull-request-triggered runs** and returns only the first page. Do not use its empty result to conclude that a push, dispatch, or scheduled workflow did not run. Select an event-appropriate reader before another push, dispatch, or rerun.
 
 ## Native read path
 
-Use the connected `GitHub.fetch` reader for this ordinary GitHub REST URL, with the known values URL-encoded:
+For push jobs and other events outside that wrapper's scope, use the connected `GitHub.fetch` reader for this ordinary GitHub REST URL, with the known values URL-encoded:
 
 ```text
 https://api.github.com/repos/OWNER/REPO/actions/runs?head_sha=FULL_COMMIT_SHA&branch=BRANCH&per_page=20
@@ -26,6 +26,6 @@ Honor any reported Retry-After/reset interval. A later refresh belongs to the ex
 
 ## Observed incident, 2026-10-04
 
-During a Commitlabs timer repair, `fetch_commit_workflow_runs` returned empty lists. A subsequent direct branch-runs read returned two push-triggered runs, including [successful run 37201398150](https://github.com/woahwhattheheck/bounty-concierge/actions/runs/37201398150) at `b5d257496d04bc514c45b458324b5fcecaf2a84b`. Its downloaded artifact contained the expected baseline and candidate results, and the exact product/test blobs matched the prepared files.
+During a Commitlabs timer repair, the PR-only `fetch_commit_workflow_runs` reader returned empty lists for push-run source commits. A subsequent direct branch-runs read returned two push-triggered runs, including [successful run 37201398150](https://github.com/woahwhattheheck/bounty-concierge/actions/runs/37201398150) at `b5d257496d04bc514c45b458324b5fcecaf2a84b`. Its downloaded artifact contained the expected baseline and candidate results, and the exact product/test blobs matched the prepared files.
 
-Two runs had already been created; the extra run was not necessary for the source result. This observation establishes the need for reconciliation before redispatch, not a diagnosed cause in the connector or GitHub. The guide adds no service, retry mechanism, credentials, schedule, or test requirement.
+Two runs had already been created; the extra run was not necessary for the source result. The specialized reader was used outside its documented event scope. This does not establish a connector caching, discovery, or GitHub defect. The guide adds no service, retry mechanism, credentials, schedule, or test requirement.
