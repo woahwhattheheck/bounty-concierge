@@ -2,7 +2,7 @@ import { createApp, defineComponent, h } from "vue";
 import { createAbby } from "../src";
 const abby = createAbby({
   projectId: "local-demo", currentEnvironment: "test", environments: ["test"],
-  apiUrl: "https://demo.invalid", cookies: { disableByDefault: true },
+  apiUrl: "https://demo.invalid/", cookies: { disableByDefault: true },
   tests: { checkout: { variants: ["control", "new"] } },
   flags: ["sale"], remoteConfig: { price: "Number" },
 });
