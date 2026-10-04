@@ -1,0 +1,69 @@
+name: Mova maintained ScVal check
+on:
+  push:
+    branches: [validation/mova-i128-rivet76f4-20261004]
+permissions:
+  contents: read
+jobs:
+  scval:
+    if: github.repository == 'woahwhattheheck/bounty-concierge'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PRODUCT_REF: fix/i128-encoding-bounds-rivet76f4-20261004
+      SOURCE_SHA: aaf9925a9dcea11d902a2f3936282b3ed7cdbff9
+      CI: true
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: Movalabs-crew/mova-store
+          ref: aaf9925a9dcea11d902a2f3936282b3ed7cdbff9
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Execute the already-reviewed pinned single-file check
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          curl --fail --silent --show-error 'https://raw.githubusercontent.com/woahwhattheheck/mova-store/260f3282fd123de15055bace75587a70ba7c9728/.github/workflows/rivet-i128-bounds.yml' -o "$RUNNER_TEMP/pinned-check.yml"
+          python -m pip install --disable-pip-version-check pyyaml==6.0.3
+          python - <<'PY'
+          import os, subprocess, yaml
+          from pathlib import Path
+          source=Path(os.environ['RUNNER_TEMP'])/'pinned-check.yml'
+          workflow=yaml.safe_load(source.read_text())
+          names=[
+            'Record exact source and install maintained dependencies',
+            'Extend the existing authoritative test file',
+            'Record the six existing-source boundary failures',
+            'Add the signed-integer boundary without changing valid encoding',
+            'Run the single maintained ScVal suite',
+          ]
+          steps={s.get('name'):s for s in workflow['jobs']['amount-encoding']['steps'] if 'run' in s}
+          try:
+            for name in names:
+              print('::group::'+name,flush=True)
+              subprocess.run(['bash','--noprofile','--norc','-e','-o','pipefail'],input=steps[name]['run'],text=True,check=True)
+              print('::endgroup::',flush=True)
+          finally:
+            import shutil
+            for name in ['lib/stellar/scval.ts','tests/lib/stellar/scval.test.ts']:
+              p=Path(name)
+              if p.exists(): shutil.copy2(p,Path('evidence')/p.name)
+            with open('evidence/source.patch','w') as f:
+              subprocess.run(['git','diff','--','lib/stellar/scval.ts','tests/lib/stellar/scval.test.ts'],stdout=f,check=True)
+            with open('evidence/blob-ids.txt','w') as f:
+              subprocess.run(['git','hash-object','lib/stellar/scval.ts','tests/lib/stellar/scval.test.ts'],stdout=f,check=True)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mova-scval-boundary-source-and-results
+          path: evidence
+          retention-days: 7
+          if-no-files-found: error
