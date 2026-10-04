@@ -24,6 +24,11 @@ The direct result exposes only safe counters:
 
 Raw comment text is never copied into the result.
 
+Signal matching scans each authoritative text once for possible starting words,
+then applies the existing patterns at those offsets. It retains all overlapping
+signals and original text boundaries while avoiding one whole-text scan per
+pattern. This is local parsing only; it adds no provider calls or cached decisions.
+
 ## Preferred live path
 
 For live GitHub claims, prefer `concierge.bounty_preflight.preflight_bounty()`. Preflight already reads canonical author-association metadata itself, reduces outside comments to competition signals, and revalidates issue/comment generation before dispatch. This document covers callers that use `qualify_dispatch()` or `python -m concierge.bounty_qualification` directly with normalized JSON snapshots.
