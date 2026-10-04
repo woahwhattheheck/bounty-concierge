@@ -404,13 +404,20 @@ def _resume_input(snapshot: Any) -> dict[str, Any]:
         raise ValueError("invalid observation interval")
     result = {key: snapshot[key] for key in (
         "schema", "source_url", "started_at", "completed_at", "minimum_total_usd",
-        "max_pages", "max_details", "page_size", "pages_fetched", "details_fetched", "requests_made",
+        "max_pages", "max_details", "pages_fetched", "details_fetched", "requests_made",
     )}
-    for key in ("max_pages", "max_details", "page_size", "pages_fetched", "details_fetched", "requests_made"):
+    for key in ("max_pages", "max_details", "pages_fetched", "details_fetched", "requests_made"):
         if type(result[key]) is not int or result[key] < 0:
             raise ValueError("invalid retained count")
+    # Early v1 captures did not record page_size. Detail-only recovery never
+    # paginates the catalog, so preserve that absence rather than inventing a
+    # historical request parameter or forcing a new catalog collection.
+    if "page_size" in snapshot:
+        page_size = snapshot["page_size"]
+        if type(page_size) is not int or not 1 <= page_size <= 100:
+            raise ValueError("invalid retained page size")
+        result["page_size"] = page_size
     if (not 1 <= result["max_pages"] <= 100 or not 0 <= result["max_details"] <= 100
-            or not 1 <= result["page_size"] <= 100
             or not 1 <= result["pages_fetched"] <= result["max_pages"]
             or result["requests_made"] < result["pages_fetched"] + result["details_fetched"]):
         raise ValueError("invalid retained collection bounds")
