@@ -353,7 +353,13 @@ def _canonical_audit(snapshot: dict[str, Any]) -> tuple[dict[str, Any], bool]:
     if not isinstance(value, dict):
         raise QualificationInputError("canonical_audit must be an object")
     required = {"issue_state", "open_pr_count", "stale_listing_signal", "search_truncated"}
-    return value, required.issubset(value)
+    complete = (
+        required.issubset(value)
+        and isinstance(value.get("issue_state"), str)
+        and bool(value["issue_state"])
+        and value.get("open_pr_count") is not None
+    )
+    return value, complete
 
 
 def qualify_dispatch(
@@ -452,7 +458,8 @@ def qualify_dispatch(
             "REJECT",
             "Live labels indicate that the bounty has already been rewarded.",
         )
-    if audit_complete and issue_state and issue_state.lower() != "open":
+    # A known non-open state remains terminal when other audit values are missing.
+    if issue_state and issue_state.lower() != "open":
         add(
             "ISSUE_NOT_OPEN",
             "REJECT",
