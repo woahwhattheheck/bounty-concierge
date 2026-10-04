@@ -98,7 +98,8 @@ class GitHubCooldown:
         GitHub recommends waiting at least one minute when a secondary-limit
         response omits Retry-After, then increasing the wait if the limit
         persists. Store only the bounded delay and observation time; no request
-        payload, endpoint or credential is retained.
+        payload, endpoint or credential is retained. Return the effective shared
+        deadline, including any later deadline already recorded by another worker.
         """
         now = time()
         with self._connection() as connection:
@@ -150,7 +151,16 @@ class GitHubCooldown:
                 "MAX(github_cooldown_v1.until_epoch, excluded.until_epoch)",
                 (self.scope, until_epoch),
             )
-            return until_epoch
+            # Read MAX back under the same lock: an in-flight response may
+            # arrive after another worker recorded a later provider deadline.
+            row = connection.execute(
+                "SELECT until_epoch FROM github_cooldown_v1 WHERE scope = ?",
+                (self.scope,),
+            ).fetchone()
+            value = row[0]
+            if not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+                raise CooldownStateError("shared GitHub cooldown deadline invalid")
+            return float(value)
 
 
 def cooldown_deadline(
