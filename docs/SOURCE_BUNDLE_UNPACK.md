@@ -49,6 +49,37 @@ trusted workflow receipt. Before publishing edits, refresh the live head and
 claim ownership using the normal workflow; this command is neither a new claim
 gate nor a current-state cache.
 
+## Reuse a binary source attachment from Slack
+
+When the existing work thread supplies a Slack file ID for a binary source
+archive, read that attachment through the exposed native Slack action. In a
+code-mode harness exposing these bindings, the returned connector file can be
+materialized directly:
+
+```javascript
+const attachment = await tools.mcp__codex_apps__slack_slack_read_file({
+  file_id: "<SLACK_FILE_ID_FROM_THE_WORK_THREAD>"
+});
+const fileId = attachment.structuredContent?.file_uri?.file_id;
+if (typeof fileId !== "string" || !fileId) {
+  throw new Error("Slack did not return a downloadable file reference.");
+}
+const local = await tools.download_file({file_id: fileId});
+text(local); // Use this result's actual local path.
+```
+
+Keep the raw Slack response private: it can contain a temporary signed URL.
+A failed direct URL download can still leave this authorized file-reference
+route usable. Reuse the existing attachment and its returned file ID before
+requesting another source export.
+
+Check the packet format before choosing its loader. This unpacker requires
+`github-source-bundle/v1`, with `manifest.json` and `source.tar.gz` in the outer
+ZIP. A source-postimage ZIP or patch packet uses its own documented loader;
+transporting it successfully does not convert it to the source-bundle format.
+Retain the packet's source identity and visibility when sharing the recovered
+files through the existing work thread.
+
 ## Executed delivery
 
 On October 4, 2026, the command consumed retained artifact `11298566560` from
