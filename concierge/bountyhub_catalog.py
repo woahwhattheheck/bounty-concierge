@@ -194,6 +194,14 @@ class _ReadFailure(Exception):
         self.code, self.status, self.retry_after = code, status, retry_after
 
 
+def _close_response(response: Any) -> None:
+    """Do not let best-effort cleanup replace the read result or original error."""
+    try:
+        response.close()
+    except Exception:
+        pass
+
+
 def _get(session: Any, url: str, report: dict[str, Any], **params: Any) -> Any:
     request_limit = report.get("request_limit")
     if request_limit is None and "requested_listing_ids" in report:
@@ -220,7 +228,7 @@ def _get(session: Any, url: str, report: dict[str, Any], **params: Any) -> Any:
                 raise _ReadFailure("HTTP_ERROR", response.status_code,
                                    _retry_after(response.headers.get("Retry-After"))) from None
             finally:
-                response.close()
+                _close_response(response)
         try:
             delay = _retry_after(response.headers.get("Retry-After"))
             status = response.status_code
@@ -241,7 +249,7 @@ def _get(session: Any, url: str, report: dict[str, Any], **params: Any) -> Any:
             except ValueError:
                 raise _ReadFailure("INVALID_JSON", status) from None
         finally:
-            response.close()
+            _close_response(response)
 
 
 def _submission_target_map(value: Any) -> dict[tuple[str, int], dict[str, str]]:
