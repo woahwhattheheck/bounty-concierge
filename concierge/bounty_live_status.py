@@ -34,6 +34,9 @@ _WEB_ISSUE_RE = re.compile(
 _API_ISSUE_RE = re.compile(
     rf"^/repos/(?P<owner>{_REPO_PART})/(?P<repo>{_REPO_PART})/issues/(?P<number>[1-9][0-9]*)/?$"
 )
+_API_REPOSITORY_ISSUE_RE = re.compile(
+    r"^/repositories/[1-9][0-9]*/issues/(?P<number>[1-9][0-9]*)/?$"
+)
 _DISCOVERY_FIELDS = frozenset(
     {
         "source_name",
@@ -306,7 +309,9 @@ def _result(
     return _seal(receipt), immediate_clear
 
 
-def _final_api_identity(final_url: str) -> tuple[str, int] | None:
+def _final_api_identity(final_url: str) -> tuple[str | None, int] | None:
+    if not isinstance(final_url, str):
+        return None
     try:
         parts = urlsplit(final_url)
     except (TypeError, ValueError):
@@ -327,9 +332,14 @@ def _final_api_identity(final_url: str) -> tuple[str, int] | None:
     if port not in (None, 443):
         return None
     match = _API_ISSUE_RE.fullmatch(parts.path)
-    if match is None:
-        return None
-    return f"{match.group('owner')}/{match.group('repo')}", int(match.group("number"))
+    if match is not None:
+        return f"{match.group('owner')}/{match.group('repo')}", int(match.group("number"))
+    match = _API_REPOSITORY_ISSUE_RE.fullmatch(parts.path)
+    if match is not None:
+        # Repository redirects may retain the stable-ID endpoint as their final
+        # URL. Its canonical name must come from the same response's issue URLs.
+        return None, int(match.group("number"))
+    return None
 
 
 def _acquire_live_status(
@@ -396,7 +406,7 @@ def _acquire_live_status(
             provider_response_code_owned=True,
         )
 
-    redirected = final_repo.casefold() != requested_repo.casefold()
+    redirected = final_repo is not None and final_repo.casefold() != requested_repo.casefold()
     if status == 404:
         return _result(
             requested_url=normalized_url,
@@ -505,7 +515,13 @@ def _acquire_live_status(
             canonical_repo=final_repo,
             repository_redirected=redirected,
         )
-    if payload_number != number or payload_repo.casefold() != final_repo.casefold():
+    if final_repo is None:
+        api_identity = _final_api_identity(payload.get("url"))
+        if api_identity is not None and api_identity[0] is not None and api_identity[1] == number:
+            final_repo = api_identity[0]
+            redirected = final_repo.casefold() != requested_repo.casefold()
+    if (payload_number != number or final_repo is None
+            or payload_repo.casefold() != final_repo.casefold()):
         return _result(
             requested_url=normalized_url,
             requested_repo=requested_repo,

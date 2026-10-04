@@ -63,6 +63,8 @@ A code-owned acquisition classifies the target as one of:
 
 A repository rename or move is accepted only when GitHub's final API URL and returned canonical `html_url` agree on repository identity and issue number. Inputs and redirects must use credential-free HTTPS without query strings or fragments.
 
+GitHub may redirect an old repository name to `/repositories/<id>/issues/<number>`. When that remains the final same-host endpoint, the reader requires the unchanged issue number and matching owner/name identities in the response's canonical `url` and `html_url`. It obtains the canonical name from that same response without another API request. Missing or conflicting canonical URLs remain unverifiable; retained receipts still cannot authorize qualification.
+
 ## Discovery metadata
 
 The optional discovery object may contain only:
