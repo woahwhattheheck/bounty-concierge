@@ -187,7 +187,7 @@ def main(argv=None):
         Case("terminal-maintainer", 100, "MAINTAINER_TERMINAL_OUTCOME", 4, baseline_calls=6, change="terminal"),
         Case("known-closed", 100, "ISSUE_NOT_OPEN", 1, change="closed"),
         Case("changed-comment", 100, "COMMENT_GENERATION_CHANGED", 4, baseline_calls=6, change="body"),
-        Case("changed-issue", 100, "COMMENT_GENERATION_CHANGED", 4, baseline_calls=6, change="issue"),
+        Case("changed-issue", 100, "ISSUE_GENERATION_CHANGED", 4, baseline_calls=6, change="issue"),
         Case("count-mismatch", 100, "COMMENT_COUNT_MISMATCH", 4, baseline_calls=6, change="count"),
         Case("duplicate-comment", 100, "COMMENT_ID_DUPLICATED", 4, baseline_calls=6, change="duplicate"),
         Case("foreign-next-not-followed", 101, "CLEAR", 6, change="foreign"),
