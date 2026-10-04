@@ -1,0 +1,50 @@
+name: Dozer1653 pinned source bundle
+on:
+  push:
+    branches: [quarry42/dozer1653]
+    paths: [.github/workflows/quarry42-dozer1653-source.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: getdozer/dozer
+          ref: 8b0b4cc021db089722cb3d48dbe915e8e9c532ec
+          persist-credentials: false
+          path: source
+      - name: Export exact tracked source and bounded issue context
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir out
+          git -C source archive --format=tar 8b0b4cc021db089722cb3d48dbe915e8e9c532ec | gzip -n > out/dozer-source.tar.gz
+          git -C source rev-parse HEAD > out/base-sha.txt
+          git -C source ls-tree -r HEAD > out/source-tree.txt
+          python3 - <<'PY'
+          import datetime, hashlib, json, urllib.request
+          from pathlib import Path
+          out = Path('out')
+          receipt = {'base_sha': '8b0b4cc021db089722cb3d48dbe915e8e9c532ec', 'at': datetime.datetime.now(datetime.timezone.utc).isoformat()}
+          receipt['archive_sha256'] = hashlib.sha256((out / 'dozer-source.tar.gz').read_bytes()).hexdigest()
+          try:
+              request = urllib.request.Request('https://api.github.com/repos/getdozer/dozer/issues/1653/comments?per_page=100', headers={'Accept': 'application/vnd.github+json', 'User-Agent': 'TJLabs-Source-Intake/1.0'})
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  comments = json.load(response)
+              assert isinstance(comments, list) and len(comments) < 100
+              rows = [{'id': item['id'], 'author': item['user']['login'], 'association': item['author_association'], 'created_at': item['created_at'], 'updated_at': item['updated_at'], 'body': item['body'], 'url': item['html_url']} for item in comments]
+              (out / 'issue-comments.json').write_text(json.dumps(rows, indent=2) + '\n')
+              receipt['comment_count'] = len(rows)
+          except Exception as error:
+              receipt['comment_read_error'] = str(error)
+          (out / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          print(json.dumps(receipt))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dozer1653-source-8b0b4cc021db
+          path: out/
+          retention-days: 7
