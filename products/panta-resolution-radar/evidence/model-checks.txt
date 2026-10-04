@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: resolution time uses Unix seconds and never substitutes end time or invents an outcome
+ok 1 - resolution time uses Unix seconds and never substitutes end time or invents an outcome
+  ---
+  duration_ms: 0.98582
+  type: 'test'
+  ...
+# Subtest: opaque pagination merges IDs without silently discarding malformed pages
+ok 2 - opaque pagination merges IDs without silently discarding malformed pages
+  ---
+  duration_ms: 0.361344
+  type: 'test'
+  ...
+# Subtest: filters and schedule priority operate on loaded rows, including watched records
+ok 3 - filters and schedule priority operate on loaded rows, including watched records
+  ---
+  duration_ms: 1.865231
+  type: 'test'
+  ...
+# Subtest: decimal amounts retain precision and unavailable values do not become zero
+ok 4 - decimal amounts retain precision and unavailable values do not become zero
+  ---
+  duration_ms: 17.135364
+  type: 'test'
+  ...
+# Subtest: calendar exports future unresolved schedules only, labels demos and folds UTF-8 safely
+ok 5 - calendar exports future unresolved schedules only, labels demos and folds UTF-8 safely
+  ---
+  duration_ms: 3.127688
+  type: 'test'
+  ...
+# Subtest: snapshot includes mode, read timestamps and explicit coverage rather than claiming a full scan
+ok 6 - snapshot includes mode, read timestamps and explicit coverage rather than claiming a full scan
+  ---
+  duration_ms: 0.195432
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 240.971631

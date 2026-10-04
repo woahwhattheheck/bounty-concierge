@@ -1,0 +1,13 @@
+{
+  "workload": "filter + full schedule sort + summary on 10,000 synthetic rows",
+  "samples": 30,
+  "warmups": 5,
+  "medianMs": 12.109,
+  "p95Ms": 16.154,
+  "node": "v22.16.0",
+  "platform": "linux",
+  "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+  "upstreamRequests": 0,
+  "domRenderingMeasured": false,
+  "limitations": "Single local process; no real API, network, DOM render or fleet throughput measurement."
+}

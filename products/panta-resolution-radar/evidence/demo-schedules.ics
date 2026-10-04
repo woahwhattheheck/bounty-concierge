@@ -1,0 +1,42 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//TJLabs//Resolution Radar//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+BEGIN:VEVENT
+UID:4tvYozdNaiDiR3t7TqJv9ZDQZHY4ptiV1ZsSYWEBoAQJ-demo@resolution-radar
+DTSTAMP:20261004T233817Z
+DTSTART:20261005T013810Z
+DURATION:PT1M
+SUMMARY:[DEMO] Panta resolution schedule: Will Harbor City open its new ele
+ ctric ferry route?
+DESCRIPTION:Powered by Panta. Catalog-scheduled time\, not a guaranteed out
+ come or settlement. Market: 4tvYozdNaiDiR3t7TqJv9ZDQZHY4ptiV1ZsSYWEBoAQJ. 
+ Data mode: demo.
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:ATytQvR1GUcbi4bpNcpqhjsoPsQCQmHxA3UdNvU6KSec-demo@resolution-radar
+DTSTAMP:20261004T233817Z
+DTSTART:20261005T033810Z
+DURATION:PT1M
+SUMMARY:[DEMO] Panta resolution schedule: Will the community chess final fi
+ nish before midnight?
+DESCRIPTION:Powered by Panta. Catalog-scheduled time\, not a guaranteed out
+ come or settlement. Market: ATytQvR1GUcbi4bpNcpqhjsoPsQCQmHxA3UdNvU6KSec. 
+ Data mode: demo.
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:9ASbeYHvkHKPZCkPdG5vk5Rkb58upvCe5VyqJJFSzjK1-demo@resolution-radar
+DTSTAMP:20261004T233817Z
+DTSTART:20261005T193810Z
+DURATION:PT1M
+SUMMARY:[DEMO] Panta resolution schedule: Will Project Cedar ship its publi
+ c beta this week?
+DESCRIPTION:Powered by Panta. Catalog-scheduled time\, not a guaranteed out
+ come or settlement. Market: 9ASbeYHvkHKPZCkPdG5vk5Rkb58upvCe5VyqJJFSzjK1. 
+ Data mode: demo.
+STATUS:TENTATIVE
+END:VEVENT
+END:VCALENDAR

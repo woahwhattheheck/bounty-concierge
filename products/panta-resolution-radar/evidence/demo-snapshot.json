@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "product": "Resolution Radar",
+  "poweredBy": "Panta",
+  "exportedAt": "2026-10-04T23:38:16.000Z",
+  "source": {
+    "mode": "demo",
+    "fetchedAt": "2026-10-04T23:38:10Z",
+    "endpoint": "Synthetic local fixture; no Panta request",
+    "cacheHit": false,
+    "catalogOnly": true,
+    "automaticPolling": false,
+    "pages": [
+      {
+        "mode": "demo",
+        "fetchedAt": "2026-10-04T23:38:10Z",
+        "endpoint": "Synthetic local fixture; no Panta request",
+        "cacheHit": false,
+        "catalogOnly": true,
+        "automaticPolling": false,
+        "requestCursor": null,
+        "returnedCount": 8
+      }
+    ],
+    "morePagesAvailable": false,
+    "paginationStopped": false
+  },
+  "filters": {
+    "query": "",
+    "category": "",
+    "phase": "",
+    "timing": "due",
+    "watched": true
+  },
+  "coverage": "Only loaded rows matching these filters; not a full-chain scan.",
+  "items": [
+    {
+      "marketId": "4nrg61Wv2AyzJeukqLsQ7WCpA8aR4e1ZhvcrSK1fAaGr",
+      "title": "Will the open-source observatory publish its October dataset?",
+      "category": "science",
+      "phase": "secondary",
+      "description": "Synthetic demonstration only. This is not a real Panta market, oracle statement or investment opportunity.",
+      "marketType": "standard",
+      "startTime": 1790984290,
+      "endTime": 1791142690,
+      "resolutionTime": 1791146290,
+      "region": "Global",
+      "resolved": false,
+      "status": "open",
+      "volumeUsdc": "8120.340000",
+      "totalVolumeUsdc": "8120.340000",
+      "yesPrice": null,
+      "noPrice": null,
+      "primaryYesPrice": null,
+      "primaryNoPrice": null,
+      "secondaryYesPrice": null,
+      "secondaryNoPrice": null,
+      "oracle": "Demonstration source — no oracle queried",
+      "createdByPartner": false,
+      "radar": {
+        "key": "due",
+        "label": "Schedule passed",
+        "at": 1791146290
+      }
+    }
+  ]
+}

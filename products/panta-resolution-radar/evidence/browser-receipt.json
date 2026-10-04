@@ -1,0 +1,29 @@
+{
+  "mode": "synthetic demo, not live Panta",
+  "transport": "in-memory UI replay; browser localhost denied by administrator",
+  "desktop": "1440x960",
+  "mobile": "390x844",
+  "initialVisibleCatalogMs": 395.385,
+  "browser": "Chromium via Playwright",
+  "pageErrors": [],
+  "apiRequestPaths": [
+    "/api/config [offline replay]",
+    "/api/demo [offline replay]",
+    "/api/demo/4nrg61Wv2AyzJeukqLsQ7WCpA8aR4e1ZhvcrSK1fAaGr [offline replay]",
+    "/api/demo/9ASbeYHvkHKPZCkPdG5vk5Rkb58upvCe5VyqJJFSzjK1 [offline replay]",
+    "/api/config [offline replay]",
+    "/api/demo [offline replay]"
+  ],
+  "checks": [
+    "8 rows / due=1 / soon=3 / missing=1",
+    "demo labeling and absent-key live control",
+    "schedule filtering",
+    "detail read and separate spot prices",
+    "watchlist filtering",
+    "one-row JSON provenance export",
+    "three-event tentative demo calendar",
+    "search",
+    "mobile no horizontal overflow"
+  ],
+  "videoSource": "793d8d0f79ba85df48a385151d1e2e21.webm"
+}
