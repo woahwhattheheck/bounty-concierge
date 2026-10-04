@@ -69,6 +69,13 @@ existing `#issuecomment-<id>` fragment behavior applies to both forms; queries
 and other subresources do not identify an issue. Different repositories or
 issue numbers remain distinct candidates.
 
+Explicit URLs in `listing_url` and `source_urls` must contain no ASCII control
+characters, DEL, or literal spaces. The resolver checks the original string
+before URL parsing, which can otherwise remove leading controls/spaces and
+embedded tabs or newlines. A malformed URL therefore cannot become a different,
+apparently clean GitHub issue reference. Use percent-encoding for spaces in
+external listing paths; surrounding prose may still contain ordinary whitespace.
+
 The resolver only returns normalized repository/issue identity, safe counts, and
 reason codes. It does not echo mirror paths, listing title/body text, or source
 URL text into receipts.
