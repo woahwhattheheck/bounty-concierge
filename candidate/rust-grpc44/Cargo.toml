@@ -1,0 +1,28 @@
+[package]
+name = "rust-grpc"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.91"
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+opentelemetry = { version = "0.33", default-features = false, features = ["trace"] }
+opentelemetry-otlp = { version = "0.33", default-features = false, features = ["trace", "grpc-tonic", "tls-ring", "tls-roots"] }
+opentelemetry_sdk = { version = "0.33", default-features = false, features = ["trace"] }
+prost = "0.14"
+shuttle-runtime = { version = "0.57", default-features = false }
+tokio = { version = "1", features = ["full"] }
+tonic = "0.14.6"
+tonic-prost = "0.14.6"
+tonic-reflection = "0.14.6"
+tonic-tracing-opentelemetry = "0.42.1"
+tracing = "0.1"
+tracing-opentelemetry = { version = "0.34", default-features = false }
+tracing-subscriber = "0.3.22"
+
+[build-dependencies]
+tonic-prost-build = "0.14.6"
+
+[dev-dependencies]
+gh-workflow = "0.9"
