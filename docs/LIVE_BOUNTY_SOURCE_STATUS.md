@@ -40,8 +40,12 @@ without a success JSON body; the existing browse command's error handler exits 1
 
 Requests are serial, with no automatic retries or sleeps. A 429, a rate-limited
 403, or an exhausted successful-response quota defers remaining requests. The
-report retains numeric `Retry-After` seconds and `X-RateLimit-Reset` epoch seconds
-when supplied. Later repositories receive `NOT_ATTEMPTED_RATE_LIMIT`; they are
+report retains `Retry-After` as `retry_after_seconds` and `X-RateLimit-Reset` epoch
+seconds when supplied. `Retry-After` accepts either delay seconds or an HTTP-date;
+dates are converted using the client's current UTC time, rounded up to whole
+seconds and clamped to zero when already past. Invalid values leave the delay
+unknown. A valid date also identifies a throttled 403 when its error message is
+generic. Later repositories receive `NOT_ATTEMPTED_RATE_LIMIT`; they are
 unknown, not empty. A source-specific non-throttling error allows other sources
 to continue. Authorization headers and raw provider error text are not copied
 into diagnostic errors.
@@ -54,6 +58,8 @@ complete. Repeated configured repository names are fetched once, case-insensitiv
 
 GitHub references: [rate-limit response guidance](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)
 and [pagination](https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api).
+The accepted `Retry-After` forms are defined in
+[RFC 9110, section 10.2.3](https://www.rfc-editor.org/rfc/rfc9110.html#section-10.2.3).
 
 ## Published index remains separate
 
