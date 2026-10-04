@@ -64,10 +64,54 @@ def _sanitize_single_line(text: str) -> str:
     return "".join(char if char.isprintable() else ascii(char)[1:-1] for char in clean)
 
 
+_NON_WHITESPACE = re.compile(r"\S")
+
+
+def _single_line_prefix(text: str, limit: int, *, start: int = 0, end: Optional[int] = None) -> str:
+    """Return a sanitized prefix without rendering the discarded suffix.
+
+    Skip whitespace runs with the regex engine, retaining one separator only
+    when a following non-whitespace character exists. Control escapes count
+    toward the output limit just as they do in the full sanitizer.
+    """
+    if not text or limit <= 0:
+        return ""
+    text = str(text)
+    stop = len(text) if end is None else min(end, len(text))
+    if stop - start <= limit:
+        # Printable short previews need only whitespace normalization; control
+        # characters keep the existing escaping behavior.
+        fragment = text[start:stop]
+        if fragment.isprintable():
+            return " ".join(fragment.split())[:limit]
+        return _sanitize_single_line(fragment)[:limit]
+    parts = []
+    remaining = limit
+    while start < stop and remaining:
+        char = text[start]
+        if char.isspace():
+            following = _NON_WHITESPACE.search(text, start, stop)
+            if following is None:
+                break
+            start = following.start()
+            if not parts:
+                continue
+            piece = " "
+        else:
+            start += 1
+            piece = char if char.isprintable() else ascii(char)[1:-1]
+        piece = piece[:remaining]
+        parts.append(piece)
+        remaining -= len(piece)
+    return "".join(parts)
+
+
 def _make_excerpt(text: str, match_start: int, match_end: int, max_len: int = _MAX_EXCERPT_LENGTH) -> str:
     """Extract a contextual window around a regex match bounded to max_len characters."""
-    raw_snippet = text[max(0, match_start - 30):min(len(text), match_end + 50)]
-    clean = _sanitize_single_line(raw_snippet)
+    start, end, _ = slice(max(0, match_start - 30), min(len(text), match_end + 50)).indices(len(text))
+    # Preserve the previous private helper's slicing behavior for tiny limits.
+    clean = (_sanitize_single_line(text[start:end]) if max_len < 3 else
+             _single_line_prefix(text, max_len + 1, start=start, end=end))
     if len(clean) > max_len:
         return clean[:max_len - 3] + "..."
     return clean
@@ -235,7 +279,7 @@ def extract_reward_evidence(title: str, body: str) -> Dict[str, Any]:
         }
 
     # Pass 3: No match
-    fallback_excerpt = _sanitize_single_line(safe_title)[:_MAX_EXCERPT_LENGTH]
+    fallback_excerpt = _single_line_prefix(safe_title, _MAX_EXCERPT_LENGTH)
     return {
         "status": "no_match",
         "amount_rtc": None,
@@ -342,10 +386,10 @@ def reward_context(row: Dict[str, Any]) -> str:
     parts = []
     excerpt = evidence.get("excerpt")
     if isinstance(excerpt, str) and excerpt:
-        parts.append("Excerpt: " + _sanitize_single_line(excerpt)[:_MAX_EXCERPT_LENGTH])
+        parts.append("Excerpt: " + _single_line_prefix(excerpt, _MAX_EXCERPT_LENGTH))
     mentions = evidence.get("mentions")
     if isinstance(mentions, list):
-        shown = [_sanitize_single_line(item)[:_MAX_EXCERPT_LENGTH]
+        shown = [_single_line_prefix(item, _MAX_EXCERPT_LENGTH)
                  for item in mentions[:_MAX_MENTIONS] if isinstance(item, str)]
         if shown:
             parts.append("Other mentions: " + "; ".join(shown))
