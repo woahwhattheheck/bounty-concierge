@@ -1,0 +1,67 @@
+name: Abby Vue focused validation
+on:
+  push:
+    branches: ["bounty/abby68-r7"]
+    paths: ["work/algora-abby-68-r7/**", ".github/workflows/abby68-r7.yml"]
+permissions:
+  contents: read
+concurrency:
+  group: abby68-r7
+  cancel-in-progress: false
+jobs:
+  vue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: carrier
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: tryabby/abby
+          ref: e763d1a9a46f8b3183e983ee1c826e7c5f80c8f2
+          path: abby
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Apply source and isolate only the required workspace packages
+        run: |
+          cp -R carrier/work/algora-abby-68-r7/source/. abby/
+          printf 'packages:\n  - packages/core\n  - packages/vue\n  - packages/tsconfig\n' > abby/pnpm-workspace.yaml
+          npm install --global pnpm@9.9.0
+      - name: Build and run only Vue acceptance checks
+        working-directory: abby
+        run: |
+          set -o pipefail
+          pnpm install --no-frozen-lockfile --ignore-scripts
+          pnpm --filter @tryabby/core build
+          pnpm --filter @tryabby/vue typecheck
+          pnpm --filter @tryabby/vue test
+          pnpm --filter @tryabby/vue build
+      - name: Record actual local-fixture demo
+        working-directory: abby/packages/vue
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/abby-recorder"
+          cd "$RUNNER_TEMP/abby-recorder"
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+          cp "$GITHUB_WORKSPACE/carrier/work/algora-abby-68-r7/record.mjs" .
+          cd "$GITHUB_WORKSPACE/abby/packages/vue"
+          pnpm exec vite --host 127.0.0.1 --port 4173 > "$RUNNER_TEMP/abby-vite.log" 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173/demo/ >/dev/null && break; sleep 1; done
+          cd "$RUNNER_TEMP/abby-recorder"
+          node record.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: abby68-r7-evidence
+          path: |
+            ${{ runner.temp }}/abby-recorder/evidence/
+            ${{ runner.temp }}/abby-vite.log
+          if-no-files-found: warn
+          retention-days: 7
