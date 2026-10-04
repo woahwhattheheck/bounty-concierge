@@ -1,0 +1,112 @@
+{
+  "python": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "baseline_blob": "0652236707e669b56fe533f5589319453c61cf3a",
+  "candidate_blob": "fc8422c74fc879fcc971ab5353ac4304f46454a7",
+  "measurement": "tracemalloc peak and five untraced alternating complete loads",
+  "compatibility": {
+    "store_profiles": 5,
+    "load_encodings": [
+      "utf-8",
+      "utf-8-sig",
+      "utf-16",
+      "utf-16-le",
+      "utf-16-be",
+      "utf-32",
+      "utf-32-le",
+      "utf-32-be"
+    ],
+    "invalid_load_profiles": 5,
+    "miss": "preserved",
+    "disk_bytes": "equal"
+  },
+  "profiles": {
+    "small": {
+      "file_bytes": 9794,
+      "issues": 20,
+      "variants": {
+        "before": {
+          "peak_traced_bytes": 38600,
+          "seconds": [
+            0.00010212868000053277,
+            0.00010066876000109914,
+            0.00012859836000188806,
+            9.911263999583753e-05,
+            0.00013939703999767516
+          ],
+          "median_seconds": 0.00010212868000053277
+        },
+        "after": {
+          "peak_traced_bytes": 37490,
+          "seconds": [
+            0.00010325180000108958,
+            9.794452000278398e-05,
+            8.742347999941557e-05,
+            0.00013284315999953833,
+            0.00011998659999790107
+          ],
+          "median_seconds": 0.00010325180000108958
+        }
+      },
+      "calls_per_timing": 25
+    },
+    "large_ascii": {
+      "file_bytes": 6004194,
+      "issues": 100,
+      "variants": {
+        "before": {
+          "peak_traced_bytes": 18040984,
+          "seconds": [
+            0.037676334000025236,
+            0.03717153299999154,
+            0.03504704300007688,
+            0.03975864400001683,
+            0.030224712000062937
+          ],
+          "median_seconds": 0.03717153299999154
+        },
+        "after": {
+          "peak_traced_bytes": 12036757,
+          "seconds": [
+            0.0308892250000099,
+            0.02972402399996099,
+            0.02962157800004661,
+            0.02766091899991352,
+            0.03054626300001928
+          ],
+          "median_seconds": 0.02972402399996099
+        }
+      },
+      "calls_per_timing": 1
+    },
+    "large_mixed": {
+      "file_bytes": 6504194,
+      "issues": 100,
+      "variants": {
+        "before": {
+          "peak_traced_bytes": 21092354,
+          "seconds": [
+            0.03521002900004078,
+            0.0350879420000183,
+            0.033139996999921095,
+            0.03547277999996368,
+            0.03743978900001821
+          ],
+          "median_seconds": 0.03521002900004078
+        },
+        "after": {
+          "peak_traced_bytes": 14588127,
+          "seconds": [
+            0.032967665000001034,
+            0.03052646100002221,
+            0.03421630200000436,
+            0.03533086099992033,
+            0.028156797000065126
+          ],
+          "median_seconds": 0.032967665000001034
+        }
+      },
+      "calls_per_timing": 1
+    }
+  }
+}
