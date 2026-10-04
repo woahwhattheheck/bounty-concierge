@@ -44,6 +44,12 @@ from concierge.secure_output import (
     create_exclusive_regular,
     open_verified_parent,
 )
+from concierge.submission_policy_context import (
+    collect_submission_policy_context,
+    summarize_submission_policy_context,
+    validate_submission_repo,
+    write_submission_policy_context,
+)
 from concierge.submission_packet import validate_submission_target
 
 
@@ -1418,7 +1424,17 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="Write a new private capture file for offline supply routing; never overwrite",
     )
+    parser.add_argument(
+        "--submission-repo", type=validate_submission_repo,
+        help="Explicit actual owner/repository for the optional policy-context export",
+    )
+    parser.add_argument(
+        "--submission-policy-context-out", type=Path,
+        help="Write a separate private advisory policy sidecar; requires --submission-repo",
+    )
     args = parser.parse_args(argv)
+    if (args.submission_repo is None) != (args.submission_policy_context_out is None):
+        parser.error("--submission-repo and --submission-policy-context-out must be used together")
 
     try:
         submission_policy_context = (
@@ -1427,23 +1443,38 @@ def main(argv: list[str] | None = None) -> int:
         )
         if args.capture is not None:
             _admit_capture_destination(args.capture)
+        if args.submission_policy_context_out is not None:
+            _admit_capture_destination(args.submission_policy_context_out)
+            if (args.capture is not None and args.capture.absolute()
+                    == args.submission_policy_context_out.absolute()):
+                raise ValueError("capture and policy context require distinct output paths")
         target = None
         if args.submission_target is not None:
             target = validate_submission_target(
                 json.loads(args.submission_target.read_text(encoding="utf-8")),
                 f"https://github.com/{args.repo}/issues/{args.issue}",
             )
-        result = preflight_bounty(
-            args.repo,
-            args.issue,
-            max_pages=args.max_pages,
-            saturation_threshold=args.saturation_threshold,
-            operator_login=args.operator_login,
-            include_capture=args.capture is not None,
-            submission_target=target,
-            submission_method=args.submission_method,
-            submission_policy_context=submission_policy_context,
-        )
+        with requests.Session() as session:
+            result = preflight_bounty(
+                args.repo,
+                args.issue,
+                session=session,
+                max_pages=args.max_pages,
+                saturation_threshold=args.saturation_threshold,
+                operator_login=args.operator_login,
+                include_capture=args.capture is not None,
+                submission_target=target,
+                submission_method=args.submission_method,
+                submission_policy_context=submission_policy_context,
+            )
+            if args.submission_policy_context_out is not None:
+                # This uses the same pool after the v1 capture's read interval.
+                # The export does not change the completed qualification/capture.
+                policy_context = collect_submission_policy_context(
+                    args.submission_repo, session=session, token=GITHUB_TOKEN,
+                )
+                write_submission_policy_context(args.submission_policy_context_out, policy_context)
+                result["submission_policy_context"] = summarize_submission_policy_context(policy_context)
         if args.capture is not None:
             capture = result.pop("capture")
             payload = (json.dumps(capture, indent=2, sort_keys=True) + "\n").encode("utf-8")
