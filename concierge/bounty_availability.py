@@ -352,6 +352,14 @@ def inspect_bounty_availability(
     ):
         raise ValueError("max_pages must be an integer between 1 and 100")
 
+    # Reuse one connection pool across both comment traversals and issue reads.
+    # Caller-supplied transports retain their existing lifetime and ownership.
+    if session is requests:
+        with requests.Session() as owned_session:
+            return inspect_bounty_availability(
+                repo, number, token, session=owned_session, max_pages=max_pages
+            )
+
     token = token or GITHUB_TOKEN
     headers = _headers(token)
     issue_url = f"https://api.github.com/repos/{repo}/issues/{number}"

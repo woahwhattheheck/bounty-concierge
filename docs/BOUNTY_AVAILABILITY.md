@@ -76,6 +76,28 @@ comment ids needed for operator follow-up. The installed claim boundary further
 reduces a HOLD to reason and signal classes only; comment ids and evidence
 objects are not emitted in claim-blocked output.
 
+## HTTP connection reuse
+
+The default availability check owns one `requests.Session` for its issue reads
+and both paginated comment traversals. It closes that session when the check
+returns or raises, including an early HOLD for a closed issue. Argument
+validation runs before the session is allocated. Callers that supply a session
+keep ownership and can reuse it for later checks.
+
+Each check still performs the same live reads and generation comparisons. For
+101 comments across two pages, six GETs share one connection pool instead of
+creating six separate pools. There is no added cache, retry, or delay.
+
+Local HTTP/1.1 replay against baseline `73e3b4f` measured six accepted TCP
+connections before this change and one after it, with six requests in both
+runs. The replay used the existing synthetic 101-comment fixture in
+`work/throughput/contract-session-reuse-20261003/benchmark.py`, Python 3.12.14,
+and Requests 2.34.2. Complete receipts and request paths matched for stable,
+closed-issue, and comment-drift cases; provider-error behavior and session
+cleanup also matched. Caller-supplied sessions remained open across successful,
+early-return, and error paths. This measures local connection reuse, not live
+GitHub latency or rate-limit savings.
+
 ## Non-authority
 
 This guard does not:
