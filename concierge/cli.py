@@ -204,7 +204,7 @@ def _canonical_browse_skill(skill):
     return {"docs": "documentation", "ci-cd": "ci/cd"}.get(normalized, normalized)
 
 
-def _filter_bounties(bounties, args):
+def _filter_bounties(bounties, args, *, presort=True):
     """Filter numeric RTC mentions, keeping unknown distinct from explicit zero."""
     from concierge.reward_evidence import reward_filter_value, reward_sort_key
 
@@ -230,8 +230,19 @@ def _filter_bounties(bounties, args):
                 continue
             bounded.append(bounty)
         filtered = bounded
-    filtered.sort(key=reward_sort_key, reverse=True)
+    if presort:
+        filtered.sort(key=reward_sort_key, reverse=True)
     return filtered
+
+
+def _limit_bounties(bounties, limit):
+    """Select stable display rows without sorting every undisplayed match."""
+    from heapq import nlargest
+    from concierge.reward_evidence import reward_sort_key
+
+    # nlargest preserves input order for equal keys and uses a full sort when
+    # the display limit covers the input. Filtering/counting still sees all rows.
+    return nlargest(limit, bounties, key=reward_sort_key)
 
 
 def _incomplete_browse_message(report):
@@ -307,8 +318,8 @@ def _cmd_browse_index(args, repos):
     if repos:
         wanted = {repo.casefold() for repo in repos}
         rows = [row for row in rows if row["repo"].casefold() in wanted]
-    filtered = _filter_bounties(rows, args)
-    displayed = filtered[:args.limit]
+    filtered = _filter_bounties(rows, args, presort=False)
+    displayed = _limit_bounties(filtered, args.limit)
     previous = snapshot.get("selection", {})
     selection = {
         "input_count": input_count,
@@ -410,8 +421,8 @@ def _cmd_browse(args):
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    filtered = _filter_bounties(report["bounties"], args)
-    displayed = filtered[: args.limit]
+    filtered = _filter_bounties(report["bounties"], args, presort=False)
+    displayed = _limit_bounties(filtered, args.limit)
     incomplete = not report["complete"]
 
     if args.report:
