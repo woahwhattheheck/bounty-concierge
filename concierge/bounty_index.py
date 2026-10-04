@@ -11,6 +11,7 @@ import os
 import re
 import sys
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from functools import lru_cache
 
 import requests
@@ -93,6 +94,24 @@ def _header_integer(headers, name):
     return int(value) if value.isascii() and value.isdigit() and len(value) <= 12 else None
 
 
+def _retry_after_seconds(headers):
+    """Normalize Retry-After delay seconds or an HTTP-date using current UTC."""
+    seconds = _header_integer(headers, "Retry-After")
+    if seconds is not None:
+        return seconds
+    value = headers.get("Retry-After")
+    if not isinstance(value, str) or len(value) > 128:
+        return None
+    try:
+        retry_at = parsedate_to_datetime(value)
+        # The obsolete asctime HTTP-date format does not include a timezone.
+        if retry_at.tzinfo is None:
+            retry_at = retry_at.replace(tzinfo=timezone.utc)
+        return max(0, math.ceil((retry_at - datetime.now(timezone.utc)).total_seconds()))
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
 def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=None):
     """Read live sources once, retaining completion and safe error information.
 
@@ -172,7 +191,7 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                     status = response.status_code
                     source["http_status"] = status
                     remaining = _header_integer(response.headers, "X-RateLimit-Remaining")
-                    retry_after = _header_integer(response.headers, "Retry-After")
+                    retry_after = _retry_after_seconds(response.headers)
                     reset_at = _header_integer(response.headers, "X-RateLimit-Reset")
                     throttled = status == 429 or (status == 403 and
                                 (remaining == 0 or retry_after is not None))
