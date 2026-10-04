@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: MIT
 """Live, source-bound cash admission for GitHub bounty issues.
 
-The caller supplies only repository/issue identity, never reward amount,
-authority, evidence URL, or historical evaluation time. Canonical issue state
-comes from bounty_preflight and is re-read before routing.
+The caller supplies repository/issue identity and an optional source-bound
+submission target, never reward amount, authority, or historical evaluation
+time. Canonical issue state comes from bounty_preflight and is re-read before
+routing.
 """
 
 from __future__ import annotations
@@ -12,12 +13,14 @@ import argparse
 from decimal import Decimal, InvalidOperation
 import hashlib
 import json
+from pathlib import Path
 import re
 from typing import Any
 
 import requests
 
 from concierge import bounty_preflight as bp
+from concierge.submission_packet import validate_submission_target
 
 
 _RECEIPT_SCHEMA = "bounty-live-cash-admission-receipt/v1"
@@ -257,6 +260,7 @@ def _build_api():
         max_pages: int = 10,
         saturation_threshold: int = 4,
         operator_login: str | None = None,
+        submission_target: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """Evaluate one GitHub issue using only live canonical source evidence.
 
@@ -265,6 +269,10 @@ def _build_api():
         """
         repo_norm = _repo(repo)
         issue_num = _issue_number(number)
+        if submission_target is not None:
+            submission_target = validate_submission_target(
+                submission_target, f"https://github.com/{repo_norm}/issues/{issue_num}"
+            )
         if isinstance(max_pages, bool) or not isinstance(max_pages, int) or max_pages <= 0:
             raise ValueError("max_pages must be a positive integer")
         if (
@@ -284,12 +292,17 @@ def _build_api():
                     max_pages=max_pages,
                     saturation_threshold=saturation_threshold,
                     operator_login=operator_login,
+                    submission_target=submission_target,
                 )
 
         issue_before, marker_before = _read_issue_generation(
             repo_norm, issue_num, token, session=session
         )
         try:
+            target_kwargs = (
+                {"submission_target": submission_target}
+                if submission_target is not None else {}
+            )
             preflight = bp.preflight_bounty(
                 repo_norm,
                 issue_num,
@@ -298,6 +311,7 @@ def _build_api():
                 max_pages=max_pages,
                 saturation_threshold=saturation_threshold,
                 operator_login=operator_login,
+                **target_kwargs,
             )
         except (bp.BountyPreflightError, ValueError, bp.QualificationInputError) as exc:
             raise LiveCashAdmissionError(f"canonical preflight failed: {exc}") from exc
@@ -373,6 +387,8 @@ def _build_api():
                 "issue_generation_sha256": _sha256_json(marker_after),
                 "preflight_sha256": _sha256_json(preflight),
                 "preflight": source_projection,
+                **({"submission_target_sha256": _sha256_json(submission_target)}
+                   if submission_target is not None else {}),
             },
             "economics": {
                 "currency": "USD" if amount is not None else None,
@@ -396,6 +412,7 @@ def _build_api():
         max_pages: int = 10,
         saturation_threshold: int = 4,
         operator_login: str | None = None,
+        submission_target: dict[str, str] | None = None,
     ) -> bool:
         """Re-read GitHub; historical self-replay is intentionally insufficient."""
         if not isinstance(receipt, dict) or receipt.get("schema") != _RECEIPT_SCHEMA:
@@ -413,6 +430,17 @@ def _build_api():
         if not isinstance(identity, dict):
             return False
         try:
+            if submission_target is not None:
+                submission_target = validate_submission_target(
+                    submission_target,
+                    f"https://github.com/{identity.get('repo')}/issues/{identity.get('issue_number')}",
+                )
+            target_digest = (
+                _sha256_json(submission_target) if submission_target is not None else None
+            )
+            source = receipt.get("source")
+            if not isinstance(source, dict) or source.get("submission_target_sha256") != target_digest:
+                return False
             current = evaluate_live_cash_admission(
                 identity.get("repo"),
                 identity.get("issue_number"),
@@ -421,6 +449,7 @@ def _build_api():
                 max_pages=max_pages,
                 saturation_threshold=saturation_threshold,
                 operator_login=operator_login,
+                submission_target=submission_target,
             )
         except (LiveCashAdmissionError, ValueError, TypeError):
             return False
@@ -452,17 +481,27 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-pages", type=int, default=10)
     parser.add_argument("--saturation-threshold", type=int, default=4)
     parser.add_argument("--operator-login")
+    parser.add_argument(
+        "--submission-target", type=Path,
+        help="JSON file containing an explicit source-bound submission target",
+    )
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     try:
+        submission_target = None
+        if args.submission_target is not None:
+            submission_target = json.loads(args.submission_target.read_text(encoding="utf-8"))
+            if type(submission_target) is not dict:
+                raise ValueError("submission-target JSON must contain an object")
         receipt = evaluate_live_cash_admission(
             args.repo,
             args.number,
             max_pages=args.max_pages,
             saturation_threshold=args.saturation_threshold,
             operator_login=args.operator_login,
+            submission_target=submission_target,
         )
-    except (LiveCashAdmissionError, ValueError) as exc:
+    except (LiveCashAdmissionError, OSError, ValueError) as exc:
         parser.error(str(exc))
     print(json.dumps(receipt, indent=2, sort_keys=True) if args.json else format_summary(receipt))
     return 0 if receipt["disposition"] in {"ACTIVE_REVIEW", "PILE_SAVE_UP"} else 2

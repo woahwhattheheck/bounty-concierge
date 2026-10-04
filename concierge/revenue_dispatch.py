@@ -43,6 +43,7 @@ from concierge.revenue_intake import (
     RevenueIntakeInputError,
     qualify_live_revenue_intake,
 )
+from concierge.submission_packet import validate_submission_target
 
 
 _GATE_MAX_BYTES = 1024 * 1024
@@ -238,6 +239,7 @@ def _apply_live_cash_gate(
     *,
     repo: str,
     number: int,
+    submission_target_sha256: str | None = None,
 ) -> dict[str, Any]:
     """Require the source-bound owner 10/15 route before implementation economics."""
     if not isinstance(result, dict) or result.get("dispatch") is not True:
@@ -273,6 +275,9 @@ def _apply_live_cash_gate(
         raise RevenueDispatchError("live cash admission target identity mismatch")
     if source.get("kind") != "LIVE_GITHUB_PREFLIGHT":
         raise RevenueDispatchError("live cash admission source is unsupported")
+    if (source.get("submission_target_sha256") != submission_target_sha256
+            or (submission_target_sha256 is None and "submission_target_sha256" in source)):
+        raise RevenueDispatchError("live cash admission submission target mismatch")
     if economics.get("active_floor") != "15" or economics.get("pile_floor") != "10":
         raise RevenueDispatchError("live cash admission dollar-floor generation mismatch")
     receipt_sha = _require_sha256(
@@ -311,6 +316,8 @@ def _apply_live_cash_gate(
             "currency": "USD",
             "receipt_sha256": receipt_sha,
         }
+        if submission_target_sha256 is not None:
+            promoted["live_cash_admission"]["submission_target_sha256"] = submission_target_sha256
         dispatch_authority = dict(promoted.get("dispatch_authority") or {})
         dispatch_authority.update(
             {
@@ -364,6 +371,8 @@ def _apply_live_cash_gate(
         "currency": economics.get("currency"),
         "receipt_sha256": receipt_sha,
     }
+    if submission_target_sha256 is not None:
+        held["live_cash_admission"]["submission_target_sha256"] = submission_target_sha256
     held["economic_admission"] = {
         "status": "NOT_CHECKED",
         "decision": None,
@@ -640,6 +649,7 @@ def qualify_available_live_revenue_intake(
     number: int,
     *,
     listing_url: Optional[str] = None,
+    submission_target: dict[str, str] | None = None,
     token: Optional[str] = None,
     session: Any = requests,
     max_pages: int = 10,
@@ -651,7 +661,19 @@ def qualify_available_live_revenue_intake(
     dispatch_as_of: Optional[str] = None,
     gate_max_age_seconds: int = _DEFAULT_GATE_MAX_AGE_SECONDS,
 ) -> dict[str, Any]:
-    """Authorize internal implementation only when live + economic gates clear."""
+    """Authorize implementation with the same explicit target in both live audits."""
+    target_kwargs: dict[str, Any] = {}
+    target_sha256 = None
+    if submission_target is not None:
+        target = validate_submission_target(
+            submission_target, f"https://github.com/{repo}/issues/{number}"
+        )
+        target_kwargs["submission_target"] = target
+        # Match the live-cash receipt's canonical JSON encoding, including
+        # non-ASCII instruction excerpts, without copying that text to output.
+        target_sha256 = hashlib.sha256(json.dumps(
+            target, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        ).encode("utf-8")).hexdigest()
     intake = qualify_live_revenue_intake(
         repo,
         number,
@@ -660,6 +682,7 @@ def qualify_available_live_revenue_intake(
         session=session,
         max_pages=max_pages,
         saturation_threshold=saturation_threshold,
+        **target_kwargs,
     )
     if not isinstance(intake, dict):
         raise RevenueDispatchError("live revenue intake did not return an object")
@@ -738,10 +761,14 @@ def qualify_available_live_revenue_intake(
             session=session,
             max_pages=max_pages,
             saturation_threshold=saturation_threshold,
+            **target_kwargs,
         )
     except LiveCashAdmissionError:
         raise RevenueDispatchError("live cash admission evaluation failed") from None
-    result = _apply_live_cash_gate(result, live_cash, repo=repo, number=number)
+    result = _apply_live_cash_gate(
+        result, live_cash, repo=repo, number=number,
+        submission_target_sha256=target_sha256,
+    )
     if not result["dispatch"]:
         return result
 
@@ -792,6 +819,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("repo", help="canonical GitHub repository in owner/name form")
     parser.add_argument("issue", type=int, help="canonical bounty issue number")
     parser.add_argument("--listing-url")
+    parser.add_argument(
+        "--submission-target", type=Path,
+        help="JSON file containing the existing explicit source-bound delivery record",
+    )
     parser.add_argument("--max-pages", type=int, default=10)
     parser.add_argument("--saturation-threshold", type=int, default=4)
     parser.add_argument(
@@ -825,10 +856,16 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     try:
         gate_receipt_bytes = _load_gate_receipt(args.gate_receipt)
+        target = None
+        if args.submission_target is not None:
+            target = json.loads(args.submission_target.read_text(encoding="utf-8"))
+            if not isinstance(target, dict):
+                raise RevenueDispatchError("submission_target JSON must contain an object")
         result = qualify_available_live_revenue_intake(
             args.repo,
             args.issue,
             listing_url=args.listing_url,
+            submission_target=target,
             max_pages=args.max_pages,
             saturation_threshold=args.saturation_threshold,
             gate_receipt_bytes=gate_receipt_bytes,
@@ -839,6 +876,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             gate_max_age_seconds=args.gate_max_age_seconds,
         )
     except (
+        OSError,
         BountyAvailabilityError,
         RevenueDispatchError,
         RevenueIntakeInputError,
