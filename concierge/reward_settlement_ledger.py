@@ -549,7 +549,7 @@ def compile_document(document: dict[str, Any]) -> dict[str, Any]:
         )
         repo = _repo(work["repo"])
         pr = _positive_int(work["pr"], field=f"cases[{index}].work.pr")
-        work_key = (repo, pr)
+        work_key = (repo.casefold(), pr)
         if work_key in work_ids:
             raise LedgerInputError(f"duplicate merged work item: {repo}#{pr}")
         work_ids.add(work_key)

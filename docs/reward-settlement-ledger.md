@@ -28,6 +28,8 @@ Each case binds:
 - zero or more source-bound lifecycle events;
 - every source to an opaque `source_id`, reference, exact SHA-256, observation timestamp, and authority class.
 
+Repository names are compared case-insensitively when detecting duplicate merged-work cases; their original spelling is retained in output.
+
 All timestamps are canonical UTC seconds (`YYYY-MM-DDTHH:MM:SSZ`). Money is positive integer minor units with an uppercase three-letter currency. JSON floats, booleans-as-money, duplicate keys, UTF-8 BOMs, future observations, rebound/reminted source identities, conflicting money/eligibility facts, outgoing transfers, and ambiguous transfer state evolution fail closed.
 
 Transfer IDs and payout-ticket IDs cannot be reused across merged work items. A transfer may have multiple observations only when amount/currency are stable and state progresses monotonically (`PENDING` → `CONFIRMING` → one terminal `CONFIRMED` or `FAILED`). Terminal conflicts/regressions fail closed.
