@@ -283,6 +283,28 @@ in text mode and child output stays in `--log-file`.
 python -m concierge.bounty_audit Scottcjn/rustchain-bounties 71 --max-pages 10 --json
 ```
 
+Audit a retained shortlist through the same command:
+
+```bash
+python -m concierge.bounty_audit --batch shortlist.json --max-pages 10 --json
+set -o pipefail
+python -m concierge.bountyhub_catalog targets catalog.json | python -m concierge.bounty_audit --batch - --json
+```
+
+`--batch` accepts a JSON list or the catalog export's exact
+`{"candidates": [...]}` object, up to 1 MiB. Each row needs an `owner/name`
+`repo` and a positive integer `number`; additional row metadata and explicit
+per-row `submission_target` records are preserved. The complete input is
+validated before provider reads. Rows retain their order and gain an independent
+`canonical_audit`. JSON mode emits the audited rows; text mode prints each
+row's summary and linked PR details, including available author and head
+metadata. Repeated issues and shared PR details use the existing batch reuse.
+Any truncated audit retains the output and returns `PARTIAL` with exit 2.
+The Bash pipeline uses `pipefail` to preserve an incomplete catalog export's
+nonzero status as well.
+`--batch` cannot be combined with the positional repo/issue or the single-issue
+`--submission-target` option.
+
 The audit reads the issue, explicitly referenced PRs, and maintainer expiry
 comments on open issues. `--max-pages` bounds each search or comment traversal.
 Exit 0 means those reads completed. If GitHub reports an incomplete search or a
