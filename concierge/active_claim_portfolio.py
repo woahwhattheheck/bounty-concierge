@@ -20,7 +20,10 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+import requests
+
 from concierge import _active_claim_portfolio_core as _core
+from concierge.bounty_index import _header_integer, _retry_after_seconds
 
 SCHEMA = "active-claim-portfolio/v2"
 _LIVE_REQUIRED = frozenset(
@@ -140,6 +143,29 @@ def _inspect_live_availability(repo: str, number: int, max_pages: int) -> Dict[s
     from concierge.bounty_availability import inspect_bounty_availability
 
     return inspect_bounty_availability(repo, number, max_pages=max_pages)
+
+
+def _provider_rate_limited(error: BaseException) -> bool:
+    """Recognize provider HTTP evidence through the live readers' error chain."""
+    seen: set[int] = set()
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        if isinstance(error, requests.HTTPError):
+            response = error.response
+            # Requests considers 4xx responses falsey even when they are present.
+            if response is not None and (
+                response.status_code == 429
+                or (
+                    response.status_code == 403
+                    and (
+                        _header_integer(response.headers, "X-RateLimit-Remaining") == 0
+                        or _retry_after_seconds(response.headers) is not None
+                    )
+                )
+            ):
+                return True
+        error = error.__cause__ or error.__context__
+    return False
 
 
 def _qualification_hold(code: str, *, canonical: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -399,27 +425,44 @@ def compile_live_active_claim_portfolio(
     cache: Dict[Tuple[str, int, Optional[str]], Tuple[Dict[str, Any], Dict[str, Any], List[str]]] = {}
     core_candidates: List[Dict[str, Any]] = []
     failure_codes: Dict[str, List[str]] = {}
+    rate_limited = False
 
     for item in validated:
         key = (item["repo"], item["number"], item["listing_url"])
         if key not in cache:
             codes: List[str] = []
-            try:
-                qualification = _qualify_live_authority(*key, max_pages)
-                if not isinstance(qualification, dict):
-                    raise TypeError("qualification authority returned non-object")
-            except Exception:
-                qualification = _qualification_hold("LIVE_QUALIFICATION_READ_FAILED")
-                codes.append("LIVE_QUALIFICATION_READ_FAILED")
-            try:
-                availability = _inspect_live_availability(item["repo"], item["number"], max_pages)
-                if not isinstance(availability, dict):
-                    raise TypeError("availability authority returned non-object")
-            except Exception:
+            if rate_limited:
+                qualification = _qualification_hold("LIVE_QUALIFICATION_NOT_ATTEMPTED_RATE_LIMIT")
+                codes.append("LIVE_QUALIFICATION_NOT_ATTEMPTED_RATE_LIMIT")
+            else:
+                try:
+                    qualification = _qualify_live_authority(*key, max_pages)
+                    if not isinstance(qualification, dict):
+                        raise TypeError("qualification authority returned non-object")
+                except Exception as exc:
+                    qualification = _qualification_hold("LIVE_QUALIFICATION_READ_FAILED")
+                    codes.append("LIVE_QUALIFICATION_READ_FAILED")
+                    if _provider_rate_limited(exc):
+                        rate_limited = True
+                        codes.append("LIVE_PROVIDER_RATE_LIMITED")
+            if rate_limited:
                 availability = _availability_hold(
-                    item["repo"], item["number"], "LIVE_AVAILABILITY_READ_FAILED"
+                    item["repo"], item["number"], "LIVE_AVAILABILITY_NOT_ATTEMPTED_RATE_LIMIT"
                 )
-                codes.append("LIVE_AVAILABILITY_READ_FAILED")
+                codes.append("LIVE_AVAILABILITY_NOT_ATTEMPTED_RATE_LIMIT")
+            else:
+                try:
+                    availability = _inspect_live_availability(item["repo"], item["number"], max_pages)
+                    if not isinstance(availability, dict):
+                        raise TypeError("availability authority returned non-object")
+                except Exception as exc:
+                    availability = _availability_hold(
+                        item["repo"], item["number"], "LIVE_AVAILABILITY_READ_FAILED"
+                    )
+                    codes.append("LIVE_AVAILABILITY_READ_FAILED")
+                    if _provider_rate_limited(exc):
+                        rate_limited = True
+                        codes.append("LIVE_PROVIDER_RATE_LIMITED")
             cache[key] = (qualification, availability, codes)
         qualification, availability, codes = cache[key]
         bound_qualification, reward_codes = _bind_live_reward(item, qualification)

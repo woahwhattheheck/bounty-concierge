@@ -13,6 +13,34 @@ The live path accepts identity, worker/sponsor assignment, reward metadata, and 
 
 Either read failing or returning non-object data fails closed. Provider exception text is not copied into the receipt. GitHub `owner/repo` identity is case-folded before live reads, candidate grouping, generation binding, event lineage, and capacity accounting.
 
+### Rate-limit stop within a compilation
+
+A confirmed GitHub rate-limit failure stops further provider reads in the
+current compilation. The live readers wrap Requests errors, so the portfolio
+inspects chained `HTTPError` responses: HTTP 429, or HTTP 403 with
+`X-RateLimit-Remaining: 0` or a valid `Retry-After` value. `Retry-After` accepts
+delay seconds and HTTP dates. Exception wording alone does not trigger a stop.
+
+The row that encounters the failure retains its read-failure reason and adds
+`LIVE_PROVIDER_RATE_LIMITED`. Reads skipped after that point receive
+`LIVE_QUALIFICATION_NOT_ATTEMPTED_RATE_LIMIT` or
+`LIVE_AVAILABILITY_NOT_ATTEMPTED_RATE_LIMIT`. A qualification failure can skip
+availability on the same row. Remaining candidates still appear in the receipt,
+and completed or cached results are preserved.
+
+The stop lasts only for that invocation. A later explicit compilation starts
+fresh. There are no automatic retries, sleeps, or persistent stop state.
+Ordinary HTTP 401/403/404 errors and transport failures continue to use the
+existing per-row HOLD behavior without suppressing other candidates' reads.
+
+Offline replay through real Requests responses and an in-memory HTTP adapter
+reduced prepared requests from six to one for three candidates when the first
+qualification read returned HTTP 429 or a header-confirmed rate-limit 403.
+All three result rows remained present. Ordinary access and transport errors
+produced identical full receipts before and after the change. Completed and
+cached rows stayed intact, and a later invocation performed fresh reads. These
+are prepared-request counts; the replay made no network or provider calls.
+
 ### Reward binding
 
 Caller reward fields are descriptive input, not live authority. When the fresh revenue-intake result is actionable, the portfolio re-derives the one native advertised reward from the verifier-owned qualification signals and requires the candidate's `reward_currency` and `reward_minor` to match exactly before READY is possible.
