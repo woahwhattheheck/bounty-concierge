@@ -230,7 +230,12 @@ def _assertive_clauses(line: str) -> Iterable[str]:
         stripped = clause.strip()
         if not stripped or "?" in stripped:
             continue
-        yield stripped
+        # Filter questions before splitting: a semicolon does not end a
+        # question. Within an assertion, keep each clause's negation local.
+        for part in stripped.split(";"):
+            part = part.strip()
+            if part:
+                yield part
 
 
 def _terminal_signals(text: str) -> tuple[str, ...]:
