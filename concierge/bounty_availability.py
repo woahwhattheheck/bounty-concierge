@@ -122,6 +122,7 @@ def _issue_marker(issue: dict[str, Any]) -> tuple[object, ...]:
     raw_id = issue.get("id")
     number = issue.get("number")
     state = issue.get("state")
+    state_reason = issue.get("state_reason")
     updated_at = issue.get("updated_at")
     comments = issue.get("comments")
     title = issue.get("title")
@@ -135,6 +136,7 @@ def _issue_marker(issue: dict[str, Any]) -> tuple[object, ...]:
         or number <= 0
         or not isinstance(state, str)
         or not state
+        or (state_reason is not None and not isinstance(state_reason, str))
         or not isinstance(updated_at, str)
         or not updated_at
         or isinstance(comments, bool)
@@ -156,6 +158,7 @@ def _issue_marker(issue: dict[str, Any]) -> tuple[object, ...]:
         comments,
         hashlib.sha256(title_text.encode("utf-8")).hexdigest(),
         hashlib.sha256(body_text.encode("utf-8")).hexdigest(),
+        state_reason.casefold() if state_reason else None,
     )
 
 
@@ -296,6 +299,7 @@ def _safe_hold(
     number: int,
     code: str,
     issue_state: str | None,
+    state_reason: str | None = None,
     signal_evidence: list[dict[str, object]] | None = None,
 ) -> dict[str, Any]:
     evidence = signal_evidence or []
@@ -314,6 +318,7 @@ def _safe_hold(
         "dispatch": False,
         "reason_code": code,
         "issue_state": issue_state,
+        "state_reason": state_reason,
         "signal_codes": signal_codes,
         "evidence": evidence,
         "authority": {
@@ -378,6 +383,7 @@ def inspect_bounty_availability(
             number=number,
             code="ISSUE_NOT_OPEN",
             issue_state="closed",
+            state_reason=before_marker[7],
         )
 
     comments_before, truncated_before = _read_comments(
@@ -489,6 +495,7 @@ def inspect_bounty_availability(
         "dispatch": True,
         "reason_code": None,
         "issue_state": "open",
+        "state_reason": None,
         "signal_codes": [],
         "evidence": [],
         "authority": {
