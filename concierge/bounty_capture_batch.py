@@ -118,6 +118,7 @@ class _BatchSession:
         self.issue_request = False
         self.cooldown = cooldown
         self.shared_cooldown_deferred = False
+        self.shared_unknown_backoff_seconds: int | None = None
         self.cooldown_state_error = False
 
     def get(self, url: str, **kwargs: Any) -> Any:
@@ -263,6 +264,12 @@ class _BatchSession:
             self.retry_after_seconds = retry_after
             self.retry_after_at = retry_at
             self.rate_limit_reset_at = _integer_header(headers, "X-RateLimit-Reset")
+        unknown_secondary = (
+            throttled
+            and remaining != 0
+            and retry_after is None
+            and retry_at is None
+        )
         if status >= 400:
             self.failure = {
                 "code": "RATE_LIMITED" if throttled else "HTTP_ERROR",
@@ -270,10 +277,16 @@ class _BatchSession:
             }
         if (throttled or remaining == 0) and self.cooldown is not None:
             try:
-                self.cooldown.extend(cooldown_deadline(
-                    retry_seconds=retry_after, retry_at=retry_at,
-                    reset_at=self.rate_limit_reset_at, primary_exhausted=remaining == 0,
-                ))
+                if unknown_secondary:
+                    deadline = self.cooldown.extend_unknown_secondary()
+                    self.shared_unknown_backoff_seconds = max(
+                        0, math.ceil(deadline - time()),
+                    )
+                else:
+                    self.cooldown.extend(cooldown_deadline(
+                        retry_seconds=retry_after, retry_at=retry_at,
+                        reset_at=self.rate_limit_reset_at, primary_exhausted=remaining == 0,
+                    ))
             except CooldownStateError:
                 # Keep the actual response and provider evidence. This batch
                 # is already stopped; report that sharing its stop failed.
@@ -465,6 +478,7 @@ def collect_batch(
             "enabled": cooldown_file is not None,
             "deferred": transport.shared_cooldown_deferred,
             "state_error": transport.cooldown_state_error,
+            "unknown_secondary_backoff_seconds": transport.shared_unknown_backoff_seconds,
         },
         "retry_after_seconds": transport.retry_after_seconds,
         "retry_after_at": transport.retry_after_at,
