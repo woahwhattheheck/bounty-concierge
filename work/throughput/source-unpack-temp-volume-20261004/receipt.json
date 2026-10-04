@@ -1,0 +1,54 @@
+{
+  "operation": "SOURCE-UNPACK-TEMP-VOLUME-6799",
+  "runtime": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+  "baseline_blob": "9fe47443c35707183e0102018306312fd6bd79bb",
+  "artifact_id": 11302078522,
+  "run_id": 37199760399,
+  "artifact_sha256": "0afde9775c0043772e604a5e5d95816ad4eda394f4535ba05a6fc267afe60b56",
+  "overlay_free_bytes": 0,
+  "tmpfs_free_bytes": 1840787456,
+  "cases": [
+    {
+      "name": "baseline",
+      "returncode": 2,
+      "duration_seconds": 0.060257,
+      "destination_exists": false,
+      "stderr": "{\"error\": \"[Errno 2] No usable temporary directory found in ['/tmp', '/var/tmp', '/usr/tmp', '/workspace/scratch/67997725ed24']\", \"error_type\": \"FileNotFoundError\"}\n"
+    },
+    {
+      "name": "candidate",
+      "returncode": 0,
+      "duration_seconds": 0.137003,
+      "destination_exists": true,
+      "stderr": "",
+      "result": {
+        "schema": "source-bundle-unpack/v1",
+        "repository": "woahwhattheheck/bounty-concierge",
+        "commit_sha": "4f5bc01a9b6d6b91d5937d9743ed3608f9003ebc",
+        "tree_sha": "4190cab009045b659e0cdce00eb0b7c405ab0cbe",
+        "archive_sha256": "18e8fa4a70cc6b4cf6dbb262b3ba58cfa51bc6f20d85b2d99f1bc7c91c3c3d7b",
+        "archive_bytes": 1800839,
+        "source_root": "/dev/shm/astra6799-source-unpack/candidate/source",
+        "selected_paths": [
+          "concierge/bounty_capture.py",
+          "AGENTS.md"
+        ],
+        "available_regular_files": 767,
+        "available_file_bytes": 6505734,
+        "extracted_regular_files": 2,
+        "extracted_file_bytes": 39689,
+        "extracted_symlinks": 0,
+        "scope": "Local source extraction only; no source execution or live-state verification."
+      },
+      "file_sha256": {
+        "AGENTS.md": "2c6985867d6444316950f08631a015745ee73c3f6284e98a480a128b30fcf19b",
+        "concierge/bounty_capture.py": "babf2e737faaac23df25df8d1d4d398df433011aaa5a745b0a12887bef549741"
+      }
+    }
+  ],
+  "baseline.py_sha256": "0318a9a8901583156e2275c2366b13bebc33f368621e14f8d8797ff9643148d1",
+  "baseline.py_git_blob": "9fe47443c35707183e0102018306312fd6bd79bb",
+  "unpack_source_bundle.py_sha256": "87c076eb1cf9a075422748c8bcd0bc0201b68adc31242d460f01a780338217b6",
+  "unpack_source_bundle.py_git_blob": "1626312ba44794ce0ebabb63b2607505766c6c74",
+  "scope": "Actual local extraction on a full default disk. No source execution, provider request, new export, package installation, or speedup claim."
+}
