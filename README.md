@@ -166,8 +166,15 @@ Use the actual current offset-aware ISO-8601 evaluation time. The batch command
 deduplicates issues and reuses one serial HTTP session; offline routing makes no
 provider requests. `--max-pages` bounds pagination; `--max-requests` counts actual
 HTTP GET attempts and stops before exceeding its budget (default 100, range
-1–10,000). The input limit is 1 MiB and 1,000 rows, each containing only `repo`
-and `number`.
+1–10,000). The input limit is 1 MiB and 1,000 rows, each requiring `repo` and
+`number` with an optional `submission_target` object. Use the existing target
+record: `repository`, `source_url`, `source_content_sha256`, and
+`instruction_excerpt`; its source must belong to that row's bounty issue.
+Identical target records deduplicate with the issue. Conflicting records for the
+same issue, including an omitted target paired with an explicit one, are rejected
+before output creation or provider reads. Private shortlist, remaining and capture
+files retain the full record for replay and resume. The printable summary includes
+only the target repository and record digest, never its instruction excerpt.
 
 The new private output directory starts with an immutable `shortlist.json` and
 retains each completed capture as it is written. On completion, handled provider
