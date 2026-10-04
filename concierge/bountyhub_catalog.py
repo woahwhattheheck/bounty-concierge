@@ -535,6 +535,11 @@ def main(argv: list[str] | None = None) -> int:
     resume = commands.add_parser("resume", help="Finish unresolved details from a retained complete catalog")
     resume.add_argument("snapshot", type=Path)
     resume.add_argument("--max-details", type=int, default=50)
+    refresh = commands.add_parser("refresh", help="Refresh explicit known listing details without catalog pages")
+    refresh.add_argument("snapshot", type=Path)
+    refresh.add_argument("--listing-id", action="append", required=True, dest="listing_ids")
+    refresh.add_argument("--previous-refresh", type=Path,
+                         help="Last targeted-refresh receipt; enforces its Retry-After cooldown")
     for command in (collect, targets):
         command.add_argument(
             "--min-funded-usd", "--min-reward-usd", dest="min_funded_usd", default="25.00",
@@ -553,6 +558,13 @@ def main(argv: list[str] | None = None) -> int:
                                    minimum_total_usd=args.min_funded_usd,
                                    include_promised=args.include_promised)
             complete = result["shortlist"]["source_complete"]
+        elif args.command == "refresh":
+            from concierge.bountyhub_refresh import _load, refresh_listings
+            result = refresh_listings(
+                _load(args.snapshot), args.listing_ids,
+                previous_refresh=_load(args.previous_refresh) if args.previous_refresh else None,
+            )
+            complete = result["complete"]
         elif args.command == "resume":
             with args.snapshot.open("rb") as source:
                 raw = source.read(4 * 1024 * 1024 + 1)
