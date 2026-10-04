@@ -21,6 +21,8 @@ from typing import Any
 
 import requests
 
+from concierge.submission_packet import validate_submission_target
+
 API = "https://api.bountyhub.dev/api/bounties"
 SCHEMA = "bountyhub-catalog/v1"
 _MONEY = re.compile(r"[0-9]{1,12}(?:\.[0-9]{1,2})?\Z")
@@ -187,11 +189,42 @@ def _get(session: Any, url: str, report: dict[str, Any], **params: Any) -> Any:
         response.close()
 
 
+def _submission_target_map(value: Any) -> dict[tuple[str, int], dict[str, str]]:
+    """Validate explicit delivery records, keyed by the original bounty issue."""
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError("submission target map must be an owner/repo#number object")
+    result: dict[tuple[str, int], dict[str, str]] = {}
+    for issue, target in value.items():
+        if not isinstance(issue, str):
+            raise ValueError("invalid submission target map issue")
+        repo, separator, number = issue.rpartition("#")
+        if not separator or not _REPO.fullmatch(repo) or not re.fullmatch(r"[1-9][0-9]*", number):
+            raise ValueError("submission target map keys must be owner/repo#number")
+        key = repo.casefold(), int(number)
+        if key in result:
+            raise ValueError("duplicate issue identity in submission target map")
+        result[key] = validate_submission_target(target, f"https://github.com/{repo}/issues/{number}")
+    return result
+
+
+def _unique_target_fields(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate field in submission target map")
+        result[key] = value
+    return result
+
+
 def select_targets(report: dict[str, Any], minimum_funded_usd: str = "25.00", *,
-                   include_promised: bool = False) -> dict[str, Any]:
+                   include_promised: bool = False,
+                   submission_targets: dict[str, Any] | None = None) -> dict[str, Any]:
     """Reduce a retained report without refreshing its time or making requests."""
     if not isinstance(report, dict) or report.get("schema") != SCHEMA or not isinstance(report.get("listings"), list):
         raise ValueError("expected a bountyhub-catalog/v1 report")
+    delivery = _submission_target_map(submission_targets)
     floor = _amount(minimum_funded_usd)
     targets: dict[tuple[str, int], dict[str, Any]] = {}
     associations: dict[str, list[str]] = {}
@@ -221,7 +254,9 @@ def select_targets(report: dict[str, Any], minimum_funded_usd: str = "25.00", *,
                 or not isinstance(listing_id, str) or not _ID.fullmatch(listing_id)):
             raise ValueError("invalid retained target identity")
         key = (repo.casefold(), number)
-        targets.setdefault(key, {"repo": repo, "number": number})
+        target = targets.setdefault(key, {"repo": repo, "number": number})
+        if key in delivery:
+            target["submission_target"] = delivery[key]
         associations.setdefault(f"{repo.casefold()}#{number}", []).append(listing_id)
     result = {
         "targets": list(targets.values()), "listing_ids_by_issue": associations,
@@ -493,6 +528,10 @@ def main(argv: list[str] | None = None) -> int:
     collect.add_argument("--page-size", type=int, default=100)
     targets = commands.add_parser("targets", help="Export targets from a retained catalog with no provider reads")
     targets.add_argument("snapshot", type=Path)
+    targets.add_argument(
+        "--submission-target-map", type=Path,
+        help="Optional JSON owner/repo#number map of existing source-bound submission_target records",
+    )
     resume = commands.add_parser("resume", help="Finish unresolved details from a retained complete catalog")
     resume.add_argument("snapshot", type=Path)
     resume.add_argument("--max-details", type=int, default=50)
@@ -522,9 +561,19 @@ def main(argv: list[str] | None = None) -> int:
             result = resume_catalog(json.loads(raw), max_details=args.max_details)
             complete = result["shortlist"]["source_complete"]
         else:
+            submission_targets = None
+            if args.submission_target_map is not None:
+                with args.submission_target_map.open("rb") as source:
+                    raw = source.read(1024 * 1024 + 1)
+                if len(raw) > 1024 * 1024:
+                    raise ValueError("submission target map exceeds 1 MiB")
+                submission_targets = json.loads(raw, object_pairs_hook=_unique_target_fields)
+                if submission_targets is None:
+                    raise ValueError("submission target map must be an object")
             with args.snapshot.open(encoding="utf-8") as source:
                 result = select_targets(json.load(source), args.min_funded_usd,
-                                        include_promised=args.include_promised)
+                                        include_promised=args.include_promised,
+                                        submission_targets=submission_targets)
             complete = result["source_complete"]
         if args.command == "targets":
             # The existing batch preflight accepts this exact envelope. Keep
@@ -536,6 +585,8 @@ def main(argv: list[str] | None = None) -> int:
             )
             if "catalog_observed_through" in result:
                 basis += f" catalog_refreshed=false catalog_observed_through={result['catalog_observed_through']}"
+            if args.submission_target_map is not None:
+                basis += f" mapped_submission_targets={sum('submission_target' in row for row in result['targets'])}"
             print(
                 f"source_started_at={result['source_started_at']} "
                 f"source_completed_at={result['source_completed_at']} "
