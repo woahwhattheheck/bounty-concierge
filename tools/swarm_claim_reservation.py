@@ -270,12 +270,12 @@ class GitHub:
             )
         return sha
 
-    def read_state(self, branch: str) -> tuple[dict[str, Any], str]:
+    def read_state(\n        self, branch: str, *, ref: str | None = None\n    ) -> tuple[dict[str, Any], str]:
         response = self.request(
             "GET",
             f"/contents/{STATE_PATH}",
             expected={200, 404},
-            params={"ref": branch},
+            params={"ref": ref or branch},
         )
         if response.status_code == 404:
             raise ReservationError(
@@ -577,7 +577,7 @@ def reserve(
                 "reservation ref race did not settle",
             )
 
-    current, _blob_sha = github.read_state(branch)
+    current, _blob_sha = github.read_state(branch, ref=head)
     expires = _parse_time(
         current["lease_expires_at"], "lease_expires_at"
     )
@@ -627,7 +627,7 @@ def reserve(
             "reservation_race",
             "reservation ref disappeared during takeover",
         )
-    winner, _ = github.read_state(branch)
+    winner, _ = github.read_state(branch, ref=winner_head)
     return (
         _public_state(
             winner,
@@ -658,7 +658,7 @@ def renew(
         raise ReservationError(
             "not_found", "reservation does not exist"
         )
-    current, _ = github.read_state(branch)
+    current, _ = github.read_state(branch, ref=head)
     if current["status"] != "ACTIVE" or current["owner"] != owner:
         return (
             _public_state(
@@ -708,7 +708,7 @@ def renew(
             "reservation_race",
             "reservation ref disappeared during renew",
         )
-    winner, _ = github.read_state(branch)
+    winner, _ = github.read_state(branch, ref=winner_head)
     return (
         _public_state(
             winner,
@@ -737,7 +737,7 @@ def release(
         raise ReservationError(
             "not_found", "reservation does not exist"
         )
-    current, _ = github.read_state(branch)
+    current, _ = github.read_state(branch, ref=head)
     if current["status"] != "ACTIVE" or current["owner"] != owner:
         return (
             _public_state(
@@ -785,7 +785,7 @@ def release(
             "reservation_race",
             "reservation ref disappeared during release",
         )
-    winner, _ = github.read_state(branch)
+    winner, _ = github.read_state(branch, ref=winner_head)
     return (
         _public_state(
             winner,
@@ -815,7 +815,7 @@ def status(
             },
             0,
         )
-    current, _ = github.read_state(branch)
+    current, _ = github.read_state(branch, ref=head)
     now = _now()
     expires = _parse_time(
         current["lease_expires_at"], "lease_expires_at"
