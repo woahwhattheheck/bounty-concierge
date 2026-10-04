@@ -13,6 +13,27 @@ The live path accepts identity, worker/sponsor assignment, reward metadata, and 
 
 Either read failing or returning non-object data fails closed. Provider exception text is not copied into the receipt. GitHub `owner/repo` identity is case-folded before live reads, candidate grouping, generation binding, event lineage, and capacity accounting.
 
+### Reuse availability for repeated issue listings
+
+Within one live compilation, successfully returned availability observations
+are reused by canonical GitHub repository and issue number. `max_pages` is
+fixed for that invocation. Qualification remains specific to each discovery
+URL, so different marketplace listings retain independent qualification
+results and the existing duplicate/conflict decisions.
+
+The cache is local to the compilation. A later compilation reads fresh
+availability, distinct issues never share an observation, and raised read
+failures are not cached for another listing. The rate-limit stop is checked
+before reuse, preserving the existing deferred-HOLD behavior.
+
+A deterministic replay of two listings for one issue reduced prepared GETs
+from 32 to 28: qualification remained 24, while the separate availability
+traversal fell from 8 to 4. Complete receipt bytes remained identical.
+The replay uses the actual readers and Requests with synthetic responses at
+the HTTP transport boundary; it makes no live provider calls. Reproduction
+and the bounded control results are in
+[`work/validation/active-claim-availability-20261004/`](../work/validation/active-claim-availability-20261004/).
+
 ### Rate-limit stop within a compilation
 
 A confirmed GitHub rate-limit failure stops further provider reads in the

@@ -433,12 +433,17 @@ def compile_live_active_claim_portfolio(
     canonical_events = _canonicalize_events(events)
     as_of = _format_utc(_utc_now())
     cache: Dict[Tuple[str, int, Optional[str]], Tuple[Dict[str, Any], Dict[str, Any], List[str]]] = {}
+    # Availability is issue-scoped; qualification also depends on the listing.
+    # max_pages is fixed for this invocation. Never reuse observations across
+    # compilations or cache raised read failures for a different listing.
+    availability_cache: Dict[Tuple[str, int], Dict[str, Any]] = {}
     core_candidates: List[Dict[str, Any]] = []
     failure_codes: Dict[str, List[str]] = {}
     rate_limited = False
 
     for item in validated:
         key = (item["repo"], item["number"], item["listing_url"])
+        issue_key = (item["repo"], item["number"])
         if key not in cache:
             codes: List[str] = []
             if rate_limited:
@@ -460,11 +465,14 @@ def compile_live_active_claim_portfolio(
                     item["repo"], item["number"], "LIVE_AVAILABILITY_NOT_ATTEMPTED_RATE_LIMIT"
                 )
                 codes.append("LIVE_AVAILABILITY_NOT_ATTEMPTED_RATE_LIMIT")
+            elif issue_key in availability_cache:
+                availability = availability_cache[issue_key]
             else:
                 try:
-                    availability = _inspect_live_availability(item["repo"], item["number"], max_pages)
+                    availability = _inspect_live_availability(*issue_key, max_pages)
                     if not isinstance(availability, dict):
                         raise TypeError("availability authority returned non-object")
+                    availability_cache[issue_key] = availability
                 except Exception as exc:
                     availability = _availability_hold(
                         item["repo"], item["number"], "LIVE_AVAILABILITY_READ_FAILED"

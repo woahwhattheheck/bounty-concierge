@@ -1,0 +1,253 @@
+{
+  "baseline_blob": "66aefdf85a99e8cefdbed8c9990041d5fd85842f",
+  "candidate_blob": "148def31b5b2da05f5723eac7f90ba490b1ded8e",
+  "case_count": 11,
+  "cases": {
+    "availability_permission403": {
+      "after_phase_gets": {
+        "availability": 2,
+        "qualification": 24
+      },
+      "after_prepared_gets": 26,
+      "before_phase_gets": {
+        "availability": 2,
+        "qualification": 24
+      },
+      "before_prepared_gets": 26,
+      "complete_receipt_equal": true,
+      "dispositions": [
+        "CONFLICT_HOLD"
+      ],
+      "receipt_sha256": "ac3f6485973e0bfc307e4d03670809c4e6cf8df064603eadd8f076bee7737ef8"
+    },
+    "availability_rate429": {
+      "after_phase_gets": {
+        "availability": 1,
+        "qualification": 12
+      },
+      "after_prepared_gets": 13,
+      "before_phase_gets": {
+        "availability": 1,
+        "qualification": 12
+      },
+      "before_prepared_gets": 13,
+      "complete_receipt_equal": true,
+      "dispositions": [
+        "CONFLICT_HOLD"
+      ],
+      "receipt_sha256": "a5c987f8a25493e035f2458e55306138f0135b9e59c16b683fcc13f171196a86"
+    },
+    "different_issue": {
+      "after_phase_gets": {
+        "availability": 8,
+        "qualification": 24
+      },
+      "after_prepared_gets": 32,
+      "before_phase_gets": {
+        "availability": 8,
+        "qualification": 24
+      },
+      "before_prepared_gets": 32,
+      "complete_receipt_equal": true,
+      "dispositions": [
+        "READY_FOR_INTERNAL_CLAIM",
+        "READY_FOR_INTERNAL_CLAIM"
+      ],
+      "receipt_sha256": "96411090a5e1a1c8c0df9ca7121aa2ae92545d8222e71314e5d1b63801c49a54"
+    },
+    "different_repo": {
+      "after_phase_gets": {
+        "availability": 8,
+        "qualification": 24
+      },
+      "after_prepared_gets": 32,
+      "before_phase_gets": {
+        "availability": 8,
+        "qualification": 24
+      },
+      "before_prepared_gets": 32,
+      "complete_receipt_equal": true,
+      "dispositions": [
+        "READY_FOR_INTERNAL_CLAIM",
+        "READY_FOR_INTERNAL_CLAIM"
+      ],
+      "receipt_sha256": "62e47ada49a82cf5cc7ef684229654d75a21ebf0faa2f4b2d477d6a1aa775368"
+    },
+    "fresh_second_compilation": {
+      "after_phase_gets": {
+        "availability": 4,
+        "qualification": 24
+      },
+      "after_prepared_gets": 28,
+      "before_phase_gets": {
+        "availability": 8,
+        "qualification": 24
+      },
+      "before_prepared_gets": 32,
+      "complete_receipt_equal": true,
+      "dispositions": [
+        "READY_FOR_INTERNAL_CLAIM"
+      ],
+      "receipt_sha256": "ffaa03ee94dc465164ccdad0e189328e81c3eb9d0db51c2db80180f6a8210dc1"
+    },
+    "max_pages_one": {
+      "after_phase_gets": {
+        "availability": 4,
+        "qualification": 24
+      },
+      "after_prepared_gets": 28,
+      "before_phase_gets": {
+        "availability": 8,
+        "qualification": 24
+      },
+      "before_prepared_gets": 32,
+      "complete_receipt_equal": true,
+      "dispositions": [
+        "READY_FOR_INTERNAL_CLAIM"
+      ],
+      "receipt_sha256": "ffaa03ee94dc465164ccdad0e189328e81c3eb9d0db51c2db80180f6a8210dc1"
+    },
+    "qualification_rate429": {
+      "after_phase_gets": {
+        "qualification": 1
+      },
+      "after_prepared_gets": 1,
+      "before_phase_gets": {
+        "qualification": 1
+      },
+      "before_prepared_gets": 1,
+      "complete_receipt_equal": true,
+      "dispositions": [
+        "CONFLICT_HOLD"
+      ],
+      "receipt_sha256": "735ed1492d959b64e748764ddbb23a2a4c95bb7c2bddb8789289d6302e591a1d"
+    },
+    "qualification_rate429_after_cached_availability": {
+      "after_phase_gets": {
+        "availability": 4,
+        "qualification": 13
+      },
+      "after_prepared_gets": 17,
+      "before_phase_gets": {
+        "availability": 4,
+        "qualification": 13
+      },
+      "before_prepared_gets": 17,
+      "complete_receipt_equal": true,
+      "dispositions": [
+        "CONFLICT_HOLD"
+      ],
+      "receipt_sha256": "efebceb1fcc4103f06bcbccce1b68ce06001b4fe3257889d12679155adf5eba0"
+    },
+    "same_issue_case_alias": {
+      "after_phase_gets": {
+        "availability": 4,
+        "qualification": 24
+      },
+      "after_prepared_gets": 28,
+      "before_phase_gets": {
+        "availability": 8,
+        "qualification": 24
+      },
+      "before_prepared_gets": 32,
+      "complete_receipt_equal": true,
+      "dispositions": [
+        "READY_FOR_INTERNAL_CLAIM"
+      ],
+      "receipt_sha256": "ffaa03ee94dc465164ccdad0e189328e81c3eb9d0db51c2db80180f6a8210dc1"
+    },
+    "same_issue_same_listing": {
+      "after_phase_gets": {
+        "availability": 4,
+        "qualification": 12
+      },
+      "after_prepared_gets": 16,
+      "before_phase_gets": {
+        "availability": 4,
+        "qualification": 12
+      },
+      "before_prepared_gets": 16,
+      "complete_receipt_equal": true,
+      "dispositions": [
+        "READY_FOR_INTERNAL_CLAIM"
+      ],
+      "receipt_sha256": "ffaa03ee94dc465164ccdad0e189328e81c3eb9d0db51c2db80180f6a8210dc1"
+    },
+    "same_issue_two_listings": {
+      "after_phase_gets": {
+        "availability": 4,
+        "qualification": 24
+      },
+      "after_prepared_gets": 28,
+      "before_phase_gets": {
+        "availability": 8,
+        "qualification": 24
+      },
+      "before_prepared_gets": 32,
+      "complete_receipt_equal": true,
+      "dispositions": [
+        "READY_FOR_INTERNAL_CLAIM"
+      ],
+      "receipt_sha256": "ffaa03ee94dc465164ccdad0e189328e81c3eb9d0db51c2db80180f6a8210dc1"
+    }
+  },
+  "controlled_clock": "2026-10-04T09:00:00Z, private documented _utc_now seam used for complete receipt equality",
+  "dependency_composition": {
+    "all_executed_dependency_blobs_match_pinned_tree": true,
+    "base_archive_commit": "261f6f866b20e4a3b6433f4ba6bf1ac130e72b92",
+    "base_archive_sha256": "9c374f26958bf84e9b43b97d55d3040effaf30c2870d0ebcb2dac2c56d84a68e",
+    "overlay_paths": [
+      "concierge/bounty_audit.py",
+      "concierge/bounty_availability.py",
+      "concierge/secure_output.py"
+    ]
+  },
+  "dependency_source_commit": "b855a699d70a33c6c9efdd9bcafc330ebeabd3ac",
+  "dependency_source_tree": "42fc22d50e2b0e4708850475ffaced8812bc56d9",
+  "environment": {
+    "python": "3.12.14",
+    "requests": "2.34.2"
+  },
+  "executed_dependency_blobs": {
+    "concierge/__init__.py": "497f9839848e88c60319c689f5b3dc4f19439493",
+    "concierge/_active_claim_portfolio_core.py": "a11f3a681b899d6c9b2aff38a43c3d31a0d102b6",
+    "concierge/_reinvestment_allocator_api.py": "0afd51877ceb8ad611352c14439d83afef9bf955",
+    "concierge/_reinvestment_allocator_reload_guard.py": "b48c8d42ba7a998925413de5cf3593e4e238fe61",
+    "concierge/_reinvestment_allocator_transport.py": "78fe60563850c760b30f8ce95c4317aa794356d7",
+    "concierge/bounty_audit.py": "e9e67052095c761b11436516dd4cac05c746eaa6",
+    "concierge/bounty_availability.py": "26203721782586a13e6aa2e0b3e3d5934b094888",
+    "concierge/bounty_cache.py": "45b30336f0b3e9cbd15a1fa4d87d41ecf9d9a5d5",
+    "concierge/bounty_capture.py": "e8a4407d2ed77b2745444fd4454f82ee51f43783",
+    "concierge/bounty_contract_common.py": "923d4ce77011372939e33ccd8cfc46090c33ee50",
+    "concierge/bounty_contract_live.py": "b73e16abffe6b7207e9a518583e80b9ae5054666",
+    "concierge/bounty_index.py": "e73c3d3f881998321d9453108deab4e03b9555ef",
+    "concierge/bounty_preflight.py": "39b88636710fa907c5e41c70b5eca81fc92dfaf6",
+    "concierge/bounty_qualification.py": "563a560f7890191fb3b7dd7cf6116aa33ad583d4",
+    "concierge/claim_work_authority.py": "bab89ccff72238421e33c1211702d199882864e1",
+    "concierge/claim_work_authority_hardening.py": "c512a503ad079f4fae7b3b98179a54ede879cb4b",
+    "concierge/config.py": "55ccb217480664be3603d8a1bc70ab7962fa3006",
+    "concierge/credential_safety.py": "581593f76499c4d52065698606155b31b23bb169",
+    "concierge/payoff_path_gate_core.py": "929ae094b9c463c83bc269d79810919caca42bd4",
+    "concierge/payoff_path_policy_authority.py": "70c852628298f93cc23d0e2662f6053a8994a445",
+    "concierge/payoff_path_policy_secure_runtime.py": "cf0349be5f9f5a1feb206654e04bcdd95056b013",
+    "concierge/payoff_path_policy_v3.py": "643de73171ccc449b1465042229da849fd81f1c6",
+    "concierge/reinvestment_allocator.py": "ae5956ad3787dcf4e55c28ebf33cddaf9f6c5585",
+    "concierge/repository_contribution_policy.py": "a21fb95159e3ea9e69ee750c124cda518d0c412e",
+    "concierge/revenue_intake.py": "44b4c42c5f6b0e73d55d50d419f7620651a60c40",
+    "concierge/reward_evidence.py": "81c16896be453ffd90233ac1c10127ea21e682be",
+    "concierge/secure_output.py": "a0e8953fc8cad9ab62c0b2708325875c4c5e0573",
+    "concierge/source_provenance.py": "7d958cd2930d5452d93aee6e852c0be014e96862",
+    "concierge/sponsor_adjudication/__init__.py": "0b2b15689340e89d886c500a088cdac2dc11841c",
+    "concierge/sponsor_adjudication/artifacts.py": "2b62ec59a18fb4da8e7c10a741a8c773a516c5f4",
+    "concierge/sponsor_adjudication/authority.py": "e689a42103d76bf462109f13ff68709a443b7c5d",
+    "concierge/sponsor_adjudication/common.py": "85d24b1e0ddbb7a66c20d2fb9ec7a7c141460b5b",
+    "concierge/sponsor_adjudication/compiler.py": "f0ad6d2b4fdfdb55b37c89e3c9e1227b73db26f0",
+    "concierge/sponsor_adjudication/guarded_cli.py": "f29b8e32e1ebcbbd08da45f95653a7a85a75c706",
+    "concierge/sponsor_adjudication/schema.py": "c253af510c492dc88e9db41848235f1dce3af7fb",
+    "concierge/sponsor_adjudication/verified.py": "b8b49664e0fa38d0d619468f1b25f89d64a9056d",
+    "concierge/submission_packet.py": "c8ec265b3489d13ee3a34137e864f964ec6104dd",
+    "concierge/submission_policy_context.py": "86e81dd814c577d0caa304510994086045f10929"
+  },
+  "measurement": "Prepared GET requests through real Requests/qualification/preflight/availability/core; HTTPAdapter.send supplies synthetic replay responses. No network transport or provider API calls.",
+  "schema": "active-claim-availability-replay/v1"
+}
