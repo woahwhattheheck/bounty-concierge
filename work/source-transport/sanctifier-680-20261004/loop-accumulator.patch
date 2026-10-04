@@ -1,0 +1,669 @@
+diff --git a/docs/detectors/README.md b/docs/detectors/README.md
+index ef4b9cba98993f10fbbd8ab0299558aee7d58e42..633b15f5329f7519059b9b7dd63b4b30c6e5fb03 100644
+--- a/docs/detectors/README.md
++++ b/docs/detectors/README.md
+@@ -25,6 +25,7 @@ detector page and to the relevant [Glossary](../glossary.md) term.
+ | [`auth_replay`](auth_replay.md) | [`SANCT_AUTH_REPLAY`](../error-codes.md) | authentication | High | Custom-account `__check_auth` with no nonce or expiry check, allowing signature replay |
+ | [`panic_detection`](panic_detection.md) | [`S002`](../error-codes.md) | panic_handling | High | `panic!` / `unwrap` / `expect` that trap the invocation |
+ | [`arithmetic_overflow`](arithmetic_overflow.md) | [`S003`](../error-codes.md) | arithmetic | High | Unchecked `+` `-` `*` that can overflow or underflow |
++| [`loop_accumulator`](loop_accumulator.md) | [`SANCT_LOOP_ACCUMULATOR`](../error-codes.md) | arithmetic | Warning | Unchecked `+=` or self-addition to a binding that survives loop iterations |
+ | [`ledger_size`](ledger_size.md) | [`S004`](../error-codes.md) | storage_limits | Medium | `contracttype` layouts approaching the ledger entry size limit |
+ | [`missing_ttl`](missing_ttl.md) | [`S006`](../error-codes.md) | storage_durability | Medium | Persistent/instance storage access without a TTL extension |
+ | [`unhandled_result`](unhandled_result.md) | [`S009`](../error-codes.md) | logic | Medium | A `Result` that is silently dropped |
+diff --git a/docs/detectors/loop_accumulator.md b/docs/detectors/loop_accumulator.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..4362fbf3f6d2bab06ad0df7ca7c61dc79e30498a
+--- /dev/null
++++ b/docs/detectors/loop_accumulator.md
+@@ -0,0 +1,87 @@
++# `loop_accumulator` — Unchecked accumulation inside a loop
++
++| | |
++| --- | --- |
++| **Finding code** | [`SANCT_LOOP_ACCUMULATOR`](../error-codes.md) |
++| **Category** | arithmetic |
++| **Severity** | Warning |
++| **Source rule** | [`rules/loop_accumulator.rs`](../../tooling/sanctifier-core/src/rules/loop_accumulator.rs) |
++| **Glossary** | [Overflow / underflow](../glossary.md) |
++
++## What it catches
++
++A variable that survives successive loop iterations and is updated with
++unchecked addition, such as `total += amount` or `total = total + amount`.
++The individual amounts can fit in the variable's integer type while their
++running total exceeds its range. Depending on overflow-check settings, this
++can abort execution or wrap the accumulated value.
++
++The rule covers `for`, `while`, and `loop`, including additions in a `while`
++condition. It also recognizes the accumulator on the right of `+` and in
++addition chains such as `total = total + amount + fee`.
++
++## Vulnerable example
++
++```rust
++#[contractimpl]
++impl Payouts {
++    pub fn total_amounts(amounts: Vec<i128>) -> i128 {
++        let mut total: i128 = 0;
++        for amount in amounts.iter() {
++            total += amount;
++        }
++        total
++    }
++}
++```
++
++## The fix
++
++Use `checked_add` and handle overflow explicitly, for example by returning
++the contract's overflow error:
++
++```rust
++#[contractimpl]
++impl Payouts {
++    pub fn total_amounts(amounts: Vec<i128>) -> Result<i128, Error> {
++        let mut total: i128 = 0;
++        for amount in amounts.iter() {
++            total = total.checked_add(amount).ok_or(Error::Overflow)?;
++        }
++        Ok(total)
++    }
++}
++```
++
++Use `total = total.saturating_add(amount)` when clamping to the integer
++type's boundary is the intended behavior. Saturation changes the result;
++it is not a substitute for rejecting an invalid financial total.
++
++## How Sanctifier detects it
++
++An AST visitor tracks lexical bindings and loop nesting. It reports an
++unchecked `+=` or additive assignment that reads the same accumulator,
++provided that binding was introduced before an enclosing loop. An additive
++chain produces one finding for its assignment.
++
++A temporary declared afresh inside a loop, including a loop-pattern binding
++or a shadow of an outer variable, is not treated as an accumulator for that
++loop. A subtotal declared in an outer loop and updated by an inner loop is
++still reported. The iterator expression of a `for` loop is visited before
++entering that loop, and deferred closure and async bodies do not inherit
++their surrounding loop context.
++
++Calls to `checked_add` and `saturating_add` do not match the unchecked-addition
++patterns. Using a checked operation elsewhere does not make an unchecked
++accumulator addition safe.
++
++**Limitations:** this is a syntactic heuristic, not type or range analysis.
++It does not prove that a loop can overflow, account for an outer accumulator
++reset on every iteration, or follow aliases and helper calls. A fixed loop
++bound alone does not suppress the finding. Ordinary additions that do not
++update an accumulator are outside this rule's scope; see
++[`arithmetic_overflow`](arithmetic_overflow.md) for broader arithmetic checks.
++
++## References
++
++- Related: [`arithmetic_overflow`](arithmetic_overflow.md), [`unsigned_underflow`](unsigned_underflow.md)
+diff --git a/docs/error-codes.md b/docs/error-codes.md
+index 155be1a0b1989b21212d8cdfe451b91c0277c67b..ccbae5ee25dada4df203af8a7cf614d94d1d610a 100644
+--- a/docs/error-codes.md
++++ b/docs/error-codes.md
+@@ -11,6 +11,7 @@ the fix, and references.
+ | `S001` | authentication | Missing authentication guard in a state-mutating function | [`auth_gap`](detectors/auth_gap.md) |
+ | `S002` | panic_handling | `panic!` / `unwrap` / `expect` usage that may abort execution | [`panic_detection`](detectors/panic_detection.md) |
+ | `S003` | arithmetic | Unchecked arithmetic with overflow/underflow risk | [`arithmetic_overflow`](detectors/arithmetic_overflow.md) |
++| `SANCT_LOOP_ACCUMULATOR` | arithmetic | Unchecked addition to an accumulator across loop iterations | [`loop_accumulator`](detectors/loop_accumulator.md) |
+ | `S004` | storage_limits | Ledger entry size exceeds or approaches configured limits | [`ledger_size`](detectors/ledger_size.md) |
+ | `S005` | storage_keys | Potential storage key collision | — |
+ | `S006` | storage_durability | Persistent/instance storage access without a TTL extension | [`missing_ttl`](detectors/missing_ttl.md) |
+diff --git a/tooling/sanctifier-core/src/finding_codes.rs b/tooling/sanctifier-core/src/finding_codes.rs
+index ad9dfb70a5abc6804b1f3fafb46b60839bec30a2..29269d791f5628c56757cd9f5baf657b5e87850d 100644
+--- a/tooling/sanctifier-core/src/finding_codes.rs
++++ b/tooling/sanctifier-core/src/finding_codes.rs
+@@ -3,6 +3,7 @@ use serde::Serialize;
+ pub const AUTH_GAP: &str = "S001";
+ pub const PANIC_USAGE: &str = "S002";
+ pub const ARITHMETIC_OVERFLOW: &str = "S003";
++pub const LOOP_ACCUMULATOR: &str = "SANCT_LOOP_ACCUMULATOR";
+ pub const LEDGER_SIZE_RISK: &str = "S004";
+ pub const STORAGE_COLLISION: &str = "S005";
+ pub const UNSAFE_PATTERN: &str = "S006";
+@@ -74,6 +75,11 @@ pub fn all_finding_codes() -> Vec<FindingCode> {
+             category: "arithmetic",
+             description: "Unchecked arithmetic operation with overflow/underflow risk",
+         },
++        FindingCode {
++            code: LOOP_ACCUMULATOR,
++            category: "arithmetic",
++            description: "Unchecked addition updates an accumulator across loop iterations",
++        },
+         FindingCode {
+             code: LEDGER_SIZE_RISK,
+             category: "storage_limits",
+diff --git a/tooling/sanctifier-core/src/rules/loop_accumulator.rs b/tooling/sanctifier-core/src/rules/loop_accumulator.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..4aa8160a39bbd2867fd879fbd2635ef0142d6dd3
+--- /dev/null
++++ b/tooling/sanctifier-core/src/rules/loop_accumulator.rs
+@@ -0,0 +1,269 @@
++use crate::finding_codes::LOOP_ACCUMULATOR;
++use crate::rules::{Rule, RuleViolation, Severity};
++use std::collections::HashMap;
++use syn::spanned::Spanned;
++use syn::visit::{self, Visit};
++use syn::{BinOp, Expr, Pat};
++
++/// Finds unchecked self-addition to bindings that survive a loop iteration.
++/// This is a syntactic warning, not a proof that an integer value overflows.
++pub struct LoopAccumulatorRule;
++
++impl LoopAccumulatorRule {
++    pub fn new() -> Self {
++        Self
++    }
++}
++
++impl Default for LoopAccumulatorRule {
++    fn default() -> Self {
++        Self::new()
++    }
++}
++
++impl Rule for LoopAccumulatorRule {
++    fn name(&self) -> &str {
++        "loop_accumulator"
++    }
++
++    fn description(&self) -> &str {
++        "Detects unchecked addition to a loop-carried accumulator"
++    }
++
++    fn check(&self, source: &str) -> Vec<RuleViolation> {
++        let Some(file) = crate::parse_cache::parse_cached(source) else {
++            return Vec::new();
++        };
++        let mut visitor = AccumulatorVisitor::default();
++        visitor.visit_file(&file);
++        visitor.violations
++    }
++
++    fn as_any(&self) -> &dyn std::any::Any {
++        self
++    }
++}
++
++#[derive(Default)]
++struct AccumulatorVisitor {
++    violations: Vec<RuleViolation>,
++    scopes: Vec<HashMap<String, usize>>,
++    // Each loop remembers the first binding ID created after it was entered.
++    // A resolved binding with a smaller ID survives that loop's iterations.
++    loops: Vec<usize>,
++    next_binding: usize,
++    current_fn: Option<String>,
++}
++
++impl AccumulatorVisitor {
++    fn bind_pattern(&mut self, pat: &Pat) {
++        struct Names(Vec<String>);
++        impl<'ast> Visit<'ast> for Names {
++            fn visit_pat_ident(&mut self, pat: &'ast syn::PatIdent) {
++                self.0.push(pat.ident.to_string());
++                visit::visit_pat_ident(self, pat);
++            }
++        }
++        let mut names = Names(Vec::new());
++        names.visit_pat(pat);
++        for name in names.0 {
++            if let Some(scope) = self.scopes.last_mut() {
++                scope.insert(name, self.next_binding);
++                self.next_binding += 1;
++            }
++        }
++    }
++
++    fn visit_function(&mut self, signature: &syn::Signature, block: &syn::Block) {
++        let old_scopes = std::mem::take(&mut self.scopes);
++        let old_loops = std::mem::take(&mut self.loops);
++        let old_fn = self.current_fn.replace(signature.ident.to_string());
++        self.scopes.push(HashMap::new());
++        for argument in &signature.inputs {
++            if let syn::FnArg::Typed(argument) = argument {
++                self.bind_pattern(&argument.pat);
++            }
++        }
++        self.visit_block(block);
++        self.scopes = old_scopes;
++        self.loops = old_loops;
++        self.current_fn = old_fn;
++    }
++
++    fn record(&mut self, target: &Expr) {
++        let Some(name) = ident_of(target) else {
++            return;
++        };
++        let binding = self.scopes.iter().rev().find_map(|scope| scope.get(&name));
++        let Some(binding) = binding else {
++            return;
++        };
++        if !self.loops.iter().any(|first_local| binding < first_local) {
++            return;
++        }
++        let Some(function) = &self.current_fn else {
++            return;
++        };
++        self.violations.push(
++            RuleViolation::new(
++                LOOP_ACCUMULATOR,
++                Severity::Warning,
++                format!(
++                    "Unchecked addition updates loop-carried accumulator `{name}` and may overflow"
++                ),
++                format!("{function}:{}", target.span().start().line),
++            )
++            .with_suggestion(format!(
++                "Use `{name}.checked_add(value)` with explicit overflow handling, \
++                 or `{name}.saturating_add(value)` if clamping is intended"
++            )),
++        );
++    }
++}
++
++impl<'ast> Visit<'ast> for AccumulatorVisitor {
++    fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
++        self.visit_function(&node.sig, &node.block);
++    }
++
++    fn visit_impl_item_fn(&mut self, node: &'ast syn::ImplItemFn) {
++        self.visit_function(&node.sig, &node.block);
++    }
++
++    fn visit_trait_item_fn(&mut self, node: &'ast syn::TraitItemFn) {
++        if let Some(block) = &node.default {
++            self.visit_function(&node.sig, block);
++        }
++    }
++
++    fn visit_block(&mut self, node: &'ast syn::Block) {
++        self.scopes.push(HashMap::new());
++        visit::visit_block(self, node);
++        self.scopes.pop();
++    }
++
++    fn visit_local(&mut self, node: &'ast syn::Local) {
++        // A shadowing binding is not visible in its initializer or else block.
++        if let Some(initializer) = &node.init {
++            self.visit_expr(&initializer.expr);
++            if let Some((_, otherwise)) = &initializer.diverge {
++                self.visit_expr(otherwise);
++            }
++        }
++        self.bind_pattern(&node.pat);
++    }
++
++    fn visit_expr_for_loop(&mut self, node: &'ast syn::ExprForLoop) {
++        // The iterable is evaluated once, before this loop is active.
++        self.visit_expr(&node.expr);
++        self.loops.push(self.next_binding);
++        self.scopes.push(HashMap::new());
++        self.bind_pattern(&node.pat);
++        self.visit_block(&node.body);
++        self.scopes.pop();
++        self.loops.pop();
++    }
++
++    fn visit_expr_while(&mut self, node: &'ast syn::ExprWhile) {
++        self.loops.push(self.next_binding);
++        self.scopes.push(HashMap::new());
++        // Unlike a for iterator, a while condition executes each iteration.
++        self.visit_expr(&node.cond);
++        self.visit_block(&node.body);
++        self.scopes.pop();
++        self.loops.pop();
++    }
++
++    fn visit_expr_loop(&mut self, node: &'ast syn::ExprLoop) {
++        self.loops.push(self.next_binding);
++        self.visit_block(&node.body);
++        self.loops.pop();
++    }
++
++    fn visit_expr_if(&mut self, node: &'ast syn::ExprIf) {
++        self.scopes.push(HashMap::new());
++        self.visit_expr(&node.cond);
++        self.visit_block(&node.then_branch);
++        self.scopes.pop();
++        if let Some((_, otherwise)) = &node.else_branch {
++            self.visit_expr(otherwise);
++        }
++    }
++
++    fn visit_expr_let(&mut self, node: &'ast syn::ExprLet) {
++        self.visit_expr(&node.expr);
++        self.bind_pattern(&node.pat);
++    }
++
++    fn visit_arm(&mut self, node: &'ast syn::Arm) {
++        self.scopes.push(HashMap::new());
++        self.bind_pattern(&node.pat);
++        if let Some((_, guard)) = &node.guard {
++            self.visit_expr(guard);
++        }
++        self.visit_expr(&node.body);
++        self.scopes.pop();
++    }
++
++    fn visit_expr_closure(&mut self, node: &'ast syn::ExprClosure) {
++        // Declaring a deferred body inside a loop does not execute it there.
++        // Captured bindings remain visible to loops inside the deferred body.
++        let old_loops = std::mem::take(&mut self.loops);
++        self.scopes.push(HashMap::new());
++        for input in &node.inputs {
++            self.bind_pattern(input);
++        }
++        self.visit_expr(&node.body);
++        self.scopes.pop();
++        self.loops = old_loops;
++    }
++
++    fn visit_expr_async(&mut self, node: &'ast syn::ExprAsync) {
++        let old_loops = std::mem::take(&mut self.loops);
++        self.visit_block(&node.block);
++        self.loops = old_loops;
++    }
++
++    fn visit_expr_binary(&mut self, node: &'ast syn::ExprBinary) {
++        if matches!(node.op, BinOp::AddAssign(_)) {
++            self.record(&node.left);
++        }
++        visit::visit_expr_binary(self, node);
++    }
++
++    fn visit_expr_assign(&mut self, node: &'ast syn::ExprAssign) {
++        if let (Some(name), Expr::Binary(add)) = (ident_of(&node.left), ungroup(&node.right)) {
++            if matches!(add.op, BinOp::Add(_)) && has_addend(&node.right, &name) {
++                self.record(&node.left);
++            }
++        }
++        visit::visit_expr_assign(self, node);
++    }
++}
++
++fn ungroup(expr: &Expr) -> &Expr {
++    match expr {
++        Expr::Paren(node) => ungroup(&node.expr),
++        Expr::Group(node) => ungroup(&node.expr),
++        _ => expr,
++    }
++}
++
++fn ident_of(expr: &Expr) -> Option<String> {
++    match ungroup(expr) {
++        Expr::Path(node) => node.path.get_ident().map(ToString::to_string),
++        _ => None,
++    }
++}
++
++// Match only an addition tree with the accumulator as an actual addend.
++// A checked_add/saturating_add receiver is not unchecked self-addition.
++fn has_addend(expr: &Expr, name: &str) -> bool {
++    match ungroup(expr) {
++        Expr::Path(node) => node.path.is_ident(name),
++        Expr::Binary(node) if matches!(node.op, BinOp::Add(_)) => {
++            has_addend(&node.left, name) || has_addend(&node.right, name)
++        }
++        _ => false,
++    }
++}
+diff --git a/tooling/sanctifier-core/src/rules/mod.rs b/tooling/sanctifier-core/src/rules/mod.rs
+index 9b99dca1cbe2e5b14d788767d87df6364fa190f2..89ba865a635e63acca44ec1908845503b2ef3ff2 100644
+--- a/tooling/sanctifier-core/src/rules/mod.rs
++++ b/tooling/sanctifier-core/src/rules/mod.rs
+@@ -18,6 +18,7 @@ pub mod hardcoded_addr;
+ pub mod init_hardcoded_admin;
+ pub mod ledger_seconds;
+ pub mod ledger_size;
++pub mod loop_accumulator;
+ pub mod missing_ttl;
+ pub mod nullifier_growth;
+ pub mod panic_detection;
+@@ -224,6 +225,7 @@ impl RuleRegistry {
+         registry.register(ledger_size::LedgerSizeRule::new());
+         registry.register(panic_detection::PanicDetectionRule::new());
+         registry.register(arithmetic_overflow::ArithmeticOverflowRule::new());
++        registry.register(loop_accumulator::LoopAccumulatorRule::new());
+         registry.register(unhandled_result::UnhandledResultRule::new());
+         registry.register(unused_variable::UnusedVariableRule::new());
+         // New hygiene rules
+diff --git a/tooling/sanctifier-core/tests/detector_snapshots.rs b/tooling/sanctifier-core/tests/detector_snapshots.rs
+index 146c852a28e425892eda94e2ac7495102c63f346..0bdb865b4c80461d9694638459651ee520936e01 100644
+--- a/tooling/sanctifier-core/tests/detector_snapshots.rs
++++ b/tooling/sanctifier-core/tests/detector_snapshots.rs
+@@ -23,7 +23,8 @@ use sanctifier_core::rules::{
+     edge_amount::EdgeAmountRule, error_code_collision::ErrorCodeCollisionRule,
+     excessive_clone::ExcessiveCloneRule, fee_rounding::FeeRoundingRule,
+     hardcoded_addr::HardcodedAddrRule, init_hardcoded_admin::InitHardcodedAdminRule,
+-    ledger_seconds::LedgerSecondsRule, ledger_size::LedgerSizeRule, missing_ttl::MissingTtlRule,
++    ledger_seconds::LedgerSecondsRule, ledger_size::LedgerSizeRule,
++    loop_accumulator::LoopAccumulatorRule, missing_ttl::MissingTtlRule,
+     panic_detection::PanicDetectionRule, sanct_unwrap::SanctUnwrapRule,
+     sep41_allowance_decrement::Sep41AllowanceDecrementRule,
+     sep41_approval_expiration::Sep41ApprovalExpirationRule, shift_overflow::ShiftOverflowRule,
+@@ -89,6 +90,39 @@ fn snapshot_arithmetic_overflow() {
+     );
+ }
+ 
++#[test]
++fn snapshot_loop_accumulator() {
++    let fixture = include_str!("fixtures/detectors/loop_accumulator.rs");
++    let findings = LoopAccumulatorRule::new().check(fixture);
++
++    assert_eq!(
++        findings
++            .iter()
++            .map(|finding| finding.location.split(':').next().unwrap())
++            .collect::<Vec<_>>(),
++        [
++            "sum_for",
++            "sum_while",
++            "sum_loop",
++            "sum_groups",
++            "sum_with_fee",
++            "sum_in_condition",
++        ],
++        "{findings:#?}",
++    );
++    assert!(findings
++        .iter()
++        .all(|finding| finding.rule_name == "SANCT_LOOP_ACCUMULATOR"));
++    assert_eq!(
++        serde_json::to_value(&findings).unwrap(),
++        serde_json::to_value(
++            RuleRegistry::with_default_rules().run_by_name(fixture, "loop_accumulator")
++        )
++        .unwrap(),
++    );
++    insta::assert_yaml_snapshot!("loop_accumulator", findings);
++}
++
+ #[test]
+ fn snapshot_unhandled_result() {
+     assert_detector_snapshot(
+diff --git a/tooling/sanctifier-core/tests/fixtures/detectors/loop_accumulator.rs b/tooling/sanctifier-core/tests/fixtures/detectors/loop_accumulator.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..8286afaa2c7da2d16fcc6094cd20101f3010b607
+--- /dev/null
++++ b/tooling/sanctifier-core/tests/fixtures/detectors/loop_accumulator.rs
+@@ -0,0 +1,132 @@
++#![no_std]
++use soroban_sdk::{contract, contractimpl, Vec};
++
++// FIXTURE: loop_accumulator detector
++// Six unchecked accumulation sites, with fresh bindings and safe APIs as controls.
++
++#[contract]
++pub struct LoopAccumulatorContract;
++
++#[contractimpl]
++impl LoopAccumulatorContract {
++    // Violation: the outer total survives each iteration and an inner shadow.
++    pub fn sum_for(values: Vec<i128>) -> i128 {
++        let mut total: i128 = 0;
++        for value in values.iter() {
++            {
++                let mut total: i128 = 0;
++                total += value; // Fresh shadow: not a loop-carried accumulator.
++            }
++            total += value;
++        }
++        total
++    }
++
++    // Violation: self-addition in a while loop, including parenthesized targets.
++    pub fn sum_while(mut values: Vec<i128>) -> i128 {
++        let mut total: i128 = 0;
++        while let Some(value) = values.pop_front() {
++            total = (total) + value;
++        }
++        total
++    }
++
++    // Violation: the accumulator is the right operand of addition.
++    pub fn sum_loop(mut values: Vec<i128>) -> i128 {
++        let mut total: i128 = 0;
++        loop {
++            let Some(value) = values.pop_front() else {
++                break;
++            };
++            total = value + total;
++        }
++        total
++    }
++
++    // Violation: a fresh outer-loop subtotal persists across the inner loop.
++    pub fn sum_groups(groups: Vec<Vec<i128>>) -> i128 {
++        let mut total: i128 = 0;
++        for values in groups.iter() {
++            let mut subtotal: i128 = 0;
++            for value in values.iter() {
++                subtotal += value;
++            }
++            total = total.saturating_add(subtotal);
++        }
++        total
++    }
++
++    // Violation: an additive chain should produce one finding for the assignment.
++    pub fn sum_with_fee(values: Vec<i128>, fee: i128) -> i128 {
++        let mut total: i128 = 0;
++        for value in values.iter() {
++            total = (total + value) + fee;
++        }
++        total
++    }
++
++    // Violation: the while condition is evaluated on every iteration.
++    pub fn sum_in_condition(mut total: i128, amount: i128, limit: i128) -> i128 {
++        while {
++            total += amount;
++            total < limit
++        } {}
++        total
++    }
++
++    // Safe: the accumulator additions explicitly handle overflow.
++    pub fn safe_apis(values: Vec<i128>) -> Result<i128, ()> {
++        let mut checked: i128 = 0;
++        let mut saturated: i128 = 0;
++        for value in values.iter() {
++            checked = checked.checked_add(value).ok_or(())?;
++            saturated = saturated.saturating_add(value);
++        }
++        checked.checked_add(saturated).ok_or(())
++    }
++
++    // Not accumulation: each temporary is fresh, and last never adds itself.
++    pub fn ordinary_addition(values: Vec<i128>) -> i128 {
++        let mut last: i128 = 0;
++        for value in values.iter() {
++            let mut temporary: i128 = 0;
++            temporary += value;
++            last = value + 1;
++        }
++        last
++    }
++
++    // Not accumulation: both loop patterns introduce fresh bindings.
++    pub fn loop_bindings(mut values: Vec<i128>) {
++        for mut value in values.iter() {
++            value += 1;
++        }
++        while let Some(mut value) = values.pop_front() {
++            value += 1;
++        }
++    }
++
++    // No loop is inherited by a deferred closure or async body.
++    pub fn deferred_bodies(values: Vec<i128>) {
++        let mut closure_total: i128 = 0;
++        let mut async_total: i128 = 0;
++        for value in values.iter() {
++            let _closure = || {
++                closure_total += value;
++            };
++            let _future = async {
++                async_total += value;
++            };
++        }
++    }
++
++    // Not loop accumulation: these additions execute before the loop begins.
++    pub fn before_loop(mut total: i128, values: Vec<i128>) -> i128 {
++        total += 1;
++        for _value in {
++            total += 1;
++            values.iter()
++        } {}
++        total
++    }
++}
+diff --git a/tooling/sanctifier-core/tests/snapshots/detector_snapshots__loop_accumulator.snap b/tooling/sanctifier-core/tests/snapshots/detector_snapshots__loop_accumulator.snap
+new file mode 100644
+index 0000000000000000000000000000000000000000..1235981de92e9b10c7a1c63744d699c521ee1e77
+--- /dev/null
++++ b/tooling/sanctifier-core/tests/snapshots/detector_snapshots__loop_accumulator.snap
+@@ -0,0 +1,35 @@
++---
++source: tooling/sanctifier-core/tests/detector_snapshots.rs
++assertion_line: 123
++expression: findings
++---
++- rule_name: SANCT_LOOP_ACCUMULATOR
++  severity: Warning
++  message: "Unchecked addition updates loop-carried accumulator `total` and may overflow"
++  location: "sum_for:20"
++  suggestion: "Use `total.checked_add(value)` with explicit overflow handling, or `total.saturating_add(value)` if clamping is intended"
++- rule_name: SANCT_LOOP_ACCUMULATOR
++  severity: Warning
++  message: "Unchecked addition updates loop-carried accumulator `total` and may overflow"
++  location: "sum_while:29"
++  suggestion: "Use `total.checked_add(value)` with explicit overflow handling, or `total.saturating_add(value)` if clamping is intended"
++- rule_name: SANCT_LOOP_ACCUMULATOR
++  severity: Warning
++  message: "Unchecked addition updates loop-carried accumulator `total` and may overflow"
++  location: "sum_loop:41"
++  suggestion: "Use `total.checked_add(value)` with explicit overflow handling, or `total.saturating_add(value)` if clamping is intended"
++- rule_name: SANCT_LOOP_ACCUMULATOR
++  severity: Warning
++  message: "Unchecked addition updates loop-carried accumulator `subtotal` and may overflow"
++  location: "sum_groups:52"
++  suggestion: "Use `subtotal.checked_add(value)` with explicit overflow handling, or `subtotal.saturating_add(value)` if clamping is intended"
++- rule_name: SANCT_LOOP_ACCUMULATOR
++  severity: Warning
++  message: "Unchecked addition updates loop-carried accumulator `total` and may overflow"
++  location: "sum_with_fee:63"
++  suggestion: "Use `total.checked_add(value)` with explicit overflow handling, or `total.saturating_add(value)` if clamping is intended"
++- rule_name: SANCT_LOOP_ACCUMULATOR
++  severity: Warning
++  message: "Unchecked addition updates loop-carried accumulator `total` and may overflow"
++  location: "sum_in_condition:71"
++  suggestion: "Use `total.checked_add(value)` with explicit overflow handling, or `total.saturating_add(value)` if clamping is intended"

@@ -1,0 +1,129 @@
+   Compiling unicode-ident v1.0.24
+   Compiling proc-macro2 v1.0.69
+   Compiling quote v1.0.33
+   Compiling syn v2.0.39
+   Compiling cfg-if v1.0.4
+   Compiling typenum v1.19.0
+   Compiling version_check v0.9.5
+   Compiling libc v0.2.183
+   Compiling serde v1.0.192
+   Compiling generic-array v0.14.9
+   Compiling serde_derive v1.0.192
+   Compiling crossbeam-utils v0.8.21
+   Compiling memchr v2.8.0
+   Compiling serde_json v1.0.108
+   Compiling autocfg v1.5.0
+   Compiling num-traits v0.2.17
+   Compiling aho-corasick v1.1.4
+   Compiling crossbeam-epoch v0.9.18
+   Compiling rustix v1.1.4
+   Compiling getrandom v0.3.4
+   Compiling itoa v1.0.17
+   Compiling ryu v1.0.23
+   Compiling either v1.15.0
+   Compiling rayon-core v1.13.0
+   Compiling regex-syntax v0.8.10
+   Compiling regex-automata v0.4.14
+   Compiling crossbeam-deque v0.8.6
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.6
+   Compiling half v2.6.0
+   Compiling anstyle v1.0.13
+   Compiling anyhow v1.0.102
+   Compiling thiserror v1.0.55
+   Compiling linux-raw-sys v0.12.1
+   Compiling clap_lex v1.0.0
+   Compiling ciborium-io v0.2.2
+   Compiling once_cell v1.21.4
+   Compiling plotters-backend v0.3.7
+   Compiling bitflags v2.11.0
+   Compiling plotters-svg v0.3.7
+   Compiling ciborium-ll v0.2.2
+   Compiling clap_builder v4.5.60
+   Compiling digest v0.10.7
+   Compiling regex v1.12.3
+   Compiling itertools v0.10.5
+   Compiling thiserror-impl v1.0.55
+   Compiling cast v0.3.0
+   Compiling fastrand v2.3.0
+   Compiling cpufeatures v0.2.17
+   Compiling same-file v1.0.6
+   Compiling walkdir v2.5.0
+   Compiling sha2 v0.10.8
+   Compiling tempfile v3.27.0
+   Compiling criterion-plot v0.5.0
+   Compiling rayon v1.11.0
+   Compiling plotters v0.3.7
+   Compiling clap v4.5.60
+   Compiling ciborium v0.2.2
+   Compiling tinytemplate v1.2.1
+   Compiling console v0.16.3
+   Compiling is-terminal v0.4.17
+   Compiling similar v2.7.0
+   Compiling hex v0.4.3
+   Compiling oorandom v11.1.5
+   Compiling anes v0.1.6
+   Compiling criterion v0.5.1
+   Compiling sanctifier-core v0.1.0 (/dev/shm/relay916-core-check/tooling/sanctifier-core)
+   Compiling insta v1.48.0
+    Finished `test` profile [unoptimized] target(s) in 1m 22s
+     Running tests/detector_snapshots.rs (/dev/relay916-build/debug/deps/detector_snapshots-9edd21f09bcf2e40)
+
+running 1 test
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Snapshot Summary ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Snapshot file: tooling/sanctifier-core/tests/snapshots/detector_snapshots__loop_accumulator.snap
+Snapshot: loop_accumulator
+Source: /dev/shm/relay916-core-check:123
+────────────────────────────────────────────────────────────────────────────────
+Expression: findings
+────────────────────────────────────────────────────────────────────────────────
++new results
+────────────┬───────────────────────────────────────────────────────────────────
+          1 │+- rule_name: SANCT_LOOP_ACCUMULATOR
+          2 │+  severity: Warning
+          3 │+  message: "Unchecked addition updates loop-carried accumulator `total` and may overflow"
+          4 │+  location: "sum_for:20"
+          5 │+  suggestion: "Use `total.checked_add(value)` with explicit overflow handling, or `total.saturating_add(value)` if clamping is intended"
+          6 │+- rule_name: SANCT_LOOP_ACCUMULATOR
+          7 │+  severity: Warning
+          8 │+  message: "Unchecked addition updates loop-carried accumulator `total` and may overflow"
+          9 │+  location: "sum_while:29"
+         10 │+  suggestion: "Use `total.checked_add(value)` with explicit overflow handling, or `total.saturating_add(value)` if clamping is intended"
+         11 │+- rule_name: SANCT_LOOP_ACCUMULATOR
+         12 │+  severity: Warning
+         13 │+  message: "Unchecked addition updates loop-carried accumulator `total` and may overflow"
+         14 │+  location: "sum_loop:41"
+         15 │+  suggestion: "Use `total.checked_add(value)` with explicit overflow handling, or `total.saturating_add(value)` if clamping is intended"
+         16 │+- rule_name: SANCT_LOOP_ACCUMULATOR
+         17 │+  severity: Warning
+         18 │+  message: "Unchecked addition updates loop-carried accumulator `subtotal` and may overflow"
+         19 │+  location: "sum_groups:52"
+         20 │+  suggestion: "Use `subtotal.checked_add(value)` with explicit overflow handling, or `subtotal.saturating_add(value)` if clamping is intended"
+         21 │+- rule_name: SANCT_LOOP_ACCUMULATOR
+         22 │+  severity: Warning
+         23 │+  message: "Unchecked addition updates loop-carried accumulator `total` and may overflow"
+         24 │+  location: "sum_with_fee:63"
+         25 │+  suggestion: "Use `total.checked_add(value)` with explicit overflow handling, or `total.saturating_add(value)` if clamping is intended"
+         26 │+- rule_name: SANCT_LOOP_ACCUMULATOR
+         27 │+  severity: Warning
+         28 │+  message: "Unchecked addition updates loop-carried accumulator `total` and may overflow"
+         29 │+  location: "sum_in_condition:71"
+         30 │+  suggestion: "Use `total.checked_add(value)` with explicit overflow handling, or `total.saturating_add(value)` if clamping is intended"
+────────────┴───────────────────────────────────────────────────────────────────
+stored new snapshot /dev/shm/relay916-core-check/tooling/sanctifier-core/tests/snapshots/detector_snapshots__loop_accumulator.snap.new
+To update snapshots run `cargo insta review`
+Stopped on the first failure. Run `cargo insta test` to run all snapshots.
+
+thread 'snapshot_loop_accumulator' panicked at /dev/shm/relay916-rust-runtime/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/insta-1.48.0/src/runtime.rs:719:13:
+snapshot assertion for 'loop_accumulator' failed in line 123
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test snapshot_loop_accumulator ... FAILED
+
+failures:
+
+failures:
+    snapshot_loop_accumulator
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 50 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `-p sanctifier-core --test detector_snapshots`

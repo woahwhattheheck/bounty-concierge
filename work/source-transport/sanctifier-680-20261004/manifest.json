@@ -1,0 +1,166 @@
+{
+  "upstream_repository": "Centurylong/sanctifier",
+  "issue": "https://github.com/Centurylong/sanctifier/issues/680",
+  "reward_status": "GrantFox OSS; Maybe Rewarded; no fixed award stated; maintainer assignment and compensation pending",
+  "base_branch": "main",
+  "base_sha": "9f6f9e4302f1982e044ab6d308782bfd9fb03255",
+  "desired_original_fork": "woahwhattheheck/sanctifier",
+  "proposed_branch": "fix/loop-accumulator-overflow",
+  "pr_title": "feat(core): detect unchecked loop accumulators",
+  "patch": {
+    "path": "loop-accumulator.patch",
+    "sha256": "5890d45a1db9e3744ed9346a1ee1cd7ac1c0336ca20135d15762660a762f9ddc",
+    "bytes": 26885
+  },
+  "changed_source_files": [
+    {
+      "path": "docs/detectors/README.md",
+      "status": "modified",
+      "mode": "100644",
+      "base_blob_sha": "ef4b9cba98993f10fbbd8ab0299558aee7d58e42",
+      "postimage_blob_sha": "633b15f5329f7519059b9b7dd63b4b30c6e5fb03",
+      "sha256": "f5cc939154b5464a311e358b1576e5d3dd59199de887894b3b16f4387c69cc08",
+      "bytes": 9890
+    },
+    {
+      "path": "docs/detectors/loop_accumulator.md",
+      "status": "added",
+      "mode": "100644",
+      "base_blob_sha": null,
+      "postimage_blob_sha": "4362fbf3f6d2bab06ad0df7ca7c61dc79e30498a",
+      "sha256": "9cab59f21169e6b775a784aff0748a87a4d1450815bddd9d54173c83801ba2bc",
+      "bytes": 3278
+    },
+    {
+      "path": "docs/error-codes.md",
+      "status": "modified",
+      "mode": "100644",
+      "base_blob_sha": "155be1a0b1989b21212d8cdfe451b91c0277c67b",
+      "postimage_blob_sha": "ccbae5ee25dada4df203af8a7cf614d94d1d610a",
+      "sha256": "5da9d5dc438e33f502392668ddedf4c6950c09f7122eb6afb67e8f6c5606493b",
+      "bytes": 6891
+    },
+    {
+      "path": "tooling/sanctifier-core/src/finding_codes.rs",
+      "status": "modified",
+      "mode": "100644",
+      "base_blob_sha": "ad9dfb70a5abc6804b1f3fafb46b60839bec30a2",
+      "postimage_blob_sha": "29269d791f5628c56757cd9f5baf657b5e87850d",
+      "sha256": "a60cf2765c3aa3e161e715595423a5185c0093f54e24d86a66d6210b5c1bd3af",
+      "bytes": 14643
+    },
+    {
+      "path": "tooling/sanctifier-core/src/rules/loop_accumulator.rs",
+      "status": "added",
+      "mode": "100644",
+      "base_blob_sha": null,
+      "postimage_blob_sha": "4aa8160a39bbd2867fd879fbd2635ef0142d6dd3",
+      "sha256": "29bfd1163e133be0052e9db16a8a80167584120ece61628e86131cbf80e3c7e8",
+      "bytes": 8708
+    },
+    {
+      "path": "tooling/sanctifier-core/src/rules/mod.rs",
+      "status": "modified",
+      "mode": "100644",
+      "base_blob_sha": "9b99dca1cbe2e5b14d788767d87df6364fa190f2",
+      "postimage_blob_sha": "89ba865a635e63acca44ec1908845503b2ef3ff2",
+      "sha256": "3251e738e6112adcaf200686b3383530de21edffe6a03d75310330160015c3b2",
+      "bytes": 14860
+    },
+    {
+      "path": "tooling/sanctifier-core/tests/detector_snapshots.rs",
+      "status": "modified",
+      "mode": "100644",
+      "base_blob_sha": "146c852a28e425892eda94e2ac7495102c63f346",
+      "postimage_blob_sha": "0bdb865b4c80461d9694638459651ee520936e01",
+      "sha256": "2c8e7f1a8e3c63a573194ecb7bbac89b639479d09bd392135cf3bfc16dc5f22b",
+      "bytes": 17960
+    },
+    {
+      "path": "tooling/sanctifier-core/tests/fixtures/detectors/loop_accumulator.rs",
+      "status": "added",
+      "mode": "100644",
+      "base_blob_sha": null,
+      "postimage_blob_sha": "8286afaa2c7da2d16fcc6094cd20101f3010b607",
+      "sha256": "4c1466a53fa4cc0bcc54a1873d5f26c5c9c43f32bf7f37fbf1b706acd8c8f24f",
+      "bytes": 4021
+    },
+    {
+      "path": "tooling/sanctifier-core/tests/snapshots/detector_snapshots__loop_accumulator.snap",
+      "status": "added",
+      "mode": "100644",
+      "base_blob_sha": null,
+      "postimage_blob_sha": "1235981de92e9b10c7a1c63744d699c521ee1e77",
+      "sha256": "89e1bc01e64e35451993f90a8e47416deac362a41b609d5a71f1c6c78fab232b",
+      "bytes": 1986
+    }
+  ],
+  "original_cargo_manifests_and_lock_unchanged": true,
+  "original_cargo_lock_sha256": "71e5ec23fc9d34f6541f66e64075b64bf2cdaaf86123efeab8d79bb3be7a20c2",
+  "checks": [
+    {
+      "command": "INSTA_UPDATE=new cargo test --offline --locked -p sanctifier-core --no-default-features --test detector_snapshots snapshot_loop_accumulator -- --exact --nocapture",
+      "workspace": "original source and manifests",
+      "toolchain": "Rust 1.85.0",
+      "result": "blocked; rustc compiling stellar-xdr 20.1.0 was killed by signal 9 before sanctifier-core or its tests ran",
+      "exit_status": 101
+    },
+    {
+      "command": "INSTA_UPDATE=new cargo test --offline --locked -p sanctifier-core --no-default-features --test detector_snapshots snapshot_loop_accumulator -- --exact --nocapture",
+      "workspace": "temporary core-only manifest, original actual core sources/tests/docs symlinked; unused soroban-sdk dependency omitted",
+      "result": "compiled actual core, emitted six expected findings and pending insta snapshot; manually reviewed snapshot before accepting",
+      "compile_seconds": 82
+    },
+    {
+      "command": "INSTA_UPDATE=no cargo test --offline --locked -p sanctifier-core --no-default-features --test detector_snapshots snapshot_loop_accumulator -- --exact --nocapture",
+      "workspace": "same temporary core-only manifest",
+      "result": "PASS: 1 test; six findings; direct rule agrees with actual default registry",
+      "test_seconds": 0.26
+    },
+    {
+      "command": "cargo test --offline --locked -p sanctifier-core --no-default-features --test detector_docs_coverage",
+      "workspace": "same temporary core-only manifest",
+      "result": "PASS: existing 3 tests",
+      "test_seconds": 0.01
+    },
+    {
+      "command": "rustfmt --edition 2021 --check tooling/sanctifier-core/src/rules/loop_accumulator.rs tooling/sanctifier-core/src/finding_codes.rs tooling/sanctifier-core/tests/detector_snapshots.rs tooling/sanctifier-core/tests/fixtures/detectors/loop_accumulator.rs",
+      "toolchain": "rustfmt from Rust 1.98.1",
+      "result": "PASS"
+    },
+    {
+      "command": "git diff --check",
+      "workspace": "original source checkout",
+      "result": "PASS"
+    }
+  ],
+  "lean_execution": {
+    "toolchain": "rustc 1.85.0 (4d91de4e4 2025-02-17); cargo 1.85.0 (d73d2caf9 2024-12-31)",
+    "jobs": 1,
+    "debug_info": false,
+    "incremental": false,
+    "retained_registry_packages": 100,
+    "retained_versions_sources_checksums_match_original_lock": true,
+    "build_artifact_size": "233 MiB (du -sh)",
+    "omitted_dependency": "soroban-sdk (unused by compiled core; occurrences only in source fixture and description strings)",
+    "scope_limit": "Original full core/Soroban SDK build and full CI have not passed. This is real focused core/parser/registry execution with a temporary dependency manifest."
+  },
+  "findings": [
+    "sum_for:20",
+    "sum_while:29",
+    "sum_loop:41",
+    "sum_groups:52",
+    "sum_with_fee:63",
+    "sum_in_condition:71"
+  ],
+  "publication": {
+    "claim_comment_status": "one native attempt rejected HTTP 403 Resource not accessible by integration",
+    "desired_fork_status": "native lookup returned 404; no fork-capable authenticated writer available in this session",
+    "take": "https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1791115365940469",
+    "upstream_pr_created": false,
+    "next_action": "Refresh issue comments/open PRs, post prepared availability comment using the original authorized sponsor account without implying assignment, create/reuse woahwhattheheck/sanctifier, apply this patch on stated base or rebase carefully, and coordinate one PR for the prepared contribution.",
+    "maintainer_assignment_confirmed": false,
+    "compensation_confirmed": false,
+    "prior_interest": "https://github.com/Centurylong/sanctifier/issues/680#issuecomment-5978563619"
+  }
+}
