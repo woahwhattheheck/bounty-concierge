@@ -54,6 +54,7 @@ _TEXT_REF_ASCII_TOKEN_PUNCT = frozenset("./?#%=&+~-")
 _TEXT_REF_JOIN_CONTROL = frozenset("‌‍")
 _MAX_TEXT_CHARS = 250_000
 _MAX_SOURCE_URLS = 100
+_URL_CONTROL_OR_SPACE_RE = re.compile(r"[\x00-\x20\x7f]")
 
 
 def _is_text_token_char(char: str) -> bool:
@@ -97,6 +98,10 @@ def _exact_string(value: Any, name: str, *, nonempty: bool = True) -> str:
 
 def _https_url(value: Any, name: str) -> SplitResult:
     raw = _exact_string(value, name)
+    # urlsplit strips leading C0/space and embedded tabs/newlines. Reject those
+    # bytes before parsing so normalization cannot invent a clean source URL.
+    if _URL_CONTROL_OR_SPACE_RE.search(raw):
+        raise CanonicalSourceInputError(f"{name} must not include control characters or spaces")
     try:
         parsed = urlsplit(raw)
         port = parsed.port
