@@ -1,0 +1,126 @@
+name: Compose portfolio secondary-limit repair
+on:
+  push:
+    branches: [validation/portfolio-secondary403-rivet76f4-20261004]
+permissions:
+  contents: write
+jobs:
+  compose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      PRODUCT_REF: fix/portfolio-secondary403-rivet76f4-20261004
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reconstruct the pinned product parent without this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = woahwhattheheck/bounty-concierge
+          test -z "$(git ls-remote --heads origin "refs/heads/$PRODUCT_REF")"
+          cp examples/active_claim_secondary_limit_replay.py "$RUNNER_TEMP/replay.py"
+          git checkout --detach 3c3f18bc1ee20c08dafb736316dbb6f57212cd77
+          cp "$RUNNER_TEMP/replay.py" examples/active_claim_secondary_limit_replay.py
+          test "$(git hash-object concierge/active_claim_portfolio.py)" = fe16c2a1de6d9ab42f464a1ce609553f634cbabe
+          test "$(git hash-object docs/ACTIVE_CLAIM_PORTFOLIO.md)" = 9ad2f963ae89bc268aff87ada156ad2b9ffdf2e4
+          python -m pip install --disable-pip-version-check requests==2.32.5
+      - name: Observe baseline using the actual live readers and offline transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          python --version
+          python examples/active_claim_secondary_limit_replay.py --observe > "$RUNNER_TEMP/before.json"
+      - name: Apply the exact ten-line source repair and update the existing guide
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('concierge/active_claim_portfolio.py')
+          old = '                return True\n        error = error.__cause__ or error.__context__\n    return False\n'
+          new = '''                return True
+                      # Secondary limits may have neither Retry-After nor zero quota.
+                      # Inspect provider JSON only; exception wording is not evidence.
+                      if response is not None and response.status_code == 403:
+                          try:
+                              payload = response.json()
+                          except (TypeError, ValueError):
+                              payload = None
+                          message = payload.get("message") if isinstance(payload, dict) else None
+                          if isinstance(message, str) and "rate limit" in message.casefold():
+                              return True
+                  error = error.__cause__ or error.__context__
+              return False
+          '''
+          source = p.read_text()
+          assert source.count(old) == 1
+          p.write_text(source.replace(old, new))
+          d = Path('docs/ACTIVE_CLAIM_PORTFOLIO.md')
+          old_doc = 'delay seconds and HTTP dates. Exception wording alone does not trigger a stop.'
+          new_doc = ('delay seconds and HTTP dates. A 403 JSON object whose string `message`\n'
+                     'contains `rate limit` also stops the compilation: GitHub secondary limits\n'
+                     'can omit `Retry-After` while primary quota remains. Malformed/non-object\n'
+                     'JSON, a non-string message, other statuses and exception wording alone\n'
+                     'do not provide that evidence. The response is already in memory; no\n'
+                     'additional request is made. See [GitHub rate-limit documentation](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api#exceeding-the-rate-limit).')
+          text = d.read_text()
+          assert text.count(old_doc) == 1
+          text = text.replace(old_doc, new_doc)
+          text += '''
+          ## Reproduce secondary-limit request savings
+
+          Run `PYTHONPATH=. python examples/active_claim_secondary_limit_replay.py`
+          from the repository root. The example uses the actual portfolio, qualification,
+          availability and Requests code; only HTTP transport and the verifier clock
+          are replaced. No provider calls, claims or payout operations occur.
+
+          The 2026-10-04 before/after replay at parent `3c3f18bc1ee20c08dafb736316dbb6f57212cd77`
+          covers 12 scenarios. A body-only secondary-limit 403 reduces three-candidate
+          prepared requests from 6 to 1 (also with nonzero remaining quota), or from
+          6 to 2 when encountered by the availability reader. With 100 candidates,
+          the count drops from 200 to 1. All result rows and fail-closed decisions remain.
+          Eight control scenarios have identical full receipt digests before/after:
+          ordinary permission errors, invalid JSON shapes, other statuses, transport
+          failure and the already-supported header/429 throttle cases. This is a
+          deterministic prepared-request reduction, not measured fleet or network speed.
+
+          Source blob after repair: `66aefdf85a99e8cefdbed8c9990041d5fd85842f`.
+          Use `--observe` on the original source to obtain the baseline counts.
+          No loop, custody, retry, scheduling or persistent-throttle behavior changes.
+          '''
+          d.write_text(text)
+          PY
+          test "$(git hash-object concierge/active_claim_portfolio.py)" = 66aefdf85a99e8cefdbed8c9990041d5fd85842f
+      - name: Run the same twelve cases and compare complete control receipts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python examples/active_claim_secondary_limit_replay.py > "$RUNNER_TEMP/after.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ['RUNNER_TEMP'])
+          before = json.loads((p/'before.json').read_text())['scenarios']
+          after = json.loads((p/'after.json').read_text())['scenarios']
+          for i, (b, a) in enumerate(zip(before, after)):
+              print(a['name'], b['prepared_requests'], '->', a['prepared_requests'])
+              if i >= 4:
+                  assert a == b, a['name']
+          assert [r['prepared_requests'] for r in before[:4]] == [6, 6, 6, 200]
+          print('PASS: 12 scenarios; eight identical control receipts; zero provider calls')
+          PY
+      - name: Preserve a source-only successor on the new owned product branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 3c3f18bc1ee20c08dafb736316dbb6f57212cd77
+          git diff --check
+          git add concierge/active_claim_portfolio.py docs/ACTIVE_CLAIM_PORTFOLIO.md examples/active_claim_secondary_limit_replay.py
+          test "$(git diff --cached --name-only | wc -l)" -eq 3
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: stop portfolio reads on body-only secondary rate limits'
+          git push origin "HEAD:refs/heads/$PRODUCT_REF"
+          git rev-parse HEAD
+          git diff --stat HEAD^
