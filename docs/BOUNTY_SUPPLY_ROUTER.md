@@ -170,6 +170,28 @@ the first provider read, and a saved HOLD or REJECT cannot become ACTIVE by
 replaying only its baseline inputs. Exporting, resuming or routing does not
 refresh an earlier capture's clock; collect it again when its evidence expires.
 
+### Retained pull request identity
+
+New captures retain an optional `baseline.linked_prs` list from the initial
+canonical audit's already-fetched PR details. Each entry contains the canonical
+PR `repository` and `number`, plus nullable `author_login`, `head_repository`,
+`head_ref` and `head_sha`. A same-repository audit row uses the captured issue's
+repository; a head fork never substitutes for the PR's repository. Missing
+provider fields stay `null`, including a deleted or unavailable head repository.
+
+Replay requires every retained PR identity to match a detail endpoint in the
+existing `observation.source_urls`, within the issue or explicit submission
+target repository. It rejects malformed or duplicate identities. The existing
+capture digest binds this evidence, and the offline replay's routing snapshot
+keeps its own copy. Old captures without this list remain supported unchanged;
+absence does not establish that no related PR existed.
+
+These fields describe captured source identity, not current ownership, a stable
+head throughout collection, contributor eligibility, acceptance or payment.
+They do not change the four canonical audit gate fields, qualification, source
+age or provider request count. Inspect them in the private capture or replay
+snapshot; reduced routing output and safe summary receipts do not expose them.
+
 The capture files and `supply.json` contain source prose needed for replay. Keep
 them in trusted custody and share the reduced routing result or safe summary
 for coordination. Content digests detect changes but do not authenticate an
