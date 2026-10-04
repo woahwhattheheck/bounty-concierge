@@ -284,12 +284,21 @@ def _fill_details(session: Any, report: dict[str, Any], floor: Decimal, max_deta
                   *, stopped: bool = False, skip_complete: bool = False) -> None:
     detail_attempts = 0
     report["details_complete"] = True
-    for index, row in enumerate(report["listings"]):
+    failed_statuses = {"READ_FAILED", "INVALID_DETAIL"}
+    order = list(range(len(report["listings"])))
+    if skip_complete:
+        # Spend a resumed budget on untouched details before retrying failures.
+        # Sorting indices leaves retained listing order and identity unchanged.
+        order.sort(key=lambda index: report["listings"][index]["funding_status"] in failed_statuses)
+    for index in order:
+        row = report["listings"][index]
         if (not _active(row) or _amount(row["advertised_total_usd"]) < floor
                 or (skip_complete and row["funding_status"] == "COMPLETE")):
             continue
         if stopped or detail_attempts >= max_details:
-            row["funding_status"] = "NOT_ATTEMPTED" if stopped else "DETAIL_LIMIT"
+            # A deferred failure is not an unattempted row on the next resume.
+            if row["funding_status"] not in failed_statuses:
+                row["funding_status"] = "NOT_ATTEMPTED" if stopped else "DETAIL_LIMIT"
             report["details_complete"] = False
             continue
         try:
