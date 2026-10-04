@@ -338,6 +338,19 @@ original metadata, repository spelling and order, with an independent nested
 audit. A later invocation performs fresh reads; partial-read signals and errors
 remain intact.
 
+Within that batch, successful source issue reads and complete maintainer-comment
+observations are also reused across explicit target variants of the same issue.
+Each target retains its own evidence and PR census. Incomplete comment traversals
+are not reused across target variants.
+
+An actual-module Requests loopback replay reduced two-row traffic from 6 to 4
+GETs for one destination with distinct evidence, and from 10 to 8 for different
+destinations, with identical complete outputs. The incomplete-comment control
+retained both traversals, and a later invocation observed changed comments.
+[Source-bound measurements](work/throughput/audit-source-reuse-20261004/results.json)
+describe the synthetic HTTP and package-import boundary; no live-provider or
+fleet-latency improvement is asserted.
+
 ---
 
 ## Platform Links

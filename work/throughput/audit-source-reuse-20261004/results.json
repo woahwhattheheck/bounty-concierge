@@ -1,0 +1,72 @@
+{
+  "boundary": "Actual audit module and direct dependencies, real target validation and Requests HTTP over loopback; unrelated concierge package bootstrap excluded; no live provider reads.",
+  "same_destination_distinct_evidence": {
+    "before": {
+      "wire_gets": 6,
+      "issue_gets": 2,
+      "search_gets": 2,
+      "comment_gets": 2
+    },
+    "after": {
+      "wire_gets": 4,
+      "issue_gets": 1,
+      "search_gets": 2,
+      "comment_gets": 1
+    },
+    "outputs_identical": true,
+    "target_evidence_distinct": true,
+    "nested_results_independent": true
+  },
+  "different_destinations": {
+    "before": {
+      "wire_gets": 10,
+      "issue_gets": 2,
+      "search_gets": 4,
+      "pr_detail_gets": 2,
+      "comment_gets": 2
+    },
+    "after": {
+      "wire_gets": 8,
+      "issue_gets": 1,
+      "search_gets": 4,
+      "pr_detail_gets": 2,
+      "comment_gets": 1
+    },
+    "outputs_identical": true,
+    "target_evidence_distinct": true,
+    "nested_results_independent": true
+  },
+  "incomplete_comments": {
+    "before": {
+      "wire_gets": 6,
+      "issue_gets": 2,
+      "search_gets": 2,
+      "comment_gets": 2
+    },
+    "after": {
+      "wire_gets": 5,
+      "issue_gets": 1,
+      "search_gets": 2,
+      "comment_gets": 2
+    },
+    "outputs_identical": true,
+    "target_evidence_distinct": true,
+    "nested_results_independent": true
+  },
+  "separate_invocations": {
+    "wire_gets": 8,
+    "issue_gets": 2,
+    "search_gets": 4,
+    "comment_gets": 2,
+    "observed_comment_times": [
+      "2026-10-04T12:00:01Z",
+      "2026-10-04T12:00:02Z"
+    ],
+    "fresh_reads": true
+  },
+  "baseline_commit": "4f5bc01a9b6d6b91d5937d9743ed3608f9003ebc",
+  "composed_base_commit": "acf2bee8348e4a7618527bd75d5cb63d5dbc6d7b",
+  "production_sha256": "903c2bca26e098a15dbb64931efb5e817ea80c09b09a8354336a40349f1b2aca",
+  "python": "3.12.14",
+  "requests": "2.34.2"
+}
