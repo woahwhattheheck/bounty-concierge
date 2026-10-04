@@ -14,6 +14,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      RUSTFLAGS: -D warnings
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,6 +49,16 @@ jobs:
           old = '- [Rust](https://www.rust-lang.org/tools/install)'
           assert old in s
           p.write_text(s.replace(old, old + ' 1.91 or newer\n- Protocol Buffers compiler (`protoc`)'))
+          p = Path('tests/ci.rs')
+          s = p.read_text()
+          replacements = {
+              'Step::uses("arduino", "setup-protoc", "v3")': 'Step::new("Install protoc").uses("arduino", "setup-protoc", "v3")',
+              'Step::uses("shuttle-hq", "deploy-action", "v2")': 'Step::new("Deploy service").uses("shuttle-hq", "deploy-action", "v2")',
+          }
+          for old, new in replacements.items():
+              assert s.count(old) == 1, old
+              s = s.replace(old, new)
+          p.write_text(s)
           PY
       - name: Install build tools
         shell: bash
@@ -70,14 +82,12 @@ jobs:
       - name: Run required build checks
         working-directory: source
         shell: bash
-        env:
-          RUSTFLAGS: -D warnings
         run: |
           set -euo pipefail
           cargo fmt --all -- --check
           cargo test --locked --all-features
           cargo clippy --locked --all-targets --all-features -- -D warnings
-          git diff --check -- Cargo.toml build.rs src/main.rs README.md
+          git diff --check -- Cargo.toml build.rs src/main.rs README.md tests/ci.rs
       - name: Export candidate and provenance
         if: always()
         shell: bash
