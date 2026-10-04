@@ -1,0 +1,157 @@
+{
+  "after": {
+    "cases": {
+      "cleanup_failure": {
+        "failed_responses": [
+          {
+            "close_count": 1,
+            "connection_released": true,
+            "raw_closed": true
+          }
+        ],
+        "failure": {
+          "code": "HTTP_ERROR",
+          "http_status": 404
+        },
+        "request_count": 1,
+        "same_original_exception": true
+      },
+      "continue": {
+        "caller_session_close_count": 0,
+        "failed_responses": [
+          {
+            "close_count": 1,
+            "connection_released": true,
+            "raw_closed": true
+          }
+        ],
+        "summary": {
+          "attempted_count": 2,
+          "captured_count": 1,
+          "failed_count": 1,
+          "rate_limit_reset_at": null,
+          "rate_limited": false,
+          "remaining_count": 1,
+          "request_count": 4,
+          "retry_after_seconds": null,
+          "status": "PARTIAL",
+          "stop_reason": "ITEM_ERRORS"
+        }
+      },
+      "quota": {
+        "caller_session_close_count": 0,
+        "failed_responses": [
+          {
+            "close_count": 1,
+            "connection_released": true,
+            "raw_closed": true
+          }
+        ],
+        "summary": {
+          "attempted_count": 1,
+          "captured_count": 0,
+          "failed_count": 1,
+          "rate_limit_reset_at": 1791111111,
+          "rate_limited": true,
+          "remaining_count": 2,
+          "request_count": 1,
+          "retry_after_seconds": 17,
+          "status": "PARTIAL",
+          "stop_reason": "RATE_LIMITED"
+        }
+      },
+      "returned_response": {
+        "body_consumed": false,
+        "caller_session_close_count": 0,
+        "close_count": 0,
+        "raw_closed": false,
+        "same_response": true
+      }
+    },
+    "requests_version": "2.34.2",
+    "source_blob": "7cd1ab630e4a0ee20bb662c88872ff36458e9678"
+  },
+  "baseline_batch_commit": "b855a699d70a33c6c9efdd9bcafc330ebeabd3ac",
+  "before": {
+    "cases": {
+      "cleanup_failure": {
+        "failed_responses": [
+          {
+            "close_count": 0,
+            "connection_released": false,
+            "raw_closed": false
+          }
+        ],
+        "failure": {
+          "code": "HTTP_ERROR",
+          "http_status": 404
+        },
+        "request_count": 1,
+        "same_original_exception": true
+      },
+      "continue": {
+        "caller_session_close_count": 0,
+        "failed_responses": [
+          {
+            "close_count": 0,
+            "connection_released": false,
+            "raw_closed": false
+          }
+        ],
+        "summary": {
+          "attempted_count": 2,
+          "captured_count": 1,
+          "failed_count": 1,
+          "rate_limit_reset_at": null,
+          "rate_limited": false,
+          "remaining_count": 1,
+          "request_count": 4,
+          "retry_after_seconds": null,
+          "status": "PARTIAL",
+          "stop_reason": "ITEM_ERRORS"
+        }
+      },
+      "quota": {
+        "caller_session_close_count": 0,
+        "failed_responses": [
+          {
+            "close_count": 0,
+            "connection_released": false,
+            "raw_closed": false
+          }
+        ],
+        "summary": {
+          "attempted_count": 1,
+          "captured_count": 0,
+          "failed_count": 1,
+          "rate_limit_reset_at": 1791111111,
+          "rate_limited": true,
+          "remaining_count": 2,
+          "request_count": 1,
+          "retry_after_seconds": 17,
+          "status": "PARTIAL",
+          "stop_reason": "RATE_LIMITED"
+        }
+      },
+      "returned_response": {
+        "body_consumed": false,
+        "caller_session_close_count": 0,
+        "close_count": 0,
+        "raw_closed": false,
+        "same_response": true
+      }
+    },
+    "requests_version": "2.34.2",
+    "source_blob": "40f700e150a97cbc631a0fe53c67de9876dea9dc"
+  },
+  "dependency_git_blobs": {
+    "bounty_audit.py": "52dabb8354947a82f0a6b20f953dd00c0d8f4245",
+    "bounty_capture.py": "96a9dca7a80e8a8ef70db1a92f376e5b6ae89197",
+    "bounty_preflight.py": "aea10efe5e557914085c3ba513ceacd5373ee6e2",
+    "secure_output.py": "a0e8953fc8cad9ab62c0b2708325875c4c5e0573"
+  },
+  "dependency_provenance": "Identical copies of local checkout4bb1b52 and its pre-existing staged preflight/audit/capture files; secure_output read from pinned batch commit. No shared source edited.",
+  "limits": "Response release and request behavior only. No live provider traffic or fleet latency claim.",
+  "method": "Whole-module import; real Requests with local HTTP/1.1 fixture; collect_batch for404 continuation and429 quota; transport ownership and cleanup exception controls.",
+  "python_version": "3.12.14"
+}

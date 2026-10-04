@@ -116,7 +116,15 @@ class _BatchSession:
             response = self.session.get(url, **kwargs)
         except requests.RequestException as exc:
             if isinstance(exc, requests.HTTPError) and exc.response is not None:
-                self._record_response(exc.response)
+                try:
+                    self._record_response(exc.response)
+                finally:
+                    # Hooks run before Requests consumes the response body.
+                    # Preserve the original HTTP error even if cleanup fails.
+                    try:
+                        exc.response.close()
+                    except Exception:
+                        pass
             else:
                 self.failure = {"code": "TRANSPORT_ERROR", "error_type": type(exc).__name__}
             raise
