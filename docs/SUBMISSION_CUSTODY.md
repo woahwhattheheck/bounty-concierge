@@ -95,6 +95,27 @@ The ledger is append-only and has a canonical SHA-256 over all normalized events
 
 `strict_json_loads()` is provided for file/transport boundaries that need duplicate-key rejection before passing objects to the API.
 
+### Inspecting a conflicted legacy ledger
+
+`inspect_ledger()` exposes original candidate registrations, dispatches, sponsor
+events and supersession flags even when old records contain conflicting
+capitalization variants of one GitHub source/revision:
+
+```python
+from concierge.submission_custody import inspect_ledger
+
+report = inspect_ledger(ledger, as_of="2026-10-04T12:00:00Z")
+conflicts = report["source_revision_conflicts"]
+records = report["candidates"]
+```
+
+A conflict returns `valid=False` with the affected submission IDs. Unrelated
+records remain visible. The original ledger digest and stored bytes are retained;
+all other digest, event, chronology and lifecycle checks still apply. This
+read-only result contains no ready/send disposition and grants no send authority.
+Ordinary verification, status evaluation and mutations remain strict. Inspection
+does not rewrite or make a conflicted ledger admissible.
+
 ### Packet JSON compatibility
 
 The packet verifier first checks the producer's v1 digest: sorted, compact JSON
