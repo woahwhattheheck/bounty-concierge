@@ -222,6 +222,8 @@ def audit_bounty(
     max_pages: int = 10,
     submission_target: dict[str, str] | None = None,
     _pr_detail_cache: dict[tuple[str, int], dict[str, Any]] | None = None,
+    _source_issue_cache: dict[tuple[str, int], dict[str, Any]] | None = None,
+    _source_expiry_cache: dict[tuple[str, int], list[dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     """Audit one GitHub bounty issue against canonical repository signals.
 
@@ -255,15 +257,26 @@ def audit_bounty(
                 repo, number, token, session=owned_session, max_pages=max_pages,
                 submission_target=submission_target,
                 _pr_detail_cache=_pr_detail_cache,
+                _source_issue_cache=_source_issue_cache,
+                _source_expiry_cache=_source_expiry_cache,
             )
 
     token = token or GITHUB_TOKEN
     headers = _headers(token)
     issue_url = f"https://api.github.com/repos/{repo}/issues/{number}"
-    issue = _object_payload(
-        _get_json(session, issue_url, headers=headers),
-        f"issue {repo}#{number}",
-    )
+    source_identity = (repo.casefold(), number)
+    if _source_issue_cache is not None and source_identity in _source_issue_cache:
+        issue = deepcopy(_source_issue_cache[source_identity])
+    else:
+        issue = _object_payload(
+            _get_json(session, issue_url, headers=headers),
+            f"issue {repo}#{number}",
+        )
+        if "pull_request" not in issue and _source_issue_cache is not None:
+            # Issue bodies/profile data are not inputs to the canonical audit.
+            _source_issue_cache[source_identity] = {
+                key: deepcopy(issue[key]) for key in ("state", "html_url") if key in issue
+            }
     if "pull_request" in issue:
         raise ValueError(f"{repo}#{number} is a pull request, not an issue")
 
@@ -365,13 +378,18 @@ def audit_bounty(
     maintainer_expiry_comments: list[dict[str, Any]] = []
     comments_truncated = False
     if issue_state == "open":
-        maintainer_expiry_comments, comments_truncated = _maintainer_expiry_evidence(
-            session,
-            repo,
-            number,
-            headers=headers,
-            max_pages=max_pages,
-        )
+        if _source_expiry_cache is not None and source_identity in _source_expiry_cache:
+            maintainer_expiry_comments = deepcopy(_source_expiry_cache[source_identity])
+        else:
+            maintainer_expiry_comments, comments_truncated = _maintainer_expiry_evidence(
+                session,
+                repo,
+                number,
+                headers=headers,
+                max_pages=max_pages,
+            )
+            if not comments_truncated and _source_expiry_cache is not None:
+                _source_expiry_cache[source_identity] = deepcopy(maintainer_expiry_comments)
     search_truncated = search_truncated or comments_truncated
     maintainer_expiry_signal = bool(maintainer_expiry_comments)
 
@@ -432,7 +450,9 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
     """Read each case-insensitive issue/explicit-target combination once per invocation.
 
     Canonical PR details are shared within this batch when distinct issues link
-    the same PR. Later invocations and standalone audits perform fresh reads.
+    the same PR. Successful source issue and complete comment observations are
+    shared across target variants; each target still receives its own PR census.
+    Later invocations and standalone audits perform fresh reads.
     A canonical issue 404/410 is retained as unavailable while independent rows
     continue. Other provider/evidence failures stop immediately. Any failed row
     raises BountyAuditError with explicit outcomes in ``partial_report``; there
@@ -446,6 +466,8 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
 
     audited = []
     pr_detail_cache: dict[tuple[str, int], dict[str, Any]] = {}
+    source_issue_cache: dict[tuple[str, int], dict[str, Any]] = {}
+    source_expiry_cache: dict[tuple[str, int], list[dict[str, Any]]] = {}
     audit_by_issue: dict[tuple[str, int, str | None], dict[str, Any]] = {}
     unavailable_by_issue: dict[tuple[str, int], BountyAuditError] = {}
     unavailable: list[dict[str, Any]] = []
@@ -478,6 +500,8 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
                     max_pages=max_pages,
                     submission_target=target,
                     _pr_detail_cache=pr_detail_cache,
+                    _source_issue_cache=source_issue_cache,
+                    _source_expiry_cache=source_expiry_cache,
                 )
             except BountyAuditError as exc:
                 if (
