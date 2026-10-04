@@ -1,0 +1,110 @@
+name: Dokploy 5492 real PostgreSQL acceptance
+on:
+  push:
+    branches: [kestrel47/dokploy5492-real-pg-20261004]
+    paths:
+      - work/acceptance/dokploy5492-k47-20261004/real-pg.cjs
+      - .github/workflows/dokploy5492-real-pg-k47.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: dokploy5492-real-pg-k47
+  cancel-in-progress: false
+jobs:
+  retained-route-postgres:
+    if: github.repository == 'woahwhattheheck/bounty-concierge'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: proof-only-local
+          POSTGRES_DB: dokploy5492_acceptance
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: work/acceptance/dokploy5492-k47-20261004
+      - uses: actions/checkout@v4
+        with:
+          repository: tokenjunkielabs/dokploy
+          ref: 06523165940dfd61d48fdb7977a39bcafa95f03b
+          path: _source/dokploy
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /apps/dokploy/server/api/routers/organization.ts
+            /packages/server/src/db/schema/account.ts
+            /packages/server/package.json
+      - uses: actions/checkout@v4
+        with:
+          repository: woahwhattheheck/bounty-concierge
+          ref: f5d7b088a038311f912b45e880a5a427646096c0
+          path: _source/retained
+          persist-credentials: false
+          sparse-checkout: work/patches/dokploy-5492-rowlock-20261004
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.4.0
+      - name: Install only the pinned route dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .proof-runtime evidence
+          cp work/acceptance/dokploy5492-k47-20261004/real-pg.cjs .proof-runtime/
+          cat > .proof-runtime/package.json <<'JSON'
+          {"private":true,"dependencies":{"drizzle-orm":"0.45.2","postgres":"3.4.4","nanoid":"3.3.18","@trpc/server":"11.10.0","typescript":"5.8.3"}}
+          JSON
+          node - <<'JS'
+          const assert = require('node:assert/strict');
+          const target = require('./_source/dokploy/packages/server/package.json');
+          const proof = require('./.proof-runtime/package.json');
+          for (const name of ['drizzle-orm','postgres','nanoid','@trpc/server']) {
+            assert.equal(proof.dependencies[name], target.dependencies[name], name);
+          }
+          JS
+          npm install --prefix .proof-runtime --ignore-scripts --no-audit --no-fund
+          npm ls --prefix .proof-runtime --json > evidence/dependencies.json
+      - name: Guard original source and apply the retained patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PACKET="$GITHUB_WORKSPACE/_source/retained/work/patches/dokploy-5492-rowlock-20261004"
+          SOURCE=apps/dokploy/server/api/routers/organization.ts
+          test "$(git -C _source/dokploy hash-object "$SOURCE")" = 2cf8009b62e87eafb5233dd45c3e42524575b2d4
+          cp "_source/dokploy/$SOURCE" evidence/organization.before.ts
+          git -C _source/dokploy apply --check "$PACKET/move-rowlock.patch"
+          git -C _source/dokploy apply "$PACKET/move-rowlock.patch"
+          git -C _source/dokploy diff --check
+          git -C _source/dokploy diff > evidence/applied.patch
+          cp .proof-runtime/package-lock.json evidence/package-lock.json
+          sha256sum .proof-runtime/real-pg.cjs "$PACKET/move-rowlock.patch" > evidence/SHA256SUMS
+          printf '%s\n' "$GITHUB_SHA" > evidence/proof-commit.txt
+      - name: Execute the retained callbacks against real PostgreSQL
+        shell: bash
+        env:
+          DATABASE_URL: postgres://postgres:proof-only-local@127.0.0.1:5432/dokploy5492_acceptance
+        run: |
+          set -euo pipefail
+          export DOKPLOY_ROOT="$GITHUB_WORKSPACE/_source/dokploy"
+          export PACKET_ROOT="$GITHUB_WORKSPACE/_source/retained/work/patches/dokploy-5492-rowlock-20261004"
+          export PROOF_OUTPUT="$GITHUB_WORKSPACE/evidence"
+          node .proof-runtime/real-pg.cjs 2>&1 | tee evidence/results.log
+      - name: Retain source-bound evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dokploy5492-postgresql-${{ github.sha }}
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 7
