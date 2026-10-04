@@ -5,6 +5,7 @@ Subcommands:
     browse   -- List and filter open bounties across all repos
     bountyhub -- Read the public BountyHub catalog and export an intake shortlist
     capture-batch -- Capture a bounded issue shortlist for offline routing
+    capture-recover -- Recover an interrupted batch from saved capture files
     faq      -- Ask a question about RustChain or bounties
     wallet   -- Register a wallet or check balance
     status   -- Check pending payouts for a wallet
@@ -171,14 +172,18 @@ def _print_bounty_table(bounties, show_evidence=False):
 def _cmd_bounty_intake(args):
     """Delegate intake flags, output and exit status to the shared modules."""
     module_args = list(args.intake_args)
-    # The catalog always emits JSON; the batch module has an explicit flag.
-    if args.json and args.command == "capture-batch":
+    # The catalog always emits JSON; capture modules have an explicit flag.
+    if args.json and args.command in {"capture-batch", "capture-recover"}:
         module_args.insert(0, "--json")
     if args.dry_run and not any(flag in module_args for flag in ("-h", "--help")):
         if args.command == "bountyhub":
             steps = ["Read the public BountyHub catalog using the requested source bounds",
                      "Return the reader's catalog report or intake shortlist"]
             unknown = ["catalog_rows", "source_completeness", "claim_eligibility"]
+        elif args.command == "capture-recover":
+            steps = ["Read the saved shortlist and completed capture files",
+                     "Rebuild offline supply, summary and remaining shortlist files"]
+            unknown = ["captured_count", "remaining_count", "dispositions"]
         else:
             steps = ["Read the requested issue shortlist",
                      "Collect GitHub preflight evidence within the request budget",
@@ -195,6 +200,8 @@ def _cmd_bounty_intake(args):
 
     if args.command == "bountyhub":
         from concierge.bountyhub_catalog import main as intake_main
+    elif args.command == "capture-recover":
+        from concierge.bounty_capture_recover import main as intake_main
     else:
         from concierge.bounty_capture_batch import main as intake_main
 
@@ -1268,6 +1275,7 @@ def _build_parser():
     for command, description in (
         ("bountyhub", "Read the public BountyHub catalog and export an intake shortlist"),
         ("capture-batch", "Capture a bounded issue shortlist for offline routing"),
+        ("capture-recover", "Recover an interrupted batch from saved capture files"),
     ):
         delegated = sub.add_parser(command, add_help=False, help=description)
         _add_common_flags(delegated)
@@ -1410,7 +1418,7 @@ def main():
     """Main CLI entry point."""
     parser = _build_parser()
     args, remaining = parser.parse_known_args()
-    if args.command in {"bountyhub", "capture-batch"}:
+    if args.command in {"bountyhub", "capture-batch", "capture-recover"}:
         args.intake_args = remaining
     elif remaining:
         parser.error("unrecognized arguments: " + " ".join(remaining))
@@ -1423,6 +1431,7 @@ def main():
         "browse": _cmd_browse,
         "bountyhub": _cmd_bounty_intake,
         "capture-batch": _cmd_bounty_intake,
+        "capture-recover": _cmd_bounty_intake,
         "faq": _cmd_faq,
         "wallet": _cmd_wallet,
         "status": _cmd_status,
