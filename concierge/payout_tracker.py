@@ -254,73 +254,74 @@ def _check_history_snapshot(
     expected_total: int | None = None
     offset = 0
 
-    while True:
-        params: dict[str, object] = {"miner_id": wallet_id}
-        if expected_total is not None:
-            remaining = expected_total - offset
-            if remaining <= 0:
-                return collected, recent
-            alignment = offset % _HISTORY_PAGE_LIMIT
-            page_limit = (
-                _HISTORY_PAGE_LIMIT
-                if alignment == 0
-                else _HISTORY_PAGE_LIMIT - alignment
-            )
-            params.update(
-                {
-                    "limit": min(page_limit, remaining),
-                    "offset": offset,
-                }
-            )
-
-        try:
-            resp = requests.get(
-                url,
-                params=params,
-                timeout=15,
-                verify=verify,
-            )
-            resp.raise_for_status()
-            try:
-                data = resp.json()
-            except (TypeError, ValueError) as exc:
-                raise PayoutLookupError(
-                    "history payout response was not valid JSON"
-                ) from exc
-        except PayoutLookupError:
-            raise
-        except (requests.RequestException, OSError) as exc:
-            raise PayoutLookupError("history payout request failed") from exc
-
-        canonical = _canonical_history_page(data, wallet_id)
-        if canonical is None:
-            if expected_total is not None or offset != 0:
-                raise PayoutLookupError("history payout pagination was malformed")
-            history = _payload_list(data, "history")
-            return history, history
-
-        page, total = canonical
-        if expected_total is None:
-            recent = page
-            expected_total = total
-            if expected_total > _HISTORY_MAX_RECORDS:
-                raise PayoutLookupError(
-                    "history payout pagination exceeds supported range"
+    with requests.Session() as session:
+        while True:
+            params: dict[str, object] = {"miner_id": wallet_id}
+            if expected_total is not None:
+                remaining = expected_total - offset
+                if remaining <= 0:
+                    return collected, recent
+                alignment = offset % _HISTORY_PAGE_LIMIT
+                page_limit = (
+                    _HISTORY_PAGE_LIMIT
+                    if alignment == 0
+                    else _HISTORY_PAGE_LIMIT - alignment
                 )
-        elif total != expected_total:
-            raise PayoutLookupError(
-                "history payout pagination changed during read"
-            )
+                params.update(
+                    {
+                        "limit": min(page_limit, remaining),
+                        "offset": offset,
+                    }
+                )
 
-        if offset + len(page) > expected_total:
-            raise PayoutLookupError("history payout pagination was malformed")
+            try:
+                with session.get(
+                    url,
+                    params=params,
+                    timeout=15,
+                    verify=verify,
+                ) as resp:
+                    resp.raise_for_status()
+                    try:
+                        data = resp.json()
+                    except (TypeError, ValueError) as exc:
+                        raise PayoutLookupError(
+                            "history payout response was not valid JSON"
+                        ) from exc
+            except PayoutLookupError:
+                raise
+            except (requests.RequestException, OSError) as exc:
+                raise PayoutLookupError("history payout request failed") from exc
 
-        collected.extend(page)
-        offset += len(page)
-        if offset == expected_total:
-            return collected, recent
-        if not page or offset > _HISTORY_MAX_OFFSET:
-            raise PayoutLookupError("history payout pagination was incomplete")
+            canonical = _canonical_history_page(data, wallet_id)
+            if canonical is None:
+                if expected_total is not None or offset != 0:
+                    raise PayoutLookupError("history payout pagination was malformed")
+                history = _payload_list(data, "history")
+                return history, history
+
+            page, total = canonical
+            if expected_total is None:
+                recent = page
+                expected_total = total
+                if expected_total > _HISTORY_MAX_RECORDS:
+                    raise PayoutLookupError(
+                        "history payout pagination exceeds supported range"
+                    )
+            elif total != expected_total:
+                raise PayoutLookupError(
+                    "history payout pagination changed during read"
+                )
+
+            if offset + len(page) > expected_total:
+                raise PayoutLookupError("history payout pagination was malformed")
+
+            collected.extend(page)
+            offset += len(page)
+            if offset == expected_total:
+                return collected, recent
+            if not page or offset > _HISTORY_MAX_OFFSET:
+                raise PayoutLookupError("history payout pagination was incomplete")
 
 
 def _check_complete_history(

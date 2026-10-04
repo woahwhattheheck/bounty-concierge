@@ -127,6 +127,13 @@ places (1 RTC = 1,000,000 units).
 concierge wallet balance YOUR_WALLET_NAME
 ```
 
+For pending transfers and recent history, use `concierge status --wallet
+YOUR_WALLET_NAME`. This reads all required history pages through one HTTP
+session, then returns pending transfers plus the original first page. The
+connection can be reused while paging; each invocation still makes fresh
+requests. HTTP responses and the session are closed on both success and error.
+A failed or incomplete read remains an error, never an empty pending list.
+
 ### Via the Block Explorer
 
 Browse balances and transactions at:
