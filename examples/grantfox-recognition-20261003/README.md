@@ -22,7 +22,7 @@ FoxPoints award and reported account total, and hashes the exact source files.
 For this retained batch, use its original observation time:
 
 ```bash
-python concierge/grantfox_recognition_import.py \
+concierge grantfox-recognition \
   --observed-at 2026-10-03T06:53:24Z \
   --pair examples/grantfox-recognition-20261003/sources/pr426.json \
          examples/grantfox-recognition-20261003/sources/comment426.json \
@@ -30,14 +30,17 @@ python concierge/grantfox_recognition_import.py \
          examples/grantfox-recognition-20261003/sources/comment427.json \
   --output /tmp/grantfox-imported-input.json
 
-python concierge/reward_settlement_ledger.py compile \
+concierge reward-ledger compile \
   --input /tmp/grantfox-imported-input.json \
   --out-dir /tmp/grantfox-imported-ledger
 ```
 
 Choose unused output paths. `--output` creates a file exclusively; omit it for
-JSON on stdout. Both scripts also support `python -m concierge.<module>` in a
-complete checkout or installation. Repeat `--pair` for another captured batch,
+JSON on stdout. Both commands appear in `concierge --help` and delegate to the
+existing modules. The script and `python -m concierge.<module>` entrypoints remain
+available. Use `concierge --dry-run grantfox-recognition ...` or
+`concierge --dry-run reward-ledger ...` to inspect the requested operation without
+reading inputs or creating outputs. Repeat `--pair` for another captured batch,
 using that batch's observation time. This reads local records; it does not fetch
 GitHub or change any provider state.
 

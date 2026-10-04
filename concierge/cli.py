@@ -6,6 +6,8 @@ Subcommands:
     bountyhub -- Read the public BountyHub catalog and export an intake shortlist
     capture-batch -- Capture a bounded issue shortlist for offline routing
     capture-recover -- Recover an interrupted batch from saved capture files
+    grantfox-recognition -- Import captured GrantFox PR and award records
+    reward-ledger -- Compile or inspect retained reward settlement records
     faq      -- Ask a question about RustChain or bounties
     wallet   -- Register a wallet or check balance
     status   -- Check pending payouts for a wallet
@@ -159,6 +161,29 @@ def _cmd_bounty_intake(args):
         from concierge.bounty_capture_batch import main as intake_main
 
     sys.exit(intake_main(module_args))
+
+
+def _cmd_reward_records(args):
+    """Expose the existing offline reward tools through the installed command."""
+    module_args = list(args.intake_args)
+    if args.dry_run and not any(flag in module_args for flag in ("-h", "--help")):
+        if args.command == "grantfox-recognition":
+            steps = ["Read the supplied captured PR and award-comment files",
+                     "Import their source identities and recognition into ledger input"]
+            unknown = ["case_count", "recognition_totals"]
+        else:
+            steps = ["Read the supplied reward records",
+                     "Compile or verify the requested settlement artifacts"]
+            unknown = ["settlement_states", "monetary_totals", "recognition_totals"]
+        _print_dry_run_plan(args, f"{args.command}.preview",
+                            {"arguments": module_args}, steps, unknown)
+        return
+
+    if args.command == "grantfox-recognition":
+        from concierge.grantfox_recognition_import import main as records_main
+    else:
+        from concierge.reward_settlement_ledger import main as records_main
+    sys.exit(records_main(module_args))
 
 
 def _browse_repos(args):
@@ -1300,6 +1325,8 @@ def _build_parser():
         ("bountyhub", "Read the public BountyHub catalog and export an intake shortlist"),
         ("capture-batch", "Capture a bounded issue shortlist for offline routing"),
         ("capture-recover", "Recover an interrupted batch from saved capture files"),
+        ("grantfox-recognition", "Import captured GrantFox PR and award records without provider calls"),
+        ("reward-ledger", "Compile or verify retained reward settlement records"),
     ):
         delegated = sub.add_parser(command, add_help=False, help=description)
         _add_common_flags(delegated)
@@ -1442,7 +1469,8 @@ def main():
     """Main CLI entry point."""
     parser = _build_parser()
     args, remaining = parser.parse_known_args()
-    if args.command in {"bountyhub", "capture-batch", "capture-recover"}:
+    if args.command in {"bountyhub", "capture-batch", "capture-recover",
+                        "grantfox-recognition", "reward-ledger"}:
         args.intake_args = remaining
     elif remaining:
         parser.error("unrecognized arguments: " + " ".join(remaining))
@@ -1456,6 +1484,8 @@ def main():
         "bountyhub": _cmd_bounty_intake,
         "capture-batch": _cmd_bounty_intake,
         "capture-recover": _cmd_bounty_intake,
+        "grantfox-recognition": _cmd_reward_records,
+        "reward-ledger": _cmd_reward_records,
         "faq": _cmd_faq,
         "wallet": _cmd_wallet,
         "status": _cmd_status,
