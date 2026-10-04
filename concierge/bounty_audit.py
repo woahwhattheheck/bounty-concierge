@@ -447,7 +447,7 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
     audited = []
     pr_detail_cache: dict[tuple[str, int], dict[str, Any]] = {}
     audit_by_issue: dict[tuple[str, int, str | None], dict[str, Any]] = {}
-    unavailable_by_issue: dict[tuple[str, int, str | None], BountyAuditError] = {}
+    unavailable_by_issue: dict[tuple[str, int], BountyAuditError] = {}
     unavailable: list[dict[str, Any]] = []
     first_unavailable: tuple[int, BountyAuditError] | None = None
     for index, bounty in enumerate(bounties):
@@ -464,11 +464,12 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
             json.dumps(target, sort_keys=True, separators=(",", ":"))
             if target is not None else None
         )
-        key = (repo.casefold(), number, target_key)
+        issue_key = (repo.casefold(), number)
+        key = (*issue_key, target_key)
         if key not in audit_by_issue:
             try:
-                if key in unavailable_by_issue:
-                    raise unavailable_by_issue[key]
+                if issue_key in unavailable_by_issue:
+                    raise unavailable_by_issue[issue_key]
                 audit_by_issue[key] = audit_bounty(
                     repo,
                     key[1],
@@ -489,7 +490,9 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
                     # deletion or permission to submit. Keep it out of the
                     # automatic remaining-list recovery path, with full input
                     # identity/metadata retained for source resolution.
-                    unavailable_by_issue[key] = exc
+                    # Issue availability is independent of target instructions;
+                    # successful audits still retain their complete target key.
+                    unavailable_by_issue[issue_key] = exc
                     unavailable.append({
                         "input_row": index + 1, "status": "ISSUE_UNAVAILABLE",
                         "candidate": deepcopy({key: value for key, value in row.items()
