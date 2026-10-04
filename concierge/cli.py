@@ -173,14 +173,23 @@ def _browse_repos(args):
     return repos
 
 
+def _canonical_browse_skill(skill):
+    """Normalize equivalent skill spellings without expanding categories."""
+    normalized = skill.lower()
+    return {"docs": "documentation", "ci-cd": "ci/cd"}.get(normalized, normalized)
+
+
 def _filter_bounties(bounties, args):
     """Filter numeric RTC mentions, keeping unknown distinct from explicit zero."""
     from concierge.reward_evidence import reward_filter_value, reward_sort_key
 
     filtered = list(bounties)
     if args.skill:
-        skill_lower = args.skill.lower()
-        filtered = [b for b in filtered if skill_lower in [s.lower() for s in b["skills"]]]
+        skill_lower = _canonical_browse_skill(args.skill)
+        filtered = [
+            b for b in filtered
+            if skill_lower in [_canonical_browse_skill(s) for s in b["skills"]]
+        ]
     if args.tier:
         tier_lower = args.tier.lower()
         filtered = [b for b in filtered if b["difficulty"] == tier_lower]
