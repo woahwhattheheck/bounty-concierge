@@ -303,7 +303,13 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                     if page == max_pages:
                         source["status"] = "PAGE_LIMIT"
                 finally:
-                    response.close()
+                    try:
+                        response.close()
+                    except Exception as exc:
+                        # Cleanup must not erase rows, quota state or source failures.
+                        # Exception messages may contain request details; keep type only.
+                        source["response_cleanup_error_type"] = type(exc).__name__
+                        source["response_cleanup_errors"] = source.get("response_cleanup_errors", 0) + 1
 
     report["updated_at"] = datetime.now(timezone.utc).isoformat()
     report["complete"] = all(row["status"] == "COMPLETE" for row in sources)
