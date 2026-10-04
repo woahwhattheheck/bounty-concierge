@@ -8,16 +8,21 @@ The queue is downstream of merged-work evidence, not a substitute for it. Merge 
 
 The core queue partitions each case into exactly one of these states:
 
-- `SETTLED`: independently certified confirmed incoming transfer.
+- `SETTLED`: independently certified confirmed incoming transfers cover the certified sponsor award in the same currency.
 - `CLOSED_NO_REWARD`: independently certified terminal no-reward closure.
 - `NEEDS_TRUST_EVIDENCE`: the latest declared state is not independently certified/current enough for a follow-up decision.
 - `AWARD_FOLLOWUP_CANDIDATE`: a sponsor award is certified but no payout ticket is certified.
 - `PAYOUT_TICKET_FOLLOWUP_CANDIDATE`: a payout ticket is certified but no payout rail is certified.
 - `PAYOUT_RAIL_FOLLOWUP_CANDIDATE`: a payout rail is certified but no transfer evidence is certified.
 - `TRANSFER_PENDING_FOLLOWUP_CANDIDATE`: certified transfer evidence remains nonterminal.
+- `PARTIAL_PAYMENT_FOLLOWUP_CANDIDATE`: confirmed incoming payments do not yet cover the certified sponsor award in its own currency.
 - `HOLD_CONTRADICTION`: certified/declared settlement facts conflict or a certified transfer is terminal-failed in a way that requires review.
 
-Terminal certified payment and no-reward closure do not become collection work merely because time passes. Nonterminal follow-up states are currentness-gated by the explicit `as_of` and `freshness_seconds` policy inputs already bound into the core queue.
+Full certified payment and no-reward closure do not become collection work merely because time passes. Nonterminal follow-up states, including payment shortfalls, are currentness-gated by the explicit `as_of` and `freshness_seconds` policy inputs already bound into the core queue.
+
+Each row's `award_balance` compares the certified sponsor award with the sum of certified confirmed incoming payments in that currency. It contains `award_minor`, `paid_minor`, `remaining_minor`, `currency`, `unit`, and the award `source_id`. For example, a 9,000-minor-unit USD award with 100 received retains 8,900 outstanding and a payment follow-up. Multiple confirmed transfers add together; pending, failed, outgoing, and other-currency transfers do not reduce that balance. The separate `certified_paid_by_currency` field preserves every actually received currency amount. No FX rate, fee allowance, or refund instruction is inferred.
+
+Without a certified sponsor award, `award_balance` is `null` and a confirmed receipt remains `NEEDS_TRUST_EVIDENCE` for payment completeness. An advertised amount alone never establishes an outstanding balance. The source ledger and certificate continue to record the actual received money; a terminal transfer alone no longer closes collection for an unpaid award.
 
 ## Separately observed contact routes
 
@@ -63,6 +68,9 @@ A case with both `AVAILABLE` and `DNR` route evidence is held as `HOLD_CONFLICT`
 - payout-ticket candidate -> `REVIEW_PAYOUT_TICKET`
 - payout-rail candidate -> `REVIEW_PAYOUT_RAIL`
 - transfer-pending candidate -> `REVIEW_TRANSFER_STATUS`
+- partial-payment candidate -> `REVIEW_REMAINING_PAYMENT`
+
+The review packet retains `award_balance` and `certified_paid_by_currency`. The accepted-work bridge also retains both amounts and routes an explicitly accepted partial-payment case to `ACCEPTED_UNPAID_COLLECTIONS_REVIEW`, rather than `PAID_CLOSED`. Existing missing-route, DNR, contradiction, acceptance-evidence, and freshness handling still applies.
 
 The packet binds the exact queue receipt and canonical contact-route document hash, and then emits its own deterministic receipt. `outbound_authorized` is always false per case, and every mutation/outbound/accounting authority flag is hard false globally.
 

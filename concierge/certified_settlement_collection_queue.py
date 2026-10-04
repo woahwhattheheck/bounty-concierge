@@ -26,18 +26,20 @@ QUEUE_STATES = frozenset({
     "PAYOUT_TICKET_FOLLOWUP_CANDIDATE",
     "PAYOUT_RAIL_FOLLOWUP_CANDIDATE",
     "TRANSFER_PENDING_FOLLOWUP_CANDIDATE",
+    "PARTIAL_PAYMENT_FOLLOWUP_CANDIDATE",
     "HOLD_CONTRADICTION",
 })
 
 _STATE_PRIORITY = {
     "HOLD_CONTRADICTION": 0,
     "NEEDS_TRUST_EVIDENCE": 1,
-    "TRANSFER_PENDING_FOLLOWUP_CANDIDATE": 2,
-    "PAYOUT_RAIL_FOLLOWUP_CANDIDATE": 3,
-    "PAYOUT_TICKET_FOLLOWUP_CANDIDATE": 4,
-    "AWARD_FOLLOWUP_CANDIDATE": 5,
-    "SETTLED": 6,
-    "CLOSED_NO_REWARD": 7,
+    "PARTIAL_PAYMENT_FOLLOWUP_CANDIDATE": 2,
+    "TRANSFER_PENDING_FOLLOWUP_CANDIDATE": 3,
+    "PAYOUT_RAIL_FOLLOWUP_CANDIDATE": 4,
+    "PAYOUT_TICKET_FOLLOWUP_CANDIDATE": 5,
+    "AWARD_FOLLOWUP_CANDIDATE": 6,
+    "SETTLED": 7,
+    "CLOSED_NO_REWARD": 8,
 }
 
 _LEDGER_RANK = {
@@ -148,6 +150,31 @@ def _money_basis(case: dict[str, Any], certified_source_ids: set[str]) -> dict[s
     }
 
 
+def _award_balance(
+    case: dict[str, Any],
+    certified_source_ids: set[str],
+    paid_by_currency: dict[str, int],
+) -> dict[str, Any] | None:
+    """Compare certified receipts with a certified award in its own currency."""
+    awards = [
+        event for event in case["events"]
+        if event["kind"] == "SPONSOR_AWARD"
+        and event["source"]["source_id"] in certified_source_ids
+    ]
+    if not awards:
+        return None
+    award = max(awards, key=lambda e: (e["source"]["observed_at"], e["event_id"]))
+    paid_minor = paid_by_currency.get(award["currency"], 0)
+    return {
+        "award_minor": award["amount_minor"],
+        "paid_minor": paid_minor,
+        "remaining_minor": max(award["amount_minor"] - paid_minor, 0),
+        "currency": award["currency"],
+        "unit": "minor",
+        "source_id": award["source"]["source_id"],
+    }
+
+
 def _route_view(case: dict[str, Any], certified_source_ids: set[str], as_of_dt: datetime, freshness_seconds: int) -> dict[str, Any]:
     tickets: list[dict[str, Any]] = []
     rails: list[dict[str, Any]] = []
@@ -241,12 +268,20 @@ def _derive_state(
             return "HOLD_CONTRADICTION", ["CERTIFIED_PAID_WITHOUT_DECLARED_PAID"]
         if cert_record["certified_paid_by_currency"] != ledger_record["paid_confirmed_by_currency"]:
             return "HOLD_CONTRADICTION", ["CERTIFIED_PAID_AMOUNT_MISMATCH"]
-        return "SETTLED", ["CERTIFIED_CONFIRMED_TRANSFER"]
+        balance = _award_balance(
+            case, set(cert_record["certified_source_ids"]), cert_record["certified_paid_by_currency"]
+        )
+        if balance is None:
+            return "NEEDS_TRUST_EVIDENCE", ["NO_CERTIFIED_SPONSOR_AWARD_FOR_PAYMENT_COMPLETENESS"]
+        if balance["remaining_minor"] == 0:
+            return "SETTLED", ["CERTIFIED_CONFIRMED_TRANSFER", "CERTIFIED_SPONSOR_AWARD_COVERED"]
+        # A terminal transfer proves receipt of that amount, not full payment.
+        # Keep a shortfall subject to the existing nonterminal freshness checks.
     if certified == "CLOSED_WITHOUT_REWARD_CERTIFIED":
         if declared != "CLOSED_WITHOUT_REWARD":
             return "HOLD_CONTRADICTION", ["CERTIFIED_CLOSURE_WITHOUT_DECLARED_CLOSURE"]
         return "CLOSED_NO_REWARD", ["CERTIFIED_NO_REWARD_CLOSURE"]
-    if declared in {"PAID_CONFIRMED", "CLOSED_WITHOUT_REWARD"}:
+    if declared in {"PAID_CONFIRMED", "CLOSED_WITHOUT_REWARD"} and certified != "PAID_CERTIFIED":
         return "NEEDS_TRUST_EVIDENCE", ["TERMINAL_DECLARED_STATE_NOT_CERTIFIED"]
     if certified == "UNTRUSTED_WORK_SOURCE":
         return "NEEDS_TRUST_EVIDENCE", ["WORK_SOURCE_NOT_CERTIFIED"]
@@ -275,6 +310,8 @@ def _derive_state(
     } and not certified_award:
         return "NEEDS_TRUST_EVIDENCE", ["NO_CERTIFIED_SPONSOR_AWARD"]
 
+    if certified == "PAID_CERTIFIED":
+        return "PARTIAL_PAYMENT_FOLLOWUP_CANDIDATE", ["CERTIFIED_PAYMENT_BELOW_SPONSOR_AWARD"]
     if certified == "TRANSFER_EVIDENCE_CERTIFIED":
         statuses = _latest_transfer_statuses(case, certified_ids)
         if "FAILED" in statuses:
@@ -361,6 +398,7 @@ def build_queue(
             "event_age_seconds": event_age_seconds,
             "driver_sources": sorted(driver_views, key=lambda x: (x["observed_at"], x["source_id"])),
             "money": _money_basis(case, certified_ids),
+            "award_balance": _award_balance(case, certified_ids, cert_record["certified_paid_by_currency"]),
             "certified_paid_by_currency": cert_record["certified_paid_by_currency"],
             "route_evidence": _route_view(case, certified_ids, as_of_dt, freshness_seconds),
             "owner_review_only": True,

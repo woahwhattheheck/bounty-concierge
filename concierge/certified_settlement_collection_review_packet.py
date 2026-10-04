@@ -35,6 +35,7 @@ FOLLOWUP_STATES = frozenset({
     "PAYOUT_TICKET_FOLLOWUP_CANDIDATE",
     "PAYOUT_RAIL_FOLLOWUP_CANDIDATE",
     "TRANSFER_PENDING_FOLLOWUP_CANDIDATE",
+    "PARTIAL_PAYMENT_FOLLOWUP_CANDIDATE",
 })
 
 
@@ -212,6 +213,8 @@ def _next_action(state: str, route_status: str) -> tuple[str, str]:
         return "REVIEW_PAYOUT_RAIL", "owner may review payout-rail status; provider mutation remains forbidden"
     if state == "TRANSFER_PENDING_FOLLOWUP_CANDIDATE":
         return "REVIEW_TRANSFER_STATUS", "owner may review transfer status; nonterminal transfer is not payment"
+    if state == "PARTIAL_PAYMENT_FOLLOWUP_CANDIDATE":
+        return "REVIEW_REMAINING_PAYMENT", "review the remaining certified award amount and existing transfer status using the separately authorized route"
     return "HOLD", "unknown queue state; do not act"
 
 
@@ -236,6 +239,8 @@ def build_review_packet(queue: Any, routes_doc: Any) -> dict[str, Any]:
             "queue_state": row.get("queue_state"),
             "reason_codes": row.get("reason_codes", []),
             "money": row.get("money"),
+            "award_balance": row.get("award_balance"),
+            "certified_paid_by_currency": row.get("certified_paid_by_currency", {}),
             "event_age_seconds": row.get("event_age_seconds"),
             "route_status": route_status,
             "contact_routes": routes,
