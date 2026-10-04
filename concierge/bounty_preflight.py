@@ -44,6 +44,7 @@ from concierge.secure_output import (
     create_exclusive_regular,
     open_verified_parent,
 )
+from concierge.submission_packet import validate_submission_target
 
 
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
@@ -684,6 +685,7 @@ def _canonical_audit_snapshot(
     session: Any,
     max_pages: int,
     comments_truncated: bool,
+    submission_target: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     raw_audit = audit_bounty(
         repo,
@@ -691,6 +693,7 @@ def _canonical_audit_snapshot(
         token,
         session=session,
         max_pages=max_pages,
+        submission_target=submission_target,
     )
     if not isinstance(raw_audit, dict):
         raise BountyPreflightError("canonical bounty audit did not return an object")
@@ -1134,6 +1137,7 @@ def preflight_bounty(
     saturation_threshold: int = 4,
     operator_login: str | None = None,
     include_capture: bool = False,
+    submission_target: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Return an operator-safe paid-work preflight result for one issue.
 
@@ -1144,6 +1148,8 @@ def preflight_bounty(
     by itself. PR competition and maintainer-comment reads remain live. Before an
     actionable result is returned, issue/comment authority and every audit field
     consumed by qualification are re-read and must remain stable.
+    An explicit submission_target is carried through every audit pass so the
+    delivery repository's competing PRs are included in the same decision.
 
     ``include_capture=True`` additionally returns a controlled source-text
     capture under ``capture``. That value is private evidence for offline supply
@@ -1151,6 +1157,10 @@ def preflight_bounty(
     """
     if not isinstance(include_capture, bool):
         raise ValueError("include_capture must be boolean")
+    if submission_target is not None:
+        submission_target = validate_submission_target(
+            submission_target, f"https://github.com/{repo}/issues/{number}"
+        )
     # Keep one connection pool across context, audit and generation reads. The
     # captured-issue adapter below forwards through this same owned session.
     # Caller-supplied sessions retain their existing lifetime and ownership.
@@ -1165,6 +1175,7 @@ def preflight_bounty(
                 saturation_threshold=saturation_threshold,
                 operator_login=operator_login,
                 include_capture=include_capture,
+                submission_target=submission_target,
             )
 
     capture_session = CaptureSession(session) if include_capture else None
@@ -1209,6 +1220,7 @@ def preflight_bounty(
         session=audit_session,
         max_pages=max_pages,
         comments_truncated=context["comments_truncated"],
+        submission_target=submission_target,
     )
     initial_audit_marker = _audit_dispatch_marker(audit)
 
@@ -1250,6 +1262,7 @@ def preflight_bounty(
             session=session,
             max_pages=max_pages,
             comments_truncated=context["comments_truncated"],
+            submission_target=submission_target,
         )
         audit_stable = _audit_dispatch_marker(audit_before_generation) == initial_audit_marker
         if include_capture:
@@ -1284,6 +1297,7 @@ def preflight_bounty(
             session=session,
             max_pages=max_pages,
             comments_truncated=context["comments_truncated"],
+            submission_target=submission_target,
         )
         final_audit_marker = _audit_dispatch_marker(audit_after_generation)
         if include_capture:
@@ -1303,6 +1317,7 @@ def preflight_bounty(
     result = {
         "repo": repo,
         "number": number,
+        **({"submission_target": submission_target} if submission_target is not None else {}),
         "attempt_count": context["attempt_count"],
         "attempt_signal_count": context["attempt_signal_count"],
         "comments_truncated": context["comments_truncated"],
@@ -1323,6 +1338,7 @@ def preflight_bounty(
             observation=capture_session.observation(),
             max_pages=max_pages,
             saturation_threshold=saturation_threshold,
+            submission_target=submission_target,
         )
     return result
 
@@ -1363,6 +1379,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-pages", type=int, default=10)
     parser.add_argument("--saturation-threshold", type=int, default=4)
     parser.add_argument(
+        "--submission-target", type=Path,
+        help="JSON file containing the existing explicit submission_target record",
+    )
+    parser.add_argument(
         "--operator-login",
         help=(
             "Optional assertion of the authenticated GitHub login for formal "
@@ -1380,6 +1400,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.capture is not None:
             _admit_capture_destination(args.capture)
+        target = None
+        if args.submission_target is not None:
+            target = validate_submission_target(
+                json.loads(args.submission_target.read_text(encoding="utf-8")),
+                f"https://github.com/{args.repo}/issues/{args.issue}",
+            )
         result = preflight_bounty(
             args.repo,
             args.issue,
@@ -1387,6 +1413,7 @@ def main(argv: list[str] | None = None) -> int:
             saturation_threshold=args.saturation_threshold,
             operator_login=args.operator_login,
             include_capture=args.capture is not None,
+            submission_target=target,
         )
         if args.capture is not None:
             capture = result.pop("capture")
