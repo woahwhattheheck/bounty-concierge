@@ -94,6 +94,12 @@ def _get_json(
                     error.rate_limit_remaining = int(remaining)
                 except ValueError:
                     pass
+        if failed_response is not None:
+            try:
+                failed_response.close()
+            except Exception:
+                # Cleanup must not replace the provider failure or its metadata.
+                pass
         raise error from exc
     try:
         payload = response.json()

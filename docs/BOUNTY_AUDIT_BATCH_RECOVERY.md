@@ -159,6 +159,42 @@ A successful call still returns the original list shape. Standalone
 `audit_bounty` behavior is unchanged. This is recovery for caught provider/evidence
 errors, not a process-crash checkpoint or a persistent cross-run HTTP cache.
 
+## HTTP-error response ownership
+
+The auditor closes a response attached to a Requests failure after copying its
+HTTP status and cooldown metadata. This also covers a caller-supplied Session
+whose response hook raises an HTTP error before `Session.get()` returns. The
+original `RequestException` remains the cause of `BountyAuditError`; a cleanup
+failure does not replace it. The caller continues to own its Session.
+
+This matters when an unavailable issue's error is retained while a batch moves
+to an independent row. An unread error response can otherwise occupy the only
+slot in a blocking connection pool, preventing that later request from reaching
+the server. Releasing the response does not retry the failed request or alter
+unavailable-row, shared-failure or cooldown decisions. Cleanup is best-effort;
+if a custom `close()` fails, connection release is not guaranteed.
+
+The [local reproducer](../examples/audit_http_release.py) uses native Requests,
+an HTTP/1.1 loopback server and a blocking one-connection pool. It executes the
+exact source definitions used by the audit/error path; unrelated target,
+comment and CLI imports are outside this check. No provider requests are made.
+
+```bash
+git show 5a8411fdb4a2c32e64b44c2ecc40f16ff470e9df:concierge/bounty_audit.py \\
+  > /tmp/audit-before.py
+python examples/audit_http_release.py --baseline /tmp/audit-before.py \\
+  --output /tmp/audit-http-release.json
+```
+
+The retained baseline made one wire request, then remained blocked during the
+bounded observation until the fixture explicitly closed its error response.
+The repaired source completed all three requests without that rescue, retaining
+one audited issue, one unavailable outcome and the PARTIAL result. Both variants
+produced the same final report after the baseline rescue, apart from their
+loopback port. This is connection-pool progress evidence, not a latency speedup
+percentage or a measurement of the live fleet. Full results and source hashes:
+[http-error response release](../work/throughput/audit-http-release-20261004-f541/results.json).
+
 ## Focused execution evidence
 
 The existing full CLI and batch implementation was executed against controlled

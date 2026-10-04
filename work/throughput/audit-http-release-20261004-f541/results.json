@@ -1,0 +1,347 @@
+{
+  "schema_version": "audit-http-response-release/v1",
+  "python": "3.12.14",
+  "requests": "2.34.2",
+  "source_definitions": [
+    "BountyAuditError",
+    "_batch_error_details",
+    "_batch_partial_report",
+    "_competition_level",
+    "_get_json",
+    "_headers",
+    "_object_payload",
+    "audit_bounties",
+    "audit_bounty"
+  ],
+  "scope": "Nine exact source AST definitions. Config token unset; unrelated CLI/target/comment imports not exercised. Native Requests/HTTPAdapter/HTTP1.1 pool; canonical URLs map exclusively to loopback. Controls inject native Requests HTTPError/Response objects; cleanup failure is deliberately injected. Time includes a forced baseline observation interval and is not a throughput benchmark.",
+  "sources": {
+    "baseline": {
+      "identity": {
+        "path": "/dev/shm/astra-ledger-f541/bounty-audit/baseline.py",
+        "bytes": 31127,
+        "sha256": "7ac247aa275e525562d0093de830dade85e9011736b2ee786e7bd1f8dae3e416",
+        "git_blob_sha": "5dbd901c4a5addda6483ecfbe05fc4454626a3c6"
+      },
+      "pool": {
+        "http_status": 404,
+        "cause_type": "HTTPError",
+        "rate_limit_remaining": 4999,
+        "partial_report": {
+          "status": "PARTIAL",
+          "input_count": 2,
+          "audited_count": 1,
+          "remaining_count": 0,
+          "failed_row": 1,
+          "rows": [
+            {
+              "repo": "Example/repo",
+              "number": 2,
+              "canonical_audit": {
+                "repo": "Example/repo",
+                "number": 2,
+                "issue_url": "https://github.com/Example/repo/issues/2",
+                "issue_state": "closed",
+                "linked_pr_count": 0,
+                "open_pr_count": 0,
+                "merged_pr_count": 0,
+                "closed_unmerged_pr_count": 0,
+                "competition_level": "none",
+                "maintainer_expiry_signal": false,
+                "maintainer_expiry_comment_count": 0,
+                "maintainer_expiry_comments": [],
+                "stale_listing_signal": false,
+                "search_truncated": false,
+                "linked_prs": []
+              }
+            }
+          ],
+          "remaining_candidates": [],
+          "error": {
+            "type": "BountyAuditError",
+            "message": "GitHub request failed for https://api.github.com/repos/Example/repo/issues/1: 404 Client Error: Not Found for url: http://127.0.0.1:43159/repos/Example/repo/issues/1",
+            "http_status": 404,
+            "retry_after": null,
+            "rate_limit_reset": null
+          },
+          "unavailable_count": 1,
+          "unavailable_candidates": [
+            {
+              "input_row": 1,
+              "status": "ISSUE_UNAVAILABLE",
+              "candidate": {
+                "repo": "Example/repo",
+                "number": 1
+              },
+              "error": {
+                "type": "BountyAuditError",
+                "message": "GitHub request failed for https://api.github.com/repos/Example/repo/issues/1: 404 Client Error: Not Found for url: http://127.0.0.1:43159/repos/Example/repo/issues/1",
+                "http_status": 404,
+                "retry_after": null,
+                "rate_limit_reset": null
+              }
+            }
+          ],
+          "traversal_complete": true
+        },
+        "before_rescue": {
+          "completed_without_rescue": false,
+          "wire_requests": 1,
+          "first_response_closed": false,
+          "first_response_content_consumed": false
+        },
+        "wire_paths": [
+          "/repos/Example/repo/issues/1",
+          "/repos/Example/repo/issues/2",
+          "/search/issues"
+        ],
+        "rescue_ms": 44.793277000280796,
+        "total_ms": 297.9169899990666,
+        "normalized_partial_report": {
+          "status": "PARTIAL",
+          "input_count": 2,
+          "audited_count": 1,
+          "remaining_count": 0,
+          "failed_row": 1,
+          "rows": [
+            {
+              "repo": "Example/repo",
+              "number": 2,
+              "canonical_audit": {
+                "repo": "Example/repo",
+                "number": 2,
+                "issue_url": "https://github.com/Example/repo/issues/2",
+                "issue_state": "closed",
+                "linked_pr_count": 0,
+                "open_pr_count": 0,
+                "merged_pr_count": 0,
+                "closed_unmerged_pr_count": 0,
+                "competition_level": "none",
+                "maintainer_expiry_signal": false,
+                "maintainer_expiry_comment_count": 0,
+                "maintainer_expiry_comments": [],
+                "stale_listing_signal": false,
+                "search_truncated": false,
+                "linked_prs": []
+              }
+            }
+          ],
+          "remaining_candidates": [],
+          "error": {
+            "type": "BountyAuditError",
+            "message": "GitHub request failed for https://api.github.com/repos/Example/repo/issues/1: 404 Client Error: Not Found for url: http://loopback/repos/Example/repo/issues/1",
+            "http_status": 404,
+            "retry_after": null,
+            "rate_limit_reset": null
+          },
+          "unavailable_count": 1,
+          "unavailable_candidates": [
+            {
+              "input_row": 1,
+              "status": "ISSUE_UNAVAILABLE",
+              "candidate": {
+                "repo": "Example/repo",
+                "number": 1
+              },
+              "error": {
+                "type": "BountyAuditError",
+                "message": "GitHub request failed for https://api.github.com/repos/Example/repo/issues/1: 404 Client Error: Not Found for url: http://loopback/repos/Example/repo/issues/1",
+                "http_status": 404,
+                "retry_after": null,
+                "rate_limit_reset": null
+              }
+            }
+          ],
+          "traversal_complete": true
+        }
+      },
+      "controls": [
+        {
+          "http_status": 429,
+          "retry_after": "7",
+          "rate_limit_reset": "2000000000",
+          "rate_limit_remaining": 0,
+          "original_cause_preserved": true,
+          "close_calls": 0,
+          "cleanup_raises": false
+        },
+        {
+          "http_status": 429,
+          "retry_after": "7",
+          "rate_limit_reset": "2000000000",
+          "rate_limit_remaining": 0,
+          "original_cause_preserved": true,
+          "close_calls": 0,
+          "cleanup_raises": true
+        }
+      ]
+    },
+    "candidate": {
+      "identity": {
+        "path": "/dev/shm/astra-ledger-f541/bounty-audit/candidate.py",
+        "bytes": 31356,
+        "sha256": "a73226851de76a68266b8c74f4590f26db3a1b63083047ef22ed139a03f49e3b",
+        "git_blob_sha": "09acb74e852306c2b107d197d5c29654bc73f26a"
+      },
+      "pool": {
+        "http_status": 404,
+        "cause_type": "HTTPError",
+        "rate_limit_remaining": 4999,
+        "partial_report": {
+          "status": "PARTIAL",
+          "input_count": 2,
+          "audited_count": 1,
+          "remaining_count": 0,
+          "failed_row": 1,
+          "rows": [
+            {
+              "repo": "Example/repo",
+              "number": 2,
+              "canonical_audit": {
+                "repo": "Example/repo",
+                "number": 2,
+                "issue_url": "https://github.com/Example/repo/issues/2",
+                "issue_state": "closed",
+                "linked_pr_count": 0,
+                "open_pr_count": 0,
+                "merged_pr_count": 0,
+                "closed_unmerged_pr_count": 0,
+                "competition_level": "none",
+                "maintainer_expiry_signal": false,
+                "maintainer_expiry_comment_count": 0,
+                "maintainer_expiry_comments": [],
+                "stale_listing_signal": false,
+                "search_truncated": false,
+                "linked_prs": []
+              }
+            }
+          ],
+          "remaining_candidates": [],
+          "error": {
+            "type": "BountyAuditError",
+            "message": "GitHub request failed for https://api.github.com/repos/Example/repo/issues/1: 404 Client Error: Not Found for url: http://127.0.0.1:44431/repos/Example/repo/issues/1",
+            "http_status": 404,
+            "retry_after": null,
+            "rate_limit_reset": null
+          },
+          "unavailable_count": 1,
+          "unavailable_candidates": [
+            {
+              "input_row": 1,
+              "status": "ISSUE_UNAVAILABLE",
+              "candidate": {
+                "repo": "Example/repo",
+                "number": 1
+              },
+              "error": {
+                "type": "BountyAuditError",
+                "message": "GitHub request failed for https://api.github.com/repos/Example/repo/issues/1: 404 Client Error: Not Found for url: http://127.0.0.1:44431/repos/Example/repo/issues/1",
+                "http_status": 404,
+                "retry_after": null,
+                "rate_limit_reset": null
+              }
+            }
+          ],
+          "traversal_complete": true
+        },
+        "before_rescue": {
+          "completed_without_rescue": true,
+          "wire_requests": 3,
+          "first_response_closed": true,
+          "first_response_content_consumed": false
+        },
+        "wire_paths": [
+          "/repos/Example/repo/issues/1",
+          "/repos/Example/repo/issues/2",
+          "/search/issues"
+        ],
+        "rescue_ms": 0.013980999938212335,
+        "total_ms": 44.72420399906696,
+        "normalized_partial_report": {
+          "status": "PARTIAL",
+          "input_count": 2,
+          "audited_count": 1,
+          "remaining_count": 0,
+          "failed_row": 1,
+          "rows": [
+            {
+              "repo": "Example/repo",
+              "number": 2,
+              "canonical_audit": {
+                "repo": "Example/repo",
+                "number": 2,
+                "issue_url": "https://github.com/Example/repo/issues/2",
+                "issue_state": "closed",
+                "linked_pr_count": 0,
+                "open_pr_count": 0,
+                "merged_pr_count": 0,
+                "closed_unmerged_pr_count": 0,
+                "competition_level": "none",
+                "maintainer_expiry_signal": false,
+                "maintainer_expiry_comment_count": 0,
+                "maintainer_expiry_comments": [],
+                "stale_listing_signal": false,
+                "search_truncated": false,
+                "linked_prs": []
+              }
+            }
+          ],
+          "remaining_candidates": [],
+          "error": {
+            "type": "BountyAuditError",
+            "message": "GitHub request failed for https://api.github.com/repos/Example/repo/issues/1: 404 Client Error: Not Found for url: http://loopback/repos/Example/repo/issues/1",
+            "http_status": 404,
+            "retry_after": null,
+            "rate_limit_reset": null
+          },
+          "unavailable_count": 1,
+          "unavailable_candidates": [
+            {
+              "input_row": 1,
+              "status": "ISSUE_UNAVAILABLE",
+              "candidate": {
+                "repo": "Example/repo",
+                "number": 1
+              },
+              "error": {
+                "type": "BountyAuditError",
+                "message": "GitHub request failed for https://api.github.com/repos/Example/repo/issues/1: 404 Client Error: Not Found for url: http://loopback/repos/Example/repo/issues/1",
+                "http_status": 404,
+                "retry_after": null,
+                "rate_limit_reset": null
+              }
+            }
+          ],
+          "traversal_complete": true
+        }
+      },
+      "controls": [
+        {
+          "http_status": 429,
+          "retry_after": "7",
+          "rate_limit_reset": "2000000000",
+          "rate_limit_remaining": 0,
+          "original_cause_preserved": true,
+          "close_calls": 1,
+          "cleanup_raises": false
+        },
+        {
+          "http_status": 429,
+          "retry_after": "7",
+          "rate_limit_reset": "2000000000",
+          "rate_limit_remaining": 0,
+          "original_cause_preserved": true,
+          "close_calls": 1,
+          "cleanup_raises": true
+        }
+      ]
+    }
+  },
+  "checks": {
+    "baseline_stalled_after_one_get": true,
+    "candidate_completed_without_rescue": true,
+    "same_partial_outcome": true,
+    "same_requests_after_baseline_rescue": true,
+    "cooldown_and_cause_preserved": true
+  },
+  "passed": true
+}
