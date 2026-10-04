@@ -385,7 +385,9 @@ def _keyword_matches(text, keyword, *, casefolded=False):
         return False
 
     normalized = text if casefolded else text.casefold()
-    return _compiled_keyword_pattern(keyword).search(normalized) is not None
+    # Every pattern contains this escaped literal; skip the boundary scan when absent.
+    return (keyword.casefold() in normalized
+            and _compiled_keyword_pattern(keyword).search(normalized) is not None)
 
 
 def tag_skills(title, body):
