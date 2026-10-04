@@ -1,0 +1,10 @@
+BASELINE REPRODUCED {"memberships":["B","C"],"memberTeam":"C","counters":{"A":0,"B":1,"C":1,"D":0}}
+REPAIRED RESULT {"memberships":["C"],"memberTeam":"C","counters":{"A":1,"B":0,"C":1,"D":0}}
+PASS concurrent moves see committed memberships after member lock
+PASS full destination rolls back removals and counters
+PASS foreign member cannot be moved
+PASS foreign destination cannot receive a member
+PASS unassignment keeps unrelated members and counters intact
+PASS moving to the same full team does not consume extra capacity
+PASS existing destination quota still rejects a second member
+{"baseline":"reproduced","candidateChecks":7,"node":"v22.16.0","typescript":"5.8.3","scope":"actual route callback; deterministic in-memory DB collaborators; not PostgreSQL or full-app validation"}

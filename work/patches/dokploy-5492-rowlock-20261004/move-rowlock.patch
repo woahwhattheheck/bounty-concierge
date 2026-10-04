@@ -1,0 +1,80 @@
+diff --git a/apps/dokploy/server/api/routers/organization.ts b/apps/dokploy/server/api/routers/organization.ts
+--- a/apps/dokploy/server/api/routers/organization.ts
++++ b/apps/dokploy/server/api/routers/organization.ts
+@@ -589,16 +589,6 @@
+ 		)
+ 		.mutation(async ({ ctx, input }) => {
+ 			const orgId = ctx.session.activeOrganizationId;
+-			const targetMember = await db.query.member.findFirst({
+-				where: and(
+-					eq(member.id, input.memberId),
+-					eq(member.organizationId, orgId),
+-				),
+-			});
+-			if (!targetMember) {
+-				throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+-			}
+-
+ 			let targetTeam: typeof team.$inferSelect | undefined;
+ 			if (input.teamId) {
+ 				targetTeam = await db.query.team.findFirst({
+@@ -609,18 +599,33 @@
+ 				}
+ 			}
+ 
+-			const currentMemberships = await db
+-				.select({ id: teamMember.id, teamId: teamMember.teamId })
+-				.from(teamMember)
+-				.innerJoin(team, eq(teamMember.teamId, team.id))
+-				.where(
+-					and(
+-						eq(teamMember.userId, targetMember.userId),
+-						eq(team.organizationId, orgId),
+-					),
+-				);
++			const targetUserId = await db.transaction(async (tx) => {
++				// Serialize moves for this member before observing its team memberships.
++				const [targetMember] = await tx
++					.select({ id: member.id, userId: member.userId })
++					.from(member)
++					.where(
++						and(
++							eq(member.id, input.memberId),
++							eq(member.organizationId, orgId),
++						),
++					)
++					.for("update");
++				if (!targetMember) {
++					throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
++				}
+ 
+-			await db.transaction(async (tx) => {
++				const currentMemberships = await tx
++					.select({ id: teamMember.id, teamId: teamMember.teamId })
++					.from(teamMember)
++					.innerJoin(team, eq(teamMember.teamId, team.id))
++					.where(
++						and(
++							eq(teamMember.userId, targetMember.userId),
++							eq(team.organizationId, orgId),
++						),
++					);
++
+ 				for (const membership of currentMemberships) {
+ 					await tx
+ 						.delete(teamMember)
+@@ -662,12 +667,13 @@
+ 					.update(member)
+ 					.set({ teamId: targetTeam?.id ?? null })
+ 					.where(eq(member.id, targetMember.id));
++				return targetMember.userId;
+ 			});
+ 
+ 			await audit(ctx, {
+ 				action: "update",
+ 				resourceType: "user",
+-				resourceId: targetMember.userId,
++				resourceId: targetUserId,
+ 				metadata: {
+ 					type: "moveMemberToTeam",
+ 					teamId: targetTeam?.id ?? null,
