@@ -29,9 +29,11 @@ from concierge.repository_contribution_policy import (
 _BODY_BOUNTY_RE = re.compile(
     r"(?im)(?:^|\s)/bounty\s+\$([0-9][0-9,]*(?:\.[0-9]{1,2})?)\b"
 )
+# Optional delimiters must consume text before their trailing whitespace. This
+# avoids repeatedly partitioning a long whitespace gap when no amount follows.
 _KEYWORD_REWARD_RE = re.compile(
     r"(?i)\b(?:bounty|reward|payout)(?:\s+(?:amount|payout))?"
-    r"\s*(?::|=|-|\bis\b|\bof\b)?\s*"
+    r"\s*(?:(?::|=|-|\bis\b|\bof\b)\s*)?"
     r"\$([0-9][0-9,]*(?:\.[0-9]{1,2})?)\b"
 )
 _AMOUNT_BEFORE_REWARD_RE = re.compile(
@@ -50,8 +52,9 @@ _RTC_RANGE_RE = re.compile(
     rf"(?i)(?<![\w.,])({_RTC_NUMBER})\s*[-–—]\s*({_RTC_NUMBER})\s*RTC\b"
 )
 _RTC_KEYWORD_REWARD_RE = re.compile(
+    # The optional Markdown prefix is nonempty for the same reason.
     rf"(?i)\b(?:bounty|reward|payout)(?:\s+(?:amount|payout))?"
-    rf"\s*(?::|=|-|\bis\b|\bof\b)?\s*\**\s*({_RTC_NUMBER})\s*RTC\b"
+    rf"\s*(?:(?::|=|-|\bis\b|\bof\b)\s*)?(?:\*+\s*)?({_RTC_NUMBER})\s*RTC\b"
 )
 _RTC_AMOUNT_BEFORE_REWARD_RE = re.compile(
     rf"(?i)(?<![\w.,])({_RTC_NUMBER})\s*RTC\s+(?:bounty|reward|payout)\b"
