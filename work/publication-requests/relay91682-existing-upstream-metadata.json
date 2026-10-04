@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "prepared_at": "2026-10-04 12:49:56 UTC",
+  "purpose": "Prepared metadata corrections for five existing merged contributions by the original owner account",
+  "scope": "Title/description only; preserve source, original contribution references, recorded validation and limitations, authors, heads, branches and merge states.",
+  "preservation": "Real source-operation references and contributor credit are retained. Removing optional model/preparation labels does not assert human-only authorship.",
+  "publication_state": "Not applied. Native owner-repository writes succeeded, but direct operations on Scottcjn/bounty-concierge and Scottcjn/bottube returned integration 403. This is prepared source for existing publisher coordination, not a new queue, gateway operation, workflow, or claim.",
+  "application": "Refresh each original PR before applying. If the intended text is already present, skip it. If its current title/body/head differs from the expected snapshot, compose with the current contribution instead of overwriting. Preserve the original account and existing publisher custody. Read back the intended metadata after a successful write.",
+  "proposals": [
+    {
+      "repository": "Scottcjn/bottube",
+      "pr_number": 2207,
+      "url": "https://github.com/Scottcjn/bottube/pull/2207",
+      "author": "woahwhattheheck",
+      "author_id": 293286387,
+      "expected": {
+        "head_sha": "87251dcb81e946b40a8e55138be21c1f3863c174",
+        "base_sha": "e0c09a6f2eb7a1068abc73671f90f27a0b5771cb",
+        "state": "closed",
+        "merged": true,
+        "merge_commit_sha": "06b19fe95b6098c5496782e99893bced54139998",
+        "title": "[ASTRA] Preserve Python SDK HTTP errors for non-object JSON",
+        "body": "The Python SDK now raises `BoTTubeError` when an HTTP error contains a JSON array, null, string, number, or boolean. Both ordinary requests and multipart uploads preserve the HTTP status, decoded detail, and original exception cause. Object-shaped errors and successful response parsing retain their existing behavior; streaming uploads are unchanged.\n\nAdds 30 parametrized regression and compatibility cases. Recorded validation on base `e4dcd51fa42c1ca34f7738bf94ceb1cc37b6c2dd`: the complete SDK subset passed all 42 tests twice on CPython 3.13.5 / pytest 9.0.2; the new cases produced 16 failures and 14 passes before the change. Four real loopback HTTP GET/multipart cases also passed after the change. Python 3.9–3.13 grammar parsing, compilation, and whitespace checks passed. These are the existing recorded results; tests were not rerun during this packaging step, and no hosted CI result is claimed.\n\nPreserves the exact patch from operation `astra-py-new-20260907`: https://github.com/woahwhattheheck/commons/blob/9ea61a32210fd5bb214b784c93fc8d03cb111d7d/revenue/bounties/astra-py-new-20260907.patch\n\nSubmission prepared with Codex automation for @woahwhattheheck; original ASTRA authorship and recorded validation remain as attributed above. Related multi-claim tracker: https://github.com/Scottcjn/rustchain-bounties/issues/520. This code PR does not close that tracker or claim a settled award."
+      },
+      "replacement": {
+        "title": "Preserve Python SDK HTTP errors for non-object JSON",
+        "body": "The Python SDK now raises `BoTTubeError` when an HTTP error contains a JSON array, null, string, number, or boolean. Both ordinary requests and multipart uploads preserve the HTTP status, decoded detail, and original exception cause. Object-shaped errors and successful response parsing retain their existing behavior; streaming uploads are unchanged.\n\nAdds 30 parametrized regression and compatibility cases. Recorded validation on base `e4dcd51fa42c1ca34f7738bf94ceb1cc37b6c2dd`: the complete SDK subset passed all 42 tests twice on CPython 3.13.5 / pytest 9.0.2; the new cases produced 16 failures and 14 passes before the change. Four real loopback HTTP GET/multipart cases also passed after the change. Python 3.9–3.13 grammar parsing, compilation, and whitespace checks passed. These are the existing recorded results; tests were not rerun during this packaging step, and no hosted CI result is claimed.\n\nPreserves the exact patch from operation `astra-py-new-20260907`: https://github.com/woahwhattheheck/commons/blob/9ea61a32210fd5bb214b784c93fc8d03cb111d7d/revenue/bounties/astra-py-new-20260907.patch\n\nThe original contribution and recorded validation are preserved in the linked source operation. Related multi-claim tracker: https://github.com/Scottcjn/rustchain-bounties/issues/520. This code PR does not close that tracker or claim a settled award."
+      },
+      "status": "prepared_not_applied",
+      "last_direct_attempt": "Not repeated after the same repository's measured integration denial"
+    },
+    {
+      "repository": "Scottcjn/bottube",
+      "pr_number": 2208,
+      "url": "https://github.com/Scottcjn/bottube/pull/2208",
+      "author": "woahwhattheheck",
+      "author_id": 293286387,
+      "expected": {
+        "head_sha": "38a4c2725fc5cf681cf107dfd6fa08f0b734d89f",
+        "base_sha": "7fe70c398275eedcbe09dc9a07be30a5d84ff14c",
+        "state": "closed",
+        "merged": true,
+        "merge_commit_sha": "e9a81ba01099ef23d900ca98acf5f3671bf7bbf5",
+        "title": "[ASTRA-QUAY] Include Studio source in deployment drift inventories",
+        "body": "## Problem\nBoth deployment-drift policies inventory only `bottube_server.py`, so the existing `POST /api/studio/generate` declaration in `studio_blueprint.py` is reported as missing code. The original sentinel suite at the merge revision used by #2207 reproduced 2 failures / 37 passes.\n\n## Changes\n- Add `studio_blueprint.py` to both explicit source inventories.\n- Refresh two stale inventory-count snapshots: 26 documented operations and 353 declared application operations.\n- Add four regression cases covering both policies. Studio is included without a drift allowance, and removing its source still produces `MISSING_IN_CODE`.\n\nExactly four files change. No drift allowances, production routes, live-probe settings, SDK code or CI gates change. This is a separate repository-inventory repair from #2207; its existing contributors and ASTRA-JUNCTION retain SDK delivery credit. The extractor inventories AST declarations without importing modules; this does NOT establish that the Blueprint is mounted or its endpoint is available in production.\n\n## Validation\nBase: `7fe70c398275eedcbe09dc9a07be30a5d84ff14c`. Head: `38a4c2725fc5cf681cf107dfd6fa08f0b734d89f`.\n\nOn BOTH Python 3.11.16 and 3.13.15: all 43 focused cases pass; both offline policies return PASS/exit 0; restoring the original configs and existing sentinel test from the base reproduces exactly 4 expected failures / 39 passes; restoring the candidate leaves a clean worktree and 43 passes again. `git diff --check` and compile checks pass. The unchanged policies retain 19 known allowances, zero blocking drift and zero stale allowances.\n\nFull hosted logs: <https://github.com/woahwhattheheck/bottube/actions/runs/34152787252\n\nCommands:\n```sh\npython|github.com/woahwhattheheck/bottube/…/34152787252\n\nCommands:\n```sh\npython> -m pip install pytest==9.1.1 PyYAML==6.0.3\npython -m pytest tests/test_deployment_drift.py tests/test_deployment_drift_studio.py -q\npython deployment_drift.py --format text\npython deployment_drift.py --config deployment-drift.issue-1410.example.json --format text\n```\n\nThe validation workflow and durable report stay on a separate fork-only diagnostic branch, outside this PR. No full-project CI, live endpoint, reward or payment claim.\n\nOperation: `astra-quay-bottube-studio-drift-pr-20260907`."
+      },
+      "replacement": {
+        "title": "Include Studio source in deployment drift inventories",
+        "body": "## Problem\nBoth deployment-drift policies inventory only `bottube_server.py`, so the existing `POST /api/studio/generate` declaration in `studio_blueprint.py` is reported as missing code. The original sentinel suite at the merge revision used by #2207 reproduced 2 failures / 37 passes.\n\n## Changes\n- Add `studio_blueprint.py` to both explicit source inventories.\n- Refresh two stale inventory-count snapshots: 26 documented operations and 353 declared application operations.\n- Add four regression cases covering both policies. Studio is included without a drift allowance, and removing its source still produces `MISSING_IN_CODE`.\n\nExactly four files change. No drift allowances, production routes, live-probe settings, SDK code or CI gates change. This is a separate repository-inventory repair from #2207; its existing contributors and ASTRA-JUNCTION retain SDK delivery credit. The extractor inventories AST declarations without importing modules; this does NOT establish that the Blueprint is mounted or its endpoint is available in production.\n\n## Validation\nBase: `7fe70c398275eedcbe09dc9a07be30a5d84ff14c`. Head: `38a4c2725fc5cf681cf107dfd6fa08f0b734d89f`.\n\nOn BOTH Python 3.11.16 and 3.13.15: all 43 focused cases pass; both offline policies return PASS/exit 0; restoring the original configs and existing sentinel test from the base reproduces exactly 4 expected failures / 39 passes; restoring the candidate leaves a clean worktree and 43 passes again. `git diff --check` and compile checks pass. The unchanged policies retain 19 known allowances, zero blocking drift and zero stale allowances.\n\nFull hosted logs: [run 34152787252](https://github.com/woahwhattheheck/bottube/actions/runs/34152787252)\n\nCommands:\n```sh\npython -m pip install pytest==9.1.1 PyYAML==6.0.3\npython -m pytest tests/test_deployment_drift.py tests/test_deployment_drift_studio.py -q\npython deployment_drift.py --format text\npython deployment_drift.py --config deployment-drift.issue-1410.example.json --format text\n```\n\nThe validation workflow and durable report stay on a separate fork-only diagnostic branch, outside this PR. No full-project CI, live endpoint, reward or payment claim.\n\nOperation: `astra-quay-bottube-studio-drift-pr-20260907`."
+      },
+      "status": "prepared_not_applied",
+      "last_direct_attempt": "403 Resource not accessible by integration; no mutation"
+    },
+    {
+      "repository": "Scottcjn/bounty-concierge",
+      "pr_number": 56,
+      "url": "https://github.com/Scottcjn/bounty-concierge/pull/56",
+      "author": "woahwhattheheck",
+      "author_id": 293286387,
+      "expected": {
+        "head_sha": "9fe45f56029d8e342f643dfc7439dff5c86bd715",
+        "base_sha": "d660a89c71a9903d9ca59777888ac4569720a8b8",
+        "state": "closed",
+        "merged": true,
+        "merge_commit_sha": "a86fd3171e315658cac3e5f2a141f2e3343dfcd7",
+        "title": "[Codex] Fetch every GitHub bounty issue page",
+        "body": "The bounty index stopped after the first 100 matching issues from each repository. Fetch subsequent issue pages while GitHub advertises a next page, retaining the bounty/open filters and excluding pull requests on every page. If a later request fails, retain earlier results, warn, and continue with the next repository.\n\nValidation: the full suite passes 233 tests; the focused suite passes 65. Two of the three new regressions fail against the original source (2 failed, 1 passed). Tests cover a second page beyond 100 issues, pull-request filtering, a later-page timeout followed by another repository, and stopping without an extra request when the last page is exactly full. HTTP responses are mocked. The full run has one unchanged test escape-sequence warning.\n\nPrepared with Codex. Related improvement program: Scottcjn/rustchain-bounties#100."
+      },
+      "replacement": {
+        "title": "Fetch every GitHub bounty issue page",
+        "body": "The bounty index stopped after the first 100 matching issues from each repository. Fetch subsequent issue pages while GitHub advertises a next page, retaining the bounty/open filters and excluding pull requests on every page. If a later request fails, retain earlier results, warn, and continue with the next repository.\n\nValidation: the full suite passes 233 tests; the focused suite passes 65. Two of the three new regressions fail against the original source (2 failed, 1 passed). Tests cover a second page beyond 100 issues, pull-request filtering, a later-page timeout followed by another repository, and stopping without an extra request when the last page is exactly full. HTTP responses are mocked. The full run has one unchanged test escape-sequence warning.\n\nRelated improvement program: Scottcjn/rustchain-bounties#100."
+      },
+      "status": "prepared_not_applied",
+      "last_direct_attempt": "403 Resource not accessible by integration; no mutation"
+    },
+    {
+      "repository": "Scottcjn/bounty-concierge",
+      "pr_number": 57,
+      "url": "https://github.com/Scottcjn/bounty-concierge/pull/57",
+      "author": "woahwhattheheck",
+      "author_id": 293286387,
+      "expected": {
+        "head_sha": "b002625898762253fdeb281e875a2810e76fee2b",
+        "base_sha": "d660a89c71a9903d9ca59777888ac4569720a8b8",
+        "state": "closed",
+        "merged": true,
+        "merge_commit_sha": "2d6be3cf240d9eb88353eb5259b9c6fabf462ee2",
+        "title": "[Codex] Run the README bounty refresh and preserve literal titles",
+        "body": "The merged README generator from #45 was not yet invoked by the scheduled index workflow. Add that invocation after rebuilding the index and include README.md in the existing automatic commit. Preserve literal generated text during sentinel replacement so titles containing Windows paths or regex backreferences do not get rewritten.\n\nThis follows up on #45's documented workflow omission and retains its existing generator. Validation: the full suite passes 232 tests and all 8 focused README tests pass. Both new regressions fail against the original replacement implementation (2 failed) and now verify exact title preservation, surrounding content, and repeat-run idempotence. The workflow wiring was inspected locally; its next hosted execution remains unverified.\n\nPrepared with Codex. Related improvement program: Scottcjn/rustchain-bounties#100."
+      },
+      "replacement": {
+        "title": "Run the README bounty refresh and preserve literal titles",
+        "body": "The merged README generator from #45 was not yet invoked by the scheduled index workflow. Add that invocation after rebuilding the index and include README.md in the existing automatic commit. Preserve literal generated text during sentinel replacement so titles containing Windows paths or regex backreferences do not get rewritten.\n\nThis follows up on #45's documented workflow omission and retains its existing generator. Validation: the full suite passes 232 tests and all 8 focused README tests pass. Both new regressions fail against the original replacement implementation (2 failed) and now verify exact title preservation, surrounding content, and repeat-run idempotence. The workflow wiring was inspected locally; its next hosted execution remains unverified.\n\nRelated improvement program: Scottcjn/rustchain-bounties#100."
+      },
+      "status": "prepared_not_applied",
+      "last_direct_attempt": "Not repeated after the same repository's measured integration denial"
+    },
+    {
+      "repository": "Scottcjn/bounty-concierge",
+      "pr_number": 58,
+      "url": "https://github.com/Scottcjn/bounty-concierge/pull/58",
+      "author": "woahwhattheheck",
+      "author_id": 293286387,
+      "expected": {
+        "head_sha": "bda5a84a22d2eb37d56763293bf774d49e0495e2",
+        "base_sha": "d660a89c71a9903d9ca59777888ac4569720a8b8",
+        "state": "closed",
+        "merged": true,
+        "merge_commit_sha": "b8aac13e4dc83f5fc4a876cb84ccafab88ddb46e",
+        "title": "[Codex] Preserve common CLI flags across subcommands",
+        "body": "Subparser defaults reset `--json` and `--dry-run` when those options appeared before a command or nested wallet action. Suppress defaults on each common flag definition and set the false defaults once at the root parser, so options retain their meaning in every supported position.\n\nValidation: the full suite passes 238 tests and all 8 new regressions pass; four fail against the original parser (4 failed, 4 passed). Tests exercise JSON output and preview behavior through the browse command, flag placement at all three wallet command levels, and clean defaults when the same parser is reused. Network functions are mocked; no wallet operations are executed. The full run has one unchanged test escape-sequence warning.\n\nPrepared with Codex. Related improvement program: Scottcjn/rustchain-bounties#100."
+      },
+      "replacement": {
+        "title": "Preserve common CLI flags across subcommands",
+        "body": "Subparser defaults reset `--json` and `--dry-run` when those options appeared before a command or nested wallet action. Suppress defaults on each common flag definition and set the false defaults once at the root parser, so options retain their meaning in every supported position.\n\nValidation: the full suite passes 238 tests and all 8 new regressions pass; four fail against the original parser (4 failed, 4 passed). Tests exercise JSON output and preview behavior through the browse command, flag placement at all three wallet command levels, and clean defaults when the same parser is reused. Network functions are mocked; no wallet operations are executed. The full run has one unchanged test escape-sequence warning.\n\nRelated improvement program: Scottcjn/rustchain-bounties#100."
+      },
+      "status": "prepared_not_applied",
+      "last_direct_attempt": "Not repeated after the same repository's measured integration denial"
+    }
+  ]
+}
