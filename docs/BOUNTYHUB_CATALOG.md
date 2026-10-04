@@ -10,12 +10,14 @@ repeating the provider reads.
 
 ```bash
 python -m concierge.bountyhub_catalog collect \
-  --max-pages 10 --max-details 50 --min-funded-usd 50.00 > catalog.json
+  --max-pages 10 --page-size 100 --max-details 50 --min-funded-usd 50.00 > catalog.json
 ```
 
 The collector uses one `requests.Session`, reads ascending numbered pages from
 `https://api.bountyhub.dev/api/bounties`, and follows the returned `hasNextPage`
-flag. It then reads pledge/claim details only for nonterminal listings whose
+flag. Each page requests `limit=100` by default; `--page-size` accepts 1 through
+100 and is recorded in the report. It then reads pledge/claim details only for
+nonterminal listings whose
 advertised total can reach the selected funding floor. The default floor is
 $50. The page and detail bounds are independent; no retry, sleep, watcher,
 schedule, claim, proposal, account change or other provider write is performed.
@@ -111,13 +113,20 @@ prose, raw pledge/claim/assignment objects, account profiles, checkout-session I
 payment-order IDs and fee-inclusive payment amounts. Retain raw API responses
 privately if needed for debugging; publish the reduced report instead.
 
-The retained collection in
+The initial retained collection in
 `work/supply/bountyhub/2026-10-04-catalog-56f3.json` read 26 listings on three pages
 and 17 selected details in 20 public GET requests. The actual CLI took 12.429
 seconds in the shared cloud harness. Seven issue targets met the reported funded
 floor before GitHub/claim preflight. These are dated observations and one measured
-run, not current availability, a latency guarantee or earnings. Re-exporting its
-shortlist requires zero provider reads and preserves the recorded interval.
+run, not current availability, a latency guarantee or earnings. That initial run
+used the provider's default page size of 10. C19E's subsequent retained public
+`page=1&limit=100` response contained the same 26 distinct listing IDs with
+`hasNextPage=false`. The collector now defaults to that larger page size: one
+catalog-page read instead of three for the observed catalog, with pledge-detail
+reads still required. This reduces the corresponding request count from 20 to
+18 if the selected details are unchanged; it is not a new wall-clock benchmark.
+Re-exporting a retained collector report requires zero provider reads and
+preserves the recorded interval.
 
 ```bash
 python -m concierge.bountyhub_catalog targets \
