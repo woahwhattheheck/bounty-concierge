@@ -35,7 +35,8 @@ _TEXT_REF_PREFIX_GUARD = rf"(?<![{_TEXT_REF_TOKEN_CHARS}])"
 _TEXT_REF_SUFFIX_GUARD = rf"(?![{_TEXT_REF_NON_DOT_TOKEN_CHARS}]|\.[{_TEXT_REF_TOKEN_CHARS}])"
 _FULL_ISSUE_URL_RE = re.compile(
     _TEXT_REF_PREFIX_GUARD
-    + r"(https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/[1-9][0-9]*"
+    + r"(https://(?:github\.com/|api\.github\.com/repos/)"
+    + r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/[1-9][0-9]*"
     + r"(?:#issuecomment-[1-9][0-9]*)?)"
     + _TEXT_REF_SUFFIX_GUARD,
     re.IGNORECASE,
@@ -124,7 +125,11 @@ def _identity(owner: str, repo: str, number_text: str) -> tuple[str, int, str]:
 
 
 def _github_issue_identity(parsed: SplitResult) -> tuple[str, int, str] | None:
-    if parsed.hostname is None or parsed.hostname.casefold() != "github.com":
+    hostname = parsed.hostname.casefold() if parsed.hostname else ""
+    path = parsed.path
+    if hostname == "api.github.com" and path.startswith("/repos/"):
+        path = path[len("/repos"):]
+    elif hostname != "github.com":
         return None
     if parsed.query:
         return None
@@ -132,7 +137,7 @@ def _github_issue_identity(parsed: SplitResult) -> tuple[str, int, str] | None:
         r"issuecomment-[1-9][0-9]*", parsed.fragment, re.IGNORECASE
     ):
         return None
-    match = _ISSUE_PATH_RE.fullmatch(parsed.path)
+    match = _ISSUE_PATH_RE.fullmatch(path)
     if match is None:
         return None
     return _identity(match.group(1), match.group(2), match.group(3))
@@ -229,8 +234,8 @@ def resolve_canonical_source(listing: dict[str, Any]) -> dict[str, Any]:
 
     Precedence is intentionally authority-aware:
 
-    1. A clean ``github.com/<owner>/<repo>/issues/<n>`` listing URL resolves to
-       itself. References in that issue's title/body cannot redirect it.
+    1. A clean GitHub web or REST issue listing URL resolves to its canonical
+       web identity. References in that issue's title/body cannot redirect it.
     2. For mirrors, explicit ``source_urls`` are considered before free text.
        Exactly one distinct GitHub issue must be present.
     3. Without explicit source URLs, title/body references may resolve the row,
