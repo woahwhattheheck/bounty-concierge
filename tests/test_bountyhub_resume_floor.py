@@ -30,7 +30,7 @@ class Feed:
                              "paymentStatus": "PROMISED" if promised else "PAID", "isPaid": False}],
             })
 
-    def get(self, url, params=None, timeout=None):
+    def get(self, url, params=None, timeout=None, allow_redirects=False):
         self.calls.append((url, params))
         if url == catalog.API:
             start = (params["page"] - 1) * params["limit"]
