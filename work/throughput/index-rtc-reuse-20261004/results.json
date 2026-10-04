@@ -1,0 +1,93 @@
+{
+  "baseline_commit": "46f3b203bd816543fb8cddf38e77cb3f558e9af6",
+  "baseline_source_sha256": "c0d1ab7b6c4f1d1b3e061bd7abcf287a8a85ea53c2a8fe44b4f4bf3cd41691e6",
+  "candidate_source_sha256": "f9632579d75390bfe323698167cfc62c65be4b8bd27afb9b280975f54436db76",
+  "retained_input": "data/bounty_index.json",
+  "retained_input_sha256": "e89a7f9e9ad3dc6463d91904d7bd9d0342a852450ebae6a19a64655248ae1daf",
+  "retained_observed_at": "2026-10-04T11:49:06.624589+00:00",
+  "retained_issue_count": 266,
+  "title_body_characters": 478398,
+  "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+  "measurement": "Actual fetch_bounties_report and Requests via loopback; real retained issue text, reconstructed provider page envelopes. Process CPU includes the loopback server.",
+  "limitations": "No live GitHub, WAN, quota savings, fleet throughput or freshly eligible bounty claim. Request count is unchanged. Only report observation clocks are excluded from equality.",
+  "outputs_equal": true,
+  "output_sha256": "da8d672cda571657b6f213a2dc2e90c2e081bcc7c52cea37d1010a02172109a4",
+  "requests_each": 11,
+  "parse_reward_calls": {
+    "before": 266,
+    "after": 0
+  },
+  "samples": {
+    "before": [
+      {
+        "wall_ms": 129.48251900525065,
+        "process_cpu_ms": 129.3413
+      },
+      {
+        "wall_ms": 146.11392599908868,
+        "process_cpu_ms": 146.39802700000004
+      },
+      {
+        "wall_ms": 158.2258170019486,
+        "process_cpu_ms": 156.06877399999996
+      },
+      {
+        "wall_ms": 143.1997580002644,
+        "process_cpu_ms": 140.0134449999999
+      },
+      {
+        "wall_ms": 125.54289200488711,
+        "process_cpu_ms": 123.90521399999987
+      },
+      {
+        "wall_ms": 132.3093390019494,
+        "process_cpu_ms": 132.45635999999993
+      },
+      {
+        "wall_ms": 134.58125599572668,
+        "process_cpu_ms": 133.72316000000018
+      }
+    ],
+    "after": [
+      {
+        "wall_ms": 124.34867800038774,
+        "process_cpu_ms": 124.31075999999996
+      },
+      {
+        "wall_ms": 127.48747400473803,
+        "process_cpu_ms": 124.11725799999995
+      },
+      {
+        "wall_ms": 135.1395620004041,
+        "process_cpu_ms": 134.22281800000002
+      },
+      {
+        "wall_ms": 136.40715400106274,
+        "process_cpu_ms": 134.9973649999998
+      },
+      {
+        "wall_ms": 128.4453569969628,
+        "process_cpu_ms": 127.28680899999989
+      },
+      {
+        "wall_ms": 123.94116500217933,
+        "process_cpu_ms": 124.15514899999991
+      },
+      {
+        "wall_ms": 128.20837100298377,
+        "process_cpu_ms": 127.0228409999996
+      }
+    ]
+  },
+  "medians_ms": {
+    "before": {
+      "wall_ms": 134.58125599572668,
+      "process_cpu_ms": 133.72316000000018
+    },
+    "after": {
+      "wall_ms": 128.20837100298377,
+      "process_cpu_ms": 127.0228409999996
+    }
+  },
+  "reward_extractor_sha256": "30d6ced46612b439e0bb75228dc6fad1e5dd81a33828c5791ea763becb247607"
+}
