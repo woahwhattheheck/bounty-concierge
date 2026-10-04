@@ -1,0 +1,28 @@
+import { chromium } from "playwright";
+import assert from "node:assert/strict";
+import { mkdir, writeFile } from "node:fs/promises";
+await mkdir("evidence", { recursive: true });
+const browser = await chromium.launch({ headless: true });
+const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, recordVideo: { dir: "evidence", size: { width: 1280, height: 720 } } });
+const page = await context.newPage();
+const requests = [];
+await page.route("https://demo.invalid/**", async route => {
+  requests.push({ url: route.request().url(), body: route.request().postData() });
+  await route.fulfill({ status: 200, contentType: "application/json", body: "{}", headers: { "access-control-allow-origin": "*" } });
+});
+await page.goto("http://127.0.0.1:4173/demo/");
+await page.locator("#state").filter({ hasText: "Checkout · Sale: false · Price: 20" }).waitFor();
+await page.waitForTimeout(2500);
+await page.locator("#act").click();
+await page.waitForTimeout(1500);
+await page.locator("#update").click();
+await page.locator("#state").filter({ hasText: "Order now · Sale: true · Price: 15" }).waitFor();
+await page.waitForTimeout(2500);
+await page.locator("#act").click();
+await page.waitForTimeout(1500);
+const bodies = requests.map(r => r.body).filter(Boolean);
+assert(bodies.some(body => body.includes("control")), "expected an event for the original variant");
+assert(bodies.some(body => body.includes("new")), "expected an event for the updated variant");
+await writeFile("evidence/events.json", JSON.stringify(requests, null, 2));
+await context.close();
+await browser.close();
