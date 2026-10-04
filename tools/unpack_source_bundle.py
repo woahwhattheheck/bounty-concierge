@@ -39,6 +39,10 @@ def _path(value: str) -> str:
     if (not isinstance(value, str) or not value or "\\" in value or "\x00" in value
             or value.startswith("/") or ".." in value.split("/")):
         raise ValueError("paths must be repository-relative without parent components")
+    # Most git-archive names are already canonical; avoid constructing paths.
+    parts = value.split("/")
+    if "" not in parts and "." not in parts:
+        return value
     result = PurePosixPath(value).as_posix()
     if result == ".":
         raise ValueError("omit --path to extract the whole source")
