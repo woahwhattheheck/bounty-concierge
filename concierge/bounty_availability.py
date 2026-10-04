@@ -238,19 +238,21 @@ def _terminal_signals(text: str) -> tuple[str, ...]:
     for line in _candidate_lines(text):
         for clause in _assertive_clauses(line):
             for code, pattern in _RULES:
-                match = pattern.search(clause)
-                if match is None:
-                    continue
-                context_start = max(0, match.start() - 40)
-                context = clause[context_start : match.end()]
-                if code == "MAINTAINER_CAP_CLOSED_SIGNAL" and match.group("stop_no"):
-                    # The "no" in "no more submissions" asserts closure; keep
-                    # any surrounding negation subject to the normal filter.
-                    start, end = match.span("stop_no")
-                    context = clause[context_start:start] + clause[end : match.end()]
-                if _NEGATION_RE.search(context):
-                    continue
-                found.add(code)
+                offset = 0
+                while (match := pattern.search(clause, offset)) is not None:
+                    context_start = max(0, match.start() - 40)
+                    context = clause[context_start : match.end()]
+                    if code == "MAINTAINER_CAP_CLOSED_SIGNAL" and match.group("stop_no"):
+                        # The "no" in "no more submissions" asserts closure; keep
+                        # any surrounding negation subject to the normal filter.
+                        start, end = match.span("stop_no")
+                        context = clause[context_start:start] + clause[end : match.end()]
+                    if not _NEGATION_RE.search(context):
+                        found.add(code)
+                        break
+                    # A negated earlier match must not hide a later assertion.
+                    # Resume after its start: bounded patterns may overlap.
+                    offset = match.start() + 1
     return tuple(sorted(found))
 
 
