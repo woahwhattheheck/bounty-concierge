@@ -163,7 +163,16 @@ def _get(session: Any, url: str, report: dict[str, Any], **params: Any) -> Any:
     try:
         response = session.get(url, params=params or None, timeout=20)
     except requests.RequestException as exc:
-        raise _ReadFailure(type(exc).__name__) from None
+        # Response hooks may raise before Session.get returns. Preserve the
+        # same status/retry metadata and cleanup as a returned HTTP failure.
+        response = exc.response if isinstance(exc, requests.HTTPError) else None
+        if response is None:
+            raise _ReadFailure(type(exc).__name__) from None
+        try:
+            raise _ReadFailure("HTTP_ERROR", response.status_code,
+                               _retry_after(response.headers.get("Retry-After"))) from None
+        finally:
+            response.close()
     try:
         delay = _retry_after(response.headers.get("Retry-After"))
         status = response.status_code
