@@ -502,6 +502,19 @@ def fetch_live_opportunities(
     session: Any = requests,
 ) -> dict[str, Any]:
     """Fetch agent-eligible listings from Superteam's first-party read endpoint."""
+    # Keep the HTTP pool across batches; caller-supplied transports stay owned
+    # by their caller. The context closes our pool on success and every error.
+    if session is requests:
+        with requests.Session() as owned_session:
+            return fetch_live_opportunities(
+                api_key=api_key,
+                listing_type=listing_type,
+                take=take,
+                deadline=deadline,
+                max_batches=max_batches,
+                as_of=as_of,
+                session=owned_session,
+            )
     key = _api_key(api_key)
     if listing_type is not None and listing_type not in _ALLOWED_TYPES:
         raise SuperteamProviderError(
