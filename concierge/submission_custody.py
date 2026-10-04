@@ -614,7 +614,12 @@ def _validate_stored_event(event: Any, as_of: datetime) -> dict[str, Any]:
     return normalized
 
 
-def _replay(events: list[dict[str, Any]], as_of: datetime) -> dict[str, Any]:
+def _replay(
+    events: list[dict[str, Any]],
+    as_of: datetime,
+    *,
+    source_revision_conflicts: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     candidates: dict[str, dict[str, Any]] = {}
     event_ids: dict[str, str] = {}
     external_refs: dict[str, str] = {}
@@ -643,8 +648,15 @@ def _replay(events: list[dict[str, Any]], as_of: datetime) -> dict[str, Any]:
             # Compare GitHub identities without changing recorded URL bytes.
             identity = (event["source_url"].casefold(), event["artifact_revision"])
             if identity in identity_keys:
-                _fail("SOURCE_REVISION_CONFLICT")
-            identity_keys[identity] = sid
+                if source_revision_conflicts is None:
+                    _fail("SOURCE_REVISION_CONFLICT")
+                source_revision_conflicts.append({
+                    "code": "SOURCE_REVISION_CONFLICT",
+                    "submission_ids": [identity_keys[identity], sid],
+                    "artifact_revision": event["artifact_revision"],
+                })
+            else:
+                identity_keys[identity] = sid
             candidate_core = {
                 key: value for key, value in event.items() if key not in {"event_id", "event_type", "occurred_at"}
             }
@@ -767,6 +779,40 @@ def verify_ledger(ledger: Any, *, as_of: Any) -> dict[str, Any]:
         "event_count": len(replay["events"]),
         "submission_count": len(replay["candidates"]),
         "ledger_sha256": normalized["ledger_sha256"],
+    }
+
+
+def inspect_ledger(ledger: Any, *, as_of: Any) -> dict[str, Any]:
+    """Expose recorded history and source conflicts without a submission decision.
+
+    Legacy source/revision aliases remain visible for diagnosis. All other
+    digest, event, chronology and lifecycle checks remain strict.
+    """
+    as_of_text, as_of_dt = _assert_as_of(as_of)
+    normalized = _normalize_ledger(ledger)
+    conflicts: list[dict[str, Any]] = []
+    replay = _replay(normalized["events"], as_of_dt, source_revision_conflicts=conflicts)
+    if replay["events"] != normalized["events"]:
+        _fail("EVENT_NORMALIZATION_DRIFT")
+    conflicted_ids = {sid for conflict in conflicts for sid in conflict["submission_ids"]}
+    return {
+        "valid": not conflicts,
+        "as_of": as_of_text,
+        "ledger_sha256": normalized["ledger_sha256"],
+        "event_count": len(replay["events"]),
+        "submission_count": len(replay["candidates"]),
+        "source_revision_conflicts": conflicts,
+        "candidates": [
+            {
+                "candidate": candidate,
+                "dispatches": replay["dispatches"][sid],
+                "sponsor_events": replay["sponsor_events"][sid],
+                "superseded": sid in replay["superseded"],
+                "source_revision_conflict": sid in conflicted_ids,
+            }
+            for sid, candidate in replay["candidates"].items()
+        ],
+        "authority": {"diagnostic_only": True, "external_send_authorized": False},
     }
 
 
