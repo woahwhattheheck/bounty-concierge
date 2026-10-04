@@ -1,5 +1,6 @@
 import { AbbyEventType, HttpService, type AbbyDataResponse } from "@tryabby/core";
 import { mount, flushPromises } from "@vue/test-utils";
+import Cookie from "js-cookie";
 import { createApp, defineComponent, h, nextTick } from "vue";
 import { afterEach, expect, it, vi } from "vitest";
 import { createAbby } from "../src";
@@ -17,7 +18,13 @@ function sdk() {
     cookies: { disableByDefault: true },
   });
 }
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+  // Development overrides intentionally persist through the real core client.
+  // Each case must start with its own initial data, not the preceding cookies.
+  for (const name of Object.keys(Cookie.get())) Cookie.remove(name);
+});
 
 it("renders typed plugin values, reacts to core updates, and tracks raw variants", async () => {
   vi.stubEnv("NODE_ENV", "development");
