@@ -128,9 +128,8 @@ def _publication_lock(target):
     with os.fdopen(fd, "r+b") as handle:
         if os.name == "nt":
             import msvcrt
-            if os.fstat(fd).st_size == 0:
-                handle.write(b"\0")
-                handle.flush()
+            # Byte-range locks may extend past EOF; avoid an unlocked
+            # initialization write racing another publisher's acquired lock.
             handle.seek(0)
             msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
         else:
