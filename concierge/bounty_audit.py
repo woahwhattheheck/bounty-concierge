@@ -339,7 +339,7 @@ def audit_bounty(
 
 
 def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, session: Any = requests, max_pages: int = 10) -> list[dict[str, Any]]:
-    """Read each exact issue/explicit-target combination once per invocation."""
+    """Read each case-insensitive issue/explicit-target combination once per invocation."""
     if session is requests:
         with requests.Session() as owned_session:
             return audit_bounties(
@@ -362,10 +362,10 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
             json.dumps(target, sort_keys=True, separators=(",", ":"))
             if target is not None else None
         )
-        key = (repo, number, target_key)
+        key = (repo.casefold(), number, target_key)
         if key not in audit_by_issue:
             audit_by_issue[key] = audit_bounty(
-                key[0],
+                repo,
                 key[1],
                 token,
                 session=session,
@@ -375,6 +375,12 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
         # Each row owns its nested report. A caller editing one scout's result
         # must not alter another row or the evidence reused later in this batch.
         row["canonical_audit"] = deepcopy(audit_by_issue[key])
+        # Repository casing does not change GitHub identity, but each row keeps
+        # its caller's spelling in the report and source-repository PR markers.
+        row["canonical_audit"]["repo"] = repo
+        for pr in row["canonical_audit"]["linked_prs"]:
+            if pr.get("repository", "").casefold() == key[0]:
+                pr["repository"] = repo
         audited.append(row)
     return audited
 

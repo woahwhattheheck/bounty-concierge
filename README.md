@@ -307,10 +307,12 @@ fallback. For a complete 100-comment issue with no linked PRs, this reduces the
 audit from four GETs to three without changing its result.
 
 Python callers of `audit_bounties()` reuse one completed audit for repeated
-repository/issue pairs within that invocation. Repository spelling is matched
-exactly and issue numbers use the existing integer conversion. Every input row
-keeps its original metadata and order, with an independent nested audit. A later
-invocation performs fresh reads; partial-read signals and errors remain intact.
+repository/issue pairs within that invocation. Repository identity ignores case
+and issue numbers use the existing integer conversion; distinct explicit
+submission-target evidence retains its own audit. Every input row keeps its
+original metadata, repository spelling and order, with an independent nested
+audit. A later invocation performs fresh reads; partial-read signals and errors
+remain intact.
 
 ---
 
