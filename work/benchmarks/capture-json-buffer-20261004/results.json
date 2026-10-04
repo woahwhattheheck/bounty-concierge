@@ -1,0 +1,333 @@
+{
+  "baseline_commit": "2fefacd83611707f7c4a3c229bfdf513f1630e01",
+  "edge_checks": {
+    "baseline": {
+      "existing_output_preserved": true,
+      "invalid_no_leaf_cases": 5,
+      "secure_output_git_blob": "b28696458e11e9498a60e6dd99aaceea468b7f20",
+      "valid_byte_cases": 10,
+      "writer_git_blob": "91298cf466a23fc796dde9f640d942f975ab737f"
+    },
+    "candidate": {
+      "existing_output_preserved": true,
+      "invalid_no_leaf_cases": 5,
+      "secure_output_git_blob": "a0e8953fc8cad9ab62c0b2708325875c4c5e0573",
+      "valid_byte_cases": 10,
+      "writer_git_blob": "40f700e150a97cbc631a0fe53c67de9876dea9dc"
+    }
+  },
+  "memory_method": "one separate tracemalloc run; fixture built before tracing; output comparison after tracing",
+  "observation_columns": [
+    "variant",
+    "case",
+    "repeat",
+    "mode",
+    "wall_seconds",
+    "traced_peak_bytes",
+    "peak_rss_kib_before_comparison"
+  ],
+  "observation_invariants": {
+    "byte_identical_in_every_observation": true,
+    "mode_0600_in_every_observation": true,
+    "outputs": "summary[case][variant].output_bytes and output_sha256",
+    "source_blobs": "edge_checks[variant].writer_git_blob and secure_output_git_blob"
+  },
+  "observations": [
+    [
+      "baseline",
+      "small",
+      0,
+      "wall",
+      0.00013336200004232523,
+      null,
+      97708
+    ],
+    [
+      "candidate",
+      "small",
+      0,
+      "wall",
+      0.00014129399994544656,
+      null,
+      97836
+    ],
+    [
+      "candidate",
+      "small",
+      1,
+      "wall",
+      0.00013320100003966218,
+      null,
+      97836
+    ],
+    [
+      "baseline",
+      "small",
+      1,
+      "wall",
+      0.00012513900003341405,
+      null,
+      97672
+    ],
+    [
+      "baseline",
+      "small",
+      2,
+      "wall",
+      0.0001295160000154283,
+      null,
+      97708
+    ],
+    [
+      "candidate",
+      "small",
+      2,
+      "wall",
+      0.00012683200009178108,
+      null,
+      97832
+    ],
+    [
+      "candidate",
+      "small",
+      3,
+      "wall",
+      0.00012739299995701003,
+      null,
+      97840
+    ],
+    [
+      "baseline",
+      "small",
+      3,
+      "wall",
+      0.00013209000007918803,
+      null,
+      97704
+    ],
+    [
+      "baseline",
+      "small",
+      4,
+      "wall",
+      0.00012764300004164397,
+      null,
+      97712
+    ],
+    [
+      "candidate",
+      "small",
+      4,
+      "wall",
+      0.0001351849999764454,
+      null,
+      97840
+    ],
+    [
+      "baseline",
+      "small",
+      null,
+      "memory",
+      0.0004846529999440463,
+      19169,
+      97704
+    ],
+    [
+      "candidate",
+      "small",
+      null,
+      "memory",
+      0.0008238570000003165,
+      21131,
+      97840
+    ],
+    [
+      "baseline",
+      "large",
+      0,
+      "wall",
+      0.08774472800007516,
+      null,
+      182440
+    ],
+    [
+      "candidate",
+      "large",
+      0,
+      "wall",
+      0.07874743499996839,
+      null,
+      159400
+    ],
+    [
+      "candidate",
+      "large",
+      1,
+      "wall",
+      0.08582306000005246,
+      null,
+      159020
+    ],
+    [
+      "baseline",
+      "large",
+      1,
+      "wall",
+      0.0899016409999831,
+      null,
+      182444
+    ],
+    [
+      "baseline",
+      "large",
+      2,
+      "wall",
+      0.09050768800000242,
+      null,
+      182440
+    ],
+    [
+      "candidate",
+      "large",
+      2,
+      "wall",
+      0.07996476599998914,
+      null,
+      159024
+    ],
+    [
+      "candidate",
+      "large",
+      3,
+      "wall",
+      0.07906073699996341,
+      null,
+      159012
+    ],
+    [
+      "baseline",
+      "large",
+      3,
+      "wall",
+      0.0878029760000345,
+      null,
+      182444
+    ],
+    [
+      "baseline",
+      "large",
+      4,
+      "wall",
+      0.09488632399995822,
+      null,
+      182436
+    ],
+    [
+      "candidate",
+      "large",
+      4,
+      "wall",
+      0.08362910000005286,
+      null,
+      159404
+    ],
+    [
+      "baseline",
+      "large",
+      null,
+      "memory",
+      0.7418528950000791,
+      47549529,
+      182444
+    ],
+    [
+      "candidate",
+      "large",
+      null,
+      "memory",
+      0.7272018129999651,
+      28967513,
+      159404
+    ]
+  ],
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "python": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+  "scope": "exact production _write_json and complete secure_output only; synthetic JSON; no network or end-to-end collector execution",
+  "secure_checks": {
+    "baseline": {
+      "checks": [
+        "bytes:partial-writes",
+        "bytes:zero-write-retained",
+        "bytes:fsync-error-retained",
+        "bytes:existing-refused",
+        "bytes:leaf-symlink-refused",
+        "bytes:parent-symlink-refused",
+        "bytes:invalid-payload-no-leaf"
+      ],
+      "fd_count_after": 4,
+      "fd_count_before": 4
+    },
+    "candidate": {
+      "checks": [
+        "bytes:partial-writes",
+        "bytes:zero-write-retained",
+        "bytes:fsync-error-retained",
+        "bytes:existing-refused",
+        "bytes:leaf-symlink-refused",
+        "bytes:parent-symlink-refused",
+        "bytes:invalid-payload-no-leaf",
+        "chunks:partial-writes",
+        "chunks:zero-write-retained",
+        "chunks:fsync-error-retained",
+        "chunks:existing-refused",
+        "chunks:leaf-symlink-refused",
+        "chunks:parent-symlink-refused",
+        "chunks:late-iterator-retained",
+        "chunks:invalid-chunk-retained"
+      ],
+      "fd_count_after": 4,
+      "fd_count_before": 4
+    }
+  },
+  "summary": [
+    {
+      "baseline": {
+        "median_peak_rss_kib": 97708,
+        "median_wall_seconds": 0.0001295160000154283,
+        "output_bytes": 9544,
+        "output_sha256": "917db207f1e6fd2a733d7e512f070d8354457b13329af4e68c7792e029a7788a",
+        "traced_peak_bytes": 19169
+      },
+      "candidate": {
+        "median_peak_rss_kib": 97836,
+        "median_wall_seconds": 0.00013320100003966218,
+        "output_bytes": 9544,
+        "output_sha256": "917db207f1e6fd2a733d7e512f070d8354457b13329af4e68c7792e029a7788a",
+        "traced_peak_bytes": 21131
+      },
+      "case": "small",
+      "traced_peak_reduction_percent": -10.235275705566282,
+      "wall_ratio_candidate_over_baseline": 1.028452083324029
+    },
+    {
+      "baseline": {
+        "median_peak_rss_kib": 182440,
+        "median_wall_seconds": 0.0899016409999831,
+        "output_bytes": 23774308,
+        "output_sha256": "427f96cf7ea38104315274f699d04710af28a8663fcd4821ec961db19806ae76",
+        "traced_peak_bytes": 47549529
+      },
+      "candidate": {
+        "median_peak_rss_kib": 159024,
+        "median_wall_seconds": 0.07996476599998914,
+        "output_bytes": 23774308,
+        "output_sha256": "427f96cf7ea38104315274f699d04710af28a8663fcd4821ec961db19806ae76",
+        "traced_peak_bytes": 28967513
+      },
+      "case": "large",
+      "traced_peak_reduction_percent": 39.07928509659896,
+      "wall_ratio_candidate_over_baseline": 0.889469481430313
+    }
+  ],
+  "wall_repeats_per_case_variant": 5
+}

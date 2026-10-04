@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import stat
-from typing import Tuple
+from typing import Iterable, Tuple
 
 
 class SecureOutputError(RuntimeError):
@@ -92,6 +92,24 @@ def create_exclusive_regular(path: Path, payload: bytes, *, mode: int = 0o600) -
     if type(payload) is not bytes:
         raise SecureOutputError("output payload must be bytes")
 
+    create_exclusive_regular_chunks(path, (payload,), mode=mode)
+
+
+def create_exclusive_regular_chunks(
+    path: Path, chunks: Iterable[bytes], *, mode: int = 0o600,
+) -> None:
+    """Create one regular file from byte chunks using the same no-follow rules.
+
+    Chunks are consumed once, without joining them into a second full buffer.
+    Callers that require validation before creation must validate their source
+    first. A later iterator, chunk, write or fsync failure leaves the created
+    generation in place, just like the bytes writer's late-failure contract.
+    """
+    try:
+        iterator = iter(chunks)
+    except TypeError as exc:
+        raise SecureOutputError("output chunks must be an iterable of bytes") from exc
+
     parent_fd, leaf = open_verified_parent(path)
     fd = -1
     try:
@@ -113,12 +131,15 @@ def create_exclusive_regular(path: Path, payload: bytes, *, mode: int = 0o600) -
         if not stat.S_ISREG(info.st_mode):
             raise SecureOutputError("output must be a regular file")
 
-        view = memoryview(payload)
-        while view:
-            written = os.write(fd, view)
-            if written <= 0:
-                raise SecureOutputError("short output write")
-            view = view[written:]
+        for chunk in iterator:
+            if type(chunk) is not bytes:
+                raise SecureOutputError("output chunk must be bytes")
+            view = memoryview(chunk)
+            while view:
+                written = os.write(fd, view)
+                if written <= 0:
+                    raise SecureOutputError("short output write")
+                view = view[written:]
         os.fsync(fd)
     finally:
         if fd >= 0:
