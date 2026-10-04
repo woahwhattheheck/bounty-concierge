@@ -5,6 +5,7 @@ Provides instant answers for common RustChain bounty questions using a
 built-in knowledge base, doc search, and optional LLM escalation.
 """
 
+from collections import deque
 from functools import lru_cache
 import os
 import re
@@ -315,16 +316,22 @@ def search_docs(question, docs_dir=None):
         return ""
 
     best_para = ""
-    best_score = 0.0
+    best_overlap = 0
+    question_size = len(q_words)
 
-    for para_stripped, p_words in iter_paragraphs(docs_dir, _keywords):
+    paragraphs = iter_paragraphs(docs_dir, _keywords)
+    for para_stripped, p_words in paragraphs:
         overlap = q_words & p_words
         if not overlap:
             continue
-        score = len(overlap) / len(q_words)
-        if score > best_score:
-            best_score = score
+        matched = len(overlap)
+        if matched > best_overlap:
+            best_overlap = matched
             best_para = para_stripped
+            if matched == question_size:
+                # Exhaust cold reads so the unchanged corpus is still cached.
+                deque(paragraphs, maxlen=0)
+                return best_para
 
     return best_para
 
