@@ -8,6 +8,7 @@ module. A funded listing is discovery evidence, not our assignment or payment.
 from __future__ import annotations
 
 import argparse
+import hashlib
 from datetime import datetime, timezone
 from decimal import Decimal
 from email.utils import parsedate_to_datetime
@@ -229,10 +230,49 @@ def select_targets(report: dict[str, Any], minimum_funded_usd: str = "25.00", *,
         "source_completed_at": report.get("completed_at"),
         "source_complete": report.get("complete") is True and unresolved == 0,
     }
+    if "catalog_observed_through" in report:
+        result["catalog_observed_through"] = report["catalog_observed_through"]
+        result["catalog_refreshed"] = False
     if include_promised:
         del result["minimum_funded_usd"]
         result.update(reward_basis="reported_funded_plus_promised", minimum_reward_usd=_money(floor))
     return result
+
+
+def _record_failure(report: dict[str, Any], exc: _ReadFailure, phase: str, **identity: Any) -> None:
+    report["errors"].append({"phase": phase, **identity, "code": exc.code, "http_status": exc.status})
+    report["rate_limited"] = exc.status == 429 or (exc.status == 403 and exc.retry_after is not None)
+    report["retry_after_seconds"] = exc.retry_after
+
+
+def _fill_details(session: Any, report: dict[str, Any], floor: Decimal, max_details: int,
+                  *, stopped: bool = False, skip_complete: bool = False) -> None:
+    detail_attempts = 0
+    report["details_complete"] = True
+    for index, row in enumerate(report["listings"]):
+        if (not _active(row) or _amount(row["advertised_total_usd"]) < floor
+                or (skip_complete and row["funding_status"] == "COMPLETE")):
+            continue
+        if stopped or detail_attempts >= max_details:
+            row["funding_status"] = "NOT_ATTEMPTED" if stopped else "DETAIL_LIMIT"
+            report["details_complete"] = False
+            continue
+        try:
+            detail_attempts += 1
+            payload = _get(session, row["source_url"], report)
+            report["details_fetched"] += 1
+            report["listings"][index] = _detail(payload, row)
+        except _ReadFailure as exc:
+            row["funding_status"] = "READ_FAILED"
+            _record_failure(report, exc, "detail", listing_id=row["listing_id"])
+            report["details_complete"] = False
+            # A listing removed after catalog collection does not invalidate
+            # later listings. Its failed read still consumes the detail budget.
+            stopped = exc.code != "HTTP_ERROR" or exc.status not in {404, 410}
+        except ValueError:
+            row["funding_status"] = "INVALID_DETAIL"
+            report["errors"].append({"phase": "detail", "listing_id": row["listing_id"], "code": "INVALID_DETAIL"})
+            report["details_complete"] = False
 
 
 def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int = 100,
@@ -263,11 +303,6 @@ def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int 
     seen: set[str] = set()
     stopped = False
 
-    def failed(exc: _ReadFailure, phase: str, **identity: Any) -> None:
-        report["errors"].append({"phase": phase, **identity, "code": exc.code, "http_status": exc.status})
-        report["rate_limited"] = exc.status == 429 or (exc.status == 403 and exc.retry_after is not None)
-        report["retry_after_seconds"] = exc.retry_after
-
     for page in range(1, max_pages + 1):
         try:
             payload = _get(session, API, report, page=page, limit=page_size)
@@ -287,7 +322,7 @@ def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int 
             if not payload["data"]:
                 raise ValueError("empty page reports a successor")
         except _ReadFailure as exc:
-            failed(exc, "catalog", page=page)
+            _record_failure(report, exc, "catalog", page=page)
             stopped = True
             break
         except ValueError:
@@ -296,34 +331,156 @@ def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int 
             break
     if not report["catalog_complete"] and not stopped:
         report["errors"].append({"phase": "catalog", "code": "PAGE_LIMIT"})
-    detail_attempts = 0
-    for index, row in enumerate(report["listings"]):
-        if not _active(row) or _amount(row["advertised_total_usd"]) < floor:
-            continue
-        if stopped or detail_attempts >= max_details:
-            row["funding_status"] = "NOT_ATTEMPTED" if stopped else "DETAIL_LIMIT"
-            report["details_complete"] = False
-            continue
-        try:
-            detail_attempts += 1
-            payload = _get(session, row["source_url"], report)
-            report["details_fetched"] += 1
-            report["listings"][index] = _detail(payload, row)
-        except _ReadFailure as exc:
-            row["funding_status"] = "READ_FAILED"
-            failed(exc, "detail", listing_id=row["listing_id"])
-            report["details_complete"] = False
-            # A listing removed after catalog collection does not invalidate
-            # later listings. Its failed read still consumes the detail budget.
-            stopped = exc.code != "HTTP_ERROR" or exc.status not in {404, 410}
-        except ValueError:
-            row["funding_status"] = "INVALID_DETAIL"
-            report["errors"].append({"phase": "detail", "listing_id": row["listing_id"], "code": "INVALID_DETAIL"})
-            report["details_complete"] = False
+    _fill_details(session, report, floor, max_details, stopped=stopped)
     report["completed_at"] = _now()
     report["complete"] = report["catalog_complete"] and report["details_complete"]
     report["listing_count"] = len(report["listings"])
     report["shortlist"] = select_targets(report, minimum_total_usd, include_promised=include_promised)
+    return report
+
+
+def _instant(value: Any) -> datetime:
+    if not isinstance(value, str):
+        raise ValueError("missing observation timestamp")
+    instant = datetime.fromisoformat(value)
+    if instant.tzinfo is None:
+        raise ValueError("observation timestamp must have a timezone")
+    return instant
+
+
+def _resume_input(snapshot: Any) -> dict[str, Any]:
+    """Validate every retained identity before opening a session; export no raw extras."""
+    if (not isinstance(snapshot, dict) or snapshot.get("schema") != SCHEMA
+            or snapshot.get("source_url") != API or snapshot.get("catalog_complete") is not True
+            or not isinstance(snapshot.get("listings"), list) or len(snapshot["listings"]) > 10000):
+        raise ValueError("resume requires a fully traversed bountyhub-catalog/v1 report")
+    started, completed = _instant(snapshot.get("started_at")), _instant(snapshot.get("completed_at"))
+    observed = snapshot.get("catalog_observed_through", snapshot["completed_at"])
+    if not started <= _instant(observed) <= completed:
+        raise ValueError("invalid observation interval")
+    result = {key: snapshot[key] for key in (
+        "schema", "source_url", "started_at", "completed_at", "minimum_total_usd",
+        "max_pages", "max_details", "page_size", "pages_fetched", "details_fetched", "requests_made",
+    )}
+    for key in ("max_pages", "max_details", "page_size", "pages_fetched", "details_fetched", "requests_made"):
+        if type(result[key]) is not int or result[key] < 0:
+            raise ValueError("invalid retained count")
+    if (not 1 <= result["max_pages"] <= 100 or not 0 <= result["max_details"] <= 100
+            or not 1 <= result["page_size"] <= 100
+            or not 1 <= result["pages_fetched"] <= result["max_pages"]
+            or result["requests_made"] < result["pages_fetched"] + result["details_fetched"]):
+        raise ValueError("invalid retained collection bounds")
+    _amount(result["minimum_total_usd"])
+    for key in ("complete", "details_complete", "rate_limited"):
+        result[key] = _boolean(snapshot, key)
+    retry = snapshot.get("retry_after_seconds")
+    if retry is not None and (type(retry) is not int or not 0 <= retry < 10**12):
+        raise ValueError("invalid retained retry guidance")
+    if (not isinstance(snapshot.get("errors"), list)
+            or any(not isinstance(error, dict) or error.get("phase") != "detail"
+                   for error in snapshot["errors"])):
+        raise ValueError("retained catalog contains invalid or unresolved catalog errors")
+    # Only the current attempt's errors are emitted. Keep the source snapshot:
+    # the resume receipt binds it by digest and records its original error count.
+    result.update(catalog_complete=True, catalog_observed_through=observed,
+                  retry_after_seconds=retry, errors=[], listings=[])
+    seen: set[str] = set()
+    for saved in snapshot["listings"]:
+        if not isinstance(saved, dict):
+            raise ValueError("invalid retained listing")
+        row = _row({
+            "id": saved.get("listing_id"), "repositoryFullName": saved.get("repo"),
+            "issueNumber": saved.get("number"), "htmlURL": saved.get("issue_url"),
+            "title": saved.get("title"), "issueState": saved.get("issue_state"),
+            "assignmentType": saved.get("assignment_type"),
+            "assignee": {} if _boolean(saved, "has_assignee") else None,
+            "claimed": saved.get("claimed"), "retracted": saved.get("retracted"),
+            "solved": saved.get("solved"), "isFrozen": saved.get("frozen"),
+            "deletedAt": "retained" if _boolean(saved, "deleted") else None,
+            "totalAmount": saved.get("advertised_total_usd"), "language": saved.get("language"),
+        })
+        if row["source_url"] != saved.get("source_url") or row["listing_id"] in seen:
+            raise ValueError("invalid or repeated retained listing source")
+        seen.add(row["listing_id"])
+        status = saved.get("funding_status")
+        if not isinstance(status, str) or status not in {
+            "COMPLETE", "NOT_REQUESTED", "NOT_ATTEMPTED", "DETAIL_LIMIT", "READ_FAILED", "INVALID_DETAIL"
+        }:
+            raise ValueError("invalid retained funding status")
+        row["funding_status"] = status
+        if status == "COMPLETE":
+            money_keys = ("reported_funded_usd", "reported_promised_usd", "other_payment_status_usd", "payout_marked_usd")
+            amounts = [_amount(saved.get(key)) for key in money_keys]
+            if sum(amounts[:3]) != _amount(row["advertised_total_usd"]) or amounts[3] > sum(amounts[:3]):
+                raise ValueError("invalid retained funding totals")
+            row.update(zip(money_keys, map(_money, amounts)))
+            for key in ("active_pledge_count", "claim_count", "open_claim_count"):
+                if type(saved.get(key)) is not int or saved[key] < 0:
+                    raise ValueError("invalid retained pledge or claim count")
+                row[key] = saved[key]
+            if row["open_claim_count"] > row["claim_count"]:
+                raise ValueError("invalid retained open claim count")
+        result["listings"].append(row)
+    if type(snapshot.get("listing_count")) is not int or snapshot["listing_count"] != len(seen):
+        raise ValueError("retained listing count disagrees")
+    result["listing_count"] = len(seen)
+    return result
+
+
+def resume_catalog(snapshot: dict[str, Any], *, max_details: int = 50,
+                   session: Any = None) -> dict[str, Any]:
+    """Finish unresolved detail reads, not a fresh catalog or eligibility check."""
+    if type(max_details) is not int or not 0 <= max_details <= 100:
+        raise ValueError("max_details must be between 0 and 100")
+    report = _resume_input(snapshot)
+    shortlist = snapshot.get("shortlist")
+    if not isinstance(shortlist, dict):
+        raise ValueError("missing retained shortlist scope")
+    basis = shortlist.get("reward_basis")
+    if basis is not None and basis != "reported_funded_plus_promised":
+        raise ValueError("invalid retained reward basis")
+    include_promised = basis is not None
+    minimum = report["minimum_total_usd"]
+    floor_key = "minimum_reward_usd" if include_promised else "minimum_funded_usd"
+    if _amount(shortlist.get(floor_key)) != _amount(minimum):
+        raise ValueError("retained shortlist floor disagrees with collection")
+    floor = _amount(minimum)
+    try:
+        source_sha256 = hashlib.sha256(json.dumps(snapshot, sort_keys=True, separators=(",", ":"),
+                                                 allow_nan=False).encode("utf-8")).hexdigest()
+    except (TypeError, ValueError):
+        raise ValueError("retained catalog must contain finite JSON values") from None
+    pending = any(_active(row) and _amount(row["advertised_total_usd"]) >= floor
+                  and row["funding_status"] != "COMPLETE" for row in report["listings"])
+    started_at = _now()
+    previous_requests, previous_details = report["requests_made"], report["details_fetched"]
+    if pending and max_details:
+        if _instant(started_at) < _instant(report["completed_at"]):
+            raise ValueError("resume time predates retained observation")
+        if report["retry_after_seconds"] is not None:
+            elapsed = (_instant(started_at) - _instant(report["completed_at"])).total_seconds()
+            if elapsed < report["retry_after_seconds"]:
+                raise ValueError("retained Retry-After cooldown has not elapsed")
+        report.update(max_details=max_details, rate_limited=False, retry_after_seconds=None)
+        if session is None:
+            with requests.Session() as owned:
+                _fill_details(owned, report, floor, max_details, skip_complete=True)
+        else:
+            _fill_details(session, report, floor, max_details, skip_complete=True)
+        report["completed_at"] = _now()
+    else:
+        # A no-op must not turn old observations into a newly dated capture or
+        # clear a cooldown. Even max_details=0 retains the last observation end.
+        report["details_complete"] = not pending
+    report["complete"] = report["details_complete"]
+    report["resume"] = {
+        "started_at": started_at, "completed_at": _now(), "catalog_refreshed": False,
+        "source_started_at": snapshot["started_at"], "source_completed_at": snapshot["completed_at"],
+        "source_error_count": len(snapshot["errors"]), "source_sha256": source_sha256,
+        "requests_made": report["requests_made"] - previous_requests,
+        "details_fetched": report["details_fetched"] - previous_details,
+    }
+    report["shortlist"] = select_targets(report, minimum, include_promised=include_promised)
     return report
 
 
@@ -336,6 +493,9 @@ def main(argv: list[str] | None = None) -> int:
     collect.add_argument("--page-size", type=int, default=100)
     targets = commands.add_parser("targets", help="Export targets from a retained catalog with no provider reads")
     targets.add_argument("snapshot", type=Path)
+    resume = commands.add_parser("resume", help="Finish unresolved details from a retained complete catalog")
+    resume.add_argument("snapshot", type=Path)
+    resume.add_argument("--max-details", type=int, default=50)
     for command in (collect, targets):
         command.add_argument(
             "--min-funded-usd", "--min-reward-usd", dest="min_funded_usd", default="25.00",
@@ -354,6 +514,13 @@ def main(argv: list[str] | None = None) -> int:
                                    minimum_total_usd=args.min_funded_usd,
                                    include_promised=args.include_promised)
             complete = result["shortlist"]["source_complete"]
+        elif args.command == "resume":
+            with args.snapshot.open("rb") as source:
+                raw = source.read(4 * 1024 * 1024 + 1)
+            if len(raw) > 4 * 1024 * 1024:
+                raise ValueError("retained catalog exceeds 4 MiB")
+            result = resume_catalog(json.loads(raw), max_details=args.max_details)
+            complete = result["shortlist"]["source_complete"]
         else:
             with args.snapshot.open(encoding="utf-8") as source:
                 result = select_targets(json.load(source), args.min_funded_usd,
@@ -367,6 +534,8 @@ def main(argv: list[str] | None = None) -> int:
                 f" reward_basis={result['reward_basis']} minimum_reward_usd={result['minimum_reward_usd']}"
                 if args.include_promised else ""
             )
+            if "catalog_observed_through" in result:
+                basis += f" catalog_refreshed=false catalog_observed_through={result['catalog_observed_through']}"
             print(
                 f"source_started_at={result['source_started_at']} "
                 f"source_completed_at={result['source_completed_at']} "
@@ -376,7 +545,8 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(json.dumps(result, indent=2, sort_keys=True))
         if not complete:
-            basis = "funded plus promised" if args.include_promised else "funded"
+            selected = result.get("shortlist", result)
+            basis = "funded plus promised" if selected.get("reward_basis") else "funded"
             print(f"PARTIAL: retained rows do not establish a complete {basis} shortlist", file=sys.stderr)
         return 0 if complete else 2
     except (OSError, ValueError, KeyError) as exc:
