@@ -113,6 +113,7 @@ def _bounty_text(bounty: dict) -> str:
             bounty.get("body", ""),
             label_text,
             bounty.get("difficulty", ""),
+            bounty.get("language", ""),
         )
     ]
     return " ".join(parts).lower()

@@ -106,11 +106,21 @@ attempts. It defaults to 100 and accepts 1–10,000. Exhaustion stops with
 `REQUEST_LIMIT` before another call; the current incomplete issue and all
 unattempted issues remain in `remaining.json`.
 
-The collector also stops on a rate limit, transport error or provider failure.
-Completed captures are retained. Handled provider/transport failures and Ctrl+C
-still write the final summary, supply and remaining files. It neither retries automatically nor
-schedules a later run. When the provider is ready, resume only the remaining
-shortlist into a new directory:
+An issue-specific failure does not stop independent candidates. For example,
+a missing issue (HTTP 404), a repository-specific HTTP 403 without rate-limit
+signals, or a PR mistakenly included in an issue shortlist is recorded as a
+failed item, then collection continues. Failed issues remain in `remaining.json`;
+completed captures remain available to the supply router. When every candidate
+has been attempted but some failed, the partial summary reports `ITEM_ERRORS`.
+`attempted_count` and `failed_count` distinguish these failures from unattempted
+work. The existing issue and request budgets still apply to all attempts.
+
+Rate limits, HTTP 401 authentication errors, server errors, transport failures,
+output failures and interruption still stop the run. Handled failures and Ctrl+C
+retain completed captures and write the final summary, supply and remaining files
+when storage is available. The collector neither retries automatically nor
+schedules a later run. After resolving the recorded failure, resume only the
+remaining shortlist into a new directory:
 
 ```bash
 python -m concierge.bounty_capture_batch capture-run/remaining.json \
@@ -119,8 +129,32 @@ python -m concierge.bounty_capture_batch capture-run/remaining.json \
 ```
 
 A hard kill can leave only `shortlist.json` and the individual captures already
-written; the final three files may be absent. Compare the saved shortlist with
-completed capture files to recover the unfinished subset before the next run.
+written; the final three files may be absent. Recover those completed captures
+offline before resuming collection:
+
+```bash
+python -m concierge.bounty_capture_recover capture-run \
+  --output-dir capture-run-recovered --json
+python -m concierge.bounty_capture_batch capture-run-recovered/remaining.json \
+  --output-dir capture-run-next --max-issues 25 --max-pages 10 \
+  --max-requests 100 --json
+```
+
+Recovery reads the saved shortlist and individual `capture-*.json` files,
+validates each completed capture with the existing offline replay, and writes
+new `supply.json`, `remaining.json` and `summary.json` files. It preserves the
+source files, exact recovered capture bytes, observation timestamps and any
+submission target. Truncated, invalid or conflicting captures are reported;
+their issues remain unfinished while other valid captures can be recovered.
+Recovery does not use the old summary, refresh evidence or make provider reads.
+
+The recovery output directory must be new, and retains the collector's private
+directory/file modes. Exit 0 means every issue has a valid recovered capture;
+exit 2 means remaining issues, recovery errors or invalid input. Read the
+recovery summary before resuming: `request_count` is zero for recovery, while
+`captured_request_count` describes only reads recorded in recovered captures,
+not failed or interrupted reads from the original run. Continue from the new
+`remaining.json` so completed captures do not consume provider capacity again.
 
 Batch exit 0 means the entire shortlist was collected, including any completed
 HOLD or REJECT results. Exit 2 means partial collection or invalid input; Ctrl+C

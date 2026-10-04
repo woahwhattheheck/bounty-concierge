@@ -34,6 +34,7 @@ _COLLECTION_CANDIDATES = frozenset({
     "PAYOUT_TICKET_FOLLOWUP_CANDIDATE",
     "PAYOUT_RAIL_FOLLOWUP_CANDIDATE",
     "TRANSFER_PENDING_FOLLOWUP_CANDIDATE",
+    "PARTIAL_PAYMENT_FOLLOWUP_CANDIDATE",
 })
 
 
@@ -343,6 +344,8 @@ def build_bridge(
             "settlement_queue_state": queue_row["queue_state"],
             "settlement_reason_codes": list(queue_row["reason_codes"]),
             "settlement_money": queue_row["money"],
+            "settlement_award_balance": queue_row["award_balance"],
+            "certified_paid_by_currency": queue_row["certified_paid_by_currency"],
             "work_acceptance": acceptance_view,
             "finish_state": finish_state,
             "finish_reason_codes": finish_reasons,
