@@ -299,6 +299,13 @@ the rows covered by the pages read. This avoids an unnecessary empty-page read
 and a false page-bound warning. Incomplete-search signals remain intact; missing,
 malformed, or inconsistent counts retain the existing bounded pagination.
 
+Comment traversal also uses GitHub's `Link` pagination metadata. A full final
+100-comment page completes without an empty-page request, including when it
+lands exactly on `--max-pages`. Explicit next-page links still require another
+page; transports without response headers retain the existing length-based
+fallback. For a complete 100-comment issue with no linked PRs, this reduces the
+audit from four GETs to three without changing its result.
+
 Python callers of `audit_bounties()` reuse one completed audit for repeated
 repository/issue pairs within that invocation. Repository spelling is matched
 exactly and issue numbers use the existing integer conversion. Every input row

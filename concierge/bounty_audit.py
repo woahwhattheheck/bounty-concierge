@@ -9,6 +9,7 @@ and reports competition plus a conservative stale-listing signal.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
 import json
 from pathlib import Path
 import re
@@ -19,6 +20,8 @@ from typing import Any
 import requests
 
 from concierge.config import GITHUB_TOKEN
+from concierge.bounty_contract_common import BountyContractEvidenceError
+from concierge.bounty_contract_live import _comment_page_has_next
 from concierge.submission_packet import validate_submission_target
 
 
@@ -50,16 +53,28 @@ def _headers(token: str | None) -> dict[str, str]:
     return headers
 
 
-def _get_json(session: Any, url: str, *, headers: dict[str, str], params: dict[str, Any] | None = None) -> Any:
+def _get_json(
+    session: Any,
+    url: str,
+    *,
+    headers: dict[str, str],
+    params: dict[str, Any] | None = None,
+    response_metadata: dict[str, Any] | None = None,
+) -> Any:
     try:
         response = session.get(url, headers=headers, params=params, timeout=15)
         response.raise_for_status()
     except requests.RequestException as exc:
         raise BountyAuditError(f"GitHub request failed for {url}: {exc}") from exc
     try:
-        return response.json()
+        payload = response.json()
     except (TypeError, ValueError) as exc:
         raise BountyAuditError(f"GitHub response was not valid JSON for {url}") from exc
+    if response_metadata is not None:
+        response_headers = getattr(response, "headers", None)
+        if isinstance(response_headers, Mapping):
+            response_metadata["link"] = response_headers.get("Link", response_headers.get("link"))
+    return payload
 
 
 def _object_payload(value: Any, context: str) -> dict[str, Any]:
@@ -128,11 +143,13 @@ def _maintainer_expiry_evidence(
     evidence: list[dict[str, Any]] = []
     comments_url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
     for page in range(1, max_pages + 1):
+        metadata: dict[str, Any] = {}
         payload = _get_json(
             session,
             comments_url,
             headers=headers,
             params={"per_page": 100, "page": page},
+            response_metadata=metadata,
         )
         if not isinstance(payload, list):
             raise BountyAuditError(f"GitHub issue comments response was not a list for {repo}#{number}")
@@ -152,7 +169,11 @@ def _maintainer_expiry_evidence(
                     "body": comment.get("body") or "",
                 }
             )
-        if len(payload) < 100:
+        try:
+            has_next = _comment_page_has_next(metadata, comments_url, page)
+        except BountyContractEvidenceError as exc:
+            raise BountyAuditError(f"GitHub issue comments pagination was invalid for {repo}#{number}") from exc
+        if has_next is False or (has_next is None and len(payload) < 100):
             return evidence, False
     return evidence, True
 
