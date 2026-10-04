@@ -72,10 +72,33 @@ Offline exit 0 means the file was processed and did not explicitly report a
 partial collection; older indexes with unspecified coverage also exit 0. Exit 2
 still prints the selected output when the saved source says `complete: false`.
 Input errors exit 1. Read `source.coverage`; none of these exits certifies a
-current live queue, eligible assignment, award or payment. The offline JSON
-envelope is a filtered result, not a replacement live `browse --report` capture.
-Keep the original index/report for later workers and select new output paths
-when redirecting stdout.
+current live queue, eligible assignment, award or payment.
+
+Filtered JSON reports can be handed to another worker or the announcement preview
+without another provider read:
+
+```sh
+python -m concierge browse --index data/bounty_index.json --tier major --report > major.json
+python -m concierge browse --index major.json --skill security --limit 5 --report > security.json
+python -m concierge.announcer --index security.json --format long
+```
+
+Each output retains the original `source` counts, provider interval, coverage and
+available per-repository/rate-limit details. `source.omitted_from_snapshot` is
+still the original saved report's display omission count. The fixed-size
+`selection` object describes local processing separately: `input_count` is the
+number of rows available to this stage, `filtered_out_count` counts rows excluded
+by this stage's filters, and `omitted_by_limit_count` counts matching rows not
+saved because of this stage's display limit. `prior_filtered_out_count` and
+`prior_omitted_by_limit_count` accumulate earlier local stages independently.
+Replay validates the count arithmetic before selecting any rows. The original
+one-stage offline format without these counters remains readable.
+
+Text and announcement previews identify the rows present in the current file;
+original provider completeness does not mean that locally omitted rows were
+recovered. Raising a later display limit cannot recover them. Keep the original
+index/report when another worker may need a different selection, and choose new
+output paths when redirecting stdout.
 
 ## Revalidate cached pages
 

@@ -44,19 +44,19 @@ python -m concierge.bounty_contract capture Scottcjn/rustchain-bounties 1234 \
 Capture performs a stable double-read:
 
 1. read the issue;
-2. read every visible issue comment, with bounded pagination;
+2. read every visible issue comment, with bounded pagination, unless the issue reports zero comments;
 3. read the issue again;
-4. read every comment again; and
+4. read every comment again, unless the unchanged issue still reports zero comments; and
 5. read the issue a final time.
 
 The receipt is emitted only when issue authority fields and the exact comment
-ID/update generation remain stable throughout the read. A truncated, malformed,
+identity/content generation remain stable throughout the read. A truncated, malformed,
 or moving generation fails closed.
 
 Comment pagination uses GitHub's `Link` completion evidence, so a full final
 page does not require an extra empty request or falsely exceed `--max-pages`.
-Both comment reads and the final issue comment-count check still run. Pagination
-targets are validated but never followed; requests retain the canonical issue
+For nonempty issues, both comment reads and the final issue comment-count
+check still run. Pagination targets are validated but never followed; requests retain the canonical issue
 URL. Injected transports without response headers retain the page-size fallback.
 See GitHub's [pagination response contract](https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api)
 for omitted single-page links and the `next` relation.
@@ -68,6 +68,19 @@ Run `PYTHONPATH=. python work/throughput/contract-pagination-20261004/proof.py`
 from a checkout retaining baseline commit `4ec4bee4b75fc1db313e183b343457a536286144`.
 The complete 100-comment capture uses 5 GETs instead of 7; this is a request-count
 measurement, not a live GitHub latency measurement.
+
+Each issue response is validated as soon as it arrives. An invalid identity or
+an already-changed generation ends the capture immediately, before further
+provider reads can waste quota or obscure that result with an unrelated error.
+A stable zero-comment issue uses three issue requests and no comment-list
+requests (three requests instead of five). The three issue observations still
+bind the comment count and update generation; a change in either rejects the
+capture. Issues with comments retain both complete comment traversals and the
+full comment-content comparison. There is no cached authority or automatic
+retry. The [request measurements](../work/throughput/contract-read-cost-20261004/results.json)
+record public capture/verify output equivalence against the existing local TLS
+provider, including an unchanged 101-comment path and earlier unstable-issue
+rejection. These counts do not establish live GitHub latency or fleet throughput.
 
 The contract fingerprint covers:
 

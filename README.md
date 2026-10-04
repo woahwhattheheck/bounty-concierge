@@ -210,12 +210,18 @@ python -m concierge.bounty_audit Scottcjn/rustchain-bounties 71 --max-pages 10 -
 The audit reads the issue, explicitly referenced PRs, and maintainer expiry
 comments on open issues. `--max-pages` bounds each search or comment traversal.
 Exit 0 means those reads completed. If GitHub reports an incomplete search or a
-traversal reaches its page bound, the command retains the collected JSON/text,
-prints `PARTIAL` to stderr, and exits 2. The JSON `search_truncated` field covers
-both search and comment-history truncation. Increase the page bound when it was
+traversal exhausts its page bound before completion, the command retains the
+collected JSON/text, prints `PARTIAL` to stderr, and exits 2. The JSON
+`search_truncated` field covers both search and comment-history truncation.
+Increase the page bound when it was
 reached, or retry the source read; a partial census cannot establish that no
 additional competing PRs or expiry comments exist. A complete census does not
 establish claim eligibility, an award, or payment.
+
+A full search page completes when GitHub's integer `total_count` exactly matches
+the rows covered by the pages read. This avoids an unnecessary empty-page read
+and a false page-bound warning. Incomplete-search signals remain intact; missing,
+malformed, or inconsistent counts retain the existing bounded pagination.
 
 Python callers of `audit_bounties()` reuse one completed audit for repeated
 repository/issue pairs within that invocation. Repository spelling is matched
