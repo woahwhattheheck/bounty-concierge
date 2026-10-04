@@ -153,7 +153,11 @@ def _validated_bounty_rows(bounties: Iterable[dict]) -> list[dict]:
 def render_table(bounties: Iterable[dict], top_n: int = DEFAULT_TOP_N) -> str:
     """Render a stable discovery table; indexed rewards are not promised pay."""
     _validate_top_n(top_n)
-    validated = _validated_bounty_rows(bounties)
+    return _render_validated_table(_validated_bounty_rows(bounties), top_n)
+
+
+def _render_validated_table(validated: list[dict], top_n: int) -> str:
+    """Render rows already validated by a public entry point."""
     def order_key(bounty):
         reward = bounty.get("reward_rtc")
         # Unary minus can round Decimal under the caller's active context.
@@ -279,7 +283,7 @@ def build_section(
         "our eligibility or payment setup. Confirm live sponsor terms and our collection "
         "route before starting work; this table does not authorize a claim or submission."
     )
-    return f"{header}\n\n{render_table(bounties, top_n=top_n)}\n\n{notice}"
+    return f"{header}\n\n{_render_validated_table(bounties, top_n)}\n\n{notice}"
 
 
 def update_readme(readme_text: str, section: str) -> str:
