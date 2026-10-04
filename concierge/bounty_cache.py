@@ -68,6 +68,7 @@ class PageCache:
             if len(raw) > _MAX_BYTES:
                 return None, True
             record = json.loads(raw)
+            del raw  # Parsed values no longer need the serialized input buffer.
             if not isinstance(record, dict) or set(record) != {"entry", "sha256"}:
                 return None, True
             entry = record["entry"]
