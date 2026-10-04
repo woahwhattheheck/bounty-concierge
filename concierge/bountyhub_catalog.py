@@ -281,14 +281,16 @@ def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int 
             break
     if not report["catalog_complete"] and not stopped:
         report["errors"].append({"phase": "catalog", "code": "PAGE_LIMIT"})
+    detail_attempts = 0
     for index, row in enumerate(report["listings"]):
         if not _active(row) or _amount(row["advertised_total_usd"]) < floor:
             continue
-        if stopped or report["details_fetched"] >= max_details:
+        if stopped or detail_attempts >= max_details:
             row["funding_status"] = "NOT_ATTEMPTED" if stopped else "DETAIL_LIMIT"
             report["details_complete"] = False
             continue
         try:
+            detail_attempts += 1
             payload = _get(session, row["source_url"], report)
             report["details_fetched"] += 1
             report["listings"][index] = _detail(payload, row)
@@ -296,7 +298,9 @@ def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int 
             row["funding_status"] = "READ_FAILED"
             failed(exc, "detail", listing_id=row["listing_id"])
             report["details_complete"] = False
-            stopped = True
+            # A listing removed after catalog collection does not invalidate
+            # later listings. Its failed read still consumes the detail budget.
+            stopped = exc.code != "HTTP_ERROR" or exc.status not in {404, 410}
         except ValueError:
             row["funding_status"] = "INVALID_DETAIL"
             report["errors"].append({"phase": "detail", "listing_id": row["listing_id"], "code": "INVALID_DETAIL"})
