@@ -200,6 +200,10 @@ def audit_bounty(repo: str, number: int, token: str | None = None, *, session: A
         candidates.extend(items)
         if len(items) < 100:
             break
+        # A full final page needs no empty-page request to prove completion.
+        total_count = payload.get("total_count")
+        if len(items) == 100 and type(total_count) is int and total_count == page * 100:
+            break
     else:
         # Search results may be capped by GitHub; make truncation explicit.
         search_truncated = True
