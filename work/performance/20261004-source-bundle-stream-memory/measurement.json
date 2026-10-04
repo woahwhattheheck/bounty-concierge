@@ -1,0 +1,157 @@
+{
+  "schema": "source-bundle-stream-memory-measurement/v1",
+  "date_utc": "2026-10-04",
+  "environment": {
+    "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+    "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+    "runtime_bundle": "26.927.11222",
+    "artifact_destination_and_spool_filesystem": "tmpfs /dev/shm; final pair used identical placement",
+    "TMPDIR": "/dev/shm/ad0d2172-source-unpack-1e357wk4/spool"
+  },
+  "input": {
+    "input_kind": "Actual installed Python package sources, captured in a new local git repository; not an upstream commit.",
+    "installed_source_root": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages",
+    "regular_python_files": 7222,
+    "python_source_bytes": 116920305,
+    "selected_paths": [
+      "pdfplumber/pdf.py",
+      "cryptography/x509/base.py"
+    ],
+    "selected_sha256": {
+      "pdfplumber/pdf.py": "c285a8226030d97dea1547a0334f0fe91a5a48e05f78f712f772e7e4fb2d337b",
+      "cryptography/x509/base.py": "3ab993c37cbc07a004fe719740f37cc7d92af9deeb0d6787d77802aba4fa0fa5"
+    },
+    "bundle_bytes": 24587334,
+    "bundle_sha256": "beeb78e9d394d8b9f19ea0f805f4dd6a6ab27c42687ecbcef25a61628cf3bf2c",
+    "manifest": {
+      "schema": "github-source-bundle/v1",
+      "repository": "local/runtime-python-sources",
+      "commit_sha": "c7647f3990408161a841f063cddd29df5332541a",
+      "tree_sha": "057b8275548295c6a445d899bc6437aea01cf097",
+      "archive": {
+        "file": "source.tar.gz",
+        "format": "git-archive/tar.gz",
+        "size_bytes": 24586706,
+        "sha256": "0102ebcc600b451b86ad0180cafd7b7581b86e1694222a835d872ea6d8df82db"
+      }
+    }
+  },
+  "method": {
+    "runs_per_version": 1,
+    "order": [
+      "baseline",
+      "candidate"
+    ],
+    "wall_clock": "time.perf_counter around real CLI subprocess",
+    "peak_memory": "resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss, Linux KiB; each measurement wrapper starts in a fresh process",
+    "boundaries": [
+      "Local controlled measurement using real installed package source bytes captured in a new local Git repository.",
+      "No hosted workload or upstream repository performance claim.",
+      "The independent duplicate-path set still grows with archive entry count.",
+      "Single sequential run per version; elapsed-time difference is descriptive, not a repeatable speedup claim."
+    ],
+    "preliminary_work": "An initial disk-based pair completed (RSS21984/15864KiB). The baseline copy had one extra trailing blank line; it was corrected to the exact source blob. A subsequent disk-based baseline attempt exited2 on ENOSPC. Final recorded pair uses exact source blobs and the same tmpfs placement."
+  },
+  "runs": {
+    "baseline": {
+      "label": "baseline",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/dev/shm/ad0d2172-source-unpack-1e357wk4/baseline.py",
+        "/dev/shm/ad0d2172-source-unpack-1e357wk4/runtime-source-bundle.zip",
+        "--repository",
+        "local/runtime-python-sources",
+        "--commit",
+        "c7647f3990408161a841f063cddd29df5332541a",
+        "--destination",
+        "/dev/shm/ad0d2172-source-unpack-1e357wk4/extracted-baseline",
+        "--path",
+        "pdfplumber/pdf.py",
+        "--path",
+        "cryptography/x509/base.py"
+      ],
+      "returncode": 0,
+      "elapsed_seconds": 1.0571918839996215,
+      "max_rss_kib": 21988,
+      "user_cpu_seconds": 0.786662,
+      "system_cpu_seconds": 0.25791,
+      "stderr": "",
+      "result": {
+        "schema": "source-bundle-unpack/v1",
+        "repository": "local/runtime-python-sources",
+        "commit_sha": "c7647f3990408161a841f063cddd29df5332541a",
+        "tree_sha": "057b8275548295c6a445d899bc6437aea01cf097",
+        "archive_sha256": "0102ebcc600b451b86ad0180cafd7b7581b86e1694222a835d872ea6d8df82db",
+        "archive_bytes": 24586706,
+        "source_root": "/dev/shm/ad0d2172-source-unpack-1e357wk4/extracted-baseline/source",
+        "selected_paths": [
+          "pdfplumber/pdf.py",
+          "cryptography/x509/base.py"
+        ],
+        "available_regular_files": 7222,
+        "available_file_bytes": 116920305,
+        "extracted_regular_files": 2,
+        "extracted_file_bytes": 34951,
+        "extracted_symlinks": 0,
+        "scope": "Local source extraction only; no source execution or live-state verification."
+      },
+      "program_sha256": "dc4ea141232cc5c1641ea5e3a990df423a9129a1775dd9270b556e5128fdc152",
+      "program_git_blob": "1ba52712f06fe5303214231fe5e4a589889d56ac"
+    },
+    "candidate": {
+      "label": "candidate",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/dev/shm/ad0d2172-source-unpack-1e357wk4/unpack_source_bundle.py",
+        "/dev/shm/ad0d2172-source-unpack-1e357wk4/runtime-source-bundle.zip",
+        "--repository",
+        "local/runtime-python-sources",
+        "--commit",
+        "c7647f3990408161a841f063cddd29df5332541a",
+        "--destination",
+        "/dev/shm/ad0d2172-source-unpack-1e357wk4/extracted-candidate",
+        "--path",
+        "pdfplumber/pdf.py",
+        "--path",
+        "cryptography/x509/base.py"
+      ],
+      "returncode": 0,
+      "elapsed_seconds": 0.9550296809975407,
+      "max_rss_kib": 15592,
+      "user_cpu_seconds": 0.701664,
+      "system_cpu_seconds": 0.22261999999999998,
+      "stderr": "",
+      "result": {
+        "schema": "source-bundle-unpack/v1",
+        "repository": "local/runtime-python-sources",
+        "commit_sha": "c7647f3990408161a841f063cddd29df5332541a",
+        "tree_sha": "057b8275548295c6a445d899bc6437aea01cf097",
+        "archive_sha256": "0102ebcc600b451b86ad0180cafd7b7581b86e1694222a835d872ea6d8df82db",
+        "archive_bytes": 24586706,
+        "source_root": "/dev/shm/ad0d2172-source-unpack-1e357wk4/extracted-candidate/source",
+        "selected_paths": [
+          "pdfplumber/pdf.py",
+          "cryptography/x509/base.py"
+        ],
+        "available_regular_files": 7222,
+        "available_file_bytes": 116920305,
+        "extracted_regular_files": 2,
+        "extracted_file_bytes": 34951,
+        "extracted_symlinks": 0,
+        "scope": "Local source extraction only; no source execution or live-state verification."
+      },
+      "program_sha256": "b22f12e3236ec87d14f3185199de4a66eee0dd0a37ea12b5184ac58a1bfd5e9c",
+      "program_git_blob": "37c315d7237950cd501e96f844ba72782c86372b"
+    }
+  },
+  "comparison": {
+    "same_result_except_destination": true,
+    "extracted_file_hashes_match_input": true,
+    "selected_sha256": {
+      "pdfplumber/pdf.py": "c285a8226030d97dea1547a0334f0fe91a5a48e05f78f712f772e7e4fb2d337b",
+      "cryptography/x509/base.py": "3ab993c37cbc07a004fe719740f37cc7d92af9deeb0d6787d77802aba4fa0fa5"
+    },
+    "peak_rss_reduction_kib": 6396,
+    "peak_rss_reduction_percent": 29.0885937784246
+  }
+}
