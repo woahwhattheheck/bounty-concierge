@@ -134,6 +134,18 @@ connection can be reused while paging; each invocation still makes fresh
 requests. HTTP responses and the session are closed on both success and error.
 A failed or incomplete read remains an error, never an empty pending list.
 
+Status reads accept existing wallet/miner identifiers exactly as stored, including
+`founder_team_bounty` and `RTC` addresses. They reject empty identifiers,
+whitespace and control characters before any request. New wallet registration
+still follows the name rules above. Preview the lookup without reading the node:
+
+```bash
+concierge status --wallet founder_team_bounty --dry-run --json
+```
+
+The preview returns one JSON plan with unknown pending/history values; it does
+not report a zero balance, an empty history or a successful lookup.
+
 ### Via the Block Explorer
 
 Browse balances and transactions at:
