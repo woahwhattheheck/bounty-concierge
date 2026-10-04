@@ -170,11 +170,40 @@ python -m concierge.bountyhub_catalog resume catalog.partial.json \
 python -m concierge.bountyhub_catalog targets catalog.resumed.json > shortlist.json
 ```
 
-`resume` inherits the source report's collection floor and explicit promised-reward
-mode. It accepts no new floor or reward-mode switch. In particular, an old $50
-capture is not silently expanded by the current $15 default. Use a new `collect`
-for a changed scope or current catalog facts. `resume_catalog(snapshot,
-max_details=10)` is the equivalent programmatic entrypoint.
+By default, `resume` inherits the source report's floor and explicit promised-reward
+mode. An old $50 capture is not silently expanded by the current $15 default.
+`resume_catalog(snapshot, max_details=10)` keeps that behavior. The reward basis
+cannot be switched by resuming; use a new `collect` for a different reward mode
+or current catalog facts.
+
+An explicit floor override can reuse the already-retained listing summaries
+instead of reading catalog pages again. For example, expand an old $25 or $50
+capture to the authorized $15 scope:
+
+```bash
+python -m concierge.bountyhub_catalog resume catalog.partial.json \
+  --min-reward-usd 15.00 --max-details 10 > catalog.floor15.json
+python -m concierge.bountyhub_catalog targets catalog.floor15.json \
+  --min-reward-usd 15.00 > shortlist.json
+```
+
+`--min-funded-usd` is the same override. Programmatic callers use
+`resume_catalog(snapshot, minimum_total_usd="15.00", max_details=10)`. The new
+floor is validated as a bounded decimal string before any provider call. Only
+unresolved active details meeting that floor consume the existing detail budget;
+previously complete details and every catalog page are reused. A subsequent
+ordinary resume inherits the explicitly selected floor from its input.
+
+The top-level `minimum_total_usd` and shortlist describe the new detail scope.
+An explicit override also records `resume.source_minimum_total_usd`,
+`resume.minimum_total_usd` and `resume.floor_changed`; the source digest still
+binds the unchanged input. Catalog observation times are not refreshed. A zero
+budget can change the declared scope without reads, but newly unresolved rows
+keep the result partial and the prior observation end/cooldown intact. For an
+input collected with promised rewards, add `--include-promised` to the separate
+`targets` command to retain that selection basis; resuming never converts a
+promise into funded money. No floor override proves fresh availability,
+assignment, platform eligibility, sponsor acceptance or payment.
 
 The complete retained catalog is validated before any provider read. A missing or
 unfinished catalog traversal, inconsistent identity/funding totals, duplicate
@@ -182,8 +211,9 @@ listing ID, or CLI input over 4 MiB is rejected. A resume before the retained
 observation time is refused before new reads. Detail
 URLs are reconstructed from the canonical API and validated UUIDs, never followed
 from an arbitrary saved URL. Existing `COMPLETE` details are not fetched again;
-only active listings meeting the original floor with unresolved details consume
-the new 0-100 request budget. A completed input or zero budget opens no session.
+only active listings meeting the selected floor with unresolved details consume
+the new 0-100 request budget. No unresolved details at that floor, or a zero
+budget, opens no session.
 
 Within that budget, `resume` visits untouched details (`NOT_REQUESTED`,
 `NOT_ATTEMPTED`, or `DETAIL_LIMIT`) before previous `READ_FAILED` or
