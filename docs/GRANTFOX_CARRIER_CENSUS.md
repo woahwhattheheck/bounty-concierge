@@ -41,3 +41,11 @@ python -m concierge.grantfox_carrier_census snapshot.json --json
 ```
 
 Exit code `0` means only `CLEAR_FOR_QUEUE_EVALUATION`. All suppression/review/hold dispositions exit `2` so shell-based intake can fail closed.
+
+## Closed-carrier classification cost
+
+The compiler classifies each normalized closed carrier directly from its `process_disposition`. It previously searched the `process_closed` list of dictionaries for every closed carrier. For `n` relevant carriers and `p` process-closed carriers, that step could require `O(n * p)` dictionary comparisons; direct classification takes `O(n)` field checks. The existing 100-observation limit remains in force.
+
+On 2026-10-04, the complete production compiler from source blob `36bfe37ba3a40b5f241982ab85029ffeddac540e` and the version with only this expression changed were executed under CPython 3.12.14. Complete receipts, including their SHA-256 digests, were identical for 10 mixed closed carriers, 100 mixed closed carriers, 100 process-closed carriers, and 100 active carriers. The mixed cases alternated `closed_unassigned` and `normal`; all observations referenced the same issue. Both versions left the input requests unchanged, and the receipt verifier accepted the original receipts. The execution exited successfully.
+
+Repeated full-compiler wall-clock samples were inconclusive because of scheduling variation. A CPU-time follow-up did not return a result before the executor became unavailable. This change therefore claims the reduced classification complexity and preserved observed behavior; it does not claim a measured end-to-end or fleet throughput improvement.
