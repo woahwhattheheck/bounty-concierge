@@ -1,0 +1,130 @@
+{
+  "timestamp_utc": "2026-10-04T13:53:02.495231+00:00",
+  "python": "3.13.5",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "before_blob": "1626312ba44794ce0ebabb63b2607505766c6c74",
+  "after_blob": "8e40ee08f1e15fe07bd34dcfa5c8a886b7416c8b",
+  "method": "One warmup per variant; seven alternating paired samples; cleanup untimed.",
+  "scope": "Synthetic local fixture; complete imported production modules; no network or provider calls.",
+  "fixture": {
+    "schema": "github-source-bundle/v1",
+    "repository": "fixture/source",
+    "commit_sha": "1111111111111111111111111111111111111111",
+    "tree_sha": "2222222222222222222222222222222222222222",
+    "archive": {
+      "file": "source.tar.gz",
+      "format": "git-archive/tar.gz",
+      "size_bytes": 81306,
+      "sha256": "484036eb4193c2c8c95b191de03eb6f36afdbcea421cff429f4895dcf16aeab2"
+    }
+  },
+  "extraction_receipt": {
+    "schema": "source-bundle-unpack/v1",
+    "repository": "fixture/source",
+    "commit_sha": "1111111111111111111111111111111111111111",
+    "tree_sha": "2222222222222222222222222222222222222222",
+    "archive_sha256": "484036eb4193c2c8c95b191de03eb6f36afdbcea421cff429f4895dcf16aeab2",
+    "archive_bytes": 81306,
+    "selected_paths": [
+      "pkg/mod_000",
+      "pkg/mod_000/file_00000.txt",
+      "pkg/mod_040/file_04000.txt",
+      "pkg/mod_079/file_07999.txt"
+    ],
+    "available_regular_files": 8000,
+    "available_file_bytes": 102890,
+    "extracted_regular_files": 102,
+    "extracted_file_bytes": 1116,
+    "extracted_symlinks": 1,
+    "scope": "Local source extraction only; no source execution or live-state verification."
+  },
+  "canonical_10000_paths": {
+    "milliseconds": {
+      "before": [
+        32.559799,
+        33.809525,
+        32.915009,
+        36.753654,
+        34.711463,
+        31.717931,
+        32.178479
+      ],
+      "after": [
+        4.360413,
+        4.703306,
+        5.598853,
+        4.70641,
+        4.469006,
+        4.104691,
+        4.436367
+      ]
+    },
+    "median_ms": {
+      "before": 32.915009,
+      "after": 4.469006
+    },
+    "median_ratio_before_over_after": 7.365174492940935
+  },
+  "fallback_10000_paths": {
+    "milliseconds": {
+      "before": [
+        35.23894,
+        33.608005,
+        34.631623,
+        34.66244,
+        32.531847,
+        32.585577,
+        35.353822
+      ],
+      "after": [
+        35.410738,
+        33.944457,
+        33.28355,
+        34.019379,
+        34.169893,
+        33.898919,
+        35.230068
+      ]
+    },
+    "median_ms": {
+      "before": 34.631623,
+      "after": 34.019379
+    },
+    "median_ratio_before_over_after": 1.0179969187562183
+  },
+  "selected_unpack_8000_files": {
+    "milliseconds": {
+      "before": [
+        440.832676,
+        493.640842,
+        486.405023,
+        479.44419,
+        455.76525,
+        465.934135,
+        452.974951
+      ],
+      "after": [
+        414.032902,
+        415.841304,
+        458.497375,
+        480.05727,
+        423.965717,
+        418.437189,
+        429.100537
+      ]
+    },
+    "median_ms": {
+      "before": 465.934135,
+      "after": 423.965717
+    },
+    "median_ratio_before_over_after": 1.0989901218828975
+  },
+  "compatibility_groups_passed": [
+    "canonical paths",
+    "normalization fallback",
+    "rejected inputs",
+    "selected extraction, normalization, overlap, bytes and symlink parity",
+    "missing selector cleanup",
+    "existing destination preserved"
+  ]
+}
