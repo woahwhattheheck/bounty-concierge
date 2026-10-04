@@ -64,7 +64,7 @@ def _row(value: Any) -> dict[str, Any]:
     title, state, assignment = value.get("title"), value.get("issueState"), value.get("assignmentType")
     if not all(isinstance(item, str) and item for item in (title, state, assignment)):
         raise ValueError("missing listing metadata")
-    return {
+    row = {
         "listing_id": listing_id, "source_url": f"{API}/{listing_id}",
         "repo": repo, "number": number, "issue_url": issue_url,
         "title": title[:2048], "issue_state": state.lower(),
@@ -78,6 +78,10 @@ def _row(value: Any) -> dict[str, Any]:
         "payout_marked_usd": None, "active_pledge_count": None,
         "claim_count": None, "open_claim_count": None,
     }
+    language = value.get("language")
+    if isinstance(language, str) and language.strip():
+        row["language"] = language.strip()[:128]
+    return row
 
 
 def _active(row: dict[str, Any]) -> bool:
@@ -88,6 +92,8 @@ def _active(row: dict[str, Any]) -> bool:
 
 def _detail(value: Any, expected: dict[str, Any]) -> dict[str, Any]:
     row = _row(value)
+    if "language" not in value and isinstance(expected.get("language"), str):
+        row["language"] = expected["language"][:128]
     if (row["listing_id"], row["repo"].casefold(), row["number"]) != (
         expected["listing_id"], expected["repo"].casefold(), expected["number"]
     ):

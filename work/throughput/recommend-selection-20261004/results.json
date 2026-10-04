@@ -1,0 +1,383 @@
+{
+  "python": "3.12.14",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+  "source_sha256": {
+    "baseline": "677c512db63869021e4f446a2347803a8afd0f5270df198958b5586a2a8c0aaa",
+    "candidate": "a255077a61f866cc9a71b1971d4ff5cb5e39f4bfac48ace1a805c31938008efb"
+  },
+  "input_sha256": {
+    "index": "250c831f8230ff92865a4af7e7e24888f810476c720b323665943962fdabb6ee",
+    "catalog": "13051cbc7aa0a087d75d071dce6aa4d679d5ca130647c3a87dcfd666dc0f01fe",
+    "skill_tags": "b176d77bf232054a6ba4fc862d71843851dd50cb74d5f4a6bdf9087cc72b6a7a"
+  },
+  "skills": [
+    "python",
+    "rust",
+    "docs",
+    "security",
+    "social-media",
+    "testing",
+    "devops",
+    "frontend",
+    "blockchain"
+  ],
+  "measurement": "complete recommend call; imports, input parsing, serialization and gc.collect excluded",
+  "sampling": "3 warmups, then 7 alternating pairs separately for untraced timing and traced allocation",
+  "datasets": {
+    "retained_index": {
+      "rows": 266,
+      "limit": 10,
+      "output_rows": 10,
+      "compatibility_comparisons": 24,
+      "output_sha256": "d780f271f88e8dd80f972754cf672f91875a738da503abf4c5c06f3a79507ed8",
+      "output_bytes": 53611,
+      "medians": {
+        "baseline": {
+          "cpu_ms": 53.320457,
+          "wall_ms": 53.313222,
+          "peak_bytes": 277776
+        },
+        "candidate": {
+          "cpu_ms": 54.236964,
+          "wall_ms": 54.677621,
+          "peak_bytes": 154144
+        }
+      },
+      "samples": {
+        "timing": {
+          "baseline": [
+            {
+              "cpu_ms": 53.316911,
+              "wall_ms": 53.310526,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 174.408945,
+              "wall_ms": 180.362038,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 53.320457,
+              "wall_ms": 53.313222,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 49.909868,
+              "wall_ms": 49.903899,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 64.834599,
+              "wall_ms": 64.828625,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 52.298585,
+              "wall_ms": 52.291583,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 57.614748,
+              "wall_ms": 57.609155,
+              "peak_bytes": null
+            }
+          ],
+          "candidate": [
+            {
+              "cpu_ms": 56.815395,
+              "wall_ms": 56.806655,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 59.854083,
+              "wall_ms": 59.846864,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 50.498194,
+              "wall_ms": 50.490481,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 54.236964,
+              "wall_ms": 54.677621,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 55.069661,
+              "wall_ms": 55.063336,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 52.223923,
+              "wall_ms": 52.218232,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 49.345086,
+              "wall_ms": 49.280449,
+              "peak_bytes": null
+            }
+          ]
+        },
+        "allocation": {
+          "baseline": [
+            {
+              "cpu_ms": 63.224175,
+              "wall_ms": 63.069581,
+              "peak_bytes": 277776
+            },
+            {
+              "cpu_ms": 66.378392,
+              "wall_ms": 66.361868,
+              "peak_bytes": 277776
+            },
+            {
+              "cpu_ms": 63.19405,
+              "wall_ms": 63.179226,
+              "peak_bytes": 277776
+            },
+            {
+              "cpu_ms": 56.9953,
+              "wall_ms": 56.976817,
+              "peak_bytes": 277776
+            },
+            {
+              "cpu_ms": 56.938835,
+              "wall_ms": 56.921403,
+              "peak_bytes": 277776
+            },
+            {
+              "cpu_ms": 62.786514,
+              "wall_ms": 62.770077,
+              "peak_bytes": 277776
+            },
+            {
+              "cpu_ms": 60.287172,
+              "wall_ms": 60.276662,
+              "peak_bytes": 277776
+            }
+          ],
+          "candidate": [
+            {
+              "cpu_ms": 70.810929,
+              "wall_ms": 70.798693,
+              "peak_bytes": 154144
+            },
+            {
+              "cpu_ms": 66.20881,
+              "wall_ms": 66.203089,
+              "peak_bytes": 154144
+            },
+            {
+              "cpu_ms": 59.108556,
+              "wall_ms": 59.095287,
+              "peak_bytes": 154144
+            },
+            {
+              "cpu_ms": 60.142948,
+              "wall_ms": 60.451218,
+              "peak_bytes": 154144
+            },
+            {
+              "cpu_ms": 57.08983,
+              "wall_ms": 57.073009,
+              "peak_bytes": 154144
+            },
+            {
+              "cpu_ms": 61.24008,
+              "wall_ms": 61.227534,
+              "peak_bytes": 154144
+            },
+            {
+              "cpu_ms": 61.502942,
+              "wall_ms": 61.492423,
+              "peak_bytes": 154144
+            }
+          ]
+        }
+      }
+    },
+    "retained_bountyhub_catalog": {
+      "rows": 26,
+      "limit": 10,
+      "output_rows": 10,
+      "compatibility_comparisons": 24,
+      "output_sha256": "22d8b4fb975009fcdd1b160ff674e6c0bdf996a0a928328ab8ab496c843c6cd0",
+      "output_bytes": 7388,
+      "medians": {
+        "baseline": {
+          "cpu_ms": 0.256031,
+          "wall_ms": 0.253552,
+          "peak_bytes": 28101
+        },
+        "candidate": {
+          "cpu_ms": 0.299176,
+          "wall_ms": 0.297328,
+          "peak_bytes": 14705
+        }
+      },
+      "samples": {
+        "timing": {
+          "baseline": [
+            {
+              "cpu_ms": 0.331995,
+              "wall_ms": 0.329175,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 0.273868,
+              "wall_ms": 0.272189,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 0.274859,
+              "wall_ms": 0.273292,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 0.256031,
+              "wall_ms": 0.253552,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 0.238846,
+              "wall_ms": 0.237408,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 0.234269,
+              "wall_ms": 0.23289,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 0.234249,
+              "wall_ms": 0.23278,
+              "peak_bytes": null
+            }
+          ],
+          "candidate": [
+            {
+              "cpu_ms": 0.299176,
+              "wall_ms": 0.297328,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 0.243233,
+              "wall_ms": 0.241173,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 0.394197,
+              "wall_ms": 0.392151,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 0.243753,
+              "wall_ms": 0.242194,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 0.288941,
+              "wall_ms": 0.287303,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 0.349631,
+              "wall_ms": 0.347623,
+              "peak_bytes": null
+            },
+            {
+              "cpu_ms": 0.303461,
+              "wall_ms": 0.301785,
+              "peak_bytes": null
+            }
+          ]
+        },
+        "allocation": {
+          "baseline": [
+            {
+              "cpu_ms": 1.003224,
+              "wall_ms": 0.993166,
+              "peak_bytes": 28101
+            },
+            {
+              "cpu_ms": 1.009313,
+              "wall_ms": 1.003731,
+              "peak_bytes": 28101
+            },
+            {
+              "cpu_ms": 1.149302,
+              "wall_ms": 1.143371,
+              "peak_bytes": 28101
+            },
+            {
+              "cpu_ms": 0.900761,
+              "wall_ms": 0.89664,
+              "peak_bytes": 28101
+            },
+            {
+              "cpu_ms": 1.117865,
+              "wall_ms": 1.111844,
+              "peak_bytes": 28101
+            },
+            {
+              "cpu_ms": 0.984135,
+              "wall_ms": 0.978824,
+              "peak_bytes": 28101
+            },
+            {
+              "cpu_ms": 1.008272,
+              "wall_ms": 1.003401,
+              "peak_bytes": 28101
+            }
+          ],
+          "candidate": [
+            {
+              "cpu_ms": 1.354738,
+              "wall_ms": 1.348701,
+              "peak_bytes": 14705
+            },
+            {
+              "cpu_ms": 0.979879,
+              "wall_ms": 0.975288,
+              "peak_bytes": 14705
+            },
+            {
+              "cpu_ms": 1.025677,
+              "wall_ms": 1.020847,
+              "peak_bytes": 14705
+            },
+            {
+              "cpu_ms": 1.061721,
+              "wall_ms": 1.05575,
+              "peak_bytes": 14705
+            },
+            {
+              "cpu_ms": 0.978177,
+              "wall_ms": 0.973986,
+              "peak_bytes": 14705
+            },
+            {
+              "cpu_ms": 1.049673,
+              "wall_ms": 1.043601,
+              "peak_bytes": 14705
+            },
+            {
+              "cpu_ms": 1.144525,
+              "wall_ms": 1.139405,
+              "peak_bytes": 14705
+            }
+          ]
+        }
+      }
+    }
+  },
+  "independent_tie_copy_cases": 4,
+  "limits": [
+    "Retained catalogs, not newly fetched live eligibility or claims.",
+    "Peak traced Python allocation is not process RSS or fleet-wide memory.",
+    "Timing is shared-host local CPU/wall time, not provider or end-to-end latency.",
+    "Allocation/timing samples use the documented default limit of 10; other limits have output checks only."
+  ]
+}

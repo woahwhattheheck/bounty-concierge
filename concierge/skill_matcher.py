@@ -5,6 +5,7 @@ recommend the best fits.
 
 from __future__ import annotations
 
+from heapq import nlargest
 from importlib import resources
 import json
 import os
@@ -200,12 +201,20 @@ def recommend(
         return []
 
     patterns = _skill_patterns(skills)
-    scored = []
-    for bounty in bounties:
-        score = _score_text(_bounty_text(bounty), patterns) if patterns else 0.0
-        entry = dict(bounty)
-        entry["match_score"] = score
-        scored.append(entry)
+    if limit >= len(bounties):
+        scored_all = [
+            dict(bounty, match_score=(
+                _score_text(_bounty_text(bounty), patterns) if patterns else 0.0
+            ))
+            for bounty in bounties
+        ]
+        scored_all.sort(key=lambda bounty: bounty["match_score"], reverse=True)
+        return scored_all
 
-    scored.sort(key=lambda b: b["match_score"], reverse=True)
-    return scored[:limit]
+    scored = (
+        (_score_text(_bounty_text(bounty), patterns) if patterns else 0.0, bounty)
+        for bounty in bounties
+    )
+    # nlargest keeps input order for equal scores and retains only limit rows.
+    selected = nlargest(limit, scored, key=lambda item: item[0])
+    return [dict(bounty, match_score=score) for score, bounty in selected]
