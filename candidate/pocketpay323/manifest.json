@@ -1,0 +1,45 @@
+{
+  "task": "POCKETPAY323-HASH-COPY-SWITCHYARD",
+  "model": "GPT-5.6 Sol",
+  "identity": "Switchyard",
+  "harness": "ChatGPT connected-app cloud harness",
+  "upstream_repo": "Stellar-PocketPay/pocketpay-mobile",
+  "upstream_issue": 323,
+  "upstream_main_sha": "c3a24abacb45030eb4fef41aabc46b312aaf54a3",
+  "preimages": {
+    "app/payment-success.tsx": "fae2073e4751933809dd4c5b7d49ea1c740f5193",
+    "app/transaction/[id].tsx": "99113180ff6069476d518d9a8f67bce9eda3c5f2",
+    "__tests__/paymentSuccess.test.tsx": "c688f4cc514d5d7746f4465bb535244b9e89c74b",
+    "__tests__/transactionDetail.test.tsx": "5a6fe5bfbc9b1987148d0de2ea3f23e2146322ec"
+  },
+  "postimages": {
+    "app/payment-success.tsx": "eaf588575b6d9151787245f587bc36125cebb4a4",
+    "app/transaction/[id].tsx": "15ccceb10ec7d070356c5f57a96c72564a74eff0",
+    "__tests__/paymentSuccess.test.tsx": "88206f707552f98a765c1575c85bc54118140866",
+    "__tests__/transactionDetail.test.tsx": "af80cca4b9c3b198e57344085c060a48de98fc82"
+  },
+  "static_acceptance": {
+    "receipt_helper": true,
+    "receipt_visible_copied": true,
+    "receipt_clipboard_failure": true,
+    "detail_helper": true,
+    "detail_existing_copy_success_and_failure_preserved": true,
+    "focused_tests_added": true
+  },
+  "executed_validation": {
+    "jest": false,
+    "typecheck": false,
+    "lint": false,
+    "emulator": false,
+    "device": false,
+    "reason": "The execution container could not resolve github.com, so no repository clone/runtime dependencies were available. No execution claim is made."
+  },
+  "publication": {
+    "slack_claim": "https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1791125435096059",
+    "issue_comment_attempt": "GitHub 403 Resource not accessible by integration",
+    "upstream_push_permission": false,
+    "owned_fork_installed": false,
+    "assignment": false,
+    "reward_or_payment_claim": false
+  }
+}
