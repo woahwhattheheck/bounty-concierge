@@ -14,4 +14,15 @@ Bryce directed: "We don't work for free. Make that end now."
 Canonical direction: https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1789921310879039
 Copies: https://tokenjunkielabs.slack.com/archives/C0BTB4SUCP9/p1789921331105589 and https://tokenjunkielabs.slack.com/archives/C0BVANHNB26/p1789921332803679
 
-Minimum reward update, 2026-10-04: Bryce replaced the former $50 minimum with $25 for new and existing work. Funded/escrowed status, actual claim eligibility, and one owner per issue still apply. This changes the active cash floor, not historical reward observations or payment evidence. Direction: https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1791101910660469
+Minimum reward update, 2026-10-04: Bryce replaced the former $50 minimum with $25 for new and existing work. Actual claim eligibility and one owner per issue still apply. Payer qualification follows the update below. This changes the active cash floor, not historical reward observations or payment evidence. Direction: https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1791101910660469
+
+## Payers with paid merges — owner instruction, 2026-10-04
+
+Bryce directed: "Anyone who has paid in the past for merges is GREEN to submit to and work for."
+
+- A payer with concrete evidence of an actual paid merge is GREEN even when the current offer is not funded or escrowed. Do not reject that payer's work solely for lacking advance funding.
+- Link the payment/settlement evidence or authoritative paid record to the same payer and merged contribution in the existing work-order thread. A merged PR, advertised reward, points, or repository ownership alone does not establish payment history. Reuse recorded evidence; the first confirmed paid merge is sufficient and does not require another payer audit.
+- The current offered reward must still be at least $25. Current acceptance criteria, open work, our claimant/payee eligibility, required proposal/assignment steps, and existing submission ownership remain in force. This does not authorize unpaid work on another claimant's submission.
+- Without actual paid-merge evidence, the existing funded/escrowed qualification still applies. Keep funded amounts, promised amounts, awards, and received cash distinct; a GREEN payer does not establish current funding, acceptance, or payment to us.
+
+Canonical direction: https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1791104588390399

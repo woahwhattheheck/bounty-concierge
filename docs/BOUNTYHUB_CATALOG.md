@@ -30,8 +30,17 @@ selected details were read; it is not an atomic snapshot of the changing service
 
 ## Include promised rewards explicitly
 
-The default shortlist uses only `reported_funded_usd`. When the work order also
-permits promised rewards, add `--include-promised` to either subcommand:
+The default shortlist uses only `reported_funded_usd`. Under the
+[October 4 owner instruction](https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1791104588390399),
+a payer with evidence of an actual paid merge is GREEN even when the current
+offer is not funded or escrowed. The current offered reward must still be at
+least $25, and current work availability, claimant eligibility, required
+assignment steps, and existing submission ownership still apply. A merged PR
+or advertised reward alone is not paid-merge evidence; reuse the payer's
+recorded payment/settlement evidence or authoritative paid record.
+
+Use the existing `--include-promised` option to discover those offers, or when
+the work order otherwise explicitly permits promised rewards:
 
 ```bash
 python -m concierge.bountyhub_catalog collect \
@@ -57,6 +66,15 @@ Programmatic callers can use `select_targets(report, "25.00", include_promised=T
 to obtain the same selection and its complete `listing_ids_by_issue` associations.
 Promised amounts remain promises; this option does not establish funding,
 assignment, eligibility, award or payment.
+
+The catalog retains aggregate amounts, not payer identities or payment-history
+records. This option therefore expands discovery; it does not classify every
+returned sponsor as GREEN. Before acting on an unfunded offer, bind the current
+offer's payer to the recorded paid-merge evidence in the existing work-order
+thread. Do not infer that identity from the repository owner, apply one payer's
+history to another contributor's pledge, or treat the aggregate promised total
+as verified compensation from a GREEN payer. No new payer audit is needed when
+the same payer's evidence is already recorded.
 
 ## Use the existing batch capture
 
