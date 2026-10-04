@@ -95,6 +95,30 @@ The ledger is append-only and has a canonical SHA-256 over all normalized events
 
 `strict_json_loads()` is provided for file/transport boundaries that need duplicate-key rejection before passing objects to the API.
 
+### Packet JSON compatibility
+
+The packet verifier first checks the producer's v1 digest: sorted, compact JSON
+with `ensure_ascii=True`. This lets builder-issued packets containing Unicode
+paths, test commands, acceptance criteria, or submission instructions enter
+custody and the existing transport router without being rehashed by callers.
+
+The previously accepted `ensure_ascii=False` UTF-8 packet digest remains a
+compatibility fallback for the identical validated packet core. No packet content
+is normalized or rewritten. Altered content must still match its supplied digest;
+the source-plus-revision duplicate rule applies across both encodings. Event,
+ledger, receipt, and transport-policy hashes keep their existing contracts.
+
+A bounded offline example exercises the actual builder, custody registration and
+replay, and public transport operation/decision APIs, including legacy UTF-8
+packets and tampered-content rejection:
+
+```bash
+PYTHONPATH=. python examples/submission_packet_unicode_roundtrip.py
+```
+
+The example makes no provider calls. Its `READY_PRIMARY` transport result retains
+`external_send_authorized=false`; it is not a send or sponsor-acceptance receipt.
+
 ## Authority ceiling
 
 Every status receipt explicitly fixes these authorities to false:

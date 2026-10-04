@@ -122,6 +122,12 @@ def _digest(value: Any) -> str:
     return hashlib.sha256(_canonical(value)).hexdigest()
 
 
+def _packet_digest(value: Any) -> str:
+    """Match the packet producer's v1 ASCII-escaped JSON wire digest."""
+    canonical = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def _github_object_url(value: Any, marker: str, code: str) -> tuple[str, str, str, int]:
     text = _text(value, f"github_{marker}_url", max_len=1024)
     parsed = urlsplit(text)
@@ -332,7 +338,9 @@ def _verify_submission_packet(packet: Any) -> dict[str, str]:
 
     packet_sha = _sha256(packet["packet_sha256"], "packet_sha256")
     core = {key: deepcopy(value) for key, value in packet.items() if key != "packet_sha256"}
-    if _digest(core) != packet_sha:
+    # Preserve previously accepted UTF-8 packets while accepting producer output.
+    # Both digests bind this exact validated core; ledger hashing stays unchanged.
+    if _packet_digest(core) != packet_sha and _digest(core) != packet_sha:
         _fail("PACKET_DIGEST_MISMATCH")
     return {
         "source_url": source,
