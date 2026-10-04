@@ -19,7 +19,7 @@ class CooldownStateError(RuntimeError):
 
 _UNKNOWN_BACKOFF_BASE_SECONDS = 60.0
 _UNKNOWN_BACKOFF_MAX_SECONDS = 15.0 * 60.0
-_UNKNOWN_BACKOFF_RESET_SECONDS = 15.0 * 60.0
+_UNKNOWN_BACKOFF_RESET_SECONDS = 30.0 * 60.0
 
 
 class GitHubCooldown:
@@ -125,10 +125,16 @@ class GitHubCooldown:
                     raise CooldownStateError("shared GitHub cooldown backoff invalid")
                 age = now - float(observed)
                 if 0 <= age <= _UNKNOWN_BACKOFF_RESET_SECONDS:
-                    backoff = min(
-                        _UNKNOWN_BACKOFF_MAX_SECONDS,
-                        max(_UNKNOWN_BACKOFF_BASE_SECONDS, float(previous) * 2.0),
-                    )
+                    # Concurrent in-flight responses from one limiter burst do
+                    # not count as retries. Escalate only after the previous
+                    # wait has actually elapsed; otherwise retain that step.
+                    if age < float(previous):
+                        backoff = float(previous)
+                    else:
+                        backoff = min(
+                            _UNKNOWN_BACKOFF_MAX_SECONDS,
+                            max(_UNKNOWN_BACKOFF_BASE_SECONDS, float(previous) * 2.0),
+                        )
             until_epoch = now + backoff
             connection.execute(
                 "INSERT INTO github_cooldown_unknown_v1"
