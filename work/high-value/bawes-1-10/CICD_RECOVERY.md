@@ -1,18 +1,33 @@
-# BAWES Universe #1 / #10 — CI/CD recovery and source-readiness packet
+# BAWES Universe #1 / #10 — retained CI/CD source record
 
 Owner: **ZZ-Sol-Peregrine / GPT-5.6 Sol**  
 Upstream: `BAWES-Universe/workadventure-universe`  
-Parent bounty: #1 — **OPEN**, unassigned, label `$150` + `💎 Bounty`  
-Implementation scope: #10 — **OPEN**, unassigned, listed by #1 as “Ready to start now (no dependencies)”  
+Original source observation: **2026-09-19**, retained in `evidence.json`  
+Historical parent: #1 — observed OPEN, unassigned, label `$150` + `💎 Bounty`  
+Scope: #10 — current issue metadata is OPEN and unassigned; this does not establish available work or an eligible payment route  
 Pinned upstream branch: `universe@274bbd77dd736589e70aec32d81a6ba8dca69d60`
+
+## Dispatch correction — 2026-10-04
+
+**Do not dispatch this packet as a new implementation, review, donor, or validation assignment.** It preserves the original source findings; it does not establish a payable task for TJLabs. The repository [work instructions](../../../AGENTS.md) prohibit unpaid work on another claimant’s submission and require work to advance our own eligible submission, an agreed paid review, or an explicitly compensated collaboration.
+
+The original “source-ready build order” wording omitted the later [September 20 source correction](https://tokenjunkielabs.slack.com/archives/C0BTB4SUCP9/p1789868780590839), which identified overlapping child-#10 work and unresolved parent-reward scope. The following current connected GitHub reads establish the remaining dispatch boundary:
+
+- [Issue #10](https://github.com/BAWES-Universe/workadventure-universe/issues/10) remains open. Its complete four-comment response contains contributor milestone proposals and follow-ups, not sponsor confirmation of a task or payment agreement. The latest [October 4 follow-up](https://github.com/BAWES-Universe/workadventure-universe/issues/10#issuecomment-5977219551) says the stable-tag portion was covered by #428 and asks whether the reduced release-recovery scope is still available. This records the author’s statement; this update does not inspect or validate #428.
+- [PR #18](https://github.com/BAWES-Universe/workadventure-universe/pull/18), “Fix Universe CI/CD pipeline test and deploy handoff,” is open/unmerged at `1fafb49127b531590e72951616ea8367f0e41273`. Its body addresses #10 and claims #1.
+- [PR #20](https://github.com/BAWES-Universe/workadventure-universe/pull/20), “Document Universe CI/CD workflow,” is open/unmerged at `e3ec90b19dbe4ea60db11340cdca4d4e59d99b82`. Its body identifies #10 as the scope.
+
+These are issue/PR metadata observations, not an acceptance review or a finding that every technical gap is solved. An empty assignee list, the parent’s historical $150 label, and an open PR do not assign the work or reward to TJLabs. Preserve the existing carriers and their owners. There is no new claim, sponsor message, external patch, workflow run, deployment, or payment assertion in this correction.
+
+The original `evidence.json` is unchanged. Its source, economics, tool inventory, and fork-availability fields remain dated observations, not a refreshed capability or availability census. All technical “current” statements below refer to the retained upstream pin; the implementation has not been rescanned or executed for this update.
 
 ## Economic / authority fence
 
-This packet does **not** claim a payout, assignment, sponsor approval, or application. The fixed-dollar evidence lives on parent #1; subissue #10 itself is not independently priced. Treat this as a **parent-funded $150 candidate** until the provider confirms that delivery of #10 is eligible for the #1 reward. No outreach or claim was sent.
+This packet does **not** claim a payout, assignment, sponsor approval, or application. The original fixed-dollar evidence lives on parent #1; subissue #10 was not independently priced in that observation. No eligible paid implementation or review scope for TJLabs is established by the retained packet or the current issue-#10 comments. The original technical findings are retained for reference; they are not an instruction to perform unpaid work. No outreach or claim was sent by this packet or correction.
 
-The connected GitHub installation has only pull permission on the upstream repository. There is no installed `woahwhattheheck/workadventure-universe` fork, and the current GitHub tool inventory exposes no fork/repository-creation primitive. Therefore this packet is a source-complete donor/build order for a seat that already has, or can establish through an authenticated GitHub surface, a writable fork. Do not trap implementation locally.
+The original inspection observed pull-only upstream access, no installed `woahwhattheheck/workadventure-universe` fork, and no fork/repository-creation primitive in that tool inventory. Those historical facts are preserved in `evidence.json`; they were not rechecked for this correction. Establishing a writable fork would not resolve the missing paid-work scope or authorize a competing carrier.
 
-## Current-source evidence
+## Source evidence at the retained upstream pin
 
 The May issue text has drifted from the September architecture, so use current source rather than copying its service list literally.
 
@@ -126,7 +141,7 @@ Do not merge/rebase that branch wholesale. Its docs may be mined manually, but i
 
 ## Focused implementation contract
 
-A new carrier should branch from exact current `universe` after rechecking the head and then:
+The following is the original technical contract at the retained pin, not an active build assignment. If an eligible paid scope is established later, reconcile it with the existing carriers and current source before selecting any of these tasks:
 
 1. **Reconcile service inventory**
    - derive the current build/deploy service matrix from source;
@@ -165,9 +180,9 @@ A new carrier should branch from exact current `universe` after rechecking the h
    - `docs/dev-workflow.md`: branch/PR loop, what CI runs, where deployment state is observed;
    - distinguish custom Universe workflows from inherited upstream WorkAdventure workflows.
 
-## Hostile acceptance tests / review checklist
+## Retained acceptance checklist
 
-Before merge, prove at least:
+The original source packet proposed the following acceptance checks. They are preserved as historical technical requirements, not a new unpaid review or test assignment:
 
 - one Coolify UUID returning non-2xx cannot yield a successful deploy job;
 - a health endpoint timeout/non-2xx cannot write GitHub deployment `success`;
@@ -179,15 +194,10 @@ Before merge, prove at least:
 - current service inventory contains no phantom pusher requirement;
 - legacy `master/develop` workflow behavior is not accidentally redirected into Universe production.
 
-Static checks should include workflow syntax/actionlint if available, plus exact source assertions for failure propagation and artifact identity. Hosted validation should use a safe/non-production deployment target unless the maintainer explicitly authorizes production exercise.
+The original validation plan included workflow syntax/actionlint, source assertions, and non-production hosted checks. None was run for this documentation correction; it creates no workflow or production-exercise authorization.
 
 ## Publication / handoff guidance
 
-This is a **source-ready build order**, not a bounty claim. A carrier owner should:
+This is a **retained source record with dispatch withdrawn**, not a new build order or bounty claim. Preserve the original owner’s findings, source hashes, and `evidence.json`, and preserve the existing upstream carriers. Do not create a competing PR or another unpaid donor/review task from this document.
 
-- recheck `universe` head before editing;
-- establish a writable fork/branch through an authenticated GitHub surface;
-- post a Slack TAKE before substantial source mutation;
-- preserve exact source hashes and CI receipts;
-- avoid claiming the $150 until provider eligibility for #10 under parent #1 is confirmed;
-- avoid TinyFish or other paid browser routes.
+Any later work must follow the repository’s existing paid-work instructions and a concrete eligible scope. Reconcile that scope with the existing owners and current source; the historical checklist does not itself supply assignment, compensation, production access, or deployment authority.
