@@ -196,6 +196,9 @@ def audit_bounty(
     that the full bounty was satisfied. An existing explicit submission_target
     adds its delivery repository to the bounded PR census. Issue comments and
     maintainer authority remain attached to the original bounty repository.
+
+    Linked PR author/head metadata comes only from canonical PR detail. Missing
+    fields stay null; this observation does not establish assignment or payment.
     """
     if "/" not in repo or not repo.split("/", 1)[0] or not repo.split("/", 1)[1]:
         raise ValueError("repo must be in owner/name form")
@@ -287,6 +290,13 @@ def audit_bounty(
             continue
         merged = bool(detail.get("merged_at"))
         state = detail.get("state") or "unknown"
+        author = detail.get("user")
+        head = detail.get("head")
+        head_repo = head.get("repo") if isinstance(head, dict) else None
+        author_login = author.get("login") if isinstance(author, dict) else None
+        head_repository = head_repo.get("full_name") if isinstance(head_repo, dict) else None
+        head_ref = head.get("ref") if isinstance(head, dict) else None
+        head_sha = head.get("sha") if isinstance(head, dict) else None
         linked_prs.append(
             {
                 "number": pr_number,
@@ -297,6 +307,10 @@ def audit_bounty(
                 "draft": bool(detail.get("draft")),
                 "merged": merged,
                 "merged_at": detail.get("merged_at"),
+                "author_login": author_login if isinstance(author_login, str) and author_login else None,
+                "head_repository": head_repository if isinstance(head_repository, str) and head_repository else None,
+                "head_ref": head_ref if isinstance(head_ref, str) and head_ref else None,
+                "head_sha": head_sha if isinstance(head_sha, str) and head_sha else None,
             }
         )
 
@@ -438,7 +452,13 @@ def main(argv: list[str] | None = None) -> int:
             status = "merged" if pr["merged"] else pr["state"]
             draft = " draft" if pr["draft"] else ""
             identity = f"{pr['repository']}#{pr['number']}" if "repository" in pr else f"#{pr['number']}"
-            print(f"  PR {identity}: {status}{draft} - {pr['title']} - {pr['url']}")
+            metadata = " ".join(
+                f"{key}={pr[key]}"
+                for key in ("author_login", "head_repository", "head_ref", "head_sha")
+                if pr.get(key) is not None
+            )
+            suffix = f" [{metadata}]" if metadata else ""
+            print(f"  PR {identity}: {status}{draft} - {pr['title']} - {pr['url']}{suffix}")
     if result["search_truncated"]:
         print(
             "PARTIAL: GitHub search or comment history is incomplete; "
