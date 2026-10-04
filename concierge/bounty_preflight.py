@@ -13,6 +13,7 @@ immediately before an ACTIONABLE dispatch decision is returned.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
 from copy import deepcopy
 import hashlib
 import json
@@ -24,6 +25,8 @@ from typing import Any
 import requests
 
 from concierge.bounty_audit import BountyAuditError, audit_bounty
+from concierge.bounty_contract_common import BountyContractEvidenceError
+from concierge.bounty_contract_live import _comment_page_has_next
 from concierge.bounty_capture import (
     CaptureInputError,
     CaptureSession,
@@ -175,8 +178,13 @@ class BountyPreflightError(RuntimeError):
 class _CapturedIssueResponse:
     """Minimal requests-compatible response for frozen canonical evidence."""
 
-    def __init__(self, payload: Any):
+    def __init__(self, payload: Any, *, response_metadata: dict[str, Any] | None = None):
         self._payload = deepcopy(payload)
+        # Unknown headers must not become a known-absent Link during replay.
+        self.headers = (
+            {"Link": deepcopy(response_metadata["link"])}
+            if response_metadata is not None and "link" in response_metadata else None
+        )
 
     def raise_for_status(self) -> None:
         return None
@@ -195,11 +203,13 @@ class _CapturedIssueSession:
         issue_snapshot: dict[str, Any],
         *,
         comment_pages: list[list[dict[str, Any]]] | None = None,
+        comment_page_metadata: list[dict[str, Any]] | None = None,
     ):
         self._session = session
         self._issue_url = issue_url
         self._issue_snapshot = deepcopy(issue_snapshot)
         self._comment_pages = deepcopy(comment_pages or [])
+        self._comment_page_metadata = deepcopy(comment_page_metadata or [])
 
     def get(
         self,
@@ -218,7 +228,13 @@ class _CapturedIssueSession:
                 and 1 <= page <= len(self._comment_pages)
                 and params == {"per_page": 100, "page": page}
             ):
-                return _CapturedIssueResponse(self._comment_pages[page - 1])
+                metadata = (
+                    self._comment_page_metadata[page - 1]
+                    if page <= len(self._comment_page_metadata) else None
+                )
+                return _CapturedIssueResponse(
+                    self._comment_pages[page - 1], response_metadata=metadata
+                )
         return self._session.get(
             url,
             headers=headers,
@@ -240,6 +256,7 @@ def _get_json(
     *,
     headers: dict[str, str],
     params: dict[str, Any] | None = None,
+    response_metadata: dict[str, Any] | None = None,
 ) -> Any:
     try:
         response = session.get(url, headers=headers, params=params, timeout=15)
@@ -247,9 +264,14 @@ def _get_json(
     except requests.RequestException as exc:
         raise BountyPreflightError(f"GitHub request failed for {url}: {exc}") from exc
     try:
-        return response.json()
+        payload = response.json()
     except (TypeError, ValueError) as exc:
         raise BountyPreflightError(f"GitHub response was not valid JSON for {url}") from exc
+    if response_metadata is not None:
+        response_headers = getattr(response, "headers", None)
+        if isinstance(response_headers, Mapping):
+            response_metadata["link"] = response_headers.get("Link", response_headers.get("link"))
+    return payload
 
 
 def _object_payload(value: Any, context: str) -> dict[str, Any]:
@@ -565,16 +587,20 @@ def _collect_comment_generation(
     comments_url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
     entries: list[tuple[int, str, str]] = []
     for page in range(1, max_pages + 1):
+        metadata: dict[str, Any] = {}
         payload = _get_json(
             session,
             comments_url,
             headers=headers,
             params={"per_page": 100, "page": page},
+            response_metadata=metadata,
         )
         if not isinstance(payload, list):
             raise BountyPreflightError(
                 f"GitHub issue comments response was not a list for {repo}#{number}"
             )
+        if len(payload) > 100:
+            raise BountyPreflightError(f"GitHub issue comments page exceeded 100 items for {repo}#{number}")
         for comment in payload:
             if not isinstance(comment, dict):
                 raise BountyPreflightError(
@@ -586,7 +612,11 @@ def _collect_comment_generation(
                     f"GitHub issue comment generation metadata was malformed for {repo}#{number}"
                 )
             entries.append(marker)
-        if len(payload) < 100:
+        try:
+            has_next = _comment_page_has_next(metadata, comments_url, page)
+        except BountyContractEvidenceError as exc:
+            raise BountyPreflightError(f"GitHub issue comments pagination was invalid for {repo}#{number}") from exc
+        if has_next is False or (has_next is None and len(payload) < 100):
             return tuple(entries), False
     return tuple(entries), True
 
@@ -949,6 +979,7 @@ def _collect_issue_context_with_snapshot(
     operator_login: str | None = None,
     include_capture: bool = False,
     comment_pages: list[list[dict[str, Any]]] | None = None,
+    comment_page_metadata: list[dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Collect safe context plus the exact canonical issue generation used."""
 
@@ -1015,16 +1046,20 @@ def _collect_issue_context_with_snapshot(
 
     comments_url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
     for page in range(1, max_pages + 1):
+        metadata: dict[str, Any] = {}
         payload = _get_json(
             session,
             comments_url,
             headers=headers,
             params={"per_page": 100, "page": page},
+            response_metadata=metadata,
         )
         if not isinstance(payload, list):
             raise BountyPreflightError(
                 f"GitHub issue comments response was not a list for {repo}#{number}"
             )
+        if len(payload) > 100:
+            raise BountyPreflightError(f"GitHub issue comments page exceeded 100 items for {repo}#{number}")
         for comment in payload:
             if not isinstance(comment, dict):
                 raise BountyPreflightError(
@@ -1069,7 +1104,13 @@ def _collect_issue_context_with_snapshot(
                 claimant_logins.add(login)
         if comment_pages is not None:
             comment_pages.append(deepcopy(payload))
-        if len(payload) < 100:
+        if comment_page_metadata is not None:
+            comment_page_metadata.append(deepcopy(metadata))
+        try:
+            has_next = _comment_page_has_next(metadata, comments_url, page)
+        except BountyContractEvidenceError as exc:
+            raise BountyPreflightError(f"GitHub issue comments pagination was invalid for {repo}#{number}") from exc
+        if has_next is False or (has_next is None and len(payload) < 100):
             break
     else:
         comments_truncated = True
@@ -1195,6 +1236,7 @@ def preflight_bounty(
     if capture_session is not None:
         session = capture_session
     initial_comment_pages: list[list[dict[str, Any]]] = []
+    initial_comment_metadata: list[dict[str, Any]] = []
     context, issue_snapshot = _collect_issue_context_with_snapshot(
         repo,
         number,
@@ -1204,6 +1246,7 @@ def preflight_bounty(
         operator_login=operator_login,
         include_capture=include_capture,
         comment_pages=initial_comment_pages,
+        comment_page_metadata=initial_comment_metadata,
     )
     # Repeatedly observing the same partial comments cannot establish complete
     # authority. Reject before audits in both modes; bounded reads remain held
@@ -1224,7 +1267,8 @@ def preflight_bounty(
     # The initial audit uses the same captured generation as context. Later
     # audit/generation rechecks below continue through the live session.
     audit_session = _CapturedIssueSession(
-        session, issue_url, issue_snapshot, comment_pages=initial_comment_pages
+        session, issue_url, issue_snapshot, comment_pages=initial_comment_pages,
+        comment_page_metadata=initial_comment_metadata,
     )
     audit = _canonical_audit_snapshot(
         repo,

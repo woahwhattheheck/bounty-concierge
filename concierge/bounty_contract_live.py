@@ -344,6 +344,7 @@ def _comment_page_has_next(metadata: dict[str, Any], url: str, page: int) -> boo
     expected = urlsplit(url)
     issue_path = expected.path.split("/issues/", 1)[1]
     relations: set[str] = set()
+    last_page = str(page)
     for entry in re.split(r",\s*(?=<)", value):
         match = re.fullmatch(r'\s*<([^<>\s]+)>\s*;\s*rel="(next|prev|first|last)"\s*', entry)
         if match is None or match[2] in relations:
@@ -366,6 +367,10 @@ def _comment_page_has_next(metadata: dict[str, Any], url: str, page: int) -> boo
                 or len(target_page) != 1 or re.fullmatch(r"[1-9][0-9]*", target_page[0]) is None
                 or (match[2] == "next" and target_page != [str(page + 1)])):
             raise BountyContractEvidenceError("LIVE_EVIDENCE_INVALID", "GitHub comment pagination target was inconsistent")
+        if match[2] == "last":
+            last_page = target_page[0]
+    if "next" not in relations and (len(last_page), last_page) > (len(str(page)), str(page)):
+        raise BountyContractEvidenceError("LIVE_EVIDENCE_INVALID", "GitHub comment pagination target was inconsistent")
     return "next" in relations
 
 
