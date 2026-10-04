@@ -10,10 +10,13 @@ performs a fresh request through code-owned transport in the same call.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 import hashlib
 import json
+import math
 import re
 from typing import Any
 from urllib.parse import urlsplit
@@ -243,6 +246,52 @@ def _github_get(url: str, *, headers: dict[str, str]):
     )
 
 
+def _provider_cooldown(response: Any, captured_at: datetime) -> dict[str, Any] | None:
+    """Retain GitHub's wait evidence without making another provider request."""
+    status = getattr(response, "status_code", None)
+    if status not in {403, 429}:
+        return None
+    headers = getattr(response, "headers", None)
+    if not isinstance(headers, Mapping):
+        headers = {}
+
+    def header(name: str) -> str:
+        value = headers.get(name, headers.get(name.lower()))
+        return value.strip() if isinstance(value, str) and len(value) <= 128 else ""
+
+    retry_after = header("Retry-After")
+    delay = None
+    if retry_after.isascii() and retry_after.isdigit() and len(retry_after) <= 12:
+        delay = int(retry_after)
+    elif retry_after:
+        try:
+            instant = parsedate_to_datetime(retry_after)
+            if instant.tzinfo is not None:
+                delay = max(0, math.ceil((instant - captured_at).total_seconds()))
+        except (TypeError, ValueError, OverflowError):
+            pass
+
+    primary_exhausted = header("X-RateLimit-Remaining") == "0"
+    reset = header("X-RateLimit-Reset")
+    if primary_exhausted and reset.isascii() and reset.isdigit() and len(reset) <= 12:
+        reset_delay = max(0, math.ceil(int(reset) - captured_at.timestamp()))
+        delay = max(delay or 0, reset_delay)
+    if status != 429 and not primary_exhausted and delay is None:
+        return None  # A permission-denied 403 is not evidence of quota exhaustion.
+
+    retry_not_before = None
+    if delay is not None:
+        try:
+            retry_not_before = _format_utc(captured_at + timedelta(seconds=delay))
+        except OverflowError:
+            pass  # Retain the full delay even when its date cannot be represented.
+    return {
+        "rate_limited": True,
+        "retry_after_seconds": delay,
+        "retry_not_before": retry_not_before,
+    }
+
+
 def _result(
     *,
     requested_url: str,
@@ -258,6 +307,7 @@ def _result(
     issue_updated_at: str | None = None,
     repository_redirected: bool = False,
     clear_at_capture: bool = False,
+    http_response: Any = None,
 ) -> tuple[dict[str, Any], bool]:
     canonical_url = (
         f"https://github.com/{canonical_repo}/issues/{number}"
@@ -299,6 +349,9 @@ def _result(
             "network_fetches_discovery_source_url": False,
         },
     }
+    cooldown = _provider_cooldown(http_response, captured_at)
+    if cooldown is not None:
+        receipt["live"]["provider_cooldown"] = cooldown
     immediate_clear = bool(
         clear_at_capture
         and provider_response_code_owned
@@ -442,6 +495,7 @@ def _acquire_live_status(
             classification="UNVERIFIABLE",
             reason_code=f"GITHUB_HTTP_{status}",
             provider_response_code_owned=True,
+            http_response=response,
             canonical_repo=final_repo,
             repository_redirected=redirected,
         )
@@ -600,3 +654,4 @@ def preflight_further_qualification(
             "next_gate_required": True,
         },
     }
+

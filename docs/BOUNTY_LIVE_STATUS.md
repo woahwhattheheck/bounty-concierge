@@ -65,6 +65,34 @@ A repository rename or move is accepted only when GitHub's final API URL and ret
 
 GitHub may redirect an old repository name to `/repositories/<id>/issues/<number>`. When that remains the final same-host endpoint, the reader requires the unchanged issue number and matching owner/name identities in the response's canonical `url` and `html_url`. It obtains the canonical name from that same response without another API request. Missing or conflicting canonical URLs remain unverifiable; retained receipts still cannot authorize qualification.
 
+## Provider cooldown visibility
+
+A GitHub quota response retains `live.provider_cooldown` in the existing receipt:
+
+```json
+{"rate_limited": true, "retry_after_seconds": 90,
+ "retry_not_before": "2026-10-04T09:31:30.250000Z"}
+```
+
+Read this from the current result before attempting another GitHub operation.
+The module still performs one request and no automatic retry or sleep. Share
+the wait evidence with the existing provider budget; a retained receipt remains
+audit evidence and never authorizes later qualification.
+
+`Retry-After` accepts bounded whole seconds or a timezone-bearing HTTP date.
+When `X-RateLimit-Remaining` is zero, the later of that wait and
+`X-RateLimit-Reset` is retained, rounding fractional seconds upward. This follows
+[GitHub's rate-limit guidance](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api).
+A permission-only 403 receives no quota annotation. A 429 with missing or invalid
+headers records a known quota response with unknown delay (`null`), so callers
+must use their existing conservative backoff policy rather than treating it as
+permission to retry immediately. An exceptionally large valid delay stays intact
+even if its derived calendar date cannot be represented.
+
+The optional field is sealed with the receipt. Successful responses, existing
+classifications and reason codes, canonical-identity handling, and the positive
+qualification predicate are unchanged. No raw headers or credentials are saved.
+
 ## Discovery metadata
 
 The optional discovery object may contain only:
