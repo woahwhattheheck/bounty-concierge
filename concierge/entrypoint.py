@@ -337,7 +337,7 @@ def _cash_admission_block(
             or economics.get("currency") != "USD"
             or fixed_amount is None
             or economics.get("fixed_semantics") is not True
-            or economics.get("active_floor") != "25"
+            or economics.get("active_floor") != "15"
             or economics.get("pile_floor") != "10"
             or not isinstance(projection, dict)
             or projection.get("dispatch") is not True
@@ -347,7 +347,7 @@ def _cash_admission_block(
             parsed_amount = Decimal(fixed_amount)
         except (InvalidOperation, ValueError):
             raise LiveCashAdmissionError("active live cash amount was malformed") from None
-        if not parsed_amount.is_finite() or parsed_amount < Decimal("25"):
+        if not parsed_amount.is_finite() or parsed_amount < Decimal("15"):
             raise LiveCashAdmissionError("active live cash amount was below the active floor")
         return None
 
@@ -364,7 +364,7 @@ def _cash_admission_block(
                 "severity": safe_disposition,
                 "message": (
                     "Live source-bound cash admission did not clear the owner's "
-                    "$25 active-work floor."
+                    "$15 active-work floor."
                 ),
             }
         ],

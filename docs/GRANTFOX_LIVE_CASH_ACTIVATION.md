@@ -7,7 +7,7 @@ The GrantFox execution path has strong but separate controls:
 - `grantfox_activation_gate` composes provider queue state, source readiness,
   dependency readiness/fulfillment, and application lifecycle continuity.
 - `bounty_live_cash_admission` re-reads canonical GitHub state and admits only
-  fixed USD economics, routing `$25+` to `main_bounty_queue`, `$10-24.99` to the
+  fixed USD economics, routing `$15+` to `main_bounty_queue`, `$10-14.99` to the
   saving pile, and non-fixed/unverified/stale work to HOLD/REJECT.
 
 Without a final composition step, a lifecycle receipt can be operationally
@@ -31,9 +31,9 @@ receipt simultaneously proves all of:
 - `route == main_bounty_queue`;
 - `currency == USD`;
 - `fixed_semantics == true`; and
-- `fixed_amount >= 25`.
+- `fixed_amount >= 15`.
 
-`$10-24.99` receipts therefore remain in the existing `bounty_pile_10_49` route;
+`$10-14.99` receipts therefore remain in the existing `bounty_pile_10_49` route;
 the route identifier is retained for compatibility. These receipts cannot be
 promoted into active GrantFox work. Non-fixed rewards, token rewards, stale
 receipts, identity mismatches, and canonical source changes fail closed.

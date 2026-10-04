@@ -10,7 +10,7 @@ repeating the provider reads.
 
 ```bash
 python -m concierge.bountyhub_catalog collect \
-  --max-pages 10 --page-size 100 --max-details 50 --min-funded-usd 25.00 > catalog.json
+  --max-pages 10 --page-size 100 --max-details 50 --min-funded-usd 15.00 > catalog.json
 ```
 
 The collector uses one `requests.Session`, reads ascending numbered pages from
@@ -19,7 +19,7 @@ flag. Each page requests `limit=100` by default; `--page-size` accepts 1 through
 100 and is recorded in the report. It then reads pledge/claim details only for
 nonterminal listings whose
 advertised total can reach the selected funding floor. The default floor is
-$25. The page and detail bounds are independent; no retry, sleep, watcher,
+$15. The page and detail bounds are independent; no retry, sleep, watcher,
 schedule, claim, proposal, account change or other provider write is performed.
 
 `catalog.json` contains every collected listing, source observation start/end,
@@ -34,7 +34,7 @@ The default shortlist uses only `reported_funded_usd`. Under the
 [October 4 owner instruction](https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1791104588390399),
 a payer with evidence of an actual paid merge is GREEN even when the current
 offer is not funded or escrowed. The current offered reward must still be at
-least $25, and current work availability, claimant eligibility, required
+least $15, and current work availability, claimant eligibility, required
 assignment steps, and existing submission ownership still apply. A merged PR
 or advertised reward alone is not paid-merge evidence; reuse the payer's
 recorded payment/settlement evidence or authoritative paid record.
@@ -44,10 +44,10 @@ the work order otherwise explicitly permits promised rewards:
 
 ```bash
 python -m concierge.bountyhub_catalog collect \
-  --include-promised --min-reward-usd 25.00 > catalog.json
+  --include-promised --min-reward-usd 15.00 > catalog.json
 
 python -m concierge.bountyhub_catalog targets catalog.json \
-  --include-promised --min-reward-usd 25.00 > shortlist.json
+  --include-promised --min-reward-usd 15.00 > shortlist.json
 ```
 
 This mode applies the floor to each resolved listing's funded plus promised
@@ -62,7 +62,7 @@ result records `reward_basis: "reported_funded_plus_promised"` and
 `minimum_reward_usd` instead of `minimum_funded_usd`. The default mode remains
 funded-only. `collect` includes those fields in `shortlist`; `targets` reports them
 to stderr while preserving the batch parser's exact candidates envelope.
-Programmatic callers can use `select_targets(report, "25.00", include_promised=True)`
+Programmatic callers can use `select_targets(report, "15.00", include_promised=True)`
 to obtain the same selection and its complete `listing_ids_by_issue` associations.
 Promised amounts remain promises; this option does not establish funding,
 assignment, eligibility, award or payment.
@@ -171,7 +171,7 @@ python -m concierge.bountyhub_catalog targets catalog.resumed.json > shortlist.j
 
 `resume` inherits the source report's collection floor and explicit promised-reward
 mode. It accepts no new floor or reward-mode switch. In particular, an old $50
-capture is not silently expanded by the current $25 default. Use a new `collect`
+capture is not silently expanded by the current $15 default. Use a new `collect`
 for a changed scope or current catalog facts. `resume_catalog(snapshot,
 max_details=10)` is the equivalent programmatic entrypoint.
 

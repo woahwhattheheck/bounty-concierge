@@ -243,7 +243,7 @@ def _safe_preflight_projection(preflight: dict[str, Any]) -> dict[str, Any]:
 
 
 def _build_api():
-    active_floor = Decimal("25")
+    active_floor = Decimal("15")
     pile_floor = Decimal("10")
     main_route = "main_bounty_queue"
     pile_route = "bounty_pile_10_49"
@@ -378,7 +378,7 @@ def _build_api():
                 "currency": "USD" if amount is not None else None,
                 "fixed_amount": _format_decimal(amount) if amount is not None else None,
                 "fixed_semantics": bool(amount is not None and not nonfixed),
-                "active_floor": "25",
+                "active_floor": "15",
                 "pile_floor": "10",
             },
             "disposition": disposition,

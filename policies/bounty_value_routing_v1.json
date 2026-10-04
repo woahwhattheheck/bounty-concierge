@@ -1,11 +1,11 @@
 {
   "assets": {
     "USD": {
-      "active_floor": "25",
+      "active_floor": "15",
       "pile_floor": "10"
     },
     "USDC": {
-      "active_floor": "25",
+      "active_floor": "15",
       "pile_floor": "10"
     }
   },
