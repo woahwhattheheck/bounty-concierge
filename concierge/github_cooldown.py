@@ -23,19 +23,46 @@ _UNKNOWN_BACKOFF_RESET_SECONDS = 30.0 * 60.0
 
 
 class GitHubCooldown:
-    """Share only a deadline between workers using one file and credential.
+    """Share quota and provider deadlines between coordinated workers.
+
+    Provider cooldowns are credential-global by default for backward
+    compatibility. Callers may opt into a hashed route-family scope while
+    primary-quota reservations remain credential-global.
 
     The parent directory must already exist and be private to the operator.
     SQLite transactions extend deadlines atomically. No database lock is held
     during HTTP. Already in-flight requests cannot be recalled by this helper.
     """
 
-    def __init__(self, path: str | Path, token: str | None) -> None:
+    def __init__(
+        self,
+        path: str | Path,
+        token: str | None,
+        *,
+        cooldown_scope: str | None = None,
+    ) -> None:
         if str(path) == ":memory:":
             raise ValueError("cooldown file must persist between processes")
+        if cooldown_scope is not None and (
+            not cooldown_scope
+            or len(cooldown_scope.encode("utf-8")) > 64
+            or "\0" in cooldown_scope
+        ):
+            raise ValueError("cooldown_scope must be a non-empty label up to 64 bytes")
         self.path = Path(path)
+        # Keep the v1 credential scope byte-for-byte for legacy callers and for
+        # primary-quota reservations, which apply across GitHub REST resources.
         self.scope = hashlib.sha256(
             b"github-rest-cooldown-v1\0" + (token or "").encode("utf-8")
+        ).hexdigest()
+        # Provider secondary limits can be resource-family specific. Opted-in
+        # callers get an isolated provider-cooldown row without exposing the
+        # credential fingerprint or the human-readable route label in SQLite.
+        self.cooldown_scope = self.scope if cooldown_scope is None else hashlib.sha256(
+            b"github-rest-cooldown-scope-v1\0"
+            + self.scope.encode("ascii")
+            + b"\0"
+            + cooldown_scope.encode("utf-8")
         ).hexdigest()
 
     @contextmanager
@@ -76,7 +103,7 @@ class GitHubCooldown:
         with self._connection() as connection:
             row = connection.execute(
                 "SELECT until_epoch FROM github_cooldown_v1 WHERE scope = ?",
-                (self.scope,),
+                (self.cooldown_scope,),
             ).fetchone()
             if row is None:
                 return None
@@ -134,7 +161,7 @@ class GitHubCooldown:
                 "FROM github_cooldown_v1 WHERE scope = ? "
                 "UNION ALL SELECT 'quota reservation', until_epoch "
                 "FROM github_quota_reserve_v1 WHERE scope = ?",
-                (self.scope, self.scope),
+                (self.cooldown_scope, self.scope),
             ).fetchall()
             values: dict[str, float] = {}
             for label, value in rows:
@@ -151,7 +178,7 @@ class GitHubCooldown:
                 "INSERT INTO github_cooldown_v1(scope, until_epoch) VALUES (?, ?) "
                 "ON CONFLICT(scope) DO UPDATE SET until_epoch = "
                 "MAX(github_cooldown_v1.until_epoch, excluded.until_epoch)",
-                (self.scope, until_epoch),
+                (self.cooldown_scope, until_epoch),
             )
 
     def reserve_quota_until(self, until_epoch: float) -> None:
@@ -183,7 +210,7 @@ class GitHubCooldown:
             row = connection.execute(
                 "SELECT backoff_seconds, observed_epoch "
                 "FROM github_cooldown_unknown_v1 WHERE scope = ?",
-                (self.scope,),
+                (self.cooldown_scope,),
             ).fetchone()
             backoff = _UNKNOWN_BACKOFF_BASE_SECONDS
             if row is not None:
@@ -217,19 +244,19 @@ class GitHubCooldown:
                 "ON CONFLICT(scope) DO UPDATE SET "
                 "backoff_seconds = excluded.backoff_seconds, "
                 "observed_epoch = excluded.observed_epoch",
-                (self.scope, backoff, now),
+                (self.cooldown_scope, backoff, now),
             )
             connection.execute(
                 "INSERT INTO github_cooldown_v1(scope, until_epoch) VALUES (?, ?) "
                 "ON CONFLICT(scope) DO UPDATE SET until_epoch = "
                 "MAX(github_cooldown_v1.until_epoch, excluded.until_epoch)",
-                (self.scope, until_epoch),
+                (self.cooldown_scope, until_epoch),
             )
             # Read MAX back under the same lock: an in-flight response may
             # arrive after another worker recorded a later provider deadline.
             row = connection.execute(
                 "SELECT until_epoch FROM github_cooldown_v1 WHERE scope = ?",
-                (self.scope,),
+                (self.cooldown_scope,),
             ).fetchone()
             value = row[0]
             if not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
