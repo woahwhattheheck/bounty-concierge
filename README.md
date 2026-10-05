@@ -206,7 +206,7 @@ provider requests. `--max-pages` bounds pagination; `--max-requests` counts actu
 HTTP GET attempts and stops before exceeding its budget (default 100, range
 1–10,000). `--reserve-requests N` is opt-in (default 0): after a successful
 GitHub response reports a positive `X-RateLimit-Remaining` value at or below
-`N`, the collector retains that response and stops before its next GET with
+`N`, that response returns normally and the collector stops before its next GET with
 `HEADROOM_RESERVED`, not `RATE_LIMITED`. With `--cooldown-file`, an available
 GitHub reset timestamp is shared through the existing quota-reservation store so
 other opted-in collectors defer until reset without consuming another request.
