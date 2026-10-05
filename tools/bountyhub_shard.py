@@ -8,6 +8,7 @@ It consumes only the shareable projection produced by bountyhub_intake.py.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -52,11 +53,32 @@ def _slot(value: str, worker_count: int) -> int:
     return int.from_bytes(digest[:8], "big") % worker_count
 
 
-def candidate_groups(snapshot: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+def reconciliation_status(snapshot: dict[str, Any]) -> str:
+    """Age-check a shared overlay again at consumption, not only at creation."""
+    if "github_reconciliation" not in snapshot:
+        return "not_applied"
+    meta = snapshot["github_reconciliation"]
+    try:
+        if not isinstance(meta, dict):
+            return "invalid"
+        observed = datetime.fromisoformat(meta["observed_at"].replace("Z", "+00:00"))
+        maximum = meta["max_age_seconds"]
+        if observed.tzinfo is None or type(maximum) is not int or maximum <= 0:
+            return "invalid"
+        age = (datetime.now(timezone.utc) - observed).total_seconds()
+        return "future" if age < 0 else "stale" if age > maximum else "fresh"
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return "invalid"
+
+
+def candidate_groups(snapshot: dict[str, Any], *, overlay_status: str | None = None) -> dict[str, list[dict[str, Any]]]:
     """Return unique candidate work keys with their already-sanitized listing rows."""
     groups: dict[str, list[dict[str, Any]]] = {}
+    status = overlay_status if overlay_status is not None else reconciliation_status(snapshot)
     for row in snapshot["rows"]:
         if not isinstance(row, dict) or row.get("catalog_candidate") is not True:
+            continue
+        if status != "not_applied" and (status != "fresh" or row.get("reconciled_candidate") is not True):
             continue
         work_key = row.get("work_key")
         if not isinstance(work_key, str) or not work_key:
@@ -71,7 +93,8 @@ def shard(snapshot: dict[str, Any], worker_key: str, worker_count: int) -> dict[
     if type(worker_count) is not int or not 1 <= worker_count <= MAX_WORKERS:
         raise ShardError(f"worker-count must be between 1 and {MAX_WORKERS}")
 
-    groups = candidate_groups(snapshot)
+    overlay_status = reconciliation_status(snapshot)
+    groups = candidate_groups(snapshot, overlay_status=overlay_status)
     worker_slot = _slot(worker_key, worker_count)
     assigned = []
     for work_key in sorted(groups):
@@ -95,6 +118,7 @@ def shard(snapshot: dict[str, Any], worker_key: str, worker_count: int) -> dict[
         "source_schema": snapshot.get("schema"),
         "source_retrieved_at": snapshot.get("retrieved_at"),
         "source_raw_sha256": snapshot.get("raw_sha256"),
+        "github_reconciliation_status": overlay_status,
         "algorithm": "sha256-mod-v1",
         "worker_key_sha256": hashlib.sha256(worker_key.encode("utf-8")).hexdigest(),
         "worker_count": worker_count,
@@ -107,6 +131,7 @@ def shard(snapshot: dict[str, Any], worker_key: str, worker_count: int) -> dict[
             "Reconcile live GitHub state and current swarm ownership before implementation.",
             "Duplicate provider cards for one work_key stay grouped and are never summed.",
             "Use one shared sanitized snapshot; this tool performs zero network requests.",
+            "When an overlay is supplied, stale/future/invalid observations yield no shard; refresh the shared capture, not one copy per agent.",
         ],
     }
 
