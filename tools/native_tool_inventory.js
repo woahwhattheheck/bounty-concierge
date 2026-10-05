@@ -6,6 +6,13 @@ const NATIVE_TOOL_PREFIXES = Object.freeze({
   slack: "mcp__codex_apps__slack_slack_",
 });
 
+// Exact namespace families observed in the ChatGPT connector harness.
+// Accept the caller's actual names; do not synthesize registry entries or permissions.
+const CONNECTOR_TOOL_PREFIXES = Object.freeze({
+  github: "GitHub.",
+  slack: "Slack.slack_",
+});
+
 const NATIVE_WRITE_ACTIONS = Object.freeze({
   github: Object.freeze([
     "create_blob", "create_tree", "create_commit", "create_branch",
@@ -28,11 +35,13 @@ function inspectToolInventory(registry, { includeNames = false } = {}) {
   const observed = new Set(allNames);
   const providers = {};
   for (const [provider, prefix] of Object.entries(NATIVE_TOOL_PREFIXES)) {
-    const names = allNames.filter(name => name.startsWith(prefix));
+    const prefixes = [prefix, CONNECTOR_TOOL_PREFIXES[provider]];
+    const names = allNames.filter(name => prefixes.some(candidate => name.startsWith(candidate)));
     const writes = {};
     for (const action of NATIVE_WRITE_ACTIONS[provider]) {
-      const name = prefix + action;
-      writes[action] = observed.has(name)
+      const name = prefixes.map(candidate => candidate + action)
+        .find(candidate => observed.has(candidate));
+      writes[action] = name
         ? { state: "OBSERVED", name }
         : { state: "NOT_OBSERVED_IN_THIS_SNAPSHOT" };
     }
@@ -45,6 +54,7 @@ function inspectToolInventory(registry, { includeNames = false } = {}) {
   const discovery = allNames.filter(name =>
     /(?:^|__)(?:[^_]+__)?(?:tool_search|search_tools|list_resources)$/.test(name)
       || name === "mcp__codex_apps__plugin_management_search_plugins"
+      || name === "api_tool.list_resources"
   );
   return {
     registryCount: allNames.length,
