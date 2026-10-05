@@ -149,17 +149,6 @@ def evaluate(
     if not isinstance(issue_state, str):
         raise GuardError("snapshot.issue.state is required")
 
-    pulls = snapshot.get("pulls")
-    if not isinstance(pulls, list):
-        raise GuardError("snapshot.pulls must be a list")
-    submitted_raw = snapshot.get("submitted_pr_numbers", [])
-    if not isinstance(submitted_raw, list):
-        raise GuardError("submitted_pr_numbers must be a list")
-    submitted: set[int] = set()
-    for value in submitted_raw:
-        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
-            raise GuardError("submitted_pr_numbers must contain positive integers")
-        submitted.add(value)
 
     if age > max_age_seconds or age < -FUTURE_SKEW_SECONDS:
         status = "STALE_SNAPSHOT"
@@ -176,6 +165,18 @@ def evaluate(
             [],
             age,
         )
+
+    pulls = snapshot.get("pulls")
+    if not isinstance(pulls, list):
+        raise GuardError("snapshot.pulls must be a list")
+    submitted_raw = snapshot.get("submitted_pr_numbers", [])
+    if not isinstance(submitted_raw, list):
+        raise GuardError("submitted_pr_numbers must be a list")
+    submitted: set[int] = set()
+    for value in submitted_raw:
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise GuardError("submitted_pr_numbers must contain positive integers")
+        submitted.add(value)
 
     own_sha = self_head_sha.strip().lower()
     if not own_sha:
