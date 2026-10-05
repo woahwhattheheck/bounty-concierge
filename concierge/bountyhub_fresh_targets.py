@@ -14,6 +14,8 @@ from pathlib import Path
 import sys
 from typing import Any
 
+from concierge.bountyhub_exclusions import unique_exclusion_fields
+
 
 def _exclude_assigned_exclusive(
     report: dict[str, Any], selected: dict[str, Any]
@@ -107,7 +109,7 @@ def _load(path: Path | None) -> Any:
     if path is None:
         return None
     with path.open(encoding="utf-8") as source:
-        return json.load(source)
+        return json.load(source, object_pairs_hook=unique_exclusion_fields)
 
 
 def main(argv: list[str] | None = None) -> int:
