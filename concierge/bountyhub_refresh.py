@@ -10,6 +10,7 @@ import argparse
 from contextlib import nullcontext
 import hashlib
 import json
+import math
 from pathlib import Path
 import sys
 from typing import Any
@@ -19,6 +20,112 @@ import requests
 from concierge import bountyhub_catalog as catalog
 
 SCHEMA = "bountyhub-target-refresh/v1"
+RESUME_PLAN_SCHEMA = "bountyhub-refresh-resume-plan/v1"
+
+
+def plan_refresh_resume(snapshot: dict[str, Any], listing_ids: list[str],
+                        previous_refresh: dict[str, Any]) -> dict[str, Any]:
+    """Plan the next partial refresh without making a provider request.
+
+    Completed rows from the previous receipt are excluded from the pending list.
+    A retained rate-limit signal without numeric Retry-After stays fail-closed:
+    the planner cannot prove when another provider read is safe.
+    """
+    validation = snapshot
+    if isinstance(snapshot, dict) and "page_size" not in snapshot:
+        validation = {**snapshot, "page_size": 100}
+    retained = catalog._resume_input(validation)
+    if not isinstance(listing_ids, list) or not 1 <= len(listing_ids) <= 100:
+        raise ValueError("provide between 1 and 100 explicit listing IDs")
+    if any(not isinstance(item, str) or not catalog._ID.fullmatch(item) for item in listing_ids):
+        raise ValueError("invalid listing identity")
+    selected = list(dict.fromkeys(listing_ids))
+    rows = {row["listing_id"]: row for row in retained["listings"]}
+    if any(item not in rows for item in selected):
+        raise ValueError("requested listing is absent from the retained catalog")
+
+    try:
+        source_digest = hashlib.sha256(json.dumps(
+            snapshot, sort_keys=True, separators=(",", ":"), allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        previous_digest = hashlib.sha256(json.dumps(
+            previous_refresh, sort_keys=True, separators=(",", ":"), allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+    except (TypeError, ValueError):
+        raise ValueError("retained refresh inputs must contain finite JSON values") from None
+
+    if (not isinstance(previous_refresh, dict)
+            or previous_refresh.get("schema") != SCHEMA
+            or previous_refresh.get("source_sha256") != source_digest):
+        raise ValueError("previous refresh must reference the same retained catalog")
+    # Validate the complete receipt structure and every successful detail row
+    # before using its status as a reason to skip a future provider request.
+    catalog._refresh_target_source(previous_refresh)
+    previous_records: dict[str, dict[str, Any]] = {}
+    for record in previous_refresh["records"]:
+        listing_id = record["listing_id"]
+        expected = rows.get(listing_id)
+        if (expected is None
+                or record.get("repo", "").casefold() != expected["repo"].casefold()
+                or record.get("number") != expected["number"]
+                or record.get("source_url") != expected["source_url"]):
+            raise ValueError("previous refresh record disagrees with the retained catalog")
+        previous_records[listing_id] = record
+
+    completed_ids = [
+        listing_id for listing_id in selected
+        if previous_records.get(listing_id, {}).get("status") == "COMPLETE"
+    ]
+    completed_set = set(completed_ids)
+    pending_ids = [listing_id for listing_id in selected if listing_id not in completed_set]
+
+    now = catalog._instant(catalog._now())
+    cooldown_remaining = 0
+    cooldown_unknown = False
+    for source in (retained, previous_refresh):
+        completed_at = catalog._instant(source.get("completed_at"))
+        if now < completed_at:
+            raise ValueError("resume plan time predates retained observation")
+        delay = source.get("retry_after_seconds")
+        if delay is not None and (type(delay) is not int or not 0 <= delay < 10**12):
+            raise ValueError("invalid retained retry guidance")
+        rate_limited = source.get("rate_limited")
+        if type(rate_limited) is not bool:
+            raise ValueError("invalid retained rate-limit flag")
+        if rate_limited and delay is None:
+            cooldown_unknown = True
+        if delay is not None:
+            elapsed = (now - completed_at).total_seconds()
+            cooldown_remaining = max(
+                cooldown_remaining,
+                max(0, math.ceil(delay - elapsed)),
+            )
+
+    return {
+        "schema": RESUME_PLAN_SCHEMA,
+        "source_sha256": source_digest,
+        "previous_refresh_sha256": previous_digest,
+        "catalog_observed_through": retained["catalog_observed_through"],
+        "requested_listing_ids": selected,
+        "completed_listing_ids": completed_ids,
+        "pending_listing_ids": pending_ids,
+        "requested_listing_count": len(selected),
+        "completed_listing_count": len(completed_ids),
+        "pending_listing_count": len(pending_ids),
+        "requests_avoided": len(completed_ids),
+        "cooldown_known": not cooldown_unknown,
+        "cooldown_remaining_seconds": None if cooldown_unknown else cooldown_remaining,
+        "ready_for_requests": bool(pending_ids) and not cooldown_unknown and cooldown_remaining == 0,
+        "resume_complete": not pending_ids,
+        "network_requests": 0,
+        "interpretation": [
+            "Pass only pending_listing_ids to the next deliberate refresh attempt.",
+            "This plan performs no provider request and does not refresh funding or issue state.",
+            "A false ready_for_requests value is not a sleep instruction or a global provider lock.",
+            "When cooldown_known is false, obtain fresh provider guidance before another read.",
+            "Reconcile live issue state and current swarm ownership before implementation.",
+        ],
+    }
 
 
 def refresh_listings(snapshot: dict[str, Any], listing_ids: list[str], *,
@@ -176,11 +283,23 @@ def main(argv: list[str] | None = None) -> int:
                         help="HTTP request allowance, 0-100; defaults to the distinct listing count")
     parser.add_argument("--previous-refresh", type=Path,
                         help="Last receipt for this catalog; enforces its Retry-After cooldown")
+    parser.add_argument(
+        "--plan-resume", action="store_true",
+        help="emit a zero-I/O plan that excludes rows completed by --previous-refresh",
+    )
     args = parser.parse_args(argv)
     try:
+        snapshot = _load(args.snapshot)
+        previous = _load(args.previous_refresh) if args.previous_refresh else None
+        if args.plan_resume:
+            if previous is None:
+                raise ValueError("--plan-resume requires --previous-refresh")
+            result = plan_refresh_resume(snapshot, args.listing_ids, previous)
+            print(json.dumps(result, indent=2, sort_keys=True))
+            return 0
         result = refresh_listings(
-            _load(args.snapshot), args.listing_ids,
-            previous_refresh=_load(args.previous_refresh) if args.previous_refresh else None,
+            snapshot, args.listing_ids,
+            previous_refresh=previous,
             max_requests=args.max_requests,
         )
         print(json.dumps(result, indent=2, sort_keys=True))

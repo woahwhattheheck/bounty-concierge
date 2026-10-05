@@ -48,6 +48,26 @@ concierge bountyhub refresh catalog.json \
   --previous-refresh refresh-01.json > refresh-02.json
 ```
 
+When a partial refresh has already completed some IDs, build an offline resume
+plan before spending another provider request:
+
+```bash
+python -m concierge.bountyhub_refresh catalog.json \
+  --listing-id "$LISTING_ID_1" \
+  --listing-id "$LISTING_ID_2" \
+  --previous-refresh refresh-01.json \
+  --plan-resume > resume-plan.json
+```
+
+The planner performs **zero network requests**. It validates the original catalog
+digest and every retained refresh record, preserves first-occurrence ID order, and
+emits `completed_listing_ids`, `pending_listing_ids`, `requests_avoided`,
+`cooldown_remaining_seconds`, and `ready_for_requests`. Pass only the pending
+IDs to the next deliberate refresh. If a retained rate-limit signal has no numeric
+`Retry-After`, `cooldown_known` is false and the plan stays not-ready rather
+than inventing a safe retry time. This is a continuation aid, not a provider lock,
+sleep loop, eligibility decision, claim, or automatic retry.
+
 Use distinct filenames: shell redirection must never truncate an input. The
 receipt's `Retry-After` is enforced before a session opens, conservatively from
 its observation end, including when the next selection differs. A receipt must
