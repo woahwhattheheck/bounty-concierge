@@ -371,7 +371,7 @@ def collect_batch(
     An optional cooldown_file shares observed quota deadlines across invocations;
     omitting it preserves per-batch-only pacing and performs no state-file I/O.
     reserve_requests is an opt-in positive remaining-request floor. A successful
-    response at or below that floor is retained, then later GETs are deferred.
+    response at or below that floor returns normally, then later GETs are deferred.
     """
     unique, duplicate_count = _shortlist(candidates)
     _positive(max_issues, "max_issues", _MAX_CANDIDATES)
@@ -569,8 +569,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--reserve-requests", type=int, default=0,
         help=(
-            "Opt-in positive GitHub remaining-request floor; retain the response "
-            "that reaches it and stop before the next GET"
+            "Opt-in positive GitHub remaining-request floor; let the response "
+            "that reaches it return, then stop before the next GET"
         ),
     )
     parser.add_argument("--saturation-threshold", type=int, default=4)
