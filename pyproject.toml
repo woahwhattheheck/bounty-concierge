@@ -16,6 +16,7 @@ concierge = "concierge.entrypoint:main"
 clawrtc = "concierge.entrypoint:main"
 concierge-revenue = "concierge.revenue_cli:main"
 concierge-discover = "concierge.discovered_revenue_intake:main"
+concierge-notifications = "concierge.github_notification_queue:main"
 
 [tool.setuptools.packages.find]
 include = ["concierge*"]
