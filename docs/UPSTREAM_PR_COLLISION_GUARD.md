@@ -10,11 +10,17 @@ does not catch that external race.
 
 ## Input contract
 
-Fetch the canonical issue and relevant pull requests immediately before
-publication. Save JSON with captured_at, issue, pulls, and optionally
-submitted_pr_numbers. The issue object must contain repository (OWNER/REPO),
-number, and state. Each pull record should include number, state, merged (or
-merged_at), title/body, URL, and its head SHA.
+Fetch the canonical issue immediately before publication. If that issue snapshot
+is stale or the canonical issue is no longer open, the guard can stop there:
+`pulls` is not required for those blocked outcomes. This lets intake prune dead
+marketplace rows after one canonical issue read instead of spending a second
+provider request on a PR search.
+
+For a fresh open issue, save JSON with captured_at, issue, pulls, and optionally
+submitted_pr_numbers. Open issues remain fail-closed when `pulls` is missing.
+The issue object must contain repository (OWNER/REPO), number, and state. Each
+pull record should include number, state, merged (or merged_at), title/body, URL,
+and its head SHA.
 
 submitted_pr_numbers is useful when a marketplace or issue body names submitted
 PRs directly. Pulls may also contain other candidate PRs; the guard recognizes
