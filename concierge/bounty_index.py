@@ -119,8 +119,7 @@ def _shared_cooldown_blocks(cooldown, report, source):
     if cooldown is None:
         return False
     try:
-        deadline = cooldown.deadline()
-        reserve_deadline = cooldown.quota_reserve_deadline()
+        deadline, reserve_deadline = cooldown.deadlines()
     except CooldownStateError:
         report["cooldown_state_error"] = True
         source["status"] = "COOLDOWN_STATE_ERROR"
