@@ -28,7 +28,12 @@ from concierge.reward_evidence import extract_reward_evidence, reward_summary
 # ---------------------------------------------------------------------------
 
 def _normalize_issue_row(issue):
-    """Return parser-safe issue fields, or None for an unsupported API row."""
+    """Return parser-safe issue fields, or None for an unsupported API row.
+
+    Optional assignment facts are tri-state: a login list means assigned, an
+    empty list means explicitly unassigned, and None means unknown. Legacy
+    cache entries lack these facts; they must not impersonate unclaimed work.
+    """
     if not isinstance(issue, dict) or "pull_request" in issue:
         return None
 
@@ -65,6 +70,25 @@ def _normalize_issue_row(issue):
             return None
         label_names.append(name)
 
+    # Preserve only the logins needed for collision checks, not user profiles.
+    assignees = None
+    raw_assignees = issue.get("assignees")
+    if isinstance(raw_assignees, list):
+        logins = []
+        for assignee in raw_assignees:
+            login = assignee.get("login") if isinstance(assignee, dict) else None
+            if not isinstance(login, str) or not login.strip():
+                break
+            logins.append(login)
+        else:
+            assignees = logins
+    updated_at = issue.get("updated_at")
+    if not isinstance(updated_at, str) or not updated_at:
+        updated_at = None
+    state = issue.get("state")
+    if state not in ("open", "closed"):
+        state = None
+
     return {
         "number": number,
         "title": title,
@@ -72,6 +96,9 @@ def _normalize_issue_row(issue):
         "url": url,
         "labels": label_names,
         "created_at": created_at,
+        "updated_at": updated_at,
+        "state": state,
+        "assignees": assignees,
     }
 
 
@@ -370,7 +397,13 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                             cache_rows.append({"number": number, "title": normalized["title"],
                                                "body": normalized["body"], "html_url": normalized["url"],
                                                "labels": [{"name": name} for name in normalized["labels"]],
-                                               "created_at": normalized["created_at"]})
+                                               "created_at": normalized["created_at"],
+                                               "updated_at": normalized["updated_at"],
+                                               "state": normalized["state"],
+                                               "assignees": (
+                                                   [{"login": login} for login in normalized["assignees"]]
+                                                   if normalized["assignees"] is not None else None
+                                               )})
                         title, body, labels = normalized["title"], normalized["body"], normalized["labels"]
                         reward_evidence = extract_reward_evidence(title, body)
                         reward = reward_evidence["amount_rtc"]
