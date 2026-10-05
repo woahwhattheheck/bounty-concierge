@@ -73,27 +73,45 @@ class SnapshotReadTest(unittest.TestCase):
             {"ref": observed_head},
         )
 
-    def test_status_pairs_state_with_observed_head(self):
-        state = active_state()
+    def test_takeover_rereads_state_at_observed_head(self):
+        stale = active_state()
+        stale["status"] = "RELEASED"
+        stale["lease_expires_at"] = stale["updated_at"]
+        fresh = active_state()
         observed_head = "c" * 40
 
         class MovingRefGitHub:
             seen_ref = None
+            initial_reads = 0
+
+            def read_state_if_exists(self, branch, *, ref=None):
+                self.initial_reads += 1
+                if ref is not None:
+                    raise AssertionError("initial read must use deterministic branch")
+                return stale, "b" * 40
 
             def ref_sha(self, branch):
                 return observed_head
 
             def read_state(self, branch, *, ref=None):
                 self.seen_ref = ref
-                return state, "d" * 40
+                return fresh, "d" * 40
 
         github = MovingRefGitHub()
-        result, code = reservation.status(
-            github, work_key=state["work_key"]
+        result, code = reservation.reserve(
+            github,
+            work_key=stale["work_key"],
+            owner="SOL-OTHER-1945",
+            event_id="takeover-snapshot-test",
+            lease_seconds=900,
+            artifact=None,
+            base_branch="main",
         )
 
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 3)
+        self.assertEqual(github.initial_reads, 1)
         self.assertEqual(github.seen_ref, observed_head)
+        self.assertEqual(result["disposition"], "BUSY")
         self.assertEqual(result["commit_sha"], observed_head)
 
     def test_fresh_target_annotations_match_custody_helper_without_mutation(self):
