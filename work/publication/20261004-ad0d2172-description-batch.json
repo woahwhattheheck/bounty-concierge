@@ -298,7 +298,20 @@
         "outcome": "provider_403",
         "readback": "unchanged at b64bb147"
       },
-      "publication_status": "prepared; original upstream historical36-case body remains unchanged"
+      "publication_status": "prepared; original upstream historical36-case body remains unchanged",
+      "native_attempts_after_preparation": [
+        {
+          "observed_at": "2026-10-05T00:08:27.116Z",
+          "tool": "update_pull_request",
+          "count": 1,
+          "outcome": "provider_403",
+          "error": "GitHub API error 403: {\"message\":\"Resource not accessible by integration\",\"documentation_url\":\"https://docs.github.com/rest/pulls/pulls#update-a-pull-request\",\"status\":\"403\"}",
+          "rate_reset_at": null,
+          "retry_after_seconds": null,
+          "expected_head": "4dbbfb40111edbbd00d4d08a84a46232b8f85327",
+          "readback": "unchanged body and exact head"
+        }
+      ]
     }
   ]
 }
