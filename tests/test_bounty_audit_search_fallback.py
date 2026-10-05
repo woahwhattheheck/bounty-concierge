@@ -39,7 +39,7 @@ def test_search_rate_limit_falls_back_to_cross_reference_timeline_without_retry(
         "source": {"issue": {
             "number": 9,
             "title": "Fix retry path",
-            "body": "Fixes #1",
+            "body": "Retry persistence follow-up",
             "html_url": "https://github.com/example/project/pull/9",
             "repository_url": "https://api.github.com/repos/example/project",
             "pull_request": {"url": "https://api.github.com/repos/example/project/pulls/9"},
@@ -48,7 +48,7 @@ def test_search_rate_limit_falls_back_to_cross_reference_timeline_without_retry(
     detail = {
         "number": 9,
         "title": "Fix retry path",
-        "body": "Fixes #1",
+        "body": "Retry persistence follow-up",
         "html_url": "https://github.com/example/project/pull/9",
         "state": "open",
         "draft": False,
