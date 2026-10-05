@@ -14,7 +14,7 @@ from typing import Any
 from concierge.github_cooldown import CooldownStateError, GitHubCooldown
 
 _SCHEMA = "github-cooldown-status/v1"
-_ENV_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\\Z")
+_ENV_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 
 
 def _deadline_status(deadline: float | None, now_epoch: float) -> dict[str, Any]:
