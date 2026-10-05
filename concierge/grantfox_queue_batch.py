@@ -42,6 +42,10 @@ _AUTHORITY = {
     "payment_or_wallet_authority": False,
 }
 
+_RESERVATION_SCHEMA = "swarm-custody-reservation/v1"
+_RESERVATION_BRANCH_PREFIX = "swarm-custody/v1"
+_RESERVATION_TOOL = "tools/swarm_claim_reservation.py"
+
 
 def _sha256_json(value: Any) -> str:
     encoded = json.dumps(
@@ -68,6 +72,18 @@ def _canonical_key(receipt: dict[str, Any]) -> tuple[str, str, int]:
 def _canonical_id(receipt: dict[str, Any]) -> str:
     owner, repo, number = _canonical_key(receipt)
     return f"{owner}/{repo}#{number}"
+
+
+def _swarm_reservation(receipt: dict[str, Any]) -> dict[str, str]:
+    canonical_id = _canonical_id(receipt)
+    work_key = f"grantfox:{canonical_id}"
+    digest = hashlib.sha256(work_key.encode("utf-8")).hexdigest()
+    return {
+        "schema": _RESERVATION_SCHEMA,
+        "work_key": work_key,
+        "branch": f"{_RESERVATION_BRANCH_PREFIX}/{digest}",
+        "tool": _RESERVATION_TOOL,
+    }
 
 
 def compile_grantfox_queue_batch(request: dict[str, Any]) -> dict[str, Any]:
@@ -121,6 +137,11 @@ def compile_grantfox_queue_batch(request: dict[str, Any]) -> dict[str, Any]:
         if child["reward"]["status"] == "POSSIBLE_DISCRETIONARY":
             possible_discretionary += 1
 
+    reservations = {
+        _canonical_id(child): _swarm_reservation(child)
+        for child in child_receipts
+    }
+
     body = {
         "schema": _SCHEMA,
         "child_schema": _CHILD_SCHEMA,
@@ -137,6 +158,8 @@ def compile_grantfox_queue_batch(request: dict[str, Any]) -> dict[str, Any]:
             ),
         },
         "authority": dict(_AUTHORITY),
+        "swarm_reservation_schema": _RESERVATION_SCHEMA,
+        "swarm_reservations": reservations,
         "children": child_receipts,
     }
     return {**body, "batch_receipt_sha256": _sha256_json(body)}
@@ -156,6 +179,13 @@ def verify_batch_receipt(receipt: dict[str, Any]) -> bool:
         return False
     if body.get("authority") != _AUTHORITY:
         return False
+
+    reservation_schema = body.get("swarm_reservation_schema")
+    reservations = body.get("swarm_reservations")
+    has_reservations = reservation_schema is not None or reservations is not None
+    if has_reservations:
+        if reservation_schema != _RESERVATION_SCHEMA or type(reservations) is not dict:
+            return False
 
     children = body.get("children")
     if type(children) is not list or not children or len(children) > _MAX_SNAPSHOTS:
@@ -192,6 +222,14 @@ def verify_batch_receipt(receipt: dict[str, Any]) -> bool:
     if body.get("issues_by_disposition") != actual_buckets:
         return False
 
+    if has_reservations:
+        expected_reservations = {
+            _canonical_id(child): _swarm_reservation(child)
+            for child in children
+        }
+        if reservations != expected_reservations:
+            return False
+
     reward_summary = body.get("reward_summary")
     if type(reward_summary) is not dict:
         return False
@@ -215,6 +253,7 @@ def format_summary(receipt: dict[str, Any]) -> str:
         f"hold={counts['HOLD']} "
         f"possible_discretionary="
         f"{receipt['reward_summary']['possible_discretionary_count']} "
+        f"reservations={len(receipt.get('swarm_reservations') or {})} "
         f"batch_receipt_sha256={receipt['batch_receipt_sha256']}"
     )
 

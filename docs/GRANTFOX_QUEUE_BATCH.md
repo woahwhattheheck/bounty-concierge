@@ -50,3 +50,21 @@ ordering, counts, buckets, reward summary, authority ceiling, and parent digest.
 
 As with the single-issue gate, all provider application, implementation write,
 submission, and payment/wallet authority remains false.
+
+## Atomic pre-TAKE reservation metadata
+
+Every newly compiled batch includes a `swarm_reservations` object keyed by the
+same canonical `owner/repo#issue` identity used by the queue. Each value carries
+the existing `swarm-custody-reservation/v1` schema, a canonical
+`grantfox:<owner>/<repo>#<issue>` work key, the deterministic
+`swarm-custody/v1/<sha256(work_key)>` branch, and the existing
+`tools/swarm_claim_reservation.py` helper path.
+
+Workers should reserve that exact work key **before** posting a Slack TAKE or
+starting source mutation. `ACQUIRED` or `OWNED` means proceed; `BUSY` means keep
+the winning owner and choose different work. The batch compiler itself remains
+advisory and makes no provider requests or reservation mutations.
+
+This is additive coordination metadata. Verification still accepts older v1
+receipts that predate reservation annotations, while validating the exact mapping
+whenever the new fields are present.
