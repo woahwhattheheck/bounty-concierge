@@ -1,9 +1,12 @@
 {
-  "started_at": "2026-10-04T23:15:37.261633+00:00",
+  "started_at": "2026-10-05T00:18:58.854694+00:00",
   "complete": true,
   "rate_limited": false,
   "retry_after_seconds": null,
   "rate_limit_reset_at": null,
+  "rate_limit_remaining": null,
+  "request_headroom_reserved": false,
+  "request_headroom_floor": 0,
   "repositories": [
     {
       "repo": "Scottcjn/rustchain-bounties",
@@ -6434,7 +6437,14 @@
           "3 RTC",
           "3 RTC"
         ],
-        "evidence_kind": "rtc_exact"
+        "evidence_kind": "rtc_exact",
+        "source_caveats": [
+          {
+            "kind": "closed",
+            "source": "body",
+            "excerpt": "llapse to one payment; repeat claims are closed. ## Rules - One claim per contributor. One SaaS"
+          }
+        ]
       }
     },
     {
@@ -8295,6 +8305,6 @@
       }
     }
   ],
-  "updated_at": "2026-10-04T23:15:40.582697+00:00",
+  "updated_at": "2026-10-05T00:19:02.092771+00:00",
   "total_count": 266
 }
