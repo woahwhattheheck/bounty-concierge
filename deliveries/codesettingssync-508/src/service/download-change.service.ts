@@ -56,7 +56,7 @@ export class DownloadChangeService {
   }
 
   public static ResolveFilePath(userFolder: string, fileName: string): string {
-    let parts: string[] = null;
+    let parts: string[] | null = null;
 
     if (fileName.indexOf("|") > -1) {
       parts = fileName.split("|");
