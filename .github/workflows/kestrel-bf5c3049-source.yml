@@ -1,0 +1,29 @@
+name: Pinned source export BF5C3049
+on:
+  push:
+    branches: [work/kestrel-bf5c3049-source]
+    paths: [.github/workflows/kestrel-bf5c3049-source.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 96188942db130bdd55e43bb7a75572b2264c8f49
+          persist-credentials: false
+      - name: Archive tracked source only
+        run: |
+          test "$(git rev-parse HEAD)" = 96188942db130bdd55e43bb7a75572b2264c8f49
+          mkdir -p export
+          git archive --format=tar.gz --output=export/source.tar.gz HEAD
+          sha256sum export/source.tar.gz > export/SHA256SUMS
+          printf '%s\n' 96188942db130bdd55e43bb7a75572b2264c8f49 > export/SOURCE_COMMIT
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-bf5c3049
+          path: export/
+          retention-days: 1
+          if-no-files-found: error
