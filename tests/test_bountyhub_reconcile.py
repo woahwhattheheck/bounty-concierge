@@ -93,10 +93,16 @@ class BountyHubReconcileTest(unittest.TestCase):
             shared = shard.shard(result, "worker", 1)
             self.assertEqual(shared["github_reconciliation_status"], "fresh")
             self.assertEqual([item["work_key"] for item in shared["work"]], ["github:owner/repo#2"])
+            indexed = shard.shard_indexed(result, 0, 1)
+            self.assertEqual(indexed["github_reconciliation_status"], "fresh")
+            self.assertEqual([item["work_key"] for item in indexed["work"]], ["github:owner/repo#2"])
             clock.now.return_value = reconcile.timestamp("2026-10-04T23:16:00Z")
             shared = shard.shard(result, "worker", 1)
             self.assertEqual(shared["github_reconciliation_status"], "stale")
             self.assertEqual(shared["work"], [])
+            indexed = shard.shard_indexed(result, 0, 1)
+            self.assertEqual(indexed["github_reconciliation_status"], "stale")
+            self.assertEqual(indexed["work"], [])
             self.assertEqual(len(result["rows"]), 3)
 
     def test_cli_output_binds_captures_and_leaves_them_unchanged(self):
