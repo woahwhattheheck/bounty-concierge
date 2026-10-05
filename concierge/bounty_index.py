@@ -153,7 +153,7 @@ def _share_quota_deadline(cooldown, report, source, remaining, retry_after, rese
 
 
 def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=None,
-                          cooldown_path=None):
+                          cooldown_path=None, reserve_requests=0):
     """Read live sources once, retaining completion and safe error information.
 
     No retries or sleeps are performed. A rate-limit response, or exhausted
@@ -174,9 +174,17 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
     file and credential. Every page checks the store; a store error defers HTTP
     rather than silently bypassing it. No waiting or automatic retries are added.
     Pass False to disable an environment-configured cooldown for this call.
+
+    ``reserve_requests`` is an opt-in primary-quota floor. When a successful
+    response reports a positive X-RateLimit-Remaining value at or below the
+    floor, the current response is retained and later provider reads are
+    deferred. This is reported as reserved headroom, not as provider throttling;
+    no cooldown, sleep, or automatic retry is introduced.
     """
     if type(max_pages) is not int or not 1 <= max_pages <= 1000:
         raise ValueError("max_pages must be an integer between 1 and 1000")
+    if type(reserve_requests) is not int or not 0 <= reserve_requests <= 10000:
+        raise ValueError("reserve_requests must be an integer between 0 and 10000")
     configured = REPOS if repos is None else repos
     if isinstance(configured, (str, bytes)):
         raise ValueError("repos must be a collection of owner/repo strings")
@@ -209,7 +217,10 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                                "stored_pages": 0, "errors": 0}
     report = {"started_at": datetime.now(timezone.utc).isoformat(), "complete": False,
               "rate_limited": False, "retry_after_seconds": None,
-              "rate_limit_reset_at": None, "repositories": sources, "bounties": []}
+              "rate_limit_reset_at": None, "rate_limit_remaining": None,
+              "request_headroom_reserved": False,
+              "request_headroom_floor": reserve_requests,
+              "repositories": sources, "bounties": []}
 
     if cooldown_path is None:
         cooldown_path = os.environ.get("CONCIERGE_BOUNTY_COOLDOWN")
@@ -225,6 +236,9 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                 continue
             if report["rate_limited"]:
                 source["status"] = "NOT_ATTEMPTED_RATE_LIMIT"
+                continue
+            if report["request_headroom_reserved"]:
+                source["status"] = "NOT_ATTEMPTED_HEADROOM_RESERVED"
                 continue
             if authentication_failed:
                 source["status"] = "NOT_ATTEMPTED_AUTH_ERROR"
@@ -274,6 +288,12 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                             error = {}
                         message = error.get("message", "") if isinstance(error, dict) else ""
                         throttled = isinstance(message, str) and "rate limit" in message.casefold()
+                    reserve_headroom = (
+                        reserve_requests > 0
+                        and status in (200, 304)
+                        and remaining is not None
+                        and 0 < remaining <= reserve_requests
+                    )
                     if throttled or remaining == 0:
                         _share_quota_deadline(
                             cooldown, report, source, remaining, retry_after, reset_at,
@@ -287,6 +307,12 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                     if remaining == 0:
                         report.update(rate_limited=True, retry_after_seconds=retry_after,
                                       rate_limit_reset_at=reset_at)
+                    elif reserve_headroom:
+                        report.update(
+                            request_headroom_reserved=True,
+                            rate_limit_remaining=remaining,
+                            rate_limit_reset_at=reset_at,
+                        )
                     if hook_http_error or status not in (200, 304):
                         if status == 401 and "Authorization" in headers:
                             authentication_failed = True
@@ -360,6 +386,9 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                     if not has_next:
                         source["status"] = "COMPLETE"
                         break
+                    if report["request_headroom_reserved"]:
+                        source["status"] = "HEADROOM_RESERVED_BEFORE_NEXT_PAGE"
+                        break
                     if report["rate_limited"]:
                         source["status"] = "RATE_LIMITED_BEFORE_NEXT_PAGE"
                         break
@@ -383,15 +412,18 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
     return report
 
 
-def fetch_bounties(repos=None, token=None, *, cache_dir=None, cooldown_path=None):
+def fetch_bounties(repos=None, token=None, *, cache_dir=None, cooldown_path=None,
+                     reserve_requests=0):
     """Return the familiar bounty list only after all sources finish.
 
     Incomplete reads raise BountyFetchIncompleteError rather than impersonating
     an empty/full queue. The existing browse CLI handles this as a nonzero exit.
     Call fetch_bounties_report() for deliberately partial diagnostic results.
     """
-    report = fetch_bounties_report(repos=repos, token=token, cache_dir=cache_dir,
-                                   cooldown_path=cooldown_path)
+    report = fetch_bounties_report(
+        repos=repos, token=token, cache_dir=cache_dir,
+        cooldown_path=cooldown_path, reserve_requests=reserve_requests,
+    )
     if not report["complete"]:
         raise BountyFetchIncompleteError(report)
     return report["bounties"]
@@ -519,10 +551,13 @@ def tag_skills(title, body):
 # Aggregation & formatting
 # ---------------------------------------------------------------------------
 
-def aggregate(repos=None, token=None, *, cache_dir=None, cooldown_path=None):
+def aggregate(repos=None, token=None, *, cache_dir=None, cooldown_path=None,
+              reserve_requests=0):
     """Return a complete sorted index, with explicit source traversal metadata."""
-    report = fetch_bounties_report(repos=repos, token=token, cache_dir=cache_dir,
-                                   cooldown_path=cooldown_path)
+    report = fetch_bounties_report(
+        repos=repos, token=token, cache_dir=cache_dir,
+        cooldown_path=cooldown_path, reserve_requests=reserve_requests,
+    )
     if not report["complete"]:
         raise BountyFetchIncompleteError(report)
     report["bounties"].sort(key=lambda b: b["reward_rtc"], reverse=True)
