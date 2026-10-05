@@ -96,6 +96,33 @@ class BountyHubShardTest(unittest.TestCase):
             for slot in result["slots"]
         ))
 
+    def test_balanced_wave_plan_uses_only_needed_slots_with_near_even_loads(self):
+        source = snapshot()
+        source["rows"] = [
+            {"listing_id": str(index), "work_key": f"github:owner/repo#{index}", "catalog_candidate": True}
+            for index in range(7)
+        ]
+
+        result = shard.plan_indexed(source, 3, "balanced-active-v1")
+        assigned = [
+            item["work_key"]
+            for slot in result["slots"]
+            for item in slot["work"]
+        ]
+
+        self.assertEqual(result["algorithm"], "balanced-active-v1")
+        self.assertEqual(result["active_worker_indices"], [0, 1, 2])
+        self.assertEqual(result["slot_work_key_counts"], [3, 2, 2])
+        self.assertEqual(len(assigned), len(set(assigned)))
+        self.assertEqual(len(assigned), 7)
+
+    def test_balanced_wave_plan_does_not_activate_more_workers_than_candidates(self):
+        result = shard.plan_indexed(snapshot(), 8, "balanced-active-v1")
+
+        self.assertEqual(result["active_worker_indices"], [0, 1])
+        self.assertEqual(result["slot_work_key_counts"], [1, 1, 0, 0, 0, 0, 0, 0])
+        self.assertEqual(result["idle_worker_count"], 6)
+
     def test_rejects_unrecognized_snapshots_and_invalid_worker_count_or_index(self):
         with self.assertRaises(shard.ShardError):
             shard.load_snapshot(json.dumps({"data": []}).encode())
@@ -105,6 +132,8 @@ class BountyHubShardTest(unittest.TestCase):
             shard.shard_indexed(snapshot(), 4, 4)
         with self.assertRaises(shard.ShardError):
             shard.shard_indexed(snapshot(), -1, 4)
+        with self.assertRaises(shard.ShardError):
+            shard.plan_indexed(snapshot(), 4, "unknown")
 
 
 if __name__ == "__main__":
