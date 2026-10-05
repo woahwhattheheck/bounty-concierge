@@ -52,7 +52,7 @@ def status_snapshot(
             "note": "Local shared state only; no GitHub request was made.",
         }
 
-    cooldown, quota = GitHubCooldown(store_path, token).deadlines()
+    cooldown, quota = GitHubCooldown(store_path, token).deadlines(read_only=True)
     provider_status = _deadline_status(cooldown, now)
     quota_status = _deadline_status(quota, now)
     active_deadlines = [

@@ -27,7 +27,12 @@ python -m concierge.github_cooldown_status \
 The command reports provider cooldown and proactive quota reservation
 separately, plus the effective remaining wait. Expired rows remain visible with
 `active=false` and zero remaining seconds. A missing file reports `ABSENT`
-and is not created.
+and is not created. An existing database is opened with SQLite `mode=ro`; the
+status path never runs the worker's schema-initialization statements. An empty
+or incomplete database is reported as unavailable rather than initialized. If
+the file disappears between the initial observation and connection, the command
+fails without recreating it. Normal worker reads and deadline updates retain
+their existing behavior.
 
 Output excludes credential values, scope fingerprints, the selected environment
 variable name, and the private SQLite path. Existing malformed or unavailable
@@ -35,3 +40,6 @@ state fails closed with a generic diagnostic and exit status 2.
 
 This is local coordination evidence, not a fresh GitHub quota reading. Separate
 containers that do not share the same SQLite file remain independent.
+
+The passive connection uses Python's documented
+[read-only SQLite URI mode](https://docs.python.org/3.10/library/sqlite3.html).
