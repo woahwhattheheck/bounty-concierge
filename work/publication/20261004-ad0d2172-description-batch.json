@@ -512,7 +512,7 @@
         "outcome": "provider_403",
         "readback": "unchanged at b64bb147"
       },
-      "publication_status": "prepared; original upstream historical36-case body remains unchanged",
+      "publication_status": "not attempted: retained carrier stopped on PH263 classifier availability failure",
       "native_attempts_after_preparation": [
         {
           "observed_at": "2026-10-05T00:08:27.116Z",
@@ -565,7 +565,34 @@
       ],
       "original_custody": "Existing PH263-BODY-650FFCAC-2050-20261004 description handoff; prior body file retained as exact provenance.",
       "custody_note": "Named operation is explicitly retained in the original Slack handoff heading; no new operation or handoff URL is created.",
-      "publication_status": "prepared; upstream historical12-case body unchanged at current source guard"
+      "publication_status": "retryable_classifier_unavailable; same-operation retry held while current shared REST quota is exhausted",
+      "author_route_attempts_20261005_75a1": [
+        {
+          "observed_at_utc": "2026-10-05T00:46:05.4504393Z",
+          "operation_id": "PH263-BODY-650FFCAC-2050-20261004",
+          "run_url": "https://github.com/woahwhattheheck/commons/actions/runs/37248326001",
+          "job_id": 111570601711,
+          "actor_id": 293286387,
+          "auth_transport": "rest",
+          "publication_attempted": true,
+          "publisher_http_status": 503,
+          "publisher_allow": false,
+          "publisher_error": "CLASSIFIER_UNAVAILABLE",
+          "publisher_reason": "model_unavailable",
+          "publisher_retryable": true,
+          "retry_after_seconds": 60,
+          "readback_head": "9f17292fab787513ee2c09e2f43787bee17299ab",
+          "desired_body_observed": false,
+          "preimage_unchanged": true
+        }
+      ],
+      "retry_hold": {
+        "reason": "new shared REST core exhaustion observed by retained Vaultquest219 caller",
+        "observed_at_utc": "2026-10-05T00:49:37.9752478Z",
+        "rate_reset": 1791163936,
+        "proof_scope": "same account binding observation in another retained lane; not a PH263 provider receipt",
+        "no_retry_after_this_PH263_attempt": true
+      }
     }
   ]
 }
