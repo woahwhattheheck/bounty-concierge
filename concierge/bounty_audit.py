@@ -11,10 +11,13 @@ from __future__ import annotations
 import argparse
 from collections.abc import Mapping
 import json
+import math
+import os
 from pathlib import Path
 import re
 import sys
 from copy import deepcopy
+from time import time
 from typing import Any
 
 import requests
@@ -22,6 +25,7 @@ import requests
 from concierge.config import GITHUB_TOKEN
 from concierge.bounty_contract_common import BountyContractEvidenceError
 from concierge.bounty_contract_live import _comment_page_has_next
+from concierge.github_cooldown import CooldownStateError, GitHubCooldown
 from concierge.submission_packet import validate_submission_target
 
 
@@ -233,6 +237,58 @@ def _is_search_rate_limit(exc: BountyAuditError) -> bool:
     return isinstance(exc.provider_message, str) and "rate limit" in exc.provider_message.casefold()
 
 
+def _search_cooldown(token: str | None) -> GitHubCooldown | None:
+    """Return the optional shared Search-only cooldown configured for this worker."""
+    path = os.environ.get("CONCIERGE_BOUNTY_COOLDOWN")
+    if not path:
+        return None
+    try:
+        return GitHubCooldown(path, token, cooldown_scope="search")
+    except ValueError as exc:
+        raise BountyAuditError("shared GitHub Search cooldown configuration invalid") from exc
+
+
+def _search_cooldown_active(cooldown: GitHubCooldown | None) -> bool:
+    if cooldown is None:
+        return False
+    try:
+        deadline = cooldown.deadline()
+    except CooldownStateError as exc:
+        raise BountyAuditError("shared GitHub Search cooldown state unavailable") from exc
+    return deadline is not None and deadline > time()
+
+
+def _record_search_cooldown(
+    cooldown: GitHubCooldown | None, exc: BountyAuditError
+) -> None:
+    """Share only the demonstrated Search provider delay; never retry here."""
+    if cooldown is None:
+        return
+    now = time()
+    deadline = None
+    if exc.retry_after is not None:
+        try:
+            delay = float(exc.retry_after.strip())
+        except ValueError:
+            delay = None
+        if delay is not None and math.isfinite(delay) and delay >= 0:
+            deadline = now + delay
+    if deadline is None and exc.rate_limit_reset is not None:
+        try:
+            reset = float(exc.rate_limit_reset.strip())
+        except ValueError:
+            reset = None
+        if reset is not None and math.isfinite(reset) and reset > now:
+            deadline = reset
+    try:
+        if deadline is None:
+            cooldown.extend_unknown_secondary()
+        else:
+            cooldown.extend(deadline)
+    except CooldownStateError as cooldown_exc:
+        raise BountyAuditError("shared GitHub Search cooldown state unavailable") from cooldown_exc
+
+
 def _timeline_linked_pr_candidates(
     session: Any,
     repo: str,
@@ -335,6 +391,7 @@ def audit_bounty(
 
     token = token or GITHUB_TOKEN
     headers = _headers(token)
+    search_cooldown = _search_cooldown(token)
     issue_url = f"https://api.github.com/repos/{repo}/issues/{number}"
     source_identity = (repo.casefold(), number)
     if _source_issue_cache is not None and source_identity in _source_issue_cache:
@@ -371,6 +428,18 @@ def audit_bounty(
         repository_candidates: list[dict[str, Any]] = []
         repository_truncated = False
         search_rate_limited = False
+        if _search_cooldown_active(search_cooldown):
+            timeline_candidates, timeline_truncated = _timeline_linked_pr_candidates(
+                session,
+                repo,
+                number,
+                headers=headers,
+                max_pages=max_pages,
+                allowed_repositories=set(search_repos),
+            )
+            candidates.extend(timeline_candidates)
+            search_truncated = search_truncated or timeline_truncated
+            break
         for page in range(1, max_pages + 1):
             try:
                 raw_payload = _get_json(
@@ -382,6 +451,7 @@ def audit_bounty(
             except BountyAuditError as exc:
                 if not _is_search_rate_limit(exc):
                     raise
+                _record_search_cooldown(search_cooldown, exc)
                 timeline_candidates, timeline_truncated = _timeline_linked_pr_candidates(
                     session,
                     repo,
