@@ -1,0 +1,7 @@
+__pycache__/
+.pytest_cache/
+.env
+.env.*
+evidence/video/
+evidence/*.png
+evidence/*.mp4

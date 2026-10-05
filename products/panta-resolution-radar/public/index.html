@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A read-only Panta market resolution dashboard with explicit data provenance and portable calendar exports.">
+  <meta name="theme-color" content="#11284c"><title>Resolution Radar · Powered by Panta</title>
+  <link rel="stylesheet" href="/styles.css"><script type="module" src="/app.mjs"></script>
+</head>
+<body>
+  <a class="skip" href="#markets">Skip to markets</a>
+  <header class="topbar"><a class="brand" href="/" aria-label="Resolution Radar home"><span class="mark" aria-hidden="true">R</span><span>Resolution <strong>Radar</strong></span></a><span class="powered">Powered by <a href="https://panta.market" target="_blank" rel="noopener noreferrer">Panta ↗</a></span></header>
+  <main>
+    <section class="hero" aria-labelledby="headline">
+      <div><p class="eyebrow">THE RESOLUTION DESK</p><h1 id="headline">Know what<br> resolves next.</h1><p class="lede">One view of Panta’s market schedules. Spot dates that need attention, keep a watchlist, and take the next deadline with you.</p></div>
+      <div class="connection"><span id="mode-badge" class="mode-badge">CONNECTING</span><label for="mode">Data source</label><select id="mode"><option value="demo">Demonstration · synthetic markets</option><option value="live">Panta live catalog</option></select><p id="connection-note">Checking server configuration…</p><button type="button" class="primary" id="refresh">Refresh catalog <span aria-hidden="true">↻</span></button><span class="small">Read-only. No wallet connection or transactions.</span></div>
+    </section>
+    <div id="mode-notice" class="notice" role="status">No catalog has been loaded.</div>
+    <div id="error" class="error hidden" role="alert"></div>
+    <section class="metrics" aria-label="Loaded catalog summary">
+      <div class="metric"><span class="metric-label">Markets loaded</span><strong id="count-loaded">—</strong><span class="metric-foot">This catalog view only</span></div>
+      <button class="metric" type="button" data-timing="due"><span class="metric-label"><i class="dot due" aria-hidden="true"></i>Schedule passed</span><strong id="count-due">—</strong><span class="metric-foot">Unresolved in this snapshot →</span></button>
+      <button class="metric" type="button" data-timing="soon"><span class="metric-label"><i class="dot soon" aria-hidden="true"></i>Next 24 hours</span><strong id="count-soon">—</strong><span class="metric-foot">Upcoming resolution schedule →</span></button>
+      <button class="metric" type="button" data-timing="unscheduled"><span class="metric-label"><i class="dot unscheduled" aria-hidden="true"></i>No resolution time</span><strong id="count-unscheduled">—</strong><span class="metric-foot">Missing data, not a zero date →</span></button>
+    </section>
+    <section class="workspace" aria-label="Market workspace">
+      <div class="catalog" id="markets" tabindex="-1">
+        <div class="section-top"><div class="tabs" role="group" aria-label="Market view"><button type="button" id="all-tab" class="tab active" aria-pressed="true">All markets</button><button type="button" id="watch-tab" class="tab" aria-pressed="false">Watched <span id="watch-count">0</span></button></div><span id="visible-count" class="small" aria-live="polite">Loading…</span></div>
+        <div class="filters">
+          <label class="search"><span>Search catalog</span><input id="search" type="search" placeholder="Search questions, categories, IDs…" autocomplete="off"></label>
+          <label><span>Category</span><select id="category"><option value="">All categories</option></select></label>
+          <label><span>Phase</span><select id="phase"><option value="">All phases</option><option>primary</option><option>secondary</option><option>resolved</option><option>cancelled</option></select></label>
+          <label><span>Resolution schedule</span><select id="timing"><option value="">Any schedule</option><option value="due">Schedule passed</option><option value="soon">Next 24 hours</option><option value="unscheduled">Time missing</option><option value="later">Later</option><option value="resolved">Resolved</option><option value="cancelled">Cancelled</option><option value="unknown">Unknown phase</option></select></label>
+        </div>
+        <div class="list-caption"><span>QUESTION / CATEGORY</span><span>RESOLUTION SCHEDULE · UTC</span></div>
+        <div id="market-list" aria-live="polite"></div>
+        <div id="empty" class="empty hidden"><h3>No matching markets</h3><p>Try another filter, load another page, or add a market to your watchlist.</p><button type="button" class="secondary" id="clear-filters">Clear filters</button></div>
+        <button id="load-more" type="button" class="secondary load-more hidden">Load next catalog page</button>
+        <p id="coverage" class="coverage">Waiting for a catalog response.</p>
+      </div>
+      <aside class="detail" aria-label="Market detail">
+        <div class="detail-kicker">INSPECTION DESK <span aria-hidden="true">↗</span></div>
+        <div id="detail-empty"><div class="radar-glyph" aria-hidden="true"><span></span></div><h2>A question.<br> Its source. Its schedule.</h2><p>Select a market to inspect its catalog record. Spot prices are fetched only when you open a detail, and may be unavailable.</p><div class="principle"><strong>A schedule is not a settlement.</strong><p>“Schedule passed” means the catalog’s time is in the past and its record is not marked resolved. It does not establish a failed settlement or an outcome.</p></div></div>
+        <div id="detail-content" class="hidden" aria-live="polite"></div>
+      </aside>
+    </section>
+    <section class="export-strip"><div><p class="eyebrow">TAKE THE NEXT STEP</p><h2>Keep the context, not just the date.</h2><p>Export the filtered rows with source timestamps, or add their future resolution schedules to a calendar.</p></div><div class="export-actions"><button type="button" id="export-json" class="secondary">Snapshot .json <span aria-hidden="true">↓</span></button><button type="button" id="export-ics" class="primary">Calendar .ics <span aria-hidden="true">↓</span></button></div></section>
+    <p id="export-status" class="small" role="status"></p>
+  </main>
+  <footer><span>Resolution Radar <span aria-hidden="true">/</span> Powered by Panta</span><span>Manual refresh · UTC schedules · No automated trading</span><a href="https://docs.panta.market/api-reference/markets/list" target="_blank" rel="noopener noreferrer">API documentation ↗</a></footer>
+</body>
+</html>
