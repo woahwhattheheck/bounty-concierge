@@ -104,6 +104,7 @@ class _BatchSession:
 
     def __init__(
         self, session: Any, max_requests: int, cooldown: GitHubCooldown | None = None,
+        reserve_requests: int = 0,
     ) -> None:
         self.session = session
         self.max_requests = max_requests
@@ -117,7 +118,11 @@ class _BatchSession:
         self.request_origin_url: str | None = None
         self.issue_request = False
         self.cooldown = cooldown
+        self.reserve_requests = reserve_requests
+        self.request_headroom_reserved = False
+        self.rate_limit_remaining: int | None = None
         self.shared_cooldown_deferred = False
+        self.shared_headroom_deferred = False
         self.shared_unknown_backoff_seconds: int | None = None
         self.cooldown_state_error = False
 
@@ -133,12 +138,19 @@ class _BatchSession:
         if self.rate_limited:
             self.failure = {"code": "RATE_LIMITED"}
             raise requests.RequestException("provider quota exhausted; remaining reads deferred")
+        if self.request_headroom_reserved:
+            self.failure = {"code": "HEADROOM_RESERVED"}
+            raise requests.RequestException("provider request headroom reserved; remaining reads deferred")
         if self.request_count >= self.max_requests:
             self.failure = {"code": "REQUEST_LIMIT"}
             raise requests.RequestException("batch request budget reached; remaining reads deferred")
         if self.cooldown is not None:
             try:
-                deadline = self.cooldown.deadline()
+                if self.reserve_requests > 0:
+                    deadline, reserve_deadline = self.cooldown.deadlines()
+                else:
+                    deadline = self.cooldown.deadline()
+                    reserve_deadline = None
             except CooldownStateError:
                 self.cooldown_state_error = True
                 self.failure = {"code": "COOLDOWN_STATE_ERROR"}
@@ -150,6 +162,14 @@ class _BatchSession:
                 self.retry_after_seconds = math.ceil(deadline - now)
                 self.failure = {"code": "RATE_LIMITED"}
                 raise requests.RequestException("shared provider cooldown active; reads deferred")
+            if reserve_deadline is not None and reserve_deadline > now:
+                self.request_headroom_reserved = True
+                self.shared_headroom_deferred = True
+                self.rate_limit_reset_at = math.ceil(reserve_deadline)
+                self.failure = {"code": "HEADROOM_RESERVED"}
+                raise requests.RequestException(
+                    "shared provider request headroom reserved; remaining reads deferred"
+                )
         self.request_count += 1
         # Keep endpoint identity private for issue-local failure isolation.
         self.request_url = target if isinstance(target, str) else getattr(target, "url", None)
@@ -239,6 +259,7 @@ class _BatchSession:
         status = response.status_code
         headers = response.headers
         remaining = _integer_header(headers, "X-RateLimit-Remaining")
+        reset_at = _integer_header(headers, "X-RateLimit-Reset")
         retry_after = _integer_header(headers, "Retry-After")
         retry_at = None
         raw_retry = headers.get("Retry-After")
@@ -263,7 +284,7 @@ class _BatchSession:
             self.rate_limited = True
             self.retry_after_seconds = retry_after
             self.retry_after_at = retry_at
-            self.rate_limit_reset_at = _integer_header(headers, "X-RateLimit-Reset")
+            self.rate_limit_reset_at = reset_at
         unknown_secondary = (
             throttled
             and remaining != 0
@@ -292,6 +313,24 @@ class _BatchSession:
                 # is already stopped; report that sharing its stop failed.
                 self.cooldown_state_error = True
 
+        reserve_headroom = (
+            self.reserve_requests > 0
+            and status in (200, 304)
+            and remaining is not None
+            and 0 < remaining <= self.reserve_requests
+        )
+        if reserve_headroom:
+            self.request_headroom_reserved = True
+            self.rate_limit_remaining = remaining
+            self.rate_limit_reset_at = reset_at
+            if self.cooldown is not None and reset_at is not None and reset_at > time():
+                try:
+                    self.cooldown.reserve_quota_until(float(reset_at))
+                except CooldownStateError:
+                    # The current successful response remains usable; report only
+                    # that sibling deferral could not be shared.
+                    self.cooldown_state_error = True
+
 
 def _write_json(path: Path, value: Any) -> None:
     # Finish serialization before creating the leaf so invalid JSON leaves no file.
@@ -319,6 +358,7 @@ def collect_batch(
     max_issues: int = 25,
     max_pages: int = 10,
     max_requests: int = 100,
+    reserve_requests: int = 0,
     saturation_threshold: int = 4,
     operator_login: str | None = None,
     cooldown_file: str | Path | None = None,
@@ -330,11 +370,15 @@ def collect_batch(
     automatic retries, sleeps, provider writes, or offline freshness changes.
     An optional cooldown_file shares observed quota deadlines across invocations;
     omitting it preserves per-batch-only pacing and performs no state-file I/O.
+    reserve_requests is an opt-in positive remaining-request floor. A successful
+    response at or below that floor returns normally, then later GETs are deferred.
     """
     unique, duplicate_count = _shortlist(candidates)
     _positive(max_issues, "max_issues", _MAX_CANDIDATES)
     _positive(max_pages, "max_pages", 1000)
     _positive(max_requests, "max_requests", 10000)
+    if type(reserve_requests) is not int or not 0 <= reserve_requests <= 10000:
+        raise ValueError("reserve_requests must be an integer between 0 and 10000")
     _positive(saturation_threshold, "saturation_threshold", _MAX_CANDIDATES)
     if operator_login is not None and (
         not isinstance(operator_login, str) or not operator_login.strip()
@@ -357,7 +401,9 @@ def collect_batch(
     _write_json(output / "shortlist.json", {"candidates": unique})
     owned = session is None
     provider = requests.Session() if owned else session
-    transport = _BatchSession(provider, max_requests, cooldown)
+    transport = _BatchSession(
+        provider, max_requests, cooldown, reserve_requests=reserve_requests,
+    )
     started = _now()
     timer = monotonic()
     captures: list[dict[str, Any]] = []
@@ -369,6 +415,9 @@ def collect_batch(
         for row in unique[:max_issues]:
             if transport.rate_limited:
                 stop_reason = "RATE_LIMITED"
+                break
+            if transport.request_headroom_reserved:
+                stop_reason = "HEADROOM_RESERVED"
                 break
             if transport.request_count >= max_requests:
                 stop_reason = "REQUEST_LIMIT"
@@ -456,7 +505,12 @@ def collect_batch(
         if len(items) == len(unique):
             stop_reason = "ITEM_ERRORS"
         else:
-            stop_reason = "RATE_LIMITED" if transport.rate_limited else "ISSUE_LIMIT"
+            if transport.rate_limited:
+                stop_reason = "RATE_LIMITED"
+            elif transport.request_headroom_reserved:
+                stop_reason = "HEADROOM_RESERVED"
+            else:
+                stop_reason = "ISSUE_LIMIT"
     summary = {
         "schema": "bounty-preflight-batch/v1",
         "status": "COMPLETE" if complete else "PARTIAL",
@@ -474,9 +528,13 @@ def collect_batch(
         "remaining_count": len(remaining),
         "request_count": transport.request_count,
         "rate_limited": transport.rate_limited,
+        "request_headroom_reserved": transport.request_headroom_reserved,
+        "request_headroom_floor": reserve_requests,
+        "rate_limit_remaining": transport.rate_limit_remaining,
         "shared_cooldown": {
             "enabled": cooldown_file is not None,
             "deferred": transport.shared_cooldown_deferred,
+            "headroom_deferred": transport.shared_headroom_deferred,
             "state_error": transport.cooldown_state_error,
             "unknown_secondary_backoff_seconds": transport.shared_unknown_backoff_seconds,
         },
@@ -484,7 +542,7 @@ def collect_batch(
         "retry_after_at": transport.retry_after_at,
         "rate_limit_reset_at": transport.rate_limit_reset_at,
         "policy": {"max_issues": max_issues, "max_pages": max_pages,
-                   "max_requests": max_requests,
+                   "max_requests": max_requests, "reserve_requests": reserve_requests,
                    "saturation_threshold": saturation_threshold},
         "items": items,
         "supply_file": "supply.json",
@@ -508,6 +566,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-issues", type=int, default=25)
     parser.add_argument("--max-pages", type=int, default=10)
     parser.add_argument("--max-requests", type=int, default=100, help="Maximum actual GET attempts in this run")
+    parser.add_argument(
+        "--reserve-requests", type=int, default=0,
+        help=(
+            "Opt-in positive GitHub remaining-request floor; let the response "
+            "that reaches it return, then stop before the next GET"
+        ),
+    )
     parser.add_argument("--saturation-threshold", type=int, default=4)
     parser.add_argument("--operator-login", help="Optional identity assertion; existing authentication rules apply")
     parser.add_argument(
@@ -527,6 +592,7 @@ def main(argv: list[str] | None = None) -> int:
         result = collect_batch(
             json.loads(raw), args.output_dir, max_issues=args.max_issues,
             max_pages=args.max_pages, max_requests=args.max_requests,
+            reserve_requests=args.reserve_requests,
             saturation_threshold=args.saturation_threshold,
             operator_login=args.operator_login, cooldown_file=args.cooldown_file,
         )
