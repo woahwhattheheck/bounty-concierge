@@ -37,7 +37,17 @@
         "retry_after_seconds": null,
         "readback": "unchanged"
       },
-      "observed_body_sha256": "212d7c8bdd56b1d37ae07d78ba73316d5658c0d8564e9e8ce484f13f149c7adb"
+      "observed_body_sha256": "212d7c8bdd56b1d37ae07d78ba73316d5658c0d8564e9e8ce484f13f149c7adb",
+      "dispatch_operation_id": "RF296-DESCRIPTION-HANDOFF-1791114288640189",
+      "dispatch_identity": {
+        "kind": "newly_established_internal_first_dispatch",
+        "operation_id": "RF296-DESCRIPTION-HANDOFF-1791114288640189",
+        "derivation": "original repository/PR row identity plus retained handoff timestamp",
+        "original_handoff": "https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1791114288640189",
+        "established_at": "2026-10-05T00:25:22.298Z",
+        "provider_journal_id_recovered": false,
+        "scope": "same existing cumulative description handoff; no new queue or PR"
+      }
     },
     {
       "id": "PAYD630",
@@ -120,6 +130,16 @@
         "observed_head": "1ee074a9deb2512b18437664dc74830f1e7f6bc0",
         "authenticated_login": "woahwhattheheck",
         "authenticated_id": 293286387
+      },
+      "dispatch_operation_id": "RF297-DESCRIPTION-HANDOFF-1791118315728269",
+      "dispatch_identity": {
+        "kind": "newly_established_internal_first_dispatch",
+        "operation_id": "RF297-DESCRIPTION-HANDOFF-1791118315728269",
+        "derivation": "original repository/PR row identity plus retained handoff timestamp",
+        "original_handoff": "https://tokenjunkielabs.slack.com/archives/C0BVANHNB26/p1791118315728269",
+        "established_at": "2026-10-05T00:25:22.298Z",
+        "provider_journal_id_recovered": false,
+        "scope": "same existing cumulative description handoff; no new queue or PR"
       }
     },
     {
@@ -151,7 +171,17 @@
         "readback": "unchanged"
       },
       "body_sha256": "b8ae19e60090f34c2b221cce2e55278bee8149eb106d90bbd780a70daafabf00",
-      "observed_body_sha256": "88a9941c0bc1a15d8930dcdf5e3a96739e9b9a9fbd040fd42b445ab9902a1071"
+      "observed_body_sha256": "88a9941c0bc1a15d8930dcdf5e3a96739e9b9a9fbd040fd42b445ab9902a1071",
+      "dispatch_operation_id": "RF298-DESCRIPTION-HANDOFF-1791116285464369",
+      "dispatch_identity": {
+        "kind": "newly_established_internal_first_dispatch",
+        "operation_id": "RF298-DESCRIPTION-HANDOFF-1791116285464369",
+        "derivation": "original repository/PR row identity plus retained handoff timestamp",
+        "original_handoff": "https://tokenjunkielabs.slack.com/archives/C0BVANHNB26/p1791116285464369",
+        "established_at": "2026-10-05T00:25:22.298Z",
+        "provider_journal_id_recovered": false,
+        "scope": "same existing cumulative description handoff; no new queue or PR"
+      }
     },
     {
       "id": "RFB143",
@@ -208,7 +238,17 @@
           "expected_head": "38d34851ddfa7e66c4206db5d124aa720d32e9e9",
           "readback": "unchanged body and exact head"
         }
-      ]
+      ],
+      "dispatch_operation_id": "RFB143-DESCRIPTION-HANDOFF-1791023298173289",
+      "dispatch_identity": {
+        "kind": "newly_established_internal_first_dispatch",
+        "operation_id": "RFB143-DESCRIPTION-HANDOFF-1791023298173289",
+        "derivation": "original repository/PR row identity plus retained handoff timestamp",
+        "original_handoff": "https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1791023298173289",
+        "established_at": "2026-10-05T00:25:22.298Z",
+        "provider_journal_id_recovered": false,
+        "scope": "same existing cumulative description handoff; no new queue or PR"
+      }
     },
     {
       "id": "RFB145",
@@ -256,7 +296,17 @@
           "expected_head": "7403dd31e4ceaa05722aa91479a3fa6e43b6d24e",
           "readback": "unchanged body and exact head"
         }
-      ]
+      ],
+      "dispatch_operation_id": "RFB145-DESCRIPTION-HANDOFF-1791065626827229",
+      "dispatch_identity": {
+        "kind": "newly_established_internal_first_dispatch",
+        "operation_id": "RFB145-DESCRIPTION-HANDOFF-1791065626827229",
+        "derivation": "original repository/PR row identity plus retained handoff timestamp",
+        "original_handoff": "https://tokenjunkielabs.slack.com/archives/C0BVANHNB26/p1791065626827229",
+        "established_at": "2026-10-05T00:25:22.298Z",
+        "provider_journal_id_recovered": false,
+        "scope": "same existing cumulative description handoff; no new queue or PR"
+      }
     },
     {
       "id": "PH259",
@@ -311,7 +361,17 @@
           "expected_head": "4dbbfb40111edbbd00d4d08a84a46232b8f85327",
           "readback": "unchanged body and exact head"
         }
-      ]
+      ],
+      "dispatch_operation_id": "PH259-DESCRIPTION-HANDOFF-1791119892522099",
+      "dispatch_identity": {
+        "kind": "newly_established_internal_first_dispatch",
+        "operation_id": "PH259-DESCRIPTION-HANDOFF-1791119892522099",
+        "derivation": "original repository/PR row identity plus retained handoff timestamp",
+        "original_handoff": "https://tokenjunkielabs.slack.com/archives/C0BVANHNB26/p1791119892522099",
+        "established_at": "2026-10-05T00:25:22.298Z",
+        "provider_journal_id_recovered": false,
+        "scope": "same existing cumulative description handoff; no new queue or PR"
+      }
     },
     {
       "id": "PH263",
