@@ -67,7 +67,7 @@ describe("DownloadChangeService", () => {
       "/user/settings.json",
       "remote",
       "local"
-    );
+    )!;
     const plan = DownloadChangeService.CreatePlan(
       [change],
       [extension("install-me")],
@@ -96,7 +96,7 @@ describe("DownloadChangeService", () => {
       "/user/settings.json",
       "remote",
       "local"
-    );
+    )!;
     const plan = DownloadChangeService.CreatePlan([change], [], []);
     let prompts = 0;
 
