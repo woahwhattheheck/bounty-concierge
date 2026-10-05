@@ -42,16 +42,39 @@ class BountyHubShardTest(unittest.TestCase):
         result = shard.shard(snapshot(), worker_key, 1)
 
         self.assertEqual(result["worker_slot"], 0)
+        self.assertEqual(result["assignment_mode"], "hashed-worker-key")
         self.assertEqual(result["candidate_work_key_count"], 2)
         self.assertEqual(result["assigned_work_key_count"], 2)
         self.assertEqual(len(result["work"][0]["listings"]), 2)
         self.assertNotIn(worker_key, json.dumps(result))
 
-    def test_rejects_unrecognized_snapshots_and_invalid_worker_count(self):
+    def test_explicit_worker_indexes_are_disjoint_and_cover_all_candidates(self):
+        results = [shard.shard_indexed(snapshot(), slot, 4) for slot in range(4)]
+        assigned = [
+            item["work_key"]
+            for result in results
+            for item in result["work"]
+        ]
+
+        self.assertCountEqual(assigned, ["github:owner/a#1", "github:owner/b#2"])
+        self.assertEqual(len(assigned), len(set(assigned)))
+        self.assertEqual(
+            [result["worker_index"] for result in results],
+            [0, 1, 2, 3],
+        )
+        self.assertTrue(
+            all(result["assignment_mode"] == "explicit-worker-index" for result in results)
+        )
+
+    def test_rejects_unrecognized_snapshots_and_invalid_worker_count_or_index(self):
         with self.assertRaises(shard.ShardError):
             shard.load_snapshot(json.dumps({"data": []}).encode())
         with self.assertRaises(shard.ShardError):
             shard.shard(snapshot(), "worker", 0)
+        with self.assertRaises(shard.ShardError):
+            shard.shard_indexed(snapshot(), 4, 4)
+        with self.assertRaises(shard.ShardError):
+            shard.shard_indexed(snapshot(), -1, 4)
 
 
 if __name__ == "__main__":
