@@ -136,3 +136,56 @@ def test_active_search_cooldown_skips_search_and_uses_timeline(tmp_path, monkeyp
     assert "https://api.github.com/search/issues" not in session.calls
     assert "https://api.github.com/repos/example/project/issues/1/timeline" in session.calls
 
+def test_batch_secondary_limit_reuses_timeline_fallback_without_shared_cooldown(monkeypatch):
+    monkeypatch.delenv("CONCIERGE_BOUNTY_COOLDOWN", raising=False)
+    first_issue = {
+        "number": 1,
+        "state": "open",
+        "html_url": "https://github.com/example/project/issues/1",
+    }
+    second_issue = {
+        "number": 2,
+        "state": "open",
+        "html_url": "https://github.com/example/project/issues/2",
+    }
+    limited = response(
+        403,
+        headers={"Retry-After": "60", "X-RateLimit-Remaining": "10"},
+        payload={"message": "You have exceeded a secondary rate limit."},
+    )
+    session = ReplaySession([
+        response(payload=first_issue),
+        limited,
+        response(payload=[]),
+        response(payload=[]),
+        response(payload=second_issue),
+        response(payload=[]),
+        response(payload=[]),
+    ])
+
+    rows = bounty_audit.audit_bounties(
+        [
+            {"repo": "example/project", "number": 1},
+            {"repo": "example/project", "number": 2},
+        ],
+        session=session,
+        max_pages=3,
+    )
+
+    assert len(rows) == 2
+    assert sum(url == "https://api.github.com/search/issues" for url in session.calls) == 1
+    assert "https://api.github.com/repos/example/project/issues/1/timeline" in session.calls
+    assert "https://api.github.com/repos/example/project/issues/2/timeline" in session.calls
+
+    fresh = ReplaySession([
+        response(payload=second_issue),
+        response(payload={"incomplete_results": False, "total_count": 0, "items": []}),
+        response(payload=[]),
+    ])
+    bounty_audit.audit_bounties(
+        [{"repo": "example/project", "number": 2}],
+        session=fresh,
+        max_pages=3,
+    )
+    assert sum(url == "https://api.github.com/search/issues" for url in fresh.calls) == 1
+
