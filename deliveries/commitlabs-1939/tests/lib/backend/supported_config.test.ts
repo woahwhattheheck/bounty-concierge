@@ -1,25 +1,31 @@
-import { beforeEach, describe, expect, it, jest } from '@virtual/jest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ValidatedEnv } from '@/lib/backend/env';
-
-let mockEnv: Partial<ValidatedEnv> = {};
-
-jest.mock('@/lib/backend/env', () => ({
-  getValidatedEnv: () => mockEnv,
+const envState = vi.hoisted(() => ({
+  current: {} as Record<string, string | undefined>,
 }));
 
-const { getSupportedConfig, RISK_PROFILES, SUPPORTED_ASSETS } = require('@/lib/backend/config');
+vi.mock('@/lib/backend/env', () => ({
+  getValidatedEnv: () => envState.current,
+}));
+
+import {
+  getSupportedConfig,
+  PARAMETER_BOUNDS,
+  RISK_PROFILES,
+  SUPPORTED_ASSETS,
+} from '@/lib/backend/config';
 
 describe('supported config overrides', () => {
   beforeEach(() => {
-    mockEnv = {};
+    envState.current = {};
   });
 
   it('returns the existing supported assets and risk profiles by default', () => {
-    const config = getSupportedConfig();
-
-    expect(config.assets).toEqual(SUPPORTED_ASSETS);
-    expect(config.riskProfiles).toEqual(RISK_PROFILES);
+    expect(getSupportedConfig()).toEqual({
+      assets: SUPPORTED_ASSETS,
+      riskProfiles: RISK_PROFILES,
+      bounds: PARAMETER_BOUNDS,
+    });
   });
 
   it('uses COMMITLABS_SUPPORTED_CONFIG_JSON assets and risk profiles when provided', () => {
@@ -34,13 +40,14 @@ describe('supported config overrides', () => {
       },
     ];
 
-    mockEnv = {
+    envState.current = {
       COMMITLABS_SUPPORTED_CONFIG_JSON: JSON.stringify({ assets, riskProfiles }),
     };
 
-    const config = getSupportedConfig();
-
-    expect(config.assets).toEqual(assets);
-    expect(config.riskProfiles).toEqual(riskProfiles);
+    expect(getSupportedConfig()).toEqual({
+      assets,
+      riskProfiles,
+      bounds: PARAMETER_BOUNDS,
+    });
   });
 });
