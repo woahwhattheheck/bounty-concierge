@@ -1,10 +1,17 @@
 diff --git a/src/sync.ts b/src/sync.ts
 --- a/src/sync.ts
 +++ b/src/sync.ts
-@@ -13,1 +13,2 @@
+@@ -11,5 +11,6 @@
+ import { LocalConfig } from "./models/localConfig.model";
+ import PragmaUtil from "./pragmaUtil";
  import { File, FileService } from "./service/file.service";
 +import { DownloadChangeService, IDownloadFileChange } from "./service/download-change.service";
-@@ -572,122 +573,187 @@
+ import { GitHubService } from "./service/github.service";
+ import { ExtensionInformation, PluginService } from "./service/plugin.service";
+@@ -569,128 +570,193 @@
+         }
+       });
+ 
 -      for (const file of updatedFiles) {
 -        let writeFile: boolean = false;
 -        let content: string = file.content;
@@ -314,14 +321,15 @@ diff --git a/src/sync.ts b/src/sync.ts
 +      }
 +
 +      await Promise.all(actionList);
-@@ -700,4 +766,4 @@
--          state.commons.ShowSummaryOutput(
--            false,
+       const settingsUpdated = await state.commons.SaveSettings(syncSetting);
+       const customSettingsUpdated = await state.commons.SetCustomSettings(
+         customSettings
+@@ -699,7 +765,7 @@
+         if (!syncSetting.quietSync) {
+           state.commons.ShowSummaryOutput(
+             false,
 -            updatedFiles,
--            deletedExtensions,
--            addedExtensions,
-+          state.commons.ShowSummaryOutput(
-+            false,
 +            changePlan.fileChanges.map(change => change.file),
-+            deletedExtensions,
-+            addedExtensions,
+             deletedExtensions,
+             addedExtensions,
+             null,
