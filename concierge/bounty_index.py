@@ -120,19 +120,25 @@ def _shared_cooldown_blocks(cooldown, report, source):
         return False
     try:
         deadline = cooldown.deadline()
+        reserve_deadline = cooldown.quota_reserve_deadline()
     except CooldownStateError:
         report["cooldown_state_error"] = True
         source["status"] = "COOLDOWN_STATE_ERROR"
         return True
     now = time()
-    if deadline is None or deadline <= now:
-        return False
-    report.update(rate_limited=True, retry_after_seconds=math.ceil(deadline - now),
-                  shared_cooldown_until_epoch=deadline)
-    source["status"] = ("RATE_LIMITED_BEFORE_NEXT_PAGE" if source["pages_fetched"]
-                        else "NOT_ATTEMPTED_SHARED_COOLDOWN")
-    return True
-
+    if deadline is not None and deadline > now:
+        report.update(rate_limited=True, retry_after_seconds=math.ceil(deadline - now),
+                      shared_cooldown_until_epoch=deadline)
+        source["status"] = ("RATE_LIMITED_BEFORE_NEXT_PAGE" if source["pages_fetched"]
+                            else "NOT_ATTEMPTED_SHARED_COOLDOWN")
+        return True
+    if reserve_deadline is not None and reserve_deadline > now:
+        report.update(quota_reserved=True, quota_reserve_reset_at=reserve_deadline,
+                      quota_reserve_source="shared")
+        source["status"] = ("QUOTA_RESERVED_BEFORE_NEXT_PAGE" if source["pages_fetched"]
+                            else "NOT_ATTEMPTED_QUOTA_RESERVE")
+        return True
+    return False
 
 def _share_quota_deadline(cooldown, report, source, remaining, retry_after, reset_at):
     """Publish a throttle without mistaking an unrelated primary reset for it."""
@@ -152,8 +158,25 @@ def _share_quota_deadline(cooldown, report, source, remaining, retry_after, rese
         source["cooldown_state_error"] = True
 
 
+def _share_quota_reserve(cooldown, report, source, remaining, reset_at):
+    """Reserve configured primary-quota headroom without reporting a provider throttle."""
+    report.update(
+        quota_reserved=True,
+        quota_remaining=remaining,
+        quota_reserve_reset_at=reset_at,
+        quota_reserve_source="response",
+    )
+    if cooldown is None or reset_at is None:
+        return
+    try:
+        cooldown.reserve_quota_until(float(reset_at))
+    except CooldownStateError:
+        report["cooldown_state_error"] = True
+        source["cooldown_state_error"] = True
+
+
 def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=None,
-                          cooldown_path=None):
+                          cooldown_path=None, quota_floor=None):
     """Read live sources once, retaining completion and safe error information.
 
     No retries or sleeps are performed. A rate-limit response, or exhausted
@@ -174,9 +197,26 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
     file and credential. Every page checks the store; a store error defers HTTP
     rather than silently bypassing it. No waiting or automatic retries are added.
     Pass False to disable an environment-configured cooldown for this call.
+
+    ``quota_floor`` (or CONCIERGE_BOUNTY_QUOTA_FLOOR) is an opt-in primary
+    remaining-request floor. Positive values preserve that many requests for
+    sibling work: the current successful page is retained, later discovery
+    reads stop, and a provider reset deadline is shared separately from actual
+    rate-limit state. Zero keeps the historical behavior.
     """
     if type(max_pages) is not int or not 1 <= max_pages <= 1000:
         raise ValueError("max_pages must be an integer between 1 and 1000")
+    if quota_floor is None:
+        raw_floor = os.environ.get("CONCIERGE_BOUNTY_QUOTA_FLOOR")
+        if raw_floor in (None, ""):
+            quota_floor = 0
+        elif (isinstance(raw_floor, str) and raw_floor.isascii()
+              and raw_floor.isdigit() and len(raw_floor) <= 7):
+            quota_floor = int(raw_floor)
+        else:
+            raise ValueError("quota_floor must be an integer between 0 and 1000000")
+    if type(quota_floor) is not int or not 0 <= quota_floor <= 1_000_000:
+        raise ValueError("quota_floor must be an integer between 0 and 1000000")
     configured = REPOS if repos is None else repos
     if isinstance(configured, (str, bytes)):
         raise ValueError("repos must be a collection of owner/repo strings")
@@ -209,7 +249,10 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                                "stored_pages": 0, "errors": 0}
     report = {"started_at": datetime.now(timezone.utc).isoformat(), "complete": False,
               "rate_limited": False, "retry_after_seconds": None,
-              "rate_limit_reset_at": None, "repositories": sources, "bounties": []}
+              "rate_limit_reset_at": None, "quota_reserved": False,
+              "quota_reserve_floor": quota_floor, "quota_remaining": None,
+              "quota_reserve_reset_at": None, "quota_reserve_source": None,
+              "repositories": sources, "bounties": []}
 
     if cooldown_path is None:
         cooldown_path = os.environ.get("CONCIERGE_BOUNTY_COOLDOWN")
@@ -225,6 +268,9 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                 continue
             if report["rate_limited"]:
                 source["status"] = "NOT_ATTEMPTED_RATE_LIMIT"
+                continue
+            if report["quota_reserved"]:
+                source["status"] = "NOT_ATTEMPTED_QUOTA_RESERVE"
                 continue
             if authentication_failed:
                 source["status"] = "NOT_ATTEMPTED_AUTH_ERROR"
@@ -283,6 +329,12 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                                       rate_limit_reset_at=reset_at)
                         source["status"] = "RATE_LIMITED"
                         break
+                    if (quota_floor > 0 and remaining is not None
+                            and 0 < remaining <= quota_floor and status in (200, 304)
+                            and not hook_http_error):
+                        _share_quota_reserve(
+                            cooldown, report, source, remaining, reset_at,
+                        )
                     # Exhaustion applies even when JSON or a cached validator is bad.
                     if remaining == 0:
                         report.update(rate_limited=True, retry_after_seconds=retry_after,
@@ -363,6 +415,9 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                     if report["rate_limited"]:
                         source["status"] = "RATE_LIMITED_BEFORE_NEXT_PAGE"
                         break
+                    if report["quota_reserved"]:
+                        source["status"] = "QUOTA_RESERVED_BEFORE_NEXT_PAGE"
+                        break
                     if page == max_pages:
                         source["status"] = "PAGE_LIMIT"
                 finally:
@@ -383,7 +438,8 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
     return report
 
 
-def fetch_bounties(repos=None, token=None, *, cache_dir=None, cooldown_path=None):
+def fetch_bounties(repos=None, token=None, *, cache_dir=None, cooldown_path=None,
+                    quota_floor=None):
     """Return the familiar bounty list only after all sources finish.
 
     Incomplete reads raise BountyFetchIncompleteError rather than impersonating
@@ -391,7 +447,7 @@ def fetch_bounties(repos=None, token=None, *, cache_dir=None, cooldown_path=None
     Call fetch_bounties_report() for deliberately partial diagnostic results.
     """
     report = fetch_bounties_report(repos=repos, token=token, cache_dir=cache_dir,
-                                   cooldown_path=cooldown_path)
+                                   cooldown_path=cooldown_path, quota_floor=quota_floor)
     if not report["complete"]:
         raise BountyFetchIncompleteError(report)
     return report["bounties"]
@@ -519,10 +575,11 @@ def tag_skills(title, body):
 # Aggregation & formatting
 # ---------------------------------------------------------------------------
 
-def aggregate(repos=None, token=None, *, cache_dir=None, cooldown_path=None):
+def aggregate(repos=None, token=None, *, cache_dir=None, cooldown_path=None,
+              quota_floor=None):
     """Return a complete sorted index, with explicit source traversal metadata."""
     report = fetch_bounties_report(repos=repos, token=token, cache_dir=cache_dir,
-                                   cooldown_path=cooldown_path)
+                                   cooldown_path=cooldown_path, quota_floor=quota_floor)
     if not report["complete"]:
         raise BountyFetchIncompleteError(report)
     report["bounties"].sort(key=lambda b: b["reward_rtc"], reverse=True)
