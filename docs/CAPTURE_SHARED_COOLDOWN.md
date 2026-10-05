@@ -46,6 +46,22 @@ failures still require increasing backoff rather than a fixed-rate loop.
 SQLite transactions only extend a deadline; a concurrent shorter observation
 cannot overwrite a longer one. The store contains a one-way credential-scope
 fingerprint and an epoch deadline, not tokens, account details or API payloads.
+
+### Optional provider route scopes
+
+Python callers that know a secondary limit belongs to a specific GitHub REST
+resource family can construct `GitHubCooldown(..., cooldown_scope="search")`
+(or another stable local label). Provider cooldown/backoff rows for different
+labels are isolated, so a Search-only secondary throttle does not automatically
+idle a healthy exact-read worker. The label itself is hashed before storage.
+
+This does **not** partition primary quota. `reserve_quota_until()` remains keyed
+only by the credential scope, and `quota_reserve_deadline()` is therefore
+shared by every provider route scope for that credential. Omitting
+`cooldown_scope` preserves the existing v1 credential-global provider row and
+database identity. Use a scoped label only when the caller can classify the
+provider limit; do not guess a narrower scope for an unknown or primary limit.
+
 The file's parent must already exist and be private; new files use mode 0600.
 An unreadable, locked or malformed requested store stops dispatch with
 `COOLDOWN_STATE_ERROR`, rather than silently bypassing it. A failure to persist
