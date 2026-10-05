@@ -1,0 +1,150 @@
+diff --git a/src/commands.ts b/src/commands.ts
+index 57b522bce07e8b39057e982b61edad0163ad4743..66c28d945339d7c355b15e11b9d4980591aad459 100644
+--- a/src/commands.ts
++++ b/src/commands.ts
+@@ -1,5 +1,4 @@
+ import { basename, dirname, join, relative } from 'node:path'
+-import * as process from 'node:process'
+ import { promisify } from 'node:util'
+ import { spawn } from 'node:child_process'
+ import { createReadStream, existsSync, readdir as readdirC, statSync } from 'node:fs'
+@@ -8,11 +7,12 @@ import { getStatsFromTree, processTraceFiles, showTree, treeIdNodes } from './tr
+ import { getTracePanel, prepareWebView } from './webview'
+ import { getCurrentConfig } from './configuration'
+ import { log } from './logger'
++import { createTraceInvocation } from './traceInvocation'
+ import type { CommandId } from './constants'
+ import { addTraceFile, getWorkspacePath, openTerminal, openTraceDirectoryExternal, setLastMessageTrigger } from './storage'
+ import { addTraceDiagnostics, clearTaceDiagnostics } from './traceDiagnostics'
+ import { setStatusBarState } from './statusBar'
+-import { afterWatches, projectPath, saveName, state, traceFiles, traceRunning } from './appState'
++import { afterWatches, saveName, state, traceFiles, traceRunning } from './appState'
+ 
+ const readdir = promisify(readdirC)
+ 
+@@ -128,18 +128,15 @@ async function runTrace(args?: unknown[]) {
+       return
+     }
+ 
+-    const quotedTraceDir = `'${traceDir}'`
+-    // eslint-disable-next-line no-template-curly-in-string
+-    const fullCmd = `(cd '${newDirName ?? workspacePath}'; ${traceCmd.replace('${traceDir}', quotedTraceDir)})`
+-
+-    log(fullCmd)
+-
+-    const newProjectPath = newDirName ?? projectPath.value
+-    if (!newProjectPath) {
++    const invocation = createTraceInvocation({ traceCmd, traceDir, workspacePath, directory: newDirName })
++    if (!invocation) {
+       vscode.window.showErrorMessage('could not get project path from workspace folders')
+       return
+     }
+ 
++    const { command: fullCmd, cwd, shell } = invocation
++    log(fullCmd)
++
+     traceRunning.value = true
+ 
+     traceFiles.value = {}
+@@ -147,8 +144,9 @@ async function runTrace(args?: unknown[]) {
+ 
+     setStatusBarState('traceError', false)
+ 
+-    log(`shell: ${process.env.SHELL}`)
+-    const cmdProcess = spawn(fullCmd, [], { cwd: newProjectPath, shell: process.env.SHELL })
++    log(`cwd: ${cwd}`)
++    log(`shell: ${shell === true ? 'default' : shell}`)
++    const cmdProcess = spawn(fullCmd, [], { cwd, shell })
+ 
+     let err = ''
+     cmdProcess.stderr.on('data', data => err += data.toString())
+diff --git a/src/traceInvocation.ts b/src/traceInvocation.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..1fc8741169f9af827c3d483cc9866a7d3ed65a54
+--- /dev/null
++++ b/src/traceInvocation.ts
+@@ -0,0 +1,31 @@
++import * as process from 'node:process'
++
++interface TraceInvocationOptions {
++  traceCmd: string
++  traceDir: string
++  workspacePath: string
++  directory?: string
++}
++
++export function createTraceInvocation(
++  { traceCmd, traceDir, workspacePath, directory }: TraceInvocationOptions,
++  platform: NodeJS.Platform = process.platform,
++  shell = process.env.SHELL,
++) {
++  // projectPath is extension storage; the compiler must run in the source tree.
++  const cwd = directory ?? workspacePath
++  if (!cwd)
++    return
++
++  const quotedTraceDir = platform === 'win32'
++    ? `"${traceDir}"`
++    : `'${traceDir.replace(/'/g, `'\\''`)}'`
++
++  return {
++    // A replacement callback preserves literal dollar sequences in path names.
++    // eslint-disable-next-line no-template-curly-in-string
++    command: traceCmd.replace('${traceDir}', () => quotedTraceDir),
++    cwd,
++    shell: platform === 'win32' ? true : shell || true,
++  }
++}
+diff --git a/test/traceInvocation.test.ts b/test/traceInvocation.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..b2cf096b75e11892ddbc926978f6a0e3d173dfe6
+--- /dev/null
++++ b/test/traceInvocation.test.ts
+@@ -0,0 +1,47 @@
++import { strict as assert } from 'node:assert'
++import { describe, it } from 'vitest'
++import { createTraceInvocation } from '../src/traceInvocation'
++
++// eslint-disable-next-line no-template-curly-in-string
++const traceCmd = 'npx tsc --noEmit --generateTrace ${traceDir}'
++
++const windowsOptions = {
++  traceCmd,
++  workspacePath: 'P:\\My projects\\app',
++  traceDir: 'C:\\Users\\Name With Space\\globalStorage\\app\\default\\traces',
++}
++
++describe('trace invocation', () => {
++  it('runs command-palette tracing in the workspace on another drive', () => {
++    assert.deepEqual(createTraceInvocation(windowsOptions, 'win32', ''), {
++      command: `npx tsc --noEmit --generateTrace "${windowsOptions.traceDir}"`,
++      cwd: windowsOptions.workspacePath,
++      shell: true,
++    })
++  })
++
++  it('runs explorer tracing in the selected directory without shell cd', () => {
++    const directory = "D:\\Other projects\\it's here"
++    const invocation = createTraceInvocation({ ...windowsOptions, directory }, 'win32', '/bin/bash')
++    assert.equal(invocation?.cwd, directory)
++    assert.equal(invocation?.shell, true)
++    assert.equal(invocation?.command, `npx tsc --noEmit --generateTrace "${windowsOptions.traceDir}"`)
++  })
++
++  it('preserves POSIX quoting, literal dollar sequences, and the configured shell', () => {
++    assert.deepEqual(createTraceInvocation({
++      traceCmd,
++      workspacePath: '/work/my project',
++      traceDir: "/tmp/it's $& data/traces",
++    }, 'linux', '/bin/sh'), {
++      command: "npx tsc --noEmit --generateTrace '/tmp/it'\\''s $& data/traces'",
++      cwd: '/work/my project',
++      shell: '/bin/sh',
++    })
++  })
++
++  it('does not create an invocation without a working directory', () => {
++    assert.equal(createTraceInvocation({ ...windowsOptions, workspacePath: '' }), undefined)
++    assert.equal(createTraceInvocation(windowsOptions, 'linux', '')?.shell, true)
++  })
++})
