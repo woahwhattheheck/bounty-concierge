@@ -204,7 +204,13 @@ Use the actual current offset-aware ISO-8601 evaluation time. The batch command
 deduplicates issues and reuses one serial HTTP session; offline routing makes no
 provider requests. `--max-pages` bounds pagination; `--max-requests` counts actual
 HTTP GET attempts and stops before exceeding its budget (default 100, range
-1–10,000). The input limit is 1 MiB and 1,000 rows, each requiring `repo` and
+1–10,000). `--reserve-requests N` is opt-in (default 0): after a successful
+GitHub response reports a positive `X-RateLimit-Remaining` value at or below
+`N`, the collector retains that response and stops before its next GET with
+`HEADROOM_RESERVED`, not `RATE_LIMITED`. With `--cooldown-file`, an available
+GitHub reset timestamp is shared through the existing quota-reservation store so
+other opted-in collectors defer until reset without consuming another request.
+The input limit is 1 MiB and 1,000 rows, each requiring `repo` and
 `number` with an optional `submission_target` object. Use the existing target
 record: `repository`, `source_url`, `source_content_sha256`, and
 `instruction_excerpt`; its source must belong to that row's bounty issue.
