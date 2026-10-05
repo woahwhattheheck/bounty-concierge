@@ -1,0 +1,42 @@
+diff --git a/src/lib/backend/errorCodes.ts b/src/lib/backend/errorCodes.ts
+--- a/src/lib/backend/errorCodes.ts
++++ b/src/lib/backend/errorCodes.ts
+@@
+-export function validateErrorCodeRegistry(): {
++export function validateErrorCodeRegistry(
++  registry: Record<string, ErrorCodeDefinition> = ERROR_CODE_REGISTRY,
++): {
+   valid: boolean;
+   duplicates: string[];
+   errors: string[];
+ } {
+-  const definitions = Object.values(ERROR_CODE_REGISTRY);
++  const definitions = Object.values(registry);
+   const codeValues = definitions.map((def) => def.code);
+@@
+-  Object.values(ERROR_CODE_REGISTRY).forEach((def) => {
++  Object.values(registry).forEach((def) => {
+@@
+-  Object.entries(ERROR_CODE_REGISTRY).forEach(([key, def]) => {
++  Object.entries(registry).forEach(([key, def]) => {
+diff --git a/src/lib/backend/errorCodes.test.ts b/src/lib/backend/errorCodes.test.ts
+--- a/src/lib/backend/errorCodes.test.ts
++++ b/src/lib/backend/errorCodes.test.ts
+@@
+   it('passes registry validation without duplicate or unknown codes', () => {
+     const result = validateErrorCodeRegistry();
+     expect(result.valid).toBe(true);
+     expect(result.duplicates).toHaveLength(0);
+   });
++
++  it('detects duplicate code values under distinct registry keys', () => {
++    const result = validateErrorCodeRegistry({
++      ...ERROR_CODE_REGISTRY,
++      BAD_REQUEST_COPY: { ...ERROR_CODE_REGISTRY.BAD_REQUEST },
++    });
++
++    expect(result.valid).toBe(false);
++    expect(result.duplicates).toEqual(['BAD_REQUEST']);
++    expect(result.errors).toContain('Duplicate error codes found: BAD_REQUEST');
++  });
+ });
