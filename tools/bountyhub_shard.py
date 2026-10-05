@@ -199,6 +199,7 @@ def plan_indexed(snapshot: dict[str, Any], worker_count: int) -> dict[str, Any]:
         slots[worker_index]["assigned_work_key_count"] += 1
 
     counts = [slot["assigned_work_key_count"] for slot in slots]
+    active_worker_indices = [index for index, count in enumerate(counts) if count > 0]
     keys = sorted(groups)
     fingerprint_payload = "".join(f"{key}\n" for key in keys).encode("utf-8")
     return {
@@ -211,13 +212,16 @@ def plan_indexed(snapshot: dict[str, Any], worker_count: int) -> dict[str, Any]:
         "worker_count": worker_count,
         "candidate_work_key_count": len(keys),
         "candidate_set_sha256": hashlib.sha256(fingerprint_payload).hexdigest(),
-        "nonempty_worker_count": sum(count > 0 for count in counts),
+        "nonempty_worker_count": len(active_worker_indices),
+        "idle_worker_count": worker_count - len(active_worker_indices),
+        "active_worker_indices": active_worker_indices,
         "max_assigned_work_key_count": max(counts, default=0),
         "slot_work_key_counts": counts,
         "slots": slots,
         "interpretation": [
             "Publish one shared plan per wave and assign each worker_index at most once.",
             "Every eligible work_key appears in exactly one slot under this worker_count.",
+            "Dispatch only active_worker_indices when dedicating workers to this plan; idle slots have no BountyHub work.",
             "This plan is advisory collision reduction, not a provider assignment.",
             "Reconcile live source state and current swarm ownership before implementation.",
             "Duplicate provider cards for one work_key stay grouped and are never summed.",
