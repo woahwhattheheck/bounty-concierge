@@ -56,6 +56,7 @@ class BountyAuditError(RuntimeError):
     rate_limit_reset: str | None = None
     request_url: str | None = None
     rate_limit_remaining: int | None = None
+    rate_limited: bool = False
 
 
 def _headers(token: str | None) -> dict[str, str]:
@@ -94,6 +95,24 @@ def _get_json(
                     error.rate_limit_remaining = int(remaining)
                 except ValueError:
                     pass
+        provider_message = ""
+        if failed_response is not None:
+            try:
+                failed_payload = failed_response.json()
+            except (TypeError, ValueError):
+                failed_payload = {}
+            if isinstance(failed_payload, dict):
+                message = failed_payload.get("message")
+                if isinstance(message, str):
+                    provider_message = message
+        error.rate_limited = error.http_status == 429 or (
+            error.http_status == 403
+            and (
+                error.rate_limit_remaining == 0
+                or error.retry_after is not None
+                or "rate limit" in provider_message.casefold()
+            )
+        )
         if failed_response is not None:
             try:
                 failed_response.close()
@@ -147,184 +166,127 @@ def references_issue(
     return bool(_issue_reference_pattern(repo, number, allow_short=allow_short).search(text))
 
 
-def _competition_level(open_pr_count: int) -> str:
-    if open_pr_count == 0:
-        return "none"
-    if open_pr_count == 1:
-        return "low"
-    if open_pr_count <= 3:
-        return "medium"
-    return "high"
+def _timeline_pr_repository(issue: dict[str, Any]) -> str | None:
+    """Return the repository identity carried by a timeline PR source."""
+    repository = issue.get("repository")
+    if isinstance(repository, dict):
+        full_name = repository.get("full_name")
+        if isinstance(full_name, str) and re.fullmatch(r"[^/\\s]+/[^/\\s]+", full_name):
+            return full_name
+
+    repository_url = issue.get("repository_url")
+    if isinstance(repository_url, str):
+        match = re.fullmatch(
+            r"https://api\\.github\\.com/repos/([^/\\s]+/[^/\\s]+)",
+            repository_url,
+            re.IGNORECASE,
+        )
+        if match is not None:
+            return match.group(1)
+
+    html_url = issue.get("html_url")
+    if isinstance(html_url, str):
+        match = re.fullmatch(
+            r"https://github\\.com/([^/\\s]+/[^/\\s]+)/pull/[1-9][0-9]*/?",
+            html_url,
+            re.IGNORECASE,
+        )
+        if match is not None:
+            return match.group(1)
+    return None
 
 
-def _is_explicit_maintainer_expiry(comment: dict[str, Any]) -> bool:
-    association = comment.get("author_association")
-    if not isinstance(association, str) or association.upper() not in _MAINTAINER_ASSOCIATIONS:
-        return False
-    body = comment.get("body")
-    if not isinstance(body, str):
-        return False
-    return any(pattern.search(body) for pattern in _MAINTAINER_EXPIRY_PATTERNS)
-
-
-def _maintainer_expiry_evidence(
+def _timeline_pr_candidates(
     session: Any,
     repo: str,
     number: int,
     *,
     headers: dict[str, str],
     max_pages: int,
-) -> tuple[list[dict[str, Any]], bool]:
-    evidence: list[dict[str, Any]] = []
-    comments_url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
-    for page in range(1, max_pages + 1):
-        metadata: dict[str, Any] = {}
-        payload = _get_json(
-            session,
-            comments_url,
-            headers=headers,
-            params={"per_page": 100, "page": page},
-            response_metadata=metadata,
-        )
-        if not isinstance(payload, list):
-            raise BountyAuditError(f"GitHub issue comments response was not a list for {repo}#{number}")
-        for comment in payload:
-            if not isinstance(comment, dict):
-                raise BountyAuditError(f"GitHub issue comments response contained a malformed item for {repo}#{number}")
-            if not _is_explicit_maintainer_expiry(comment):
-                continue
-            user = comment.get("user")
-            login = user.get("login") if isinstance(user, dict) else None
-            evidence.append(
-                {
-                    "url": comment.get("html_url") or "",
-                    "author_association": str(comment.get("author_association") or "").upper(),
-                    "author": login or "",
-                    "created_at": comment.get("created_at"),
-                    "body": comment.get("body") or "",
-                }
-            )
-        try:
-            has_next = _comment_page_has_next(metadata, comments_url, page)
-        except BountyContractEvidenceError as exc:
-            raise BountyAuditError(f"GitHub issue comments pagination was invalid for {repo}#{number}") from exc
-        if has_next is False or (has_next is None and len(payload) < 100):
-            return evidence, False
-    return evidence, True
-
-
-def audit_bounty(
-    repo: str,
-    number: int,
-    token: str | None = None,
-    *,
-    session: Any = requests,
-    max_pages: int = 10,
-    submission_target: dict[str, str] | None = None,
-    _pr_detail_cache: dict[tuple[str, int], dict[str, Any]] | None = None,
-    _source_issue_cache: dict[tuple[str, int], dict[str, Any]] | None = None,
-    _source_expiry_cache: dict[tuple[str, int], list[dict[str, Any]]] | None = None,
-    _search_cache: dict[tuple[str, int], list[dict[str, Any]]] | None = None,
-) -> dict[str, Any]:
-    """Audit one GitHub bounty issue against canonical repository signals.
-
-    ``stale_listing_signal`` is intentionally conservative: it is true only
-    when the issue is still open and either an explicitly linked PR has already
-    merged or a repository maintainer explicitly says that the bounty expired,
-    was cancelled, or is no longer offered.  That is a review signal, not proof
-    that the full bounty was satisfied. An existing explicit submission_target
-    adds its delivery repository to the bounded PR census. Issue comments and
-    maintainer authority remain attached to the original bounty repository.
-
-    Linked PR author/head metadata comes only from canonical PR detail. Missing
-    fields stay null; this observation does not establish assignment or payment.
-    """
-    if "/" not in repo or not repo.split("/", 1)[0] or not repo.split("/", 1)[1]:
-        raise ValueError("repo must be in owner/name form")
-    if number <= 0:
-        raise ValueError("number must be a positive issue number")
-    if max_pages <= 0:
-        raise ValueError("max_pages must be positive")
-    if submission_target is not None:
-        submission_target = validate_submission_target(
-            submission_target, f"https://github.com/{repo}/issues/{number}"
-        )
-
-    # requests.get creates and closes a Session for every call. Keep one pool
-    # for this traversal without changing ownership of caller-supplied sessions.
-    if session is requests:
-        with requests.Session() as owned_session:
-            return audit_bounty(
-                repo, number, token, session=owned_session, max_pages=max_pages,
-                submission_target=submission_target,
-                _pr_detail_cache=_pr_detail_cache,
-                _source_issue_cache=_source_issue_cache,
-                _source_expiry_cache=_source_expiry_cache,
-                _search_cache=_search_cache,
-            )
-
-    token = token or GITHUB_TOKEN
-    headers = _headers(token)
-    issue_url = f"https://api.github.com/repos/{repo}/issues/{number}"
-    source_identity = (repo.casefold(), number)
-    if _source_issue_cache is not None and source_identity in _source_issue_cache:
-        issue = deepcopy(_source_issue_cache[source_identity])
-    else:
-        issue = _object_payload(
-            _get_json(session, issue_url, headers=headers),
-            f"issue {repo}#{number}",
-        )
-        if "pull_request" not in issue and _source_issue_cache is not None:
-            # Issue bodies/profile data are not inputs to the canonical audit.
-            _source_issue_cache[source_identity] = {
-                key: deepcopy(issue[key]) for key in ("state", "html_url") if key in issue
-            }
-    if "pull_request" in issue:
-        raise ValueError(f"{repo}#{number} is a pull request, not an issue")
-
-    search_repos = [repo]
-    if (submission_target is not None
-            and submission_target["repository"].casefold() != repo.casefold()):
-        search_repos.append(submission_target["repository"])
-    cross_repository = len(search_repos) > 1
+) -> tuple[list[tuple[str, dict[str, Any]]], bool]:
+    """Discover PR candidates from canonical cross-reference timeline events."""
+    timeline_url = f"https://api.github.com/repos/{repo}/issues/{number}/timeline"
     candidates: list[tuple[str, dict[str, Any]]] = []
     search_truncated = False
     search_url = "https://api.github.com/search/issues"
+    timeline_candidates: list[tuple[str, dict[str, Any]]] | None = None
+    timeline_truncated = False
     for search_repo in search_repos:
         query = f"repo:{search_repo} is:pr {number}"
         # The owning batch fixes the session, token, representation and page size.
         # GitHub repository identity ignores case; preserve query spelling on the wire.
         search_key = (f"repo:{search_repo.casefold()} is:pr {number}", max_pages)
         if _search_cache is not None and search_key in _search_cache:
-            candidates.extend((search_repo, item) for item in deepcopy(_search_cache[search_key]))
+            candidates.extend(
+                (search_repo, item) for item in deepcopy(_search_cache[search_key])
+            )
             continue
+
         repository_candidates: list[dict[str, Any]] = []
         repository_truncated = False
-        for page in range(1, max_pages + 1):
-            payload = _object_payload(
-                _get_json(
-                    session,
-                    search_url,
-                    headers=headers,
-                    params={"q": query, "per_page": 100, "page": page},
-                ),
-                f"search in {search_repo} for {repo}#{number}",
-            )
-            if payload.get("incomplete_results") is True:
-                repository_truncated = True
-            items = payload.get("items", [])
-            if not isinstance(items, list) or any(not isinstance(item, dict) for item in items):
-                raise BountyAuditError(f"GitHub search response contained malformed items for {repo}#{number}")
-            repository_candidates.extend(items)
-            if len(items) < 100:
-                break
-            # A full final page needs no empty-page request to prove completion.
-            total_count = payload.get("total_count")
-            if len(items) == 100 and type(total_count) is int and total_count == page * 100:
-                break
+        if timeline_candidates is not None:
+            repository_candidates = [
+                deepcopy(candidate)
+                for pr_repo, candidate in timeline_candidates
+                if pr_repo.casefold() == search_repo.casefold()
+            ]
+            repository_truncated = timeline_truncated
         else:
-            # Keep incompleteness from either bounded repository traversal.
-            repository_truncated = True
+            try:
+                for page in range(1, max_pages + 1):
+                    payload = _object_payload(
+                        _get_json(
+                            session,
+                            search_url,
+                            headers=headers,
+                            params={"q": query, "per_page": 100, "page": page},
+                        ),
+                        f"search in {search_repo} for {repo}#{number}",
+                    )
+                    if payload.get("incomplete_results") is True:
+                        repository_truncated = True
+                    items = payload.get("items", [])
+                    if not isinstance(items, list) or any(
+                        not isinstance(item, dict) for item in items
+                    ):
+                        raise BountyAuditError(
+                            f"GitHub search response contained malformed items for {repo}#{number}"
+                        )
+                    repository_candidates.extend(items)
+                    if len(items) < 100:
+                        break
+                    # A full final page needs no empty-page request to prove completion.
+                    total_count = payload.get("total_count")
+                    if (
+                        len(items) == 100
+                        and type(total_count) is int
+                        and total_count == page * 100
+                    ):
+                        break
+                else:
+                    # Keep incompleteness from either bounded repository traversal.
+                    repository_truncated = True
+            except BountyAuditError as exc:
+                if exc.request_url != search_url or not exc.rate_limited:
+                    raise
+                # Search has its own secondary limits. Do not retry it. The source
+                # issue timeline records GitHub cross-references without spending
+                # another Search request; canonical PR detail below remains the
+                # authority for an explicit current issue reference.
+                timeline_candidates, timeline_truncated = _timeline_pr_candidates(
+                    session,
+                    repo,
+                    number,
+                    headers=headers,
+                    max_pages=max_pages,
+                )
+                repository_candidates = [
+                    deepcopy(candidate)
+                    for pr_repo, candidate in timeline_candidates
+                    if pr_repo.casefold() == search_repo.casefold()
+                ]
+                repository_truncated = timeline_truncated
+
         candidates.extend((search_repo, item) for item in repository_candidates)
         search_truncated = search_truncated or repository_truncated
         if _search_cache is not None and not repository_truncated:
@@ -333,8 +295,12 @@ def audit_bounty(
     exact_candidates: dict[tuple[str, int], tuple[str, dict[str, Any]]] = {}
     for pr_repo, candidate in candidates:
         pr_number = candidate.get("number")
-        if (type(pr_number) is not int or pr_number <= 0
-                or not references_issue(candidate, repo, number, pr_repo=pr_repo)):
+        if type(pr_number) is not int or pr_number <= 0:
+            continue
+        if (
+            candidate.get("_timeline_cross_reference") is not True
+            and not references_issue(candidate, repo, number, pr_repo=pr_repo)
+        ):
             continue
         exact_candidates[(pr_repo.casefold(), pr_number)] = (pr_repo, candidate)
 
