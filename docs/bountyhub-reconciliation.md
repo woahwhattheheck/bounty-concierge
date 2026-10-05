@@ -39,6 +39,11 @@ python tools/bountyhub_shard.py \
   --output bountyhub-wave-plan.json
 python tools/bountyhub_shard.py \
   --input bountyhub-reconciled.json \
+  --all-workers --worker-count 200 \
+  --plan-algorithm balanced-active-v1 \
+  --output bountyhub-balanced-wave-plan.json
+python tools/bountyhub_shard.py \
+  --input bountyhub-reconciled.json \
   --worker-index 0 --worker-count 8
 ```
 
@@ -60,6 +65,8 @@ an old capture live. The sharder checks the original capture time again against
 its own current clock, so a previously fresh overlay cannot remain fresh forever.
 Refresh one shared capture when needed rather than making every worker refetch it.
 Catalogs without an overlay retain the existing advisory sharding behavior. Use `--all-workers` once per wave to emit one authoritative manifest containing every explicit slot, a stable candidate-set fingerprint, and occupancy counts. Share that plan and assign each `worker_index` at most once instead of letting every worker independently choose a slot. This removes coordinator-side index collisions without adding provider traffic. Individual workers can still use `--worker-index`; `--worker-key` remains available for backward-compatible hashed assignment.
+
+The default wave-plan algorithm remains `sha256-mod-v1`. For fleet-heavy waves where the worker count is much larger than the candidate set, opt into `--plan-algorithm balanced-active-v1`. It sorts the candidate work keys, activates only the first `min(worker_count, candidate_count)` slots, and distributes keys round-robin so active-slot loads differ by at most one. The mode is deterministic, changes no provider state, and makes no additional network requests. Use the shared plan as the source of worker indexes; do not mix it with independently hashed `--worker-key` assignments in the same wave.
 
 This observation does not establish an available platform claim, absence of a
 competing PR, escrow, acceptance or payout. Reconcile current team ownership and
