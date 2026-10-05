@@ -362,6 +362,7 @@ def select_targets(report: dict[str, Any], minimum_funded_usd: str = "15.00", *,
     floor = _amount(minimum_funded_usd)
     targets: dict[tuple[str, int], dict[str, Any]] = {}
     associations: dict[str, list[str]] = {}
+    excluded: dict[tuple[str, int], dict[str, Any]] = {}
     unresolved = 0
     for row in report["listings"]:
         if not isinstance(row, dict):
@@ -369,6 +370,22 @@ def select_targets(report: dict[str, Any], minimum_funded_usd: str = "15.00", *,
         if not _active(row):
             continue
         if _amount(row["advertised_total_usd"]) < floor:
+            continue
+        repo, number, listing_id = row.get("repo"), row.get("number"), row.get("listing_id")
+        if (not isinstance(repo, str) or not _REPO.fullmatch(repo)
+                or type(number) is not int or number < 1
+                or not isinstance(listing_id, str) or not _ID.fullmatch(listing_id)):
+            raise ValueError("invalid retained target identity")
+        key = (repo.casefold(), number)
+        if key in exclusions:
+            # An explicit caller exclusion applies before funding resolution.
+            # Retain every listing identity without claiming its funding was read.
+            record = excluded.setdefault(key, {
+                "repo": repo, "number": number, **exclusions[key], "listing_ids": [],
+            })
+            if key in delivery:
+                record["submission_target"] = delivery[key]
+            record["listing_ids"].append(listing_id)
             continue
         if row.get("funding_status") != "COMPLETE":
             unresolved += 1
@@ -382,25 +399,10 @@ def select_targets(report: dict[str, Any], minimum_funded_usd: str = "15.00", *,
             reward += _amount(row["reported_promised_usd"])
         if reward < floor:
             continue
-        repo, number, listing_id = row.get("repo"), row.get("number"), row.get("listing_id")
-        if (not isinstance(repo, str) or not _REPO.fullmatch(repo)
-                or type(number) is not int or number < 1
-                or not isinstance(listing_id, str) or not _ID.fullmatch(listing_id)):
-            raise ValueError("invalid retained target identity")
-        key = (repo.casefold(), number)
         target = targets.setdefault(key, {"repo": repo, "number": number})
         if key in delivery:
             target["submission_target"] = delivery[key]
         associations.setdefault(f"{repo.casefold()}#{number}", []).append(listing_id)
-    excluded = []
-    for key in list(targets):
-        if key not in exclusions:
-            continue
-        target = targets.pop(key)
-        excluded.append({
-            **target, **exclusions[key],
-            "listing_ids": associations.pop(f"{key[0]}#{key[1]}"),
-        })
     result = {
         "targets": list(targets.values()), "listing_ids_by_issue": associations,
         "minimum_funded_usd": _money(floor), "unresolved_funding_count": unresolved,
@@ -420,7 +422,7 @@ def select_targets(report: dict[str, Any], minimum_funded_usd: str = "15.00", *,
         del result["minimum_funded_usd"]
         result.update(reward_basis="reported_funded_plus_promised", minimum_reward_usd=_money(floor))
     if excluded_issues is not None:
-        result["excluded_targets"] = excluded
+        result["excluded_targets"] = list(excluded.values())
     return result
 
 
@@ -431,7 +433,8 @@ def _record_failure(report: dict[str, Any], exc: _ReadFailure, phase: str, **ide
 
 
 def _fill_details(session: Any, report: dict[str, Any], floor: Decimal, max_details: int,
-                  *, stopped: bool = False, skip_complete: bool = False) -> None:
+                  *, stopped: bool = False, skip_complete: bool = False,
+                  exclusions: dict[tuple[str, int], dict[str, str]] | None = None) -> None:
     detail_attempts = 0
     report["details_complete"] = True
     failed_statuses = {"READ_FAILED", "INVALID_DETAIL"}
@@ -444,6 +447,14 @@ def _fill_details(session: Any, report: dict[str, Any], floor: Decimal, max_deta
         row = report["listings"][index]
         if (not _active(row) or _amount(row["advertised_total_usd"]) < floor
                 or (skip_complete and row["funding_status"] == "COMPLETE")):
+            continue
+        key = (row["repo"].casefold(), row["number"])
+        if exclusions and key in exclusions:
+            # Keep the unresolved row intact, and spend no detail/request budget.
+            report.setdefault("detail_exclusions", []).append({
+                "repo": row["repo"], "number": row["number"],
+                "listing_id": row["listing_id"], **exclusions[key],
+            })
             continue
         if stopped or detail_attempts >= max_details:
             # A deferred failure is not an unattempted row on the next resume.
@@ -475,6 +486,7 @@ def _fill_details(session: Any, report: dict[str, Any], floor: Decimal, max_deta
 
 def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int = 100,
                   minimum_total_usd: str = "15.00", include_promised: bool = False,
+                  excluded_issues: dict[str, Any] | None = None,
                   session: Any = None) -> dict[str, Any]:
     """Collect once with bounded reads; retain partial progress and never retry."""
     if type(max_pages) is not int or not 1 <= max_pages <= 100:
@@ -484,11 +496,13 @@ def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int 
     if type(page_size) is not int or not 1 <= page_size <= 100:
         raise ValueError("page_size must be between 1 and 100")
     floor = _amount(minimum_total_usd)
+    exclusions = normalize_exclusions(excluded_issues)
     if session is None:
         with requests.Session() as owned:
             return fetch_catalog(max_pages=max_pages, max_details=max_details,
                                  page_size=page_size, minimum_total_usd=minimum_total_usd,
-                                 include_promised=include_promised, session=owned)
+                                 include_promised=include_promised,
+                                 excluded_issues=excluded_issues, session=owned)
     report: dict[str, Any] = {
         "schema": SCHEMA, "source_url": API, "started_at": _now(),
         "completed_at": None, "complete": False, "catalog_complete": False,
@@ -499,6 +513,8 @@ def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int 
         "rate_limited": False,
         "retry_after_seconds": None, "errors": [], "listings": [],
     }
+    if excluded_issues is not None:
+        report.update(detail_scope="exclude_supplied_issues", detail_exclusions=[])
     seen: set[str] = set()
     stopped = False
 
@@ -530,11 +546,13 @@ def fetch_catalog(*, max_pages: int = 10, max_details: int = 50, page_size: int 
             break
     if not report["catalog_complete"] and not stopped:
         report["errors"].append({"phase": "catalog", "code": "PAGE_LIMIT"})
-    _fill_details(session, report, floor, max_details, stopped=stopped)
+    _fill_details(session, report, floor, max_details, stopped=stopped, exclusions=exclusions)
     report["completed_at"] = _now()
     report["complete"] = report["catalog_complete"] and report["details_complete"]
     report["listing_count"] = len(report["listings"])
-    report["shortlist"] = select_targets(report, minimum_total_usd, include_promised=include_promised)
+    report["shortlist"] = select_targets(report, minimum_total_usd,
+                                         include_promised=include_promised,
+                                         excluded_issues=excluded_issues)
     return report
 
 
@@ -725,10 +743,12 @@ def main(argv: list[str] | None = None) -> int:
         "--submission-target-map", type=Path,
         help="Optional JSON owner/repo#number map of existing source-bound submission_target records",
     )
-    targets.add_argument(
-        "--exclude-issues", type=Path,
-        help="Optional JSON owner/repo#number map of retained reasons, source URLs and observation times",
-    )
+    for command in (collect, targets):
+        command.add_argument(
+            "--exclude-issues", type=Path,
+            help="Optional dated issue-exclusion JSON; collect skips those detail reads, "
+                 "targets filters retained rows without requests",
+        )
     resume = commands.add_parser("resume", help="Finish unresolved details from a retained complete catalog")
     resume.add_argument("snapshot", type=Path)
     resume.add_argument("--max-details", type=int, default=50)
@@ -761,11 +781,21 @@ def main(argv: list[str] | None = None) -> int:
         )
     args = parser.parse_args(argv)
     try:
+        excluded_issues = None
+        if args.command in ("collect", "targets") and args.exclude_issues is not None:
+            with args.exclude_issues.open("rb") as source:
+                raw = source.read(1024 * 1024 + 1)
+            if len(raw) > 1024 * 1024:
+                raise ValueError("issue exclusions exceed 1 MiB")
+            excluded_issues = json.loads(raw, object_pairs_hook=unique_exclusion_fields)
+            if excluded_issues is None:
+                raise ValueError("issue exclusions must be an object")
         if args.command == "collect":
             result = fetch_catalog(max_pages=args.max_pages, max_details=args.max_details,
                                    page_size=args.page_size,
                                    minimum_total_usd=args.min_funded_usd,
-                                   include_promised=args.include_promised)
+                                   include_promised=args.include_promised,
+                                   excluded_issues=excluded_issues)
             complete = result["shortlist"]["source_complete"]
         elif args.command == "refresh":
             from concierge.bountyhub_refresh import _load, refresh_listings
@@ -785,15 +815,6 @@ def main(argv: list[str] | None = None) -> int:
             complete = result["shortlist"]["source_complete"]
         else:
             submission_targets = None
-            excluded_issues = None
-            if args.exclude_issues is not None:
-                with args.exclude_issues.open("rb") as source:
-                    raw = source.read(1024 * 1024 + 1)
-                if len(raw) > 1024 * 1024:
-                    raise ValueError("issue exclusions exceed 1 MiB")
-                excluded_issues = json.loads(raw, object_pairs_hook=unique_exclusion_fields)
-                if excluded_issues is None:
-                    raise ValueError("issue exclusions must be an object")
             if args.submission_target_map is not None:
                 with args.submission_target_map.open("rb") as source:
                     raw = source.read(1024 * 1024 + 1)
