@@ -8,7 +8,8 @@
     "Apply each body only if the current head and intervening body edits have been reconciled. Preserve the original PR and title.",
     "Read the target after an uncertain write; do not submit duplicate gateway issues or comments.",
     "The generic gateway documented on September20 defaults to the second account and is not an established owner293 route.",
-    "RF296/RF297/RF298 retry preparation records the exact provider error, not a proven underlying cause. No Retry-After or rate-reset value was exposed. Re-read current PR author/head/body and reconcile any intervening edits before a later eligible update."
+    "RF296/RF297/RF298 retry preparation records the exact provider error, not a proven underlying cause. No Retry-After or rate-reset value was exposed. Re-read current PR author/head/body and reconcile any intervening edits before a later eligible update.",
+    "A dispatch_operation_id, when present, is the stable identity established for this original handoff. Reuse it; existing_operation_id:null records that no earlier ID was recovered and is not permission to create another dispatch identity."
   ],
   "items": [
     {
@@ -47,7 +48,40 @@
         "established_at": "2026-10-05T00:25:22.298Z",
         "provider_journal_id_recovered": false,
         "scope": "same existing cumulative description handoff; no new queue or PR"
-      }
+      },
+      "author_publication_attempts": [
+        {
+          "observed_at": "2026-10-05T00:32:44.7419898Z",
+          "schema": "author-publication-observation/v1",
+          "operation_id": "RF296-DESCRIPTION-HANDOFF-1791114288640189",
+          "actor_id": 293286387,
+          "auth_transport": "rest",
+          "publication_attempted": true,
+          "observed_head": "5b36c889de2c35af83bc0774ef813b03017a8e66",
+          "target_url": "https://github.com/RemitFlow/RemitFlow-Frontend/pull/296",
+          "author_matches": true,
+          "publisher_http_status": 200,
+          "publisher_allow": true,
+          "publisher_error": null,
+          "publisher_reason": null,
+          "publisher_status": null,
+          "readback_head": "5b36c889de2c35af83bc0774ef813b03017a8e66",
+          "body_matches": true,
+          "title_matches": true,
+          "outcome": "published_readback_confirmed",
+          "run_id": 37247920224,
+          "job_id": 111569405754,
+          "carrier_commit": "a7278058b5ce3d7abcf7da655df6c64f9db20d99",
+          "run_url": "https://github.com/woahwhattheheck/commons/actions/runs/37247920224",
+          "independent_native_readback": {
+            "head": "5b36c889de2c35af83bc0774ef813b03017a8e66",
+            "body_matches": true,
+            "title_matches": true,
+            "author_id": 293286387
+          }
+        }
+      ],
+      "publication_status": "published; exact body/head/title/author readback confirmed"
     },
     {
       "id": "PAYD630",
@@ -140,7 +174,40 @@
         "established_at": "2026-10-05T00:25:22.298Z",
         "provider_journal_id_recovered": false,
         "scope": "same existing cumulative description handoff; no new queue or PR"
-      }
+      },
+      "author_publication_attempts": [
+        {
+          "observed_at": "2026-10-05T00:32:49.6257405Z",
+          "schema": "author-publication-observation/v1",
+          "operation_id": "RF297-DESCRIPTION-HANDOFF-1791118315728269",
+          "actor_id": 293286387,
+          "auth_transport": "rest",
+          "publication_attempted": true,
+          "observed_head": "1ee074a9deb2512b18437664dc74830f1e7f6bc0",
+          "target_url": "https://github.com/RemitFlow/RemitFlow-Frontend/pull/297",
+          "author_matches": true,
+          "publisher_http_status": 200,
+          "publisher_allow": true,
+          "publisher_error": null,
+          "publisher_reason": null,
+          "publisher_status": null,
+          "readback_head": "1ee074a9deb2512b18437664dc74830f1e7f6bc0",
+          "body_matches": true,
+          "title_matches": true,
+          "outcome": "published_readback_confirmed",
+          "run_id": 37247920224,
+          "job_id": 111569405754,
+          "carrier_commit": "a7278058b5ce3d7abcf7da655df6c64f9db20d99",
+          "run_url": "https://github.com/woahwhattheheck/commons/actions/runs/37247920224",
+          "independent_native_readback": {
+            "head": "1ee074a9deb2512b18437664dc74830f1e7f6bc0",
+            "body_matches": true,
+            "title_matches": true,
+            "author_id": 293286387
+          }
+        }
+      ],
+      "publication_status": "published; exact body/head/title/author readback confirmed"
     },
     {
       "id": "RF298",
@@ -181,7 +248,40 @@
         "established_at": "2026-10-05T00:25:22.298Z",
         "provider_journal_id_recovered": false,
         "scope": "same existing cumulative description handoff; no new queue or PR"
-      }
+      },
+      "author_publication_attempts": [
+        {
+          "observed_at": "2026-10-05T00:32:55.3691560Z",
+          "schema": "author-publication-observation/v1",
+          "operation_id": "RF298-DESCRIPTION-HANDOFF-1791116285464369",
+          "actor_id": 293286387,
+          "auth_transport": "rest",
+          "publication_attempted": true,
+          "observed_head": "09fc9539f8898152309788654ee0205804ee58b3",
+          "target_url": "https://github.com/RemitFlow/RemitFlow-Frontend/pull/298",
+          "author_matches": true,
+          "publisher_http_status": 200,
+          "publisher_allow": true,
+          "publisher_error": null,
+          "publisher_reason": null,
+          "publisher_status": null,
+          "readback_head": "09fc9539f8898152309788654ee0205804ee58b3",
+          "body_matches": true,
+          "title_matches": true,
+          "outcome": "published_readback_confirmed",
+          "run_id": 37247920224,
+          "job_id": 111569405754,
+          "carrier_commit": "a7278058b5ce3d7abcf7da655df6c64f9db20d99",
+          "run_url": "https://github.com/woahwhattheheck/commons/actions/runs/37247920224",
+          "independent_native_readback": {
+            "head": "09fc9539f8898152309788654ee0205804ee58b3",
+            "body_matches": true,
+            "title_matches": true,
+            "author_id": 293286387
+          }
+        }
+      ],
+      "publication_status": "published; exact body/head/title/author readback confirmed"
     },
     {
       "id": "RFB143",
@@ -225,7 +325,7 @@
           "topic": "cursor position scopes"
         }
       ],
-      "publication_status": "prepared; upstream body readback remains the historical preimage; dispatch awaiting original operation custody and recovered supported author road",
+      "publication_status": "published; exact body/head/title/author readback confirmed",
       "native_attempts_after_preparation": [
         {
           "observed_at": "2026-10-05T00:02:11.414Z",
@@ -248,7 +348,39 @@
         "established_at": "2026-10-05T00:25:22.298Z",
         "provider_journal_id_recovered": false,
         "scope": "same existing cumulative description handoff; no new queue or PR"
-      }
+      },
+      "author_publication_attempts": [
+        {
+          "observed_at": "2026-10-05T00:33:03.0231973Z",
+          "schema": "author-publication-observation/v1",
+          "operation_id": "RFB143-DESCRIPTION-HANDOFF-1791023298173289",
+          "actor_id": 293286387,
+          "auth_transport": "rest",
+          "publication_attempted": true,
+          "observed_head": "38d34851ddfa7e66c4206db5d124aa720d32e9e9",
+          "target_url": "https://github.com/RemitFlow/RemitFlow-Backend/pull/143",
+          "author_matches": true,
+          "publisher_http_status": 200,
+          "publisher_allow": true,
+          "publisher_error": null,
+          "publisher_reason": null,
+          "publisher_status": null,
+          "readback_head": "38d34851ddfa7e66c4206db5d124aa720d32e9e9",
+          "body_matches": true,
+          "title_matches": true,
+          "outcome": "published_readback_confirmed",
+          "run_id": 37247920224,
+          "job_id": 111569405754,
+          "carrier_commit": "a7278058b5ce3d7abcf7da655df6c64f9db20d99",
+          "run_url": "https://github.com/woahwhattheheck/commons/actions/runs/37247920224",
+          "independent_native_readback": {
+            "head": "38d34851ddfa7e66c4206db5d124aa720d32e9e9",
+            "body_matches": true,
+            "title_matches": true,
+            "author_id": 293286387
+          }
+        }
+      ]
     },
     {
       "id": "RFB145",
@@ -283,7 +415,7 @@
           "topic": "opaque tuple provider operation ID"
         }
       ],
-      "publication_status": "prepared; upstream body readback remains the historical preimage; dispatch awaiting original operation custody and recovered supported author road",
+      "publication_status": "publisher policy blocked; correction_or_retraction; prior body remains unchanged",
       "native_attempts_after_preparation": [
         {
           "observed_at": "2026-10-05T00:02:11.414Z",
@@ -306,7 +438,39 @@
         "established_at": "2026-10-05T00:25:22.298Z",
         "provider_journal_id_recovered": false,
         "scope": "same existing cumulative description handoff; no new queue or PR"
-      }
+      },
+      "author_publication_attempts": [
+        {
+          "observed_at": "2026-10-05T00:33:10.2464082Z",
+          "schema": "author-publication-observation/v1",
+          "operation_id": "RFB145-DESCRIPTION-HANDOFF-1791065626827229",
+          "actor_id": 293286387,
+          "auth_transport": "rest",
+          "publication_attempted": true,
+          "observed_head": "7403dd31e4ceaa05722aa91479a3fa6e43b6d24e",
+          "target_url": "https://github.com/RemitFlow/RemitFlow-Backend/pull/145",
+          "author_matches": true,
+          "publisher_http_status": 403,
+          "publisher_allow": false,
+          "publisher_error": null,
+          "publisher_reason": "correction_or_retraction",
+          "publisher_status": null,
+          "readback_head": "7403dd31e4ceaa05722aa91479a3fa6e43b6d24e",
+          "body_matches": false,
+          "title_matches": true,
+          "outcome": "desired_body_not_observed",
+          "run_id": 37247920224,
+          "job_id": 111569405754,
+          "carrier_commit": "a7278058b5ce3d7abcf7da655df6c64f9db20d99",
+          "run_url": "https://github.com/woahwhattheheck/commons/actions/runs/37247920224",
+          "independent_native_readback": {
+            "head": "7403dd31e4ceaa05722aa91479a3fa6e43b6d24e",
+            "body_matches": false,
+            "title_matches": true,
+            "author_id": 293286387
+          }
+        }
+      ]
     },
     {
       "id": "PH259",
