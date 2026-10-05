@@ -271,7 +271,9 @@ def _timeline_linked_pr_candidates(
             pr_repo = repository_url[len(api_prefix):].strip("/")
             if pr_repo.casefold() not in allowed:
                 continue
-            candidates.append((pr_repo, source_issue))
+            candidate = deepcopy(source_issue)
+            candidate["_timeline_cross_reference"] = True
+            candidates.append((pr_repo, candidate))
         try:
             has_next = _comment_page_has_next(metadata, timeline_url, page)
         except BountyContractEvidenceError as exc:
@@ -421,8 +423,10 @@ def audit_bounty(
     exact_candidates: dict[tuple[str, int], tuple[str, dict[str, Any]]] = {}
     for pr_repo, candidate in candidates:
         pr_number = candidate.get("number")
-        if (type(pr_number) is not int or pr_number <= 0
-                or not references_issue(candidate, repo, number, pr_repo=pr_repo)):
+        if type(pr_number) is not int or pr_number <= 0:
+            continue
+        if (candidate.get("_timeline_cross_reference") is not True
+                and not references_issue(candidate, repo, number, pr_repo=pr_repo)):
             continue
         exact_candidates[(pr_repo.casefold(), pr_number)] = (pr_repo, candidate)
 
@@ -444,8 +448,10 @@ def audit_bounty(
             if _pr_detail_cache is not None:
                 # Share only a successful payload; each consumer owns its copy.
                 _pr_detail_cache[identity] = deepcopy(detail)
-        if not references_issue(detail, repo, number, pr_repo=pr_repo):
+        if (candidate.get("_timeline_cross_reference") is not True
+                and not references_issue(detail, repo, number, pr_repo=pr_repo)):
             # Search discovery may lag an edited reference in either repository.
+            # Timeline cross-reference events are already canonical linkage evidence.
             continue
         merged = bool(detail.get("merged_at"))
         state = detail.get("state") or "unknown"
