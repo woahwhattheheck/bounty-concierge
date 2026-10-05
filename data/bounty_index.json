@@ -1,5 +1,5 @@
 {
-  "started_at": "2026-10-05T00:18:58.854694+00:00",
+  "started_at": "2026-10-05T13:40:52.623313+00:00",
   "complete": true,
   "rate_limited": false,
   "retry_after_seconds": null,
@@ -85,6 +85,9 @@
         "mining"
       ],
       "created_at": "2026-03-25T16:04:23Z",
+      "updated_at": "2026-09-17T21:42:42Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3333.0,
       "difficulty": "critical",
       "skills": [
@@ -116,6 +119,9 @@
         "bounty"
       ],
       "created_at": "2026-02-22T15:26:17Z",
+      "updated_at": "2026-08-29T16:41:39Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 750.0,
       "difficulty": "critical",
       "skills": [
@@ -150,6 +156,9 @@
         "community"
       ],
       "created_at": "2026-04-22T03:28:15Z",
+      "updated_at": "2026-09-22T19:00:09Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 500.0,
       "difficulty": "critical",
       "skills": [
@@ -183,6 +192,9 @@
         "bounty"
       ],
       "created_at": "2026-02-27T20:03:08Z",
+      "updated_at": "2026-09-17T17:07:46Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 430.0,
       "difficulty": "critical",
       "skills": [
@@ -214,6 +226,9 @@
         "bounty"
       ],
       "created_at": "2026-03-26T13:54:35Z",
+      "updated_at": "2026-08-28T20:06:48Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 300.0,
       "difficulty": "critical",
       "skills": [
@@ -245,6 +260,9 @@
         "distribution"
       ],
       "created_at": "2026-06-14T18:57:22Z",
+      "updated_at": "2026-09-16T15:04:29Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 200.0,
       "difficulty": "critical",
       "skills": [
@@ -277,6 +295,9 @@
         "engagement"
       ],
       "created_at": "2026-03-06T00:04:30Z",
+      "updated_at": "2026-08-01T22:20:20Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 200.0,
       "difficulty": "critical",
       "skills": [
@@ -307,6 +328,9 @@
         "bounty"
       ],
       "created_at": "2026-02-22T15:26:50Z",
+      "updated_at": "2026-09-27T00:20:38Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 200.0,
       "difficulty": "critical",
       "skills": [
@@ -338,6 +362,9 @@
         "bounty"
       ],
       "created_at": "2026-02-13T20:13:54Z",
+      "updated_at": "2026-09-17T21:41:08Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 200.0,
       "difficulty": "critical",
       "skills": [
@@ -370,6 +397,9 @@
         "community"
       ],
       "created_at": "2026-03-06T14:01:18Z",
+      "updated_at": "2026-09-22T21:38:28Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 150.0,
       "difficulty": "micro",
       "skills": [
@@ -400,6 +430,9 @@
         "bounty"
       ],
       "created_at": "2026-03-06T00:53:13Z",
+      "updated_at": "2026-09-28T10:06:25Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 150.0,
       "difficulty": "major",
       "skills": [
@@ -438,6 +471,9 @@
         "community"
       ],
       "created_at": "2026-02-26T20:47:40Z",
+      "updated_at": "2026-09-17T21:23:46Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 150.0,
       "difficulty": "major",
       "skills": [
@@ -475,6 +511,9 @@
         "ecosystem"
       ],
       "created_at": "2026-02-02T16:30:15Z",
+      "updated_at": "2026-09-17T19:21:10Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 150.0,
       "difficulty": "major",
       "skills": [
@@ -508,6 +547,9 @@
         "claimed"
       ],
       "created_at": "2026-04-04T03:03:17Z",
+      "updated_at": "2026-10-04T15:30:18Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 133.0,
       "difficulty": "major",
       "skills": [
@@ -543,6 +585,9 @@
         "open"
       ],
       "created_at": "2026-02-06T01:13:53Z",
+      "updated_at": "2026-10-05T03:38:00Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 133.0,
       "difficulty": "major",
       "skills": [
@@ -576,6 +621,9 @@
         "bounty"
       ],
       "created_at": "2026-05-22T15:44:46Z",
+      "updated_at": "2026-09-02T15:12:37Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 100.0,
       "difficulty": "major",
       "skills": [],
@@ -606,6 +654,9 @@
         "community"
       ],
       "created_at": "2026-04-22T16:23:31Z",
+      "updated_at": "2026-09-29T17:41:14Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 100.0,
       "difficulty": "major",
       "skills": [
@@ -641,6 +692,9 @@
         "rip-302"
       ],
       "created_at": "2026-03-06T00:27:52Z",
+      "updated_at": "2026-09-17T22:29:49Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 100.0,
       "difficulty": "major",
       "skills": [
@@ -676,6 +730,9 @@
         "bounty"
       ],
       "created_at": "2026-02-22T15:26:29Z",
+      "updated_at": "2026-08-02T08:27:35Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 100.0,
       "difficulty": "major",
       "skills": [
@@ -705,6 +762,9 @@
         "distribution"
       ],
       "created_at": "2026-02-22T15:25:29Z",
+      "updated_at": "2026-08-29T01:05:22Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 100.0,
       "difficulty": "major",
       "skills": [
@@ -737,6 +797,9 @@
         "bounty"
       ],
       "created_at": "2026-02-22T15:25:06Z",
+      "updated_at": "2026-10-04T23:09:48Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 100.0,
       "difficulty": "major",
       "skills": [
@@ -770,6 +833,9 @@
         "community"
       ],
       "created_at": "2026-02-12T03:05:56Z",
+      "updated_at": "2026-09-20T23:21:40Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 100.0,
       "difficulty": "major",
       "skills": [
@@ -804,6 +870,9 @@
         "hardening"
       ],
       "created_at": "2026-02-06T01:03:30Z",
+      "updated_at": "2026-09-18T03:41:00Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 100.0,
       "difficulty": "major",
       "skills": [
@@ -838,6 +907,9 @@
         "ecosystem"
       ],
       "created_at": "2026-02-06T00:52:33Z",
+      "updated_at": "2026-09-17T19:56:06Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 100.0,
       "difficulty": "major",
       "skills": [
@@ -871,6 +943,9 @@
         "hardening"
       ],
       "created_at": "2026-02-04T00:20:49Z",
+      "updated_at": "2026-10-03T11:22:14Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 100.0,
       "difficulty": "major",
       "skills": [
@@ -904,6 +979,9 @@
         "ecosystem"
       ],
       "created_at": "2026-02-02T16:28:10Z",
+      "updated_at": "2026-09-17T19:47:56Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 100.0,
       "difficulty": "major",
       "skills": [
@@ -939,6 +1017,9 @@
         "needs strong contributor"
       ],
       "created_at": "2026-02-02T16:03:10Z",
+      "updated_at": "2026-09-18T03:45:03Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 100.0,
       "difficulty": "major",
       "skills": [
@@ -971,6 +1052,9 @@
         "integration"
       ],
       "created_at": "2026-02-18T20:20:02Z",
+      "updated_at": "2026-09-18T02:41:07Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 80.0,
       "difficulty": "major",
       "skills": [
@@ -999,6 +1083,9 @@
         "bounty"
       ],
       "created_at": "2026-03-07T04:02:59Z",
+      "updated_at": "2026-08-01T22:08:56Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 75.0,
       "difficulty": "major",
       "skills": [
@@ -1035,6 +1122,9 @@
         "development"
       ],
       "created_at": "2026-03-07T03:24:23Z",
+      "updated_at": "2026-09-26T20:01:53Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 75.0,
       "difficulty": "major",
       "skills": [
@@ -1070,6 +1160,9 @@
         "ecosystem"
       ],
       "created_at": "2026-02-12T15:33:18Z",
+      "updated_at": "2026-08-28T02:06:02Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 75.0,
       "difficulty": "major",
       "skills": [
@@ -1098,6 +1191,9 @@
         "hardening"
       ],
       "created_at": "2026-02-06T01:03:38Z",
+      "updated_at": "2026-09-18T03:39:40Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 75.0,
       "difficulty": "major",
       "skills": [
@@ -1130,6 +1226,9 @@
         "propagation"
       ],
       "created_at": "2026-02-02T16:02:51Z",
+      "updated_at": "2026-08-02T09:24:21Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 75.0,
       "difficulty": "major",
       "skills": [
@@ -1160,6 +1259,9 @@
         "integration"
       ],
       "created_at": "2026-04-09T14:57:05Z",
+      "updated_at": "2026-09-17T20:03:31Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 67.0,
       "difficulty": "major",
       "skills": [
@@ -1195,6 +1297,9 @@
         "development"
       ],
       "created_at": "2026-03-07T00:24:50Z",
+      "updated_at": "2026-09-18T03:30:37Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 67.0,
       "difficulty": "major",
       "skills": [
@@ -1230,6 +1335,9 @@
         "bounty"
       ],
       "created_at": "2026-03-21T00:27:35Z",
+      "updated_at": "2026-08-02T08:47:09Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 50.0,
       "difficulty": "major",
       "skills": [],
@@ -1260,6 +1368,9 @@
         "bounty"
       ],
       "created_at": "2026-03-09T01:58:15Z",
+      "updated_at": "2026-09-24T01:12:43Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 50.0,
       "difficulty": "major",
       "skills": [
@@ -1292,6 +1403,9 @@
         "distribution"
       ],
       "created_at": "2026-03-08T02:46:01Z",
+      "updated_at": "2026-09-18T10:54:26Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 50.0,
       "difficulty": "major",
       "skills": [
@@ -1327,6 +1441,9 @@
         "testing"
       ],
       "created_at": "2026-03-06T00:28:27Z",
+      "updated_at": "2026-09-17T22:31:32Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 50.0,
       "difficulty": "major",
       "skills": [
@@ -1363,6 +1480,9 @@
         "bounty"
       ],
       "created_at": "2026-02-27T17:08:00Z",
+      "updated_at": "2026-09-18T03:47:29Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 50.0,
       "difficulty": "major",
       "skills": [
@@ -1394,6 +1514,9 @@
         "community"
       ],
       "created_at": "2026-02-26T21:44:41Z",
+      "updated_at": "2026-09-17T20:57:17Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 50.0,
       "difficulty": "major",
       "skills": [
@@ -1421,6 +1544,9 @@
         "bounty"
       ],
       "created_at": "2026-02-22T15:24:52Z",
+      "updated_at": "2026-09-16T04:18:17Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 50.0,
       "difficulty": "major",
       "skills": [
@@ -1455,6 +1581,9 @@
         "open"
       ],
       "created_at": "2026-02-19T20:19:08Z",
+      "updated_at": "2026-09-17T20:34:09Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 50.0,
       "difficulty": "major",
       "skills": [
@@ -1485,6 +1614,9 @@
         "hardening"
       ],
       "created_at": "2026-02-17T00:20:06Z",
+      "updated_at": "2026-09-18T18:38:23Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 50.0,
       "difficulty": "major",
       "skills": [
@@ -1519,6 +1651,9 @@
         "hardening"
       ],
       "created_at": "2026-02-06T01:03:43Z",
+      "updated_at": "2026-09-17T22:32:56Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 50.0,
       "difficulty": "major",
       "skills": [
@@ -1550,6 +1685,9 @@
         "ecosystem"
       ],
       "created_at": "2026-02-02T17:26:12Z",
+      "updated_at": "2026-09-18T03:17:09Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 50.0,
       "difficulty": "standard",
       "skills": [
@@ -1579,6 +1717,9 @@
         "hardening"
       ],
       "created_at": "2026-02-02T16:04:42Z",
+      "updated_at": "2026-09-18T02:49:40Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 50.0,
       "difficulty": "standard",
       "skills": [
@@ -1607,6 +1748,9 @@
         "hardening"
       ],
       "created_at": "2026-02-02T16:05:17Z",
+      "updated_at": "2026-09-17T16:36:34Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 40.0,
       "difficulty": "standard",
       "skills": [
@@ -1635,6 +1779,9 @@
         "hardening"
       ],
       "created_at": "2026-02-02T16:04:58Z",
+      "updated_at": "2026-09-18T02:47:49Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 40.0,
       "difficulty": "standard",
       "skills": [
@@ -1660,6 +1807,9 @@
         "claimed"
       ],
       "created_at": "2026-08-10T17:31:52Z",
+      "updated_at": "2026-10-03T10:48:43Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 35.0,
       "difficulty": "standard",
       "skills": [
@@ -1693,6 +1843,9 @@
         "open"
       ],
       "created_at": "2026-07-19T23:38:33Z",
+      "updated_at": "2026-10-01T15:17:46Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 35.0,
       "difficulty": "standard",
       "skills": [
@@ -1727,6 +1880,9 @@
         "distribution"
       ],
       "created_at": "2026-07-19T21:33:52Z",
+      "updated_at": "2026-09-25T19:15:49Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 35.0,
       "difficulty": "standard",
       "skills": [
@@ -1760,6 +1916,9 @@
         "distribution"
       ],
       "created_at": "2026-03-21T17:18:18Z",
+      "updated_at": "2026-09-16T15:04:54Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 33.0,
       "difficulty": "standard",
       "skills": [
@@ -1789,6 +1948,9 @@
         "bounty"
       ],
       "created_at": "2026-03-08T02:36:42Z",
+      "updated_at": "2026-08-01T20:08:01Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 33.0,
       "difficulty": "standard",
       "skills": [],
@@ -1819,6 +1981,9 @@
         "content"
       ],
       "created_at": "2026-02-26T22:21:53Z",
+      "updated_at": "2026-08-29T17:50:39Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 33.0,
       "difficulty": "standard",
       "skills": [
@@ -1852,6 +2017,9 @@
         "community"
       ],
       "created_at": "2026-02-26T03:27:14Z",
+      "updated_at": "2026-09-23T00:25:02Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 33.0,
       "difficulty": "major",
       "skills": [
@@ -1882,6 +2050,9 @@
         "community"
       ],
       "created_at": "2026-02-17T00:20:10Z",
+      "updated_at": "2026-09-17T23:20:05Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 33.0,
       "difficulty": "standard",
       "skills": [
@@ -1913,6 +2084,9 @@
         "distribution"
       ],
       "created_at": "2026-03-08T02:46:35Z",
+      "updated_at": "2026-09-16T15:06:11Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 30.0,
       "difficulty": "standard",
       "skills": [
@@ -1943,6 +2117,9 @@
         "bounty"
       ],
       "created_at": "2026-02-27T18:34:55Z",
+      "updated_at": "2026-09-17T21:21:35Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 30.0,
       "difficulty": "standard",
       "skills": [
@@ -1970,6 +2147,9 @@
         "distribution"
       ],
       "created_at": "2026-02-19T01:12:27Z",
+      "updated_at": "2026-09-15T03:21:55Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 30.0,
       "difficulty": "standard",
       "skills": [],
@@ -1996,6 +2176,9 @@
         "community"
       ],
       "created_at": "2026-04-08T17:02:06Z",
+      "updated_at": "2026-07-21T16:27:17Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 30.0,
       "difficulty": "standard",
       "skills": [
@@ -2027,6 +2210,9 @@
         "bounty"
       ],
       "created_at": "2026-02-15T21:52:38Z",
+      "updated_at": "2026-09-26T15:29:36Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 30.0,
       "difficulty": "standard",
       "skills": [],
@@ -2050,6 +2236,9 @@
         "ecosystem"
       ],
       "created_at": "2026-02-28T22:57:02Z",
+      "updated_at": "2026-09-18T03:46:33Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 27.0,
       "difficulty": "standard",
       "skills": [
@@ -2082,6 +2271,9 @@
         "bottube"
       ],
       "created_at": "2026-06-08T16:58:42Z",
+      "updated_at": "2026-08-19T12:35:54Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 25.0,
       "difficulty": "standard",
       "skills": [
@@ -2111,6 +2303,9 @@
         "claimed"
       ],
       "created_at": "2026-06-01T16:18:30Z",
+      "updated_at": "2026-10-03T22:13:34Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 25.0,
       "difficulty": "standard",
       "skills": [
@@ -2142,6 +2337,9 @@
         "github-action"
       ],
       "created_at": "2026-03-21T16:38:14Z",
+      "updated_at": "2026-08-01T19:04:08Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 25.0,
       "difficulty": "standard",
       "skills": [
@@ -2172,6 +2370,9 @@
         "infrastructure"
       ],
       "created_at": "2026-03-16T01:24:09Z",
+      "updated_at": "2026-09-14T08:32:41Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 25.0,
       "difficulty": "standard",
       "skills": [
@@ -2201,6 +2402,9 @@
         "community"
       ],
       "created_at": "2026-03-08T16:29:36Z",
+      "updated_at": "2026-08-02T08:17:06Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 25.0,
       "difficulty": "standard",
       "skills": [
@@ -2233,6 +2437,9 @@
         "community"
       ],
       "created_at": "2026-03-07T00:15:22Z",
+      "updated_at": "2026-08-02T08:17:24Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 25.0,
       "difficulty": "standard",
       "skills": [
@@ -2262,6 +2469,9 @@
         "bounty"
       ],
       "created_at": "2026-02-27T18:34:43Z",
+      "updated_at": "2026-09-17T21:16:45Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 25.0,
       "difficulty": "standard",
       "skills": [
@@ -2288,6 +2498,9 @@
         "bounty"
       ],
       "created_at": "2026-02-27T18:34:38Z",
+      "updated_at": "2026-09-17T21:16:27Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 25.0,
       "difficulty": "standard",
       "skills": [
@@ -2318,6 +2531,9 @@
         "community"
       ],
       "created_at": "2026-02-12T15:33:19Z",
+      "updated_at": "2026-08-02T09:18:35Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 25.0,
       "difficulty": "standard",
       "skills": [
@@ -2344,6 +2560,9 @@
         "standard"
       ],
       "created_at": "2026-02-02T18:49:30Z",
+      "updated_at": "2026-08-02T09:20:39Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 25.0,
       "difficulty": "standard",
       "skills": [
@@ -2378,6 +2597,9 @@
         "ecosystem"
       ],
       "created_at": "2026-02-02T17:27:36Z",
+      "updated_at": "2026-09-18T03:34:09Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 25.0,
       "difficulty": "micro",
       "skills": [
@@ -2407,6 +2629,9 @@
         "standard"
       ],
       "created_at": "2026-02-02T04:32:35Z",
+      "updated_at": "2026-08-02T21:56:52Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 25.0,
       "difficulty": "standard",
       "skills": [
@@ -2437,6 +2662,9 @@
         "bounty"
       ],
       "created_at": "2026-02-02T18:49:32Z",
+      "updated_at": "2026-09-17T21:40:18Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 25.0,
       "difficulty": "standard",
       "skills": [
@@ -2469,6 +2697,9 @@
         "claimed"
       ],
       "created_at": "2026-08-10T17:31:53Z",
+      "updated_at": "2026-09-28T03:10:47Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 20.0,
       "difficulty": "standard",
       "skills": [
@@ -2498,6 +2729,9 @@
         "bounty"
       ],
       "created_at": "2026-06-12T18:17:39Z",
+      "updated_at": "2026-09-13T16:00:44Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 20.0,
       "difficulty": "standard",
       "skills": [
@@ -2531,6 +2765,9 @@
         "bottube"
       ],
       "created_at": "2026-06-08T16:58:45Z",
+      "updated_at": "2026-09-30T03:10:27Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 20.0,
       "difficulty": "standard",
       "skills": [
@@ -2561,6 +2798,9 @@
         "claimed"
       ],
       "created_at": "2026-04-17T03:03:07Z",
+      "updated_at": "2026-10-05T11:57:36Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 20.0,
       "difficulty": "standard",
       "skills": [
@@ -2592,6 +2832,9 @@
         "mobile"
       ],
       "created_at": "2026-03-10T23:50:18Z",
+      "updated_at": "2026-08-02T08:12:15Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 20.0,
       "difficulty": "standard",
       "skills": [
@@ -2621,6 +2864,9 @@
         "development"
       ],
       "created_at": "2026-03-07T00:15:24Z",
+      "updated_at": "2026-09-30T02:24:15Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 20.0,
       "difficulty": "standard",
       "skills": [
@@ -2655,6 +2901,9 @@
         "bounty"
       ],
       "created_at": "2026-02-27T19:11:42Z",
+      "updated_at": "2026-08-02T09:12:03Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 20.0,
       "difficulty": "standard",
       "skills": [
@@ -2682,6 +2931,9 @@
         "bounty"
       ],
       "created_at": "2026-02-27T18:34:47Z",
+      "updated_at": "2026-09-17T23:10:05Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 20.0,
       "difficulty": "standard",
       "skills": [
@@ -2708,6 +2960,9 @@
         "bounty"
       ],
       "created_at": "2026-02-27T18:34:45Z",
+      "updated_at": "2026-09-17T21:18:46Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 20.0,
       "difficulty": "standard",
       "skills": [
@@ -2737,6 +2992,9 @@
         "distribution"
       ],
       "created_at": "2026-02-26T22:21:40Z",
+      "updated_at": "2026-09-16T15:06:55Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 20.0,
       "difficulty": "standard",
       "skills": [
@@ -2766,6 +3024,9 @@
         "bounty"
       ],
       "created_at": "2026-02-18T17:36:03Z",
+      "updated_at": "2026-09-18T02:39:42Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 20.0,
       "difficulty": "standard",
       "skills": [
@@ -2794,6 +3055,9 @@
         "bounty"
       ],
       "created_at": "2026-02-18T17:23:37Z",
+      "updated_at": "2026-08-01T23:27:23Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 20.0,
       "difficulty": "standard",
       "skills": [
@@ -2821,6 +3085,9 @@
         "bounty"
       ],
       "created_at": "2026-02-17T20:14:51Z",
+      "updated_at": "2026-08-01T23:27:29Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 20.0,
       "difficulty": "standard",
       "skills": [
@@ -2849,6 +3116,9 @@
         "community"
       ],
       "created_at": "2026-04-08T17:02:09Z",
+      "updated_at": "2026-09-17T21:37:50Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 20.0,
       "difficulty": "standard",
       "skills": [
@@ -2879,6 +3149,9 @@
         "bounty"
       ],
       "created_at": "2026-06-06T15:41:33Z",
+      "updated_at": "2026-10-04T14:10:03Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 17.0,
       "difficulty": "standard",
       "skills": [
@@ -2908,6 +3181,9 @@
         "distribution"
       ],
       "created_at": "2026-06-01T16:18:28Z",
+      "updated_at": "2026-09-22T00:56:26Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 17.0,
       "difficulty": "standard",
       "skills": [
@@ -2938,6 +3214,9 @@
         "bounty"
       ],
       "created_at": "2026-04-17T03:03:05Z",
+      "updated_at": "2026-09-29T22:21:22Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 17.0,
       "difficulty": "standard",
       "skills": [
@@ -2969,6 +3248,9 @@
         "bounty"
       ],
       "created_at": "2026-03-16T18:15:15Z",
+      "updated_at": "2026-08-25T23:08:32Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 17.0,
       "difficulty": "standard",
       "skills": [
@@ -3001,6 +3283,9 @@
         "development"
       ],
       "created_at": "2026-03-07T03:24:22Z",
+      "updated_at": "2026-08-01T22:09:13Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 17.0,
       "difficulty": "standard",
       "skills": [
@@ -3032,6 +3317,9 @@
         "bounty"
       ],
       "created_at": "2026-02-27T18:34:40Z",
+      "updated_at": "2026-09-17T23:09:48Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 17.0,
       "difficulty": "standard",
       "skills": [
@@ -3061,6 +3349,9 @@
         "distribution"
       ],
       "created_at": "2026-02-26T22:21:21Z",
+      "updated_at": "2026-09-21T03:00:30Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 17.0,
       "difficulty": "standard",
       "skills": [
@@ -3092,6 +3383,9 @@
         "bounty"
       ],
       "created_at": "2026-06-11T23:03:00Z",
+      "updated_at": "2026-09-10T01:28:28Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 15.0,
       "difficulty": "standard",
       "skills": [],
@@ -3122,6 +3416,9 @@
         "web"
       ],
       "created_at": "2026-03-21T16:38:15Z",
+      "updated_at": "2026-09-28T10:21:05Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 15.0,
       "difficulty": "standard",
       "skills": [],
@@ -3148,6 +3445,9 @@
         "development"
       ],
       "created_at": "2026-03-07T03:24:24Z",
+      "updated_at": "2026-08-01T22:09:08Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 15.0,
       "difficulty": "standard",
       "skills": [
@@ -3182,6 +3482,9 @@
         "badges"
       ],
       "created_at": "2026-03-06T14:03:26Z",
+      "updated_at": "2026-08-26T06:04:50Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 15.0,
       "difficulty": "micro",
       "skills": [],
@@ -3210,6 +3513,9 @@
         "bounty"
       ],
       "created_at": "2026-02-27T19:11:44Z",
+      "updated_at": "2026-08-01T22:36:40Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 15.0,
       "difficulty": "standard",
       "skills": [
@@ -3238,6 +3544,9 @@
         "live-url-verified"
       ],
       "created_at": "2026-02-17T20:14:47Z",
+      "updated_at": "2026-10-05T04:28:28Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 15.0,
       "difficulty": "standard",
       "skills": [
@@ -3268,6 +3577,9 @@
         "distribution"
       ],
       "created_at": "2026-02-17T01:58:47Z",
+      "updated_at": "2026-10-02T18:19:30Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 15.0,
       "difficulty": "standard",
       "skills": [
@@ -3303,6 +3615,9 @@
         "micro"
       ],
       "created_at": "2026-02-02T04:32:48Z",
+      "updated_at": "2026-09-18T03:27:09Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 15.0,
       "difficulty": "micro",
       "skills": [
@@ -3330,6 +3645,9 @@
         "bounty"
       ],
       "created_at": "2026-02-13T20:13:24Z",
+      "updated_at": "2026-09-17T17:05:30Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 15.0,
       "difficulty": "standard",
       "skills": [
@@ -3360,6 +3678,9 @@
         "bounty"
       ],
       "created_at": "2026-04-08T17:02:11Z",
+      "updated_at": "2026-08-29T15:16:28Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 15.0,
       "difficulty": "standard",
       "skills": [
@@ -3394,6 +3715,9 @@
         "community"
       ],
       "created_at": "2026-02-26T03:27:20Z",
+      "updated_at": "2026-08-01T22:59:27Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 13.0,
       "difficulty": "standard",
       "skills": [
@@ -3425,6 +3749,9 @@
         "standard"
       ],
       "created_at": "2026-07-19T21:43:45Z",
+      "updated_at": "2026-09-29T23:36:46Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 12.0,
       "difficulty": "standard",
       "skills": [
@@ -3456,6 +3783,9 @@
         "claimed"
       ],
       "created_at": "2026-07-19T21:43:36Z",
+      "updated_at": "2026-09-29T17:42:44Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [],
@@ -3486,6 +3816,9 @@
         "community"
       ],
       "created_at": "2026-07-19T21:34:00Z",
+      "updated_at": "2026-09-14T00:29:02Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "micro",
       "skills": [
@@ -3516,6 +3849,9 @@
         "distribution"
       ],
       "created_at": "2026-06-11T23:03:35Z",
+      "updated_at": "2026-09-26T03:37:14Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -3549,6 +3885,9 @@
         "10-rtc"
       ],
       "created_at": "2026-03-22T03:03:23Z",
+      "updated_at": "2026-08-01T18:58:49Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -3582,6 +3921,9 @@
         "node-4"
       ],
       "created_at": "2026-03-21T18:10:23Z",
+      "updated_at": "2026-08-02T08:06:16Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -3611,6 +3953,9 @@
         "homebrew"
       ],
       "created_at": "2026-03-21T16:38:15Z",
+      "updated_at": "2026-08-02T08:06:22Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -3638,6 +3983,9 @@
         "bounty"
       ],
       "created_at": "2026-03-19T13:58:11Z",
+      "updated_at": "2026-09-30T03:10:30Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -3668,6 +4016,9 @@
         "bounty"
       ],
       "created_at": "2026-03-16T18:15:08Z",
+      "updated_at": "2026-08-25T23:08:39Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -3701,6 +4052,9 @@
         "community"
       ],
       "created_at": "2026-03-10T16:31:07Z",
+      "updated_at": "2026-08-02T08:12:27Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -3735,6 +4089,9 @@
         "community"
       ],
       "created_at": "2026-03-10T16:31:07Z",
+      "updated_at": "2026-08-02T09:04:38Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -3766,6 +4123,9 @@
         "development"
       ],
       "created_at": "2026-03-07T03:24:28Z",
+      "updated_at": "2026-09-29T23:38:48Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -3797,6 +4157,9 @@
         "development"
       ],
       "created_at": "2026-03-07T03:24:27Z",
+      "updated_at": "2026-08-02T08:49:27Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -3829,6 +4192,9 @@
         "development"
       ],
       "created_at": "2026-03-07T03:24:25Z",
+      "updated_at": "2026-08-02T09:08:23Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -3861,6 +4227,9 @@
         "social"
       ],
       "created_at": "2026-03-06T19:15:26Z",
+      "updated_at": "2026-03-06T21:07:17Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [],
@@ -3888,6 +4257,9 @@
         "bounty"
       ],
       "created_at": "2026-02-27T19:11:53Z",
+      "updated_at": "2026-08-02T08:21:25Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -3914,6 +4286,9 @@
         "bounty"
       ],
       "created_at": "2026-02-27T19:11:51Z",
+      "updated_at": "2026-08-02T09:11:01Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -3940,6 +4315,9 @@
         "bounty"
       ],
       "created_at": "2026-02-27T18:34:53Z",
+      "updated_at": "2026-09-17T23:10:35Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -3966,6 +4344,9 @@
         "bounty"
       ],
       "created_at": "2026-02-27T18:34:49Z",
+      "updated_at": "2026-09-17T23:10:18Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -3994,6 +4375,9 @@
         "content"
       ],
       "created_at": "2026-02-26T22:22:03Z",
+      "updated_at": "2026-09-29T07:44:05Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -4026,6 +4410,9 @@
         "community"
       ],
       "created_at": "2026-02-12T03:04:08Z",
+      "updated_at": "2026-09-17T01:30:29Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -4058,6 +4445,9 @@
         "ecosystem"
       ],
       "created_at": "2026-02-02T17:27:41Z",
+      "updated_at": "2026-09-18T17:26:27Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "major",
       "skills": [
@@ -4090,6 +4480,9 @@
         "red-team"
       ],
       "created_at": "2026-02-02T16:04:24Z",
+      "updated_at": "2026-09-18T02:51:04Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -4122,6 +4515,9 @@
         "community"
       ],
       "created_at": "2026-02-21T02:30:51Z",
+      "updated_at": "2026-07-29T02:19:44Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -4158,6 +4554,9 @@
         "area: miner"
       ],
       "created_at": "2026-02-15T01:05:39Z",
+      "updated_at": "2026-09-26T15:29:37Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -4190,6 +4589,9 @@
         "bounty"
       ],
       "created_at": "2026-02-13T20:13:35Z",
+      "updated_at": "2026-08-28T20:34:10Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -4221,6 +4623,9 @@
         "bounty"
       ],
       "created_at": "2026-02-03T22:25:16Z",
+      "updated_at": "2026-09-29T08:20:25Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [],
@@ -4249,6 +4654,9 @@
         "bounty"
       ],
       "created_at": "2026-04-08T17:02:08Z",
+      "updated_at": "2026-09-21T03:59:02Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 10.0,
       "difficulty": "standard",
       "skills": [
@@ -4282,6 +4690,9 @@
         "testing"
       ],
       "created_at": "2026-07-19T21:43:49Z",
+      "updated_at": "2026-09-29T16:14:21Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 8.0,
       "difficulty": "micro",
       "skills": [
@@ -4309,6 +4720,9 @@
         "bounty"
       ],
       "created_at": "2026-06-12T18:50:39Z",
+      "updated_at": "2026-09-17T21:34:32Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 8.0,
       "difficulty": "micro",
       "skills": [
@@ -4337,6 +4751,9 @@
         "bounty"
       ],
       "created_at": "2026-05-27T21:56:09Z",
+      "updated_at": "2026-09-26T00:09:55Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 8.0,
       "difficulty": "micro",
       "skills": [
@@ -4369,6 +4786,9 @@
         "8-rtc"
       ],
       "created_at": "2026-03-22T03:03:25Z",
+      "updated_at": "2026-08-02T09:01:23Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 8.0,
       "difficulty": "micro",
       "skills": [
@@ -4401,6 +4821,9 @@
         "micro"
       ],
       "created_at": "2026-07-19T21:43:46Z",
+      "updated_at": "2026-09-29T16:07:02Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 7.0,
       "difficulty": "micro",
       "skills": [],
@@ -4426,6 +4849,9 @@
         "bounty"
       ],
       "created_at": "2026-06-12T18:17:40Z",
+      "updated_at": "2026-09-18T02:43:44Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 7.0,
       "difficulty": "micro",
       "skills": [
@@ -4458,6 +4884,9 @@
         "claimed"
       ],
       "created_at": "2026-06-06T16:02:32Z",
+      "updated_at": "2026-10-02T15:28:38Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 7.0,
       "difficulty": "micro",
       "skills": [
@@ -4489,6 +4918,9 @@
         "distribution"
       ],
       "created_at": "2026-03-07T18:00:36Z",
+      "updated_at": "2026-09-16T15:04:35Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 7.0,
       "difficulty": "micro",
       "skills": [
@@ -4519,6 +4951,9 @@
         "testing"
       ],
       "created_at": "2026-03-07T18:00:33Z",
+      "updated_at": "2026-09-28T04:09:58Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 7.0,
       "difficulty": "micro",
       "skills": [
@@ -4549,6 +4984,9 @@
         "bottube"
       ],
       "created_at": "2026-03-07T00:53:33Z",
+      "updated_at": "2026-08-24T04:31:18Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 7.0,
       "difficulty": "micro",
       "skills": [
@@ -4581,6 +5019,9 @@
         "bounty"
       ],
       "created_at": "2026-02-27T19:11:49Z",
+      "updated_at": "2026-08-02T08:21:31Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 7.0,
       "difficulty": "micro",
       "skills": [
@@ -4607,6 +5048,9 @@
         "bounty"
       ],
       "created_at": "2026-02-27T19:11:46Z",
+      "updated_at": "2026-08-02T09:11:32Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 7.0,
       "difficulty": "micro",
       "skills": [
@@ -4633,6 +5077,9 @@
         "bounty"
       ],
       "created_at": "2026-02-18T00:50:13Z",
+      "updated_at": "2026-09-08T19:45:55Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 7.0,
       "difficulty": "micro",
       "skills": [],
@@ -4661,6 +5108,9 @@
         "bounty"
       ],
       "created_at": "2026-02-18T00:49:57Z",
+      "updated_at": "2026-08-02T08:44:16Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 7.0,
       "difficulty": "micro",
       "skills": [
@@ -4690,6 +5140,9 @@
         "bounty"
       ],
       "created_at": "2026-02-17T15:03:21Z",
+      "updated_at": "2026-08-01T23:30:08Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 7.0,
       "difficulty": "micro",
       "skills": [
@@ -4718,6 +5171,9 @@
         "bounty"
       ],
       "created_at": "2026-02-15T22:25:44Z",
+      "updated_at": "2026-08-01T23:35:26Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 7.0,
       "difficulty": "micro",
       "skills": [
@@ -4748,6 +5204,9 @@
         "bounty"
       ],
       "created_at": "2026-02-15T22:25:44Z",
+      "updated_at": "2026-08-02T09:18:04Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 7.0,
       "difficulty": "micro",
       "skills": [
@@ -4778,6 +5237,9 @@
         "bounty"
       ],
       "created_at": "2026-02-15T22:25:44Z",
+      "updated_at": "2026-08-01T23:41:01Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 7.0,
       "difficulty": "micro",
       "skills": [
@@ -4811,6 +5273,9 @@
         "community"
       ],
       "created_at": "2026-02-15T00:55:51Z",
+      "updated_at": "2026-08-01T23:46:34Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 7.0,
       "difficulty": "micro",
       "skills": [
@@ -4845,6 +5310,9 @@
         "claimed"
       ],
       "created_at": "2026-07-19T21:43:33Z",
+      "updated_at": "2026-10-05T12:01:06Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -4877,6 +5345,9 @@
         "engagement"
       ],
       "created_at": "2026-07-19T21:34:02Z",
+      "updated_at": "2026-09-17T10:32:10Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -4907,9 +5378,13 @@
         "micro",
         "multi-claim",
         "community",
-        "content"
+        "content",
+        "claimed"
       ],
       "created_at": "2026-07-19T21:34:01Z",
+      "updated_at": "2026-10-05T10:14:16Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -4939,6 +5414,9 @@
         "bounty"
       ],
       "created_at": "2026-06-11T23:03:34Z",
+      "updated_at": "2026-09-30T03:10:16Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -4974,6 +5452,9 @@
         "needs-human"
       ],
       "created_at": "2026-04-09T03:25:42Z",
+      "updated_at": "2026-09-22T21:37:47Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -5008,6 +5489,9 @@
         "distribution"
       ],
       "created_at": "2026-04-02T15:44:27Z",
+      "updated_at": "2026-09-22T21:37:54Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -5041,6 +5525,9 @@
         "5-rtc"
       ],
       "created_at": "2026-03-22T03:03:24Z",
+      "updated_at": "2026-08-02T08:06:10Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -5071,6 +5558,9 @@
         "distribution"
       ],
       "created_at": "2026-03-17T02:05:49Z",
+      "updated_at": "2026-10-05T04:28:21Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -5102,6 +5592,9 @@
         "bottube"
       ],
       "created_at": "2026-03-16T17:06:10Z",
+      "updated_at": "2026-08-25T23:08:46Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -5133,6 +5626,9 @@
         "creative"
       ],
       "created_at": "2026-03-14T23:42:58Z",
+      "updated_at": "2026-08-26T06:05:56Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [],
@@ -5163,6 +5659,9 @@
         "distribution"
       ],
       "created_at": "2026-03-14T23:42:56Z",
+      "updated_at": "2026-09-16T15:05:21Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -5196,6 +5695,9 @@
         "community"
       ],
       "created_at": "2026-03-10T16:05:07Z",
+      "updated_at": "2026-09-20T14:06:12Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -5224,6 +5726,9 @@
         "bounty"
       ],
       "created_at": "2026-03-08T02:35:07Z",
+      "updated_at": "2026-08-01T22:08:22Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -5254,6 +5759,9 @@
         "research"
       ],
       "created_at": "2026-03-07T18:00:34Z",
+      "updated_at": "2026-09-11T13:10:31Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [],
@@ -5283,6 +5791,9 @@
         "distribution"
       ],
       "created_at": "2026-03-07T00:15:26Z",
+      "updated_at": "2026-09-30T03:10:29Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -5313,6 +5824,9 @@
         "social"
       ],
       "created_at": "2026-03-06T19:15:08Z",
+      "updated_at": "2026-03-06T21:07:16Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -5340,6 +5854,9 @@
         "social"
       ],
       "created_at": "2026-03-06T19:14:56Z",
+      "updated_at": "2026-03-06T21:07:15Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -5368,6 +5885,9 @@
         "5 RTC"
       ],
       "created_at": "2026-03-03T13:47:54Z",
+      "updated_at": "2026-08-02T09:09:58Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -5395,6 +5915,9 @@
         "bounty"
       ],
       "created_at": "2026-02-22T15:24:32Z",
+      "updated_at": "2026-09-17T21:42:03Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -5427,6 +5950,9 @@
         "community"
       ],
       "created_at": "2026-02-21T02:29:31Z",
+      "updated_at": "2026-09-21T03:11:10Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -5457,6 +5983,9 @@
         "bounty"
       ],
       "created_at": "2026-04-08T17:03:52Z",
+      "updated_at": "2026-09-22T06:41:49Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 5.0,
       "difficulty": "micro",
       "skills": [
@@ -5487,6 +6016,9 @@
         "open"
       ],
       "created_at": "2026-07-20T15:41:39Z",
+      "updated_at": "2026-09-14T00:28:41Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 4.0,
       "difficulty": "micro",
       "skills": [
@@ -5520,6 +6052,9 @@
         "community"
       ],
       "created_at": "2026-02-12T03:06:31Z",
+      "updated_at": "2026-09-18T11:00:36Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 4.0,
       "difficulty": "micro",
       "skills": [
@@ -5552,6 +6087,9 @@
         "engagement"
       ],
       "created_at": "2026-07-19T21:33:51Z",
+      "updated_at": "2026-09-14T00:29:07Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -5581,6 +6119,9 @@
         "bounty"
       ],
       "created_at": "2026-06-09T03:08:16Z",
+      "updated_at": "2026-09-06T08:30:09Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -5611,6 +6152,9 @@
         "bounty"
       ],
       "created_at": "2026-05-27T21:56:08Z",
+      "updated_at": "2026-09-24T01:11:34Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [],
@@ -5636,6 +6180,9 @@
         "bounty"
       ],
       "created_at": "2026-05-27T21:56:06Z",
+      "updated_at": "2026-09-24T01:11:33Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [],
@@ -5665,6 +6212,9 @@
         "community"
       ],
       "created_at": "2026-04-10T17:30:21Z",
+      "updated_at": "2026-09-12T06:27:59Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -5698,6 +6248,9 @@
         "distribution"
       ],
       "created_at": "2026-04-02T15:45:11Z",
+      "updated_at": "2026-08-29T19:46:12Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -5732,6 +6285,9 @@
         "distribution"
       ],
       "created_at": "2026-04-02T15:45:01Z",
+      "updated_at": "2026-09-16T15:05:40Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -5766,6 +6322,9 @@
         "distribution"
       ],
       "created_at": "2026-04-02T15:42:28Z",
+      "updated_at": "2026-09-16T15:03:02Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -5797,6 +6356,9 @@
         "miner"
       ],
       "created_at": "2026-04-02T15:41:51Z",
+      "updated_at": "2026-10-04T13:43:43Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -5828,6 +6390,9 @@
         "3-rtc"
       ],
       "created_at": "2026-03-22T03:03:25Z",
+      "updated_at": "2026-08-02T08:06:05Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -5857,6 +6422,9 @@
         "bounty"
       ],
       "created_at": "2026-03-18T16:35:36Z",
+      "updated_at": "2026-09-17T20:16:13Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -5889,6 +6457,9 @@
         "propagation"
       ],
       "created_at": "2026-03-10T23:48:34Z",
+      "updated_at": "2026-08-01T19:46:49Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -5919,6 +6490,9 @@
         "community"
       ],
       "created_at": "2026-03-10T16:05:08Z",
+      "updated_at": "2026-10-04T07:00:24Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -5949,6 +6523,9 @@
         "bounty"
       ],
       "created_at": "2026-03-10T15:42:29Z",
+      "updated_at": "2026-10-04T13:09:50Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -5986,6 +6563,9 @@
         "community"
       ],
       "created_at": "2026-03-09T22:03:48Z",
+      "updated_at": "2026-09-17T19:26:03Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -6014,6 +6594,9 @@
         "bounty"
       ],
       "created_at": "2026-03-08T02:35:58Z",
+      "updated_at": "2026-09-11T12:59:15Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -6044,6 +6627,9 @@
         "design"
       ],
       "created_at": "2026-03-07T18:00:37Z",
+      "updated_at": "2026-09-17T21:06:07Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -6074,6 +6660,9 @@
         "bottube"
       ],
       "created_at": "2026-03-07T16:17:32Z",
+      "updated_at": "2026-10-04T09:36:35Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -6107,6 +6696,9 @@
         "distribution"
       ],
       "created_at": "2026-03-07T16:17:09Z",
+      "updated_at": "2026-09-16T15:02:54Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -6139,6 +6731,9 @@
         "easy"
       ],
       "created_at": "2026-02-26T21:54:17Z",
+      "updated_at": "2026-09-29T17:38:54Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -6173,6 +6768,9 @@
         "easy"
       ],
       "created_at": "2026-02-26T21:54:02Z",
+      "updated_at": "2026-09-23T03:20:02Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -6205,6 +6803,9 @@
         "bounty"
       ],
       "created_at": "2026-02-25T02:44:28Z",
+      "updated_at": "2026-10-01T08:00:24Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -6239,6 +6840,9 @@
         "community"
       ],
       "created_at": "2026-02-20T12:51:41Z",
+      "updated_at": "2026-09-23T00:25:04Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -6268,6 +6872,9 @@
         "bounty"
       ],
       "created_at": "2026-02-14T17:34:51Z",
+      "updated_at": "2026-10-05T04:27:21Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -6302,6 +6909,9 @@
         "community"
       ],
       "created_at": "2026-02-21T02:29:40Z",
+      "updated_at": "2026-08-28T20:04:28Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -6334,6 +6944,9 @@
         "bounty"
       ],
       "created_at": "2026-02-13T20:12:59Z",
+      "updated_at": "2026-10-04T10:25:38Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 3.0,
       "difficulty": "micro",
       "skills": [
@@ -6364,6 +6977,9 @@
         "bounty"
       ],
       "created_at": "2026-06-11T23:02:38Z",
+      "updated_at": "2026-10-05T04:27:31Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -6392,6 +7008,9 @@
         "bounty"
       ],
       "created_at": "2026-05-22T15:44:41Z",
+      "updated_at": "2026-08-02T08:01:51Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [],
@@ -6420,6 +7039,9 @@
         "bounty"
       ],
       "created_at": "2026-05-20T19:40:25Z",
+      "updated_at": "2026-08-01T22:04:41Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -6457,6 +7079,9 @@
         "bounty"
       ],
       "created_at": "2026-05-11T16:18:31Z",
+      "updated_at": "2026-10-05T04:27:20Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -6485,6 +7110,9 @@
         "bounty"
       ],
       "created_at": "2026-05-11T16:18:30Z",
+      "updated_at": "2026-08-02T08:01:57Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -6516,6 +7144,9 @@
         "2-rtc"
       ],
       "created_at": "2026-03-22T03:03:27Z",
+      "updated_at": "2026-08-01T18:53:37Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -6548,6 +7179,9 @@
         "claimed"
       ],
       "created_at": "2026-03-20T15:32:02Z",
+      "updated_at": "2026-10-04T13:43:47Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -6578,6 +7212,9 @@
         "bounty"
       ],
       "created_at": "2026-03-17T02:05:44Z",
+      "updated_at": "2026-08-25T23:08:12Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -6606,6 +7243,9 @@
         "bounty"
       ],
       "created_at": "2026-03-16T18:12:44Z",
+      "updated_at": "2026-10-05T04:27:33Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -6638,6 +7278,9 @@
         "creative"
       ],
       "created_at": "2026-03-14T23:42:59Z",
+      "updated_at": "2026-08-26T06:06:01Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -6669,6 +7312,9 @@
         "creative"
       ],
       "created_at": "2026-03-14T23:42:56Z",
+      "updated_at": "2026-09-14T18:58:11Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -6701,6 +7347,9 @@
         "community"
       ],
       "created_at": "2026-03-10T16:05:07Z",
+      "updated_at": "2026-10-02T05:25:42Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -6733,6 +7382,9 @@
         "distribution"
       ],
       "created_at": "2026-03-07T16:17:07Z",
+      "updated_at": "2026-09-20T15:15:29Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -6765,6 +7417,9 @@
         "community"
       ],
       "created_at": "2026-03-06T14:59:22Z",
+      "updated_at": "2026-09-11T14:20:33Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -6798,6 +7453,9 @@
         "community"
       ],
       "created_at": "2026-03-01T04:13:54Z",
+      "updated_at": "2026-09-17T22:04:07Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "standard",
       "skills": [
@@ -6830,6 +7488,9 @@
         "community"
       ],
       "created_at": "2026-03-01T04:13:51Z",
+      "updated_at": "2026-10-05T09:52:04Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "standard",
       "skills": [],
@@ -6860,6 +7521,9 @@
         "community"
       ],
       "created_at": "2026-03-01T04:13:49Z",
+      "updated_at": "2026-09-17T22:04:15Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "standard",
       "skills": [],
@@ -6890,6 +7554,9 @@
         "community"
       ],
       "created_at": "2026-03-01T04:13:47Z",
+      "updated_at": "2026-09-17T22:04:47Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "standard",
       "skills": [],
@@ -6921,6 +7588,9 @@
         "community"
       ],
       "created_at": "2026-03-01T04:13:08Z",
+      "updated_at": "2026-10-04T13:19:08Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -6952,6 +7622,9 @@
         "bounty"
       ],
       "created_at": "2026-02-25T02:44:33Z",
+      "updated_at": "2026-08-02T09:16:24Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -6986,6 +7659,9 @@
         "distribution"
       ],
       "created_at": "2026-02-25T02:44:27Z",
+      "updated_at": "2026-09-16T15:02:38Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -7020,6 +7696,9 @@
         "community"
       ],
       "created_at": "2026-02-17T01:08:47Z",
+      "updated_at": "2026-10-05T08:21:02Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -7056,6 +7735,9 @@
         "community"
       ],
       "created_at": "2026-02-15T00:56:05Z",
+      "updated_at": "2026-09-08T07:40:03Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -7086,6 +7768,9 @@
         "community"
       ],
       "created_at": "2026-02-12T03:04:09Z",
+      "updated_at": "2026-10-05T03:34:56Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 2.0,
       "difficulty": "micro",
       "skills": [
@@ -7121,6 +7806,9 @@
         "stars"
       ],
       "created_at": "2026-07-19T21:33:49Z",
+      "updated_at": "2026-10-05T06:30:15Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7153,6 +7841,9 @@
         "onboarding"
       ],
       "created_at": "2026-04-09T03:26:26Z",
+      "updated_at": "2026-09-17T17:12:04Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [],
@@ -7184,6 +7875,9 @@
         "bottube"
       ],
       "created_at": "2026-04-02T15:44:53Z",
+      "updated_at": "2026-09-11T10:09:14Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7215,6 +7909,9 @@
         "onboarding"
       ],
       "created_at": "2026-04-02T15:44:45Z",
+      "updated_at": "2026-09-11T10:11:30Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7246,6 +7943,9 @@
         "bottube"
       ],
       "created_at": "2026-04-02T15:44:17Z",
+      "updated_at": "2026-09-17T21:47:45Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7277,6 +7977,9 @@
         "bottube"
       ],
       "created_at": "2026-04-02T15:44:11Z",
+      "updated_at": "2026-09-11T10:04:38Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7307,6 +8010,9 @@
         "onboarding"
       ],
       "created_at": "2026-04-02T15:41:22Z",
+      "updated_at": "2026-10-04T14:10:39Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7338,6 +8044,9 @@
         "1-4-rtc"
       ],
       "created_at": "2026-03-22T03:03:27Z",
+      "updated_at": "2026-08-02T09:00:51Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7374,6 +8083,9 @@
         "distribution"
       ],
       "created_at": "2026-03-16T17:06:12Z",
+      "updated_at": "2026-09-16T15:01:07Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7407,6 +8119,9 @@
         "accessibility"
       ],
       "created_at": "2026-03-10T23:50:21Z",
+      "updated_at": "2026-09-21T21:47:02Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7436,6 +8151,9 @@
         "bounty"
       ],
       "created_at": "2026-03-09T01:52:39Z",
+      "updated_at": "2026-09-13T12:54:37Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7472,6 +8190,9 @@
         "distribution"
       ],
       "created_at": "2026-03-08T20:22:30Z",
+      "updated_at": "2026-09-16T15:03:36Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7501,6 +8222,9 @@
         "bottube"
       ],
       "created_at": "2026-03-07T16:18:19Z",
+      "updated_at": "2026-09-30T03:09:57Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7531,6 +8255,9 @@
         "bottube"
       ],
       "created_at": "2026-03-07T16:17:53Z",
+      "updated_at": "2026-09-24T00:23:55Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7561,6 +8288,9 @@
         "bottube"
       ],
       "created_at": "2026-03-07T16:17:31Z",
+      "updated_at": "2026-09-24T00:20:27Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7591,6 +8321,9 @@
         "bottube"
       ],
       "created_at": "2026-03-07T16:16:42Z",
+      "updated_at": "2026-09-24T00:16:54Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7621,6 +8354,9 @@
         "bottube"
       ],
       "created_at": "2026-03-07T16:16:41Z",
+      "updated_at": "2026-09-24T00:17:42Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7651,6 +8387,9 @@
         "bottube"
       ],
       "created_at": "2026-03-07T16:16:40Z",
+      "updated_at": "2026-09-24T00:19:35Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7681,6 +8420,9 @@
         "community"
       ],
       "created_at": "2026-03-07T00:15:27Z",
+      "updated_at": "2026-10-04T13:22:54Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7714,6 +8456,9 @@
         "onboarding"
       ],
       "created_at": "2026-03-06T14:18:53Z",
+      "updated_at": "2026-08-01T22:17:47Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7747,6 +8492,9 @@
         "community"
       ],
       "created_at": "2026-03-01T04:13:33Z",
+      "updated_at": "2026-09-17T20:35:11Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [],
@@ -7776,6 +8524,9 @@
         "community"
       ],
       "created_at": "2026-02-26T21:21:18Z",
+      "updated_at": "2026-08-01T22:53:50Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [],
@@ -7805,6 +8556,9 @@
         "community"
       ],
       "created_at": "2026-02-26T21:21:10Z",
+      "updated_at": "2026-08-02T09:15:51Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7834,6 +8588,9 @@
         "bounty"
       ],
       "created_at": "2026-02-25T02:43:57Z",
+      "updated_at": "2026-08-24T04:31:22Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7868,6 +8625,9 @@
         "community"
       ],
       "created_at": "2026-02-24T01:18:27Z",
+      "updated_at": "2026-08-17T19:00:30Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7895,6 +8655,9 @@
         "bounty"
       ],
       "created_at": "2026-02-20T18:43:46Z",
+      "updated_at": "2026-10-05T04:27:24Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7927,6 +8690,9 @@
         "community"
       ],
       "created_at": "2026-02-17T01:08:44Z",
+      "updated_at": "2026-10-04T15:30:29Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7960,6 +8726,9 @@
         "community"
       ],
       "created_at": "2026-02-14T21:05:30Z",
+      "updated_at": "2026-10-05T04:27:22Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -7995,6 +8764,9 @@
         "community"
       ],
       "created_at": "2026-02-12T15:33:20Z",
+      "updated_at": "2026-08-01T23:52:19Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "micro",
       "skills": [
@@ -8024,6 +8796,9 @@
         "ecosystem"
       ],
       "created_at": "2026-02-02T16:38:32Z",
+      "updated_at": "2026-09-18T03:32:05Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 1.0,
       "difficulty": "critical",
       "skills": [
@@ -8059,6 +8834,9 @@
         "community"
       ],
       "created_at": "2026-03-06T15:44:49Z",
+      "updated_at": "2026-10-05T04:15:59Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 0.5,
       "difficulty": "micro",
       "skills": [
@@ -8094,6 +8872,9 @@
         "community"
       ],
       "created_at": "2026-03-07T00:40:02Z",
+      "updated_at": "2026-09-29T17:35:59Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 0.33,
       "difficulty": "micro",
       "skills": [
@@ -8127,6 +8908,9 @@
         "claimed"
       ],
       "created_at": "2026-09-05T23:48:51Z",
+      "updated_at": "2026-10-03T21:12:07Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 0.1,
       "difficulty": "micro",
       "skills": [
@@ -8159,6 +8943,9 @@
         "community"
       ],
       "created_at": "2026-04-12T18:25:39Z",
+      "updated_at": "2026-09-17T17:45:30Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 0.01,
       "difficulty": "micro",
       "skills": [
@@ -8189,6 +8976,9 @@
         "bounty"
       ],
       "created_at": "2026-09-18T00:06:02Z",
+      "updated_at": "2026-10-04T11:05:11Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 0.0,
       "difficulty": "micro",
       "skills": [
@@ -8218,6 +9008,9 @@
         "needs strong contributor"
       ],
       "created_at": "2026-02-02T17:25:52Z",
+      "updated_at": "2026-09-17T23:22:30Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 0.0,
       "difficulty": "micro",
       "skills": [
@@ -8247,6 +9040,9 @@
         "propagation"
       ],
       "created_at": "2026-02-02T16:23:18Z",
+      "updated_at": "2026-09-18T03:36:48Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 0.0,
       "difficulty": "major",
       "skills": [
@@ -8282,6 +9078,9 @@
         "propagation"
       ],
       "created_at": "2026-02-02T16:21:56Z",
+      "updated_at": "2026-09-18T03:37:55Z",
+      "state": "open",
+      "assignees": [],
       "reward_rtc": 0.0,
       "difficulty": "major",
       "skills": [
@@ -8305,6 +9104,6 @@
       }
     }
   ],
-  "updated_at": "2026-10-05T00:19:02.092771+00:00",
+  "updated_at": "2026-10-05T13:40:56.390514+00:00",
   "total_count": 266
 }
