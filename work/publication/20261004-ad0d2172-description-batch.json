@@ -195,7 +195,20 @@
           "topic": "cursor position scopes"
         }
       ],
-      "publication_status": "prepared; upstream body readback remains the historical preimage; dispatch awaiting original operation custody and recovered supported author road"
+      "publication_status": "prepared; upstream body readback remains the historical preimage; dispatch awaiting original operation custody and recovered supported author road",
+      "native_attempts_after_preparation": [
+        {
+          "observed_at": "2026-10-05T00:02:11.414Z",
+          "tool": "update_pull_request",
+          "count": 1,
+          "outcome": "provider_403",
+          "error": "GitHub API error 403: {\"message\":\"Resource not accessible by integration\",\"documentation_url\":\"https://docs.github.com/rest/pulls/pulls#update-a-pull-request\",\"status\":\"403\"}",
+          "rate_reset_at": null,
+          "retry_after_seconds": null,
+          "expected_head": "38d34851ddfa7e66c4206db5d124aa720d32e9e9",
+          "readback": "unchanged body and exact head"
+        }
+      ]
     },
     {
       "id": "RFB145",
@@ -230,7 +243,20 @@
           "topic": "opaque tuple provider operation ID"
         }
       ],
-      "publication_status": "prepared; upstream body readback remains the historical preimage; dispatch awaiting original operation custody and recovered supported author road"
+      "publication_status": "prepared; upstream body readback remains the historical preimage; dispatch awaiting original operation custody and recovered supported author road",
+      "native_attempts_after_preparation": [
+        {
+          "observed_at": "2026-10-05T00:02:11.414Z",
+          "tool": "update_pull_request",
+          "count": 1,
+          "outcome": "provider_403",
+          "error": "GitHub API error 403: {\"message\":\"Resource not accessible by integration\",\"documentation_url\":\"https://docs.github.com/rest/pulls/pulls#update-a-pull-request\",\"status\":\"403\"}",
+          "rate_reset_at": null,
+          "retry_after_seconds": null,
+          "expected_head": "7403dd31e4ceaa05722aa91479a3fa6e43b6d24e",
+          "readback": "unchanged body and exact head"
+        }
+      ]
     }
   ]
 }
