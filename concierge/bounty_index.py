@@ -120,19 +120,25 @@ def _shared_cooldown_blocks(cooldown, report, source):
         return False
     try:
         deadline = cooldown.deadline()
+        reserve_deadline = cooldown.quota_reserve_deadline()
     except CooldownStateError:
         report["cooldown_state_error"] = True
         source["status"] = "COOLDOWN_STATE_ERROR"
         return True
     now = time()
-    if deadline is None or deadline <= now:
-        return False
-    report.update(rate_limited=True, retry_after_seconds=math.ceil(deadline - now),
-                  shared_cooldown_until_epoch=deadline)
-    source["status"] = ("RATE_LIMITED_BEFORE_NEXT_PAGE" if source["pages_fetched"]
-                        else "NOT_ATTEMPTED_SHARED_COOLDOWN")
-    return True
-
+    if deadline is not None and deadline > now:
+        report.update(rate_limited=True, retry_after_seconds=math.ceil(deadline - now),
+                      shared_cooldown_until_epoch=deadline)
+        source["status"] = ("RATE_LIMITED_BEFORE_NEXT_PAGE" if source["pages_fetched"]
+                            else "NOT_ATTEMPTED_SHARED_COOLDOWN")
+        return True
+    if reserve_deadline is not None and reserve_deadline > now:
+        report.update(request_headroom_reserved=True, rate_limit_reset_at=reserve_deadline)
+        source["status"] = ("HEADROOM_RESERVED_BEFORE_NEXT_PAGE"
+                            if source["pages_fetched"]
+                            else "NOT_ATTEMPTED_HEADROOM_RESERVED")
+        return True
+    return False
 
 def _share_quota_deadline(cooldown, report, source, remaining, retry_after, reset_at):
     """Publish a throttle without mistaking an unrelated primary reset for it."""
@@ -313,6 +319,12 @@ def fetch_bounties_report(repos=None, token=None, *, max_pages=100, cache_dir=No
                             rate_limit_remaining=remaining,
                             rate_limit_reset_at=reset_at,
                         )
+                        if cooldown is not None and reset_at is not None:
+                            try:
+                                cooldown.reserve_quota_until(float(reset_at))
+                            except CooldownStateError:
+                                report["cooldown_state_error"] = True
+                                source["cooldown_state_error"] = True
                     if hook_http_error or status not in (200, 304):
                         if status == 401 and "Authorization" in headers:
                             authentication_failed = True
