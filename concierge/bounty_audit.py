@@ -351,6 +351,7 @@ def audit_bounty(
     _source_issue_cache: dict[tuple[str, int], dict[str, Any]] | None = None,
     _source_expiry_cache: dict[tuple[str, int], list[dict[str, Any]]] | None = None,
     _search_cache: dict[tuple[str, int], list[dict[str, Any]]] | None = None,
+    _batch_search_state: dict[str, bool] | None = None,
 ) -> dict[str, Any]:
     """Audit one GitHub bounty issue against canonical repository signals.
 
@@ -387,6 +388,7 @@ def audit_bounty(
                 _source_issue_cache=_source_issue_cache,
                 _source_expiry_cache=_source_expiry_cache,
                 _search_cache=_search_cache,
+                _batch_search_state=_batch_search_state,
             )
 
     token = token or GITHUB_TOKEN
@@ -428,7 +430,13 @@ def audit_bounty(
         repository_candidates: list[dict[str, Any]] = []
         repository_truncated = False
         search_rate_limited = False
-        if _search_cooldown_active(search_cooldown):
+        batch_search_blocked = (
+            _batch_search_state is not None
+            and _batch_search_state.get("rate_limited") is True
+        )
+        if batch_search_blocked or _search_cooldown_active(search_cooldown):
+            if _batch_search_state is not None:
+                _batch_search_state["rate_limited"] = True
             timeline_candidates, timeline_truncated = _timeline_linked_pr_candidates(
                 session,
                 repo,
@@ -451,6 +459,8 @@ def audit_bounty(
             except BountyAuditError as exc:
                 if not _is_search_rate_limit(exc):
                     raise
+                if _batch_search_state is not None:
+                    _batch_search_state["rate_limited"] = True
                 _record_search_cooldown(search_cooldown, exc)
                 timeline_candidates, timeline_truncated = _timeline_linked_pr_candidates(
                     session,
@@ -649,6 +659,7 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
     source_issue_cache: dict[tuple[str, int], dict[str, Any]] = {}
     source_expiry_cache: dict[tuple[str, int], list[dict[str, Any]]] = {}
     search_cache: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    batch_search_state: dict[str, bool] = {"rate_limited": False}
     audit_by_issue: dict[tuple[str, int, str | None], dict[str, Any]] = {}
     unavailable_by_issue: dict[tuple[str, int], BountyAuditError] = {}
     unavailable: list[dict[str, Any]] = []
@@ -684,6 +695,7 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
                     _source_issue_cache=source_issue_cache,
                     _source_expiry_cache=source_expiry_cache,
                     _search_cache=search_cache,
+                    _batch_search_state=batch_search_state,
                 )
             except BountyAuditError as exc:
                 if (
