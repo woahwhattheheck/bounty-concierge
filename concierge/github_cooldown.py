@@ -99,6 +99,27 @@ class GitHubCooldown:
                 raise CooldownStateError("shared GitHub quota reservation deadline invalid")
             return float(value)
 
+    def deadlines(self) -> tuple[float | None, float | None]:
+        """Read provider and quota-reservation deadlines in one SQLite snapshot.
+
+        A single statement keeps the pair consistent and avoids opening and
+        initializing the same store twice for each discovery preflight.
+        """
+        with self._connection() as connection:
+            rows = connection.execute(
+                "SELECT 'cooldown', until_epoch "
+                "FROM github_cooldown_v1 WHERE scope = ? "
+                "UNION ALL SELECT 'quota reservation', until_epoch "
+                "FROM github_quota_reserve_v1 WHERE scope = ?",
+                (self.scope, self.scope),
+            ).fetchall()
+            values: dict[str, float] = {}
+            for label, value in rows:
+                if not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+                    raise CooldownStateError(f"shared GitHub {label} deadline invalid")
+                values[label] = float(value)
+            return values.get("cooldown"), values.get("quota reservation")
+
     def extend(self, until_epoch: float) -> None:
         if not math.isfinite(until_epoch) or until_epoch < 0:
             raise CooldownStateError("shared GitHub cooldown deadline invalid")
