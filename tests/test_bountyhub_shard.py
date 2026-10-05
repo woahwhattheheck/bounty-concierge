@@ -66,6 +66,36 @@ class BountyHubShardTest(unittest.TestCase):
             all(result["assignment_mode"] == "explicit-worker-index" for result in results)
         )
 
+    def test_wave_plan_assigns_every_candidate_once_and_reports_occupancy(self):
+        result = shard.plan_indexed(snapshot(), 4)
+        assigned = [
+            item["work_key"]
+            for slot in result["slots"]
+            for item in slot["work"]
+        ]
+
+        self.assertEqual(result["schema"], "bountyhub-wave-plan/v1")
+        self.assertCountEqual(assigned, ["github:owner/a#1", "github:owner/b#2"])
+        self.assertEqual(len(assigned), len(set(assigned)))
+        self.assertEqual(sum(result["slot_work_key_counts"]), 2)
+        self.assertEqual(
+            result["nonempty_worker_count"],
+            sum(count > 0 for count in result["slot_work_key_counts"]),
+        )
+        self.assertEqual(
+            result["max_assigned_work_key_count"],
+            max(result["slot_work_key_counts"]),
+        )
+        self.assertEqual(len(result["candidate_set_sha256"]), 64)
+        self.assertEqual(
+            [slot["worker_index"] for slot in result["slots"]],
+            list(range(4)),
+        )
+        self.assertTrue(all(
+            slot["assigned_work_key_count"] == len(slot["work"])
+            for slot in result["slots"]
+        ))
+
     def test_rejects_unrecognized_snapshots_and_invalid_worker_count_or_index(self):
         with self.assertRaises(shard.ShardError):
             shard.load_snapshot(json.dumps({"data": []}).encode())

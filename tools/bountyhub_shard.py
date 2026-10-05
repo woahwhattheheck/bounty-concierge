@@ -102,6 +102,22 @@ def candidate_groups(
     return groups
 
 
+def _project_listings(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep only sanitized listing fields needed by workers."""
+    return [
+        {
+            key: row.get(key)
+            for key in (
+                "listing_id", "title", "advertised_usd",
+                "provider_funding_status", "assignment_type",
+                "assignee_username", "reconciliation_reasons",
+            )
+            if key in row
+        }
+        for row in rows
+    ]
+
+
 def _shard_for_slot(
     snapshot: dict[str, Any], worker_slot: int, worker_count: int
 ) -> dict[str, Any]:
@@ -113,18 +129,10 @@ def _shard_for_slot(
     for work_key in sorted(groups):
         if _slot(work_key, worker_count) != worker_slot:
             continue
-        listings = []
-        for row in groups[work_key]:
-            listings.append({
-                key: row.get(key)
-                for key in (
-                    "listing_id", "title", "advertised_usd",
-                    "provider_funding_status", "assignment_type",
-                    "assignee_username", "reconciliation_reasons",
-                )
-                if key in row
-            })
-        assigned.append({"work_key": work_key, "listings": listings})
+        assigned.append({
+            "work_key": work_key,
+            "listings": _project_listings(groups[work_key]),
+        })
 
     return {
         "schema": "bountyhub-work-shard/v1",
@@ -173,6 +181,51 @@ def shard_indexed(
     return result
 
 
+def plan_indexed(snapshot: dict[str, Any], worker_count: int) -> dict[str, Any]:
+    """Build one authoritative manifest for every explicit worker slot."""
+    _validate_worker_count(worker_count)
+    overlay_status = reconciliation_status(snapshot)
+    groups = candidate_groups(snapshot, overlay_status=overlay_status)
+    slots = [
+        {"worker_index": index, "assigned_work_key_count": 0, "work": []}
+        for index in range(worker_count)
+    ]
+    for work_key in sorted(groups):
+        worker_index = _slot(work_key, worker_count)
+        slots[worker_index]["work"].append({
+            "work_key": work_key,
+            "listings": _project_listings(groups[work_key]),
+        })
+        slots[worker_index]["assigned_work_key_count"] += 1
+
+    counts = [slot["assigned_work_key_count"] for slot in slots]
+    keys = sorted(groups)
+    fingerprint_payload = "".join(f"{key}\n" for key in keys).encode("utf-8")
+    return {
+        "schema": "bountyhub-wave-plan/v1",
+        "source_schema": snapshot.get("schema"),
+        "source_retrieved_at": snapshot.get("retrieved_at"),
+        "source_raw_sha256": snapshot.get("raw_sha256"),
+        "github_reconciliation_status": overlay_status,
+        "algorithm": "sha256-mod-v1",
+        "worker_count": worker_count,
+        "candidate_work_key_count": len(keys),
+        "candidate_set_sha256": hashlib.sha256(fingerprint_payload).hexdigest(),
+        "nonempty_worker_count": sum(count > 0 for count in counts),
+        "max_assigned_work_key_count": max(counts, default=0),
+        "slot_work_key_counts": counts,
+        "slots": slots,
+        "interpretation": [
+            "Publish one shared plan per wave and assign each worker_index at most once.",
+            "Every eligible work_key appears in exactly one slot under this worker_count.",
+            "This plan is advisory collision reduction, not a provider assignment.",
+            "Reconcile live source state and current swarm ownership before implementation.",
+            "Duplicate provider cards for one work_key stay grouped and are never summed.",
+            "The planner performs zero network requests; refresh the shared capture when stale.",
+        ],
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, required=True, help="sanitized intake JSON")
@@ -186,13 +239,20 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         help="explicit zero-based slot assigned uniquely by the wave orchestrator",
     )
+    selector.add_argument(
+        "--all-workers",
+        action="store_true",
+        help="emit one authoritative manifest containing every explicit worker slot",
+    )
     parser.add_argument("--worker-count", type=int, required=True, help="advisory shard count")
     parser.add_argument("--output", type=Path, help="write shard JSON instead of stdout")
     args = parser.parse_args(argv)
 
     try:
         snapshot = load_snapshot(_read_bounded(args.input))
-        if args.worker_index is not None:
+        if args.all_workers:
+            result = plan_indexed(snapshot, args.worker_count)
+        elif args.worker_index is not None:
             result = shard_indexed(snapshot, args.worker_index, args.worker_count)
         else:
             result = shard(snapshot, args.worker_key, args.worker_count)
