@@ -56,3 +56,15 @@ def test_expired_deadlines_are_not_blocking(tmp_path):
     assert result["effective_until_epoch"] is None
     assert result["provider_cooldown"]["retry_after_seconds"] == 0
     assert result["quota_reservation"]["retry_after_seconds"] == 0
+def test_cli_accepts_normal_token_env_name(tmp_path, capsys):
+    path = tmp_path / "missing.sqlite"
+
+    assert status.main([
+        "--cooldown-file", str(path),
+        "--token-env", "GITHUB_TOKEN",
+        "--json",
+    ]) == 0
+
+    result = json.loads(capsys.readouterr().out)
+    assert result["state"] == "ABSENT"
+    assert not path.exists()
