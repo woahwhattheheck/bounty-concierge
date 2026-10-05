@@ -8,7 +8,7 @@ diff --git a/src/sync.ts b/src/sync.ts
 +import { DownloadChangeService, IDownloadFileChange } from "./service/download-change.service";
  import { GitHubService } from "./service/github.service";
  import { ExtensionInformation, PluginService } from "./service/plugin.service";
-@@ -569,128 +570,193 @@
+@@ -569,128 +570,196 @@
          }
        });
  
@@ -188,7 +188,7 @@ diff --git a/src/sync.ts b/src/sync.ts
 +                fileName
 +              );
 +        const fileExists = await FileService.FileExists(targetPath);
-+        let localContent: string = null;
++        let localContent: string | null = null;
 +
 +        if (fileExists) {
 +          localContent = await FileService.ReadFile(targetPath);
@@ -247,6 +247,9 @@ diff --git a/src/sync.ts b/src/sync.ts
 +
 +      if (!confirmed) {
 +        vscode.window.setStatusBarMessage("Sync: Download canceled.", 3000);
++        if (syncSetting.autoUpload) {
++          await state.commons.HandleStartWatching();
++        }
 +        return;
 +      }
 +
@@ -324,7 +327,7 @@ diff --git a/src/sync.ts b/src/sync.ts
        const settingsUpdated = await state.commons.SaveSettings(syncSetting);
        const customSettingsUpdated = await state.commons.SetCustomSettings(
          customSettings
-@@ -699,7 +765,7 @@
+@@ -699,7 +768,7 @@
          if (!syncSetting.quietSync) {
            state.commons.ShowSummaryOutput(
              false,
