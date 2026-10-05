@@ -99,13 +99,36 @@ class GitHubCooldown:
                 raise CooldownStateError("shared GitHub quota reservation deadline invalid")
             return float(value)
 
-    def deadlines(self) -> tuple[float | None, float | None]:
+    @contextmanager
+    def _read_only_connection(self) -> Iterator[sqlite3.Connection]:
+        connection = None
+        try:
+            connection = sqlite3.connect(
+                self.path.absolute().as_uri() + "?mode=ro",
+                timeout=1.0,
+                uri=True,
+            )
+            yield connection
+        except (OSError, sqlite3.Error, ValueError, OverflowError) as exc:
+            raise CooldownStateError("shared GitHub cooldown state unavailable") from exc
+        finally:
+            if connection is not None:
+                connection.close()
+
+    def deadlines(
+        self, *, read_only: bool = False
+    ) -> tuple[float | None, float | None]:
         """Read provider and quota-reservation deadlines in one SQLite snapshot.
 
         A single statement keeps the pair consistent and avoids opening and
         initializing the same store twice for each discovery preflight.
+        Read-only observation never creates a database or initializes its schema;
+        missing or incomplete state raises CooldownStateError.
         """
-        with self._connection() as connection:
+        connection_context = (
+            self._read_only_connection() if read_only else self._connection()
+        )
+        with connection_context as connection:
             rows = connection.execute(
                 "SELECT 'cooldown', until_epoch "
                 "FROM github_cooldown_v1 WHERE scope = ? "
