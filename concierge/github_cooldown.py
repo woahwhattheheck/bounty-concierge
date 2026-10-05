@@ -56,6 +56,10 @@ class GitHubCooldown:
                     "(scope TEXT PRIMARY KEY, until_epoch REAL NOT NULL)"
                 )
                 connection.execute(
+                    "CREATE TABLE IF NOT EXISTS github_quota_reserve_v1 "
+                    "(scope TEXT PRIMARY KEY, until_epoch REAL NOT NULL)"
+                )
+                connection.execute(
                     "CREATE TABLE IF NOT EXISTS github_cooldown_unknown_v1 "
                     "(scope TEXT PRIMARY KEY, backoff_seconds REAL NOT NULL, "
                     "observed_epoch REAL NOT NULL)"
@@ -81,6 +85,20 @@ class GitHubCooldown:
                 raise CooldownStateError("shared GitHub cooldown deadline invalid")
             return float(value)
 
+    def quota_reserve_deadline(self) -> float | None:
+        """Return an operator-requested quota reservation deadline, if active."""
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT until_epoch FROM github_quota_reserve_v1 WHERE scope = ?",
+                (self.scope,),
+            ).fetchone()
+            if row is None:
+                return None
+            value = row[0]
+            if not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+                raise CooldownStateError("shared GitHub quota reservation deadline invalid")
+            return float(value)
+
     def extend(self, until_epoch: float) -> None:
         if not math.isfinite(until_epoch) or until_epoch < 0:
             raise CooldownStateError("shared GitHub cooldown deadline invalid")
@@ -89,6 +107,18 @@ class GitHubCooldown:
                 "INSERT INTO github_cooldown_v1(scope, until_epoch) VALUES (?, ?) "
                 "ON CONFLICT(scope) DO UPDATE SET until_epoch = "
                 "MAX(github_cooldown_v1.until_epoch, excluded.until_epoch)",
+                (self.scope, until_epoch),
+            )
+
+    def reserve_quota_until(self, until_epoch: float) -> None:
+        """Share a primary-quota headroom reservation without calling it a throttle."""
+        if not math.isfinite(until_epoch) or until_epoch < 0:
+            raise CooldownStateError("shared GitHub quota reservation deadline invalid")
+        with self._connection() as connection:
+            connection.execute(
+                "INSERT INTO github_quota_reserve_v1(scope, until_epoch) VALUES (?, ?) "
+                "ON CONFLICT(scope) DO UPDATE SET until_epoch = "
+                "MAX(github_quota_reserve_v1.until_epoch, excluded.until_epoch)",
                 (self.scope, until_epoch),
             )
 
