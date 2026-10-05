@@ -1,0 +1,54 @@
+Subject: [PATCH] fix: count days in parsed durations
+Source: https://github.com/tine1117/oss-hunter-livefire/issues/1
+Status: implemented and executed; not submitted upstream.
+
+The source issue advertises $50 with Algora/$50 labels. Funding and award
+eligibility are unverified; the README calls this repo a sandbox/test fixture.
+No reward or confirmed receivable is claimed.
+
+Publication limitation: shared-account fork lookup returned 404; upstream
+push permission is false; connected GitHub actions do not include fork creation.
+No new publisher request, local-PC task or upstream mutation was made.
+
+Validation: CPython 3.13.5, python -m unittest discover -s tests.
+The two new regressions fail on the upstream preimage (exit 1, two failures).
+All nine existing-plus-added cases pass on the candidate (exit 0).
+
+Preimage source blob: ee515c684db5359838e5847fd6cec52aef2453c3
+Preimage tests blob: b259480aafaa38491877bd4ccd8308a2625f1981
+Candidate source blob: 911a27839933c4a5389a007ed1957fbe66c7be6d
+Candidate tests blob: 1103ed31e685e38a3ffb6469030501da6ee6945a
+Diff-only SHA256: 9b3ba932e3fcc44744f152dc8f33a6774792f1b14bb8f3cd5ec3d48b59f883c8
+
+Refresh the two source preimages and current shared-handle claim before applying.
+Keep this same packet; the implementation and focused checks are complete.
+
+--- a/duration_utils.py
++++ b/duration_utils.py
+@@ -4,9 +4,10 @@
+ 
+ import re
+ 
+-# Seconds per unit. Supported: weeks, hours, minutes, seconds.
++# Seconds per unit. Supported: weeks, days, hours, minutes, seconds.
+ _UNITS = {
+     "w": 604800,
++    "d": 86400,
+     "h": 3600,
+     "m": 60,
+     "s": 1,
+--- a/tests/test_duration_utils.py
++++ b/tests/test_duration_utils.py
+@@ -16,6 +16,12 @@
+     def test_weeks(self):
+         self.assertEqual(parse_duration("1w"), 604800)
+ 
++    def test_days(self):
++        self.assertEqual(parse_duration("1d"), 86400)
++
++    def test_days_and_hours(self):
++        self.assertEqual(parse_duration("2d4h"), 187200)
++
+     def test_combined(self):
+         self.assertEqual(parse_duration("1h30m"), 5400)
+ 
