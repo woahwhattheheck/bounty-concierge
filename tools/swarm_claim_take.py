@@ -31,16 +31,16 @@ _MUTATION_LANES = frozenset({"build", "repair"})
 _REPO_TEXT = r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
 _REPO_RE = re.compile(rf"^{_REPO_TEXT}$")
 _ISSUE_RE = re.compile(
-    rf"^(?:github:)?(?P<repo>{_REPO_TEXT})#(?P<number>[1-9][0-9]*)$",
+    rf"^(?:github:)?(?P<repo>{_REPO_TEXT})#(?P<number>0*[1-9][0-9]*)$",
     re.IGNORECASE,
 )
 _PULL_RE = re.compile(
-    rf"^(?:github:)?(?P<repo>{_REPO_TEXT})!(?P<number>[1-9][0-9]*)$",
+    rf"^(?:github:)?(?P<repo>{_REPO_TEXT})!(?P<number>0*[1-9][0-9]*)$",
     re.IGNORECASE,
 )
 _GITHUB_URL_RE = re.compile(
     rf"^https://github[.]com/(?P<repo>{_REPO_TEXT})/"
-    rf"(?P<kind>issues|pull)/(?P<number>[1-9][0-9]*)/?$",
+    rf"(?P<kind>issues|pull)/(?P<number>0*[1-9][0-9]*)/?$",
     re.IGNORECASE,
 )
 
