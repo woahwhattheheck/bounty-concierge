@@ -71,6 +71,7 @@ def _exclude_assigned_exclusive(
     result["assigned_exclusive_exclusions"] = excluded
     result["assigned_exclusive_exclusion_count"] = len(excluded)
     result["swarm_reservation_schema"] = "swarm-custody-reservation/v1"
+    result["swarm_take_schema"] = "swarm-claim-take/v1"
     annotated_targets = []
     for retained_target in result["targets"]:
         target = dict(retained_target)
@@ -83,6 +84,9 @@ def _exclude_assigned_exclusive(
             "work_key": work_key,
             "branch": f"swarm-custody/v1/{digest}",
             "tool": "tools/swarm_claim_reservation.py",
+            "take_schema": result["swarm_take_schema"],
+            "take_tool": "tools/swarm_claim_take.py",
+            "take_protocol": "reserve_before_slack_take",
         }
         annotated_targets.append(target)
     result["targets"] = annotated_targets
@@ -94,6 +98,7 @@ def _exclude_assigned_exclusive(
     result["green_authorized"] = False
     result["requires_canonical_preflight"] = True
     result["requires_work_order_lease"] = True
+    result["requires_swarm_reservation"] = True
     result["canonical_preflight_candidates"] = {
         "candidates": [
             {
