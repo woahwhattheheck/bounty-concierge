@@ -49,11 +49,24 @@ fingerprint and an epoch deadline, not tokens, account details or API payloads.
 
 ### Optional provider route scopes
 
-Python callers that know a secondary limit belongs to a specific GitHub REST
-resource family can construct `GitHubCooldown(..., cooldown_scope="search")`
-(or another stable local label). Provider cooldown/backoff rows for different
+Capture workers that know a secondary limit belongs to a specific GitHub REST
+resource family can pass a stable local label through the CLI:
+
+```bash
+python -m concierge.bounty_capture_batch shortlist.json \
+  --output-dir /tmp/capture-search \
+  --cooldown-file "$HOME/.cache/bounty-capture/github.sqlite" \
+  --cooldown-scope search
+```
+
+Python callers can pass `cooldown_scope="search"` alongside `cooldown_file=`
+to `collect_batch`; direct `GitHubCooldown(..., cooldown_scope="search")`
+construction remains available. Provider cooldown/backoff rows for different
 labels are isolated, so a Search-only secondary throttle does not automatically
-idle a healthy exact-read worker. The label itself is hashed before storage.
+idle a healthy exact-read worker. `summary.json` reports
+`shared_cooldown.scoped=true` when the opt-in label is active. The label itself
+is hashed before storage. A scope without `--cooldown-file` / `cooldown_file=`
+is rejected rather than silently becoming process-local.
 
 This does **not** partition primary quota. `reserve_quota_until()` remains keyed
 only by the credential scope, and `quota_reserve_deadline()` is therefore

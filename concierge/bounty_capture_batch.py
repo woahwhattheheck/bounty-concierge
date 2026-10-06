@@ -364,6 +364,7 @@ def collect_batch(
     saturation_threshold: int = 4,
     operator_login: str | None = None,
     cooldown_file: str | Path | None = None,
+    cooldown_scope: str | None = None,
 ) -> dict[str, Any]:
     """Save each completed preflight immediately; return a safe coverage summary.
 
@@ -388,9 +389,13 @@ def collect_batch(
         raise ValueError("operator_login must be a nonempty string when supplied")
     if session is not None and not callable(getattr(session, "get", None)):
         raise ValueError("session must provide get")
+    if cooldown_scope is not None and cooldown_file is None:
+        raise ValueError("cooldown_scope requires cooldown_file")
 
     cooldown = (
-        GitHubCooldown(cooldown_file, token or GITHUB_TOKEN)
+        GitHubCooldown(
+            cooldown_file, token or GITHUB_TOKEN, cooldown_scope=cooldown_scope,
+        )
         if cooldown_file is not None else None
     )
     output = Path(output_dir)
@@ -535,6 +540,7 @@ def collect_batch(
         "rate_limit_remaining": transport.rate_limit_remaining,
         "shared_cooldown": {
             "enabled": cooldown_file is not None,
+            "scoped": cooldown_scope is not None,
             "deferred": transport.shared_cooldown_deferred,
             "headroom_deferred": transport.shared_headroom_deferred,
             "state_error": transport.cooldown_state_error,
@@ -581,6 +587,10 @@ def main(argv: list[str] | None = None) -> int:
         "--cooldown-file", type=Path,
         help="Opt-in shared SQLite quota deadline file; requires an existing private parent directory",
     )
+    parser.add_argument(
+        "--cooldown-scope",
+        help="Optional stable provider route-family label; requires --cooldown-file",
+    )
     parser.add_argument("--json", action="store_true", help="Print the safe collection summary")
     args = parser.parse_args(argv)
     try:
@@ -597,6 +607,7 @@ def main(argv: list[str] | None = None) -> int:
             reserve_requests=args.reserve_requests,
             saturation_threshold=args.saturation_threshold,
             operator_login=args.operator_login, cooldown_file=args.cooldown_file,
+            cooldown_scope=args.cooldown_scope,
         )
     except (OSError, ValueError, SecureOutputError) as exc:
         parser.error(str(exc))
