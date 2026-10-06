@@ -32,6 +32,8 @@ class BountyHubIntakeTest(unittest.TestCase):
     def test_inclusive_minimum_and_promised_not_excluded(self):
         result = project(row(), row(totalAmount="14.99"), row(totalAmount="15.01", paymentStatus="PAID", amountPaid="99.99"))
         self.assertEqual([r["catalog_candidate"] for r in result["rows"]], [True, False, True])
+        self.assertEqual([r["dispatch_status"] for r in result["rows"]], ["LEAD", "LEAD", "LEAD"])
+        self.assertTrue(all(r["requires_canonical_preflight"] for r in result["rows"]))
         self.assertEqual(result["rows"][2]["advertised_usd"], "15.01")
         for invalid in (True, "NaN", "Infinity", -1, "15.001"):
             with self.subTest(invalid=invalid), self.assertRaises(intake.IntakeError):
