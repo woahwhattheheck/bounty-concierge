@@ -21,8 +21,10 @@ from pathlib import Path
 from typing import Any
 
 from concierge.repository_contribution_policy import (
+    AUTOMATED_UPSTREAM_SUBMISSION,
     RepositoryPolicyInputError,
     evaluate_repository_policy,
+    issue_body_prohibits_automated_submission,
 )
 
 
@@ -415,6 +417,11 @@ def qualify_dispatch(
     except RepositoryPolicyInputError as exc:
         raise QualificationInputError(str(exc)) from exc
 
+    issue_method_prohibited = (
+        snapshot.get("submission_method") == AUTOMATED_UPSTREAM_SUBMISSION
+        and issue_body_prohibits_automated_submission(texts[0])
+    )
+
     body_rewards = _advertised_rewards(texts[0])
     title_rewards = _advertised_rewards(title)
     advertised_rewards = body_rewards | title_rewards
@@ -463,6 +470,12 @@ def qualify_dispatch(
     def add(code: str, severity: str, message: str) -> None:
         reasons.append({"code": code, "severity": severity, "message": message})
 
+    if issue_method_prohibited:
+        add(
+            "ISSUE_AUTOMATED_SUBMISSION_PROHIBITED",
+            "HOLD",
+            "Canonical issue terms prohibit the declared automated upstream submission.",
+        )
     if repository_policy is not None and repository_policy["reason_code"] is not None:
         add(
             repository_policy["reason_code"],
@@ -606,6 +619,8 @@ def qualify_dispatch(
             "canonical_policy_block_categories": policy_label_categories,
             **({"repository_contribution_policy": repository_policy}
                if repository_policy is not None else {}),
+            **({"issue_automated_submission_prohibited": issue_method_prohibited}
+               if snapshot.get("submission_method") == AUTOMATED_UPSTREAM_SUBMISSION else {}),
             "attempt_count": attempt_count,
             "open_pr_count": open_pr_count,
             "private_context_signal_types": private_signal_types,
