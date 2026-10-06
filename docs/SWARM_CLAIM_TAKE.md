@@ -91,10 +91,9 @@ This reduces internal duplicate work; it does not replace:
 - repository head/preimage checks before source mutation;
 - provider rate-limit handling.
 
-Use the most specific stable work identity available. For a GitHub issue lane,
-prefer `github:owner/repo#number`. Platform-specific intake may deliberately
-use a stronger namespace such as `bountyhub:owner/repo#number`; all contenders
-for that lane must use the same key.
+Use the most specific explicit GitHub resource identity available. Catalog
+provenance stays in intake evidence; the custody key must converge on the
+underlying GitHub issue or pull request.
 
 
 ## Canonical resource keys and operation lanes
