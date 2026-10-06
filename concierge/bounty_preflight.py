@@ -597,6 +597,17 @@ def _comment_generation_entry(comment: dict[str, Any]) -> tuple[int, str, str] |
     return comment_id, updated_at, semantic_digest
 
 
+def _validated_comment_generation(
+    entries: list[tuple[int, str, str]],
+) -> tuple[tuple[int, str, str], ...]:
+    """Reject repeated identities rather than count them as complete authority."""
+    if len({entry[0] for entry in entries}) != len(entries):
+        raise BountyPreflightError(
+            "GitHub issue comment generation contains duplicate identities"
+        )
+    return tuple(entries)
+
+
 def _collect_comment_generation(
     repo: str,
     number: int,
@@ -640,8 +651,8 @@ def _collect_comment_generation(
         except BountyContractEvidenceError as exc:
             raise BountyPreflightError(f"GitHub issue comments pagination was invalid for {repo}#{number}") from exc
         if has_next is False or (has_next is None and len(payload) < 100):
-            return tuple(entries), False
-    return tuple(entries), True
+            return _validated_comment_generation(entries), False
+    return _validated_comment_generation(entries), True
 
 
 def _canonical_generation_stable(
@@ -1149,7 +1160,7 @@ def _collect_issue_context_with_snapshot(
             "credential_gate_signal_types": sorted(credential_signals),
             "maintainer_pause_signal_count": maintainer_pause_signal_count,
             "_comment_generation": (
-                tuple(comment_generation) if comment_generation_complete else None
+                _validated_comment_generation(comment_generation) if comment_generation_complete else None
             ),
             **assignee_state,
             **(
