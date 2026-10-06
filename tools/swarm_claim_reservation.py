@@ -625,6 +625,9 @@ def reserve(
             )
 
     current, _blob_sha = current_read
+    # State reads may block until after the lease deadline. Compare against
+    # post-read time so a stale owner cannot receive OWNED from an expired lease.
+    now = _now()
     expires = _parse_time(
         current["lease_expires_at"], "lease_expires_at"
     )
