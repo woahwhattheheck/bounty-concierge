@@ -124,6 +124,12 @@ class SwarmClaimFenceTest(unittest.TestCase):
         ])
         self.assertEqual(events[0].work_key, "github:acme/widget#7")
 
+    def test_github_pull_url_is_canonicalized(self):
+        events = load([
+            "TAKE · OP-PR-URL · model\nhttps://github.com/Acme/Widget/pull/0007"
+        ])
+        self.assertEqual(events[0].work_key, "github:acme/widget#7")
+
     def test_preflight_allows_empty_lane_and_recognizes_owner(self):
         report = fence.reconcile(load(["TAKE · OP-A · model\nAcme/a#1"]))
         self.assertEqual(fence.preflight(report, "Acme/b#2", "OP-B")["status"], "TAKE_ALLOWED")
