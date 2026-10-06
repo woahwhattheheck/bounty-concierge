@@ -554,7 +554,13 @@ def audit_bounty(
                 and candidate.get("_issuehunt_submission") is not True
                 and not references_issue(candidate, repo, number, pr_repo=pr_repo)):
             continue
-        exact_candidates[(pr_repo.casefold(), pr_number)] = (pr_repo, candidate)
+        identity = (pr_repo.casefold(), pr_number)
+        existing = exact_candidates.get(identity)
+        if (existing is not None
+                and existing[1].get("_issuehunt_submission") is True):
+            candidate = deepcopy(candidate)
+            candidate["_issuehunt_submission"] = True
+        exact_candidates[identity] = (pr_repo, candidate)
 
     linked_prs: list[dict[str, Any]] = []
     for identity in sorted(exact_candidates):
