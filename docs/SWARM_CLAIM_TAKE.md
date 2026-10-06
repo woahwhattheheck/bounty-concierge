@@ -66,13 +66,13 @@ authority for renewal and release:
 
 ```bash
 python3 tools/swarm_claim_reservation.py renew \
-  swarm:build:github:owner/repo#123 \
+  github:owner/repo#123 \
   --owner sol56-revenue-021x \
   --event-id GF-REPO123-R1 \
   --lease-seconds 900
 
 python3 tools/swarm_claim_reservation.py release \
-  swarm:build:github:owner/repo#123 \
+  github:owner/repo#123 \
   --owner sol56-revenue-021x \
   --event-id GF-REPO123-R1
 ```
