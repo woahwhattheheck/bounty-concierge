@@ -191,9 +191,42 @@ def _retry_after(value: str | None) -> int | None:
         return None
 
 
+def _rate_limit_hint(headers: Any) -> tuple[int | None, bool]:
+    """Return the safest known delay and whether primary quota is exhausted."""
+    retry_after = _retry_after(headers.get("Retry-After"))
+    remaining = headers.get("X-RateLimit-Remaining")
+    quota_exhausted = isinstance(remaining, str) and remaining.strip(" \t") == "0"
+
+    reset_after: int | None = None
+    reset = headers.get("X-RateLimit-Reset")
+    if quota_exhausted and isinstance(reset, str):
+        reset = reset.strip(" \t")
+        if reset.isascii() and reset.isdigit() and len(reset) <= 12:
+            try:
+                reset_after = max(
+                    0,
+                    math.ceil(int(reset) - datetime.now(timezone.utc).timestamp()),
+                )
+            except (ValueError, OverflowError):
+                reset_after = None
+
+    delays = [delay for delay in (retry_after, reset_after) if delay is not None]
+    return (max(delays) if delays else None), quota_exhausted
+
+
 class _ReadFailure(Exception):
-    def __init__(self, code: str, status: int | None = None, retry_after: int | None = None):
-        self.code, self.status, self.retry_after = code, status, retry_after
+    def __init__(
+        self,
+        code: str,
+        status: int | None = None,
+        retry_after: int | None = None,
+        *,
+        rate_limited: bool = False,
+    ):
+        self.code = code
+        self.status = status
+        self.retry_after = retry_after
+        self.rate_limited = rate_limited
 
 
 def _close_response(response: Any) -> None:
@@ -227,12 +260,19 @@ def _get(session: Any, url: str, report: dict[str, Any], **params: Any) -> Any:
             if response is None:
                 raise _ReadFailure(type(exc).__name__) from None
             try:
-                raise _ReadFailure("HTTP_ERROR", response.status_code,
-                                   _retry_after(response.headers.get("Retry-After"))) from None
+                delay, quota_exhausted = _rate_limit_hint(response.headers)
+                status = response.status_code
+                raise _ReadFailure(
+                    "HTTP_ERROR",
+                    status,
+                    delay,
+                    rate_limited=status == 429
+                    or (status == 403 and (quota_exhausted or delay is not None)),
+                ) from None
             finally:
                 _close_response(response)
         try:
-            delay = _retry_after(response.headers.get("Retry-After"))
+            delay, quota_exhausted = _rate_limit_hint(response.headers)
             status = response.status_code
             if response.is_redirect and response.next is not None:
                 if delay is not None and delay > 0:
@@ -245,7 +285,13 @@ def _get(session: Any, url: str, report: dict[str, Any], **params: Any) -> Any:
                 redirects += 1
                 continue
             if status != 200:
-                raise _ReadFailure("HTTP_ERROR", status, delay)
+                raise _ReadFailure(
+                    "HTTP_ERROR",
+                    status,
+                    delay,
+                    rate_limited=status == 429
+                    or (status == 403 and (quota_exhausted or delay is not None)),
+                )
             try:
                 return response.json()
             except ValueError:
@@ -428,7 +474,7 @@ def select_targets(report: dict[str, Any], minimum_funded_usd: str = "15.00", *,
 
 def _record_failure(report: dict[str, Any], exc: _ReadFailure, phase: str, **identity: Any) -> None:
     report["errors"].append({"phase": phase, **identity, "code": exc.code, "http_status": exc.status})
-    report["rate_limited"] = exc.status == 429 or (exc.status == 403 and exc.retry_after is not None)
+    report["rate_limited"] = exc.rate_limited
     report["retry_after_seconds"] = exc.retry_after
 
 
