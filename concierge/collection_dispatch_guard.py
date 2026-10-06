@@ -16,7 +16,7 @@ single-writer lease before touching an external provider.
 from __future__ import annotations
 
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -94,6 +94,23 @@ def _text(value: Any, field: str, *, limit: int = 512) -> str:
     ):
         _fail("TEXT_INVALID", field)
     return value
+
+
+def _utc_time(value: datetime | None) -> datetime:
+    current = datetime.now(timezone.utc) if value is None else value
+    if not isinstance(current, datetime) or current.tzinfo is None or current.utcoffset() is None:
+        _fail("GUARD_TIME_INVALID")
+    return current.astimezone(timezone.utc)
+
+
+def _evidence_time(value: Any) -> datetime:
+    if type(value) is not str:
+        _fail("GUARD_EVIDENCE_TIME_INVALID")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return _utc_time(parsed)
+    except (ValueError, TypeError) as exc:
+        raise CollectionDispatchGuardError("GUARD_EVIDENCE_TIME_INVALID") from exc
 
 
 def _packet_binding(packet: Any) -> dict[str, Any]:
@@ -223,6 +240,7 @@ def authorize_collection_dispatch(
     The caller must next acquire the local lease with
     :func:`acquire_guarded_local_lease` before sending.
     """
+    current = _utc_time(now)
     binding = _packet_binding(packet)
     owner_text = _text(owner, "owner", limit=256)
     claim_id = _text(claim_event_id, "claim_event_id", limit=256)
@@ -237,7 +255,7 @@ def authorize_collection_dispatch(
                 "provider_queries": provider_queries,
             },
             required_providers=required_providers,
-            now=now,
+            now=current,
             max_query_age_seconds=max_query_age_seconds,
         )
     except OutboundDedupeInputError as exc:
@@ -291,6 +309,15 @@ def authorize_collection_dispatch(
                 disposition="DNR",
             )
         return _shared_hold(core=core, reason_code="PROVIDER_GATE:HOLD")
+
+    # CLEAR provider evidence expires at the oldest query's deadline, rather
+    # than receiving a new lifetime when the receipt is generated.
+    core["provider_evidence_checked_at"] = current.isoformat()
+    core["provider_evidence_valid_until"] = min(
+        _evidence_time(query["completed_at"])
+        + timedelta(seconds=max_query_age_seconds)
+        for query in provider_queries
+    ).isoformat()
 
     try:
         shared = evaluate_shared_claim(
@@ -352,7 +379,7 @@ def acquire_guarded_local_lease(
     ttl_seconds: int = 300,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Acquire the durable local lease only from an intact CLEAR guard receipt."""
+    """Acquire a local lease from an intact CLEAR receipt with fresh evidence."""
     guard = _verify_guard_receipt(result)
     owner_text = _text(owner, "owner", limit=256)
     if guard.get("disposition") != "CLEAR" or guard.get("dispatch") is not True:
@@ -378,12 +405,20 @@ def acquire_guarded_local_lease(
     if identity.key != guard.get("operation_key") or identity.key != singlewriter.get("operation_key"):
         _fail("SINGLEWRITER_OPERATION_KEY_MISMATCH")
 
+    current = _utc_time(now)
+    checked_at = _evidence_time(guard.get("provider_evidence_checked_at"))
+    valid_until = _evidence_time(guard.get("provider_evidence_valid_until"))
+    if valid_until < checked_at or current < checked_at:
+        _fail("GUARD_EVIDENCE_TIME_INVALID")
+    if current > valid_until:
+        _fail("GUARD_PROVIDER_EVIDENCE_STALE")
+
     writer = OutboundSingleWriter(root)
     return writer.acquire(
         **identity.canonical,
         owner=owner_text,
         ttl_seconds=ttl_seconds,
-        now=now,
+        now=current,
     )
 
 
