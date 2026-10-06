@@ -148,8 +148,16 @@ def test_integration_scope_denial_is_local_to_exact_repo_and_action(tmp_path):
     assert calls == ["denied-provider"]
     assert repeated["status"] == "RAIL_DEFERRED"
     assert repeated["provider_called"] is False
-    assert repeated["reason"] == "INTEGRATION_SCOPE_DENIED"
-    assert repeated["scope"] == "rail+repo+action"
+    assert set(repeated) == {
+        "status",
+        "provider_called",
+        "retry_after",
+        "operation",
+        "action",
+        "repo",
+        "carrier",
+        "expected_head",
+    }
     assert 1 <= repeated["retry_after"] <= 900
 
     assert _run(
