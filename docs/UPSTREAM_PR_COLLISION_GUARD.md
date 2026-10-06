@@ -39,6 +39,15 @@ already obtained during normal compare/readback or only for a small plausible
 candidate set. Missing fingerprints preserve the existing issue/head decision
 path; malformed supplied fingerprints fail closed.
 
+If pull discovery returns empty but the subsequent GitHub create call returns
+HTTP 422 with the authoritative `A pull request already exists for OWNER:BRANCH`
+error, add that normalized response as `create_error` and rerun the guard.
+`PROVIDER_COLLISION` is terminal for that create attempt: do not retry the
+create, rebuild source, or dispatch another publisher. Resolve the canonical PR
+with an exact head/branch read instead. Other 422 validation failures are not
+silently treated as collisions and fail closed as malformed reconciliation
+input.
+
 ## Run
 
     python3 tools/upstream_pr_collision_guard.py \
@@ -57,6 +66,9 @@ Statuses:
 - COLLISION: another open or merged related PR exists.
 - CONTENT_COLLISION: another open or merged PR has the exact same changed-path
   and postimage-blob fingerprint, even if it references a different child issue.
+- PROVIDER_COLLISION: GitHub's create endpoint authoritatively reported that a
+  pull request already exists for the requested head. Do not retry creation;
+  reconcile that exact head/branch to the canonical PR.
 - ISSUE_NOT_OPEN: canonical issue is no longer open.
 - STALE_SNAPSHOT: provider state is too old, or implausibly future-dated.
 
