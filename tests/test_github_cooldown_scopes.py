@@ -52,6 +52,7 @@ def test_scoped_unknown_secondary_backoff_is_independent(tmp_path, monkeypatch):
     assert search.extend_unknown_secondary() == 1180.0
     assert core.extend_unknown_secondary() == 1120.0
 
+
 def test_schema_ddl_runs_once_per_helper_instance(tmp_path, monkeypatch):
     path = tmp_path / "cooldown.sqlite"
     from concierge import github_cooldown
@@ -77,4 +78,29 @@ def test_schema_ddl_runs_once_per_helper_instance(tmp_path, monkeypatch):
         if statement.lstrip().upper().startswith("CREATE TABLE")
     ]
     assert len(schema_statements) == 3
+
+
+def test_recovery_lease_rejects_stale_owner_and_preserves_newer_deadline(
+    tmp_path, monkeypatch
+):
+    from concierge import github_cooldown
+
+    clock = [1000.0]
+    monkeypatch.setattr(github_cooldown, "time", lambda: clock[0])
+
+    path = tmp_path / "cooldown.sqlite"
+    first = GitHubCooldown(path, "test-credential")
+    second = GitHubCooldown(path, "test-credential")
+    first.extend(900.0)
+
+    assert first.claim_recovery_probe("worker-a") == (True, True, 1015.0)
+    assert second.claim_recovery_probe("worker-b") == (True, False, 1015.0)
+
+    clock[0] = 1016.0
+    assert second.claim_recovery_probe("worker-b") == (True, True, 1031.0)
+    assert first.complete_recovery_probe("worker-a") is False
+
+    first.extend(1100.0)
+    assert second.complete_recovery_probe("worker-b") is False
+    assert second.deadline() == 1100.0
 
