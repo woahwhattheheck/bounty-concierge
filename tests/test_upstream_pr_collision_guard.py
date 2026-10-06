@@ -211,5 +211,41 @@ class UpstreamPrCollisionGuardEarlyPruneTest(unittest.TestCase):
                 self.assertEqual(report["status"], expected)
 
 
+    def test_related_pull_requires_known_state_before_publish(self):
+        for state, expected in (
+            (None, "ERROR"), ("unknown", "ERROR"), ("open", "COLLISION"),
+            ("closed", "PUBLISH_ALLOWED"),
+        ):
+            with self.subTest(state=state):
+                payload = snapshot()
+                payload["pulls"] = [{
+                    "number": 99, "state": state, "head_sha": "b" * 40,
+                    "title": "Existing carrier", "body": "Closes #12",
+                }]
+                if expected == "ERROR":
+                    with self.assertRaisesRegex(guard.GuardError, "needs state open or closed"):
+                        guard.evaluate(
+                            payload, expected_issue_key=ISSUE_KEY,
+                            self_head_sha=HEAD, now=NOW,
+                        )
+                else:
+                    report = guard.evaluate(
+                        payload, expected_issue_key=ISSUE_KEY,
+                        self_head_sha=HEAD, now=NOW,
+                    )
+                    self.assertEqual(report["status"], expected)
+        payload = snapshot()
+        payload["pulls"] = [{"number": 100, "body": "Closes #99"}]
+        self.assertTrue(guard.evaluate(
+            payload, expected_issue_key=ISSUE_KEY,
+            self_head_sha=HEAD, now=NOW,
+        )["publish_allowed"])
+        payload["pulls"] = [{"number": 99, "body": "Closes #12", "merged": True}]
+        self.assertEqual(guard.evaluate(
+            payload, expected_issue_key=ISSUE_KEY,
+            self_head_sha=HEAD, now=NOW,
+        )["status"], "COLLISION")
+
+
 if __name__ == "__main__":
     unittest.main()
