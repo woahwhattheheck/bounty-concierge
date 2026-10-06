@@ -76,7 +76,7 @@ def test_schema_ddl_runs_once_per_helper_instance(tmp_path, monkeypatch):
         for statement in statements
         if statement.lstrip().upper().startswith("CREATE TABLE")
     ]
-    assert len(schema_statements) == 3
+    assert len(schema_statements) == 4
 
 def test_remaining_wait_seconds_uses_longest_shared_deadline(tmp_path, monkeypatch):
     path = tmp_path / "cooldown.sqlite"
