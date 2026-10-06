@@ -502,7 +502,13 @@ def compile_revenue_response_queue(manifest: Any, provider_read_batch: Any, *, p
         )
         normalized_snapshots.append(snapshot)
         items.append(_classify(row, snapshot, now=current, auto_ack_grace_hours=normalized_policy["auto_ack_grace_hours"]))
-    items.sort(key=lambda item: (item["priority"], item["follow_up_due_at"] or "", item["latest_provider_event_at"], item["engagement_id"]))
+    items.sort(key=lambda item: (
+        item["priority"],
+        _timestamp(item["follow_up_due_at"], field="follow_up_due_at")
+        if item["follow_up_due_at"] else datetime.min.replace(tzinfo=timezone.utc),
+        _timestamp(item["latest_provider_event_at"], field="latest_provider_event_at"),
+        item["engagement_id"],
+    ))
     summary = {state: sum(item["state"] == state for item in items) for state in _PRIORITY}
     authority = {
         "provider_read_attested": True, "provider_identity_authorized": True, "scope_attested": True,
