@@ -87,3 +87,28 @@ def test_scope_denial_is_shared_without_a_second_provider_call(tmp_path):
     assert len(calls) == 1
     assert second.request_count == 0
     assert second.failure == {"code": "SCOPE_DENIED"}
+
+
+def test_stale_terminal_breaker_state_expires_before_live_admission(tmp_path):
+    calls = []
+    ledger = GitHubBreakerLedger(
+        tmp_path / "breaker.sqlite",
+        provider_route="github-app-installation-7",
+        credential="credential",
+        stale_ttl_seconds=1,
+    )
+    ledger.record_receipt(
+        "read-known-coordinate",
+        "AUTH_FAILED",
+        observed_epoch=time() - 10,
+    )
+    response = SimpleNamespace(status_code=200, headers={})
+    session = SimpleNamespace(
+        get=lambda url, **kwargs: calls.append(url) or response
+    )
+
+    transport = _BatchSession(session, max_requests=5, breaker=ledger)
+    assert transport.get("https://api.github.com/repos/example/repo/issues/1") is response
+    assert len(calls) == 1
+    assert transport.request_count == 1
+    assert transport.breaker_cleanup_done is True
