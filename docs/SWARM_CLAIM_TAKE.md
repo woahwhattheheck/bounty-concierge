@@ -66,13 +66,13 @@ authority for renewal and release:
 
 ```bash
 python3 tools/swarm_claim_reservation.py renew \
-  github:owner/repo#123 \
+  swarm:build:github:owner/repo#123 \
   --owner sol56-revenue-021x \
   --event-id GF-REPO123-R1 \
   --lease-seconds 900
 
 python3 tools/swarm_claim_reservation.py release \
-  github:owner/repo#123 \
+  swarm:build:github:owner/repo#123 \
   --owner sol56-revenue-021x \
   --event-id GF-REPO123-R1
 ```
@@ -105,7 +105,10 @@ Equivalent issue forms `Owner/Repo#17`, `github:owner/repo#17`,
 `https://github.com/Owner/Repo/issues/17`, and the programmatic
 `{"repository":"Owner/Repo","issue_number":17}` all map to
 `github:owner/repo#17`. Equivalent PR forms use `!N` and `/pull/N`.
-Repository identity is case-folded.
+Repository identity is case-folded. Explicit numeric aliases with leading zeros,
+such as `Owner/Repo#00017`, `Owner/Repo!00017`, and `/issues/00017`,
+normalize to the same positive number (`17`). All-zero identifiers remain
+unnormalized; they do not identify a valid GitHub issue or PR.
 
 A normalized reservation key is `swarm:<lane>:<resource>`, where lane is one
 of `build`, `repair`, `qa`, `publish`, `metadata`, or `claim`.
