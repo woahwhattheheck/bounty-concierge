@@ -2,7 +2,6 @@
 """Admit GitHub read/discovery operations before provider I/O."""
 from __future__ import annotations
 
-import math
 from pathlib import Path
 import re
 from secrets import token_hex
