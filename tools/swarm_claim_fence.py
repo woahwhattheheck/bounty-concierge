@@ -9,7 +9,8 @@ claim for one canonical GitHub issue wins until that exact claim is released.
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from decimal import Decimal, InvalidOperation
 import json
 from pathlib import Path
 import re
@@ -17,6 +18,8 @@ import sys
 from typing import Any, Iterable
 
 MAX_BYTES = 4 * 1024 * 1024
+MAX_TOTAL_BYTES = 8 * 1024 * 1024
+MAX_INPUTS = 8
 MAX_MESSAGES = 10000
 
 _ACQUIRE = {"TAKE", "CLAIM"}
@@ -198,6 +201,59 @@ def load_events(raw: bytes) -> tuple[list[Event], list[dict[str, Any]]]:
     return events, ignored
 
 
+def _numeric_slack_ts(ts: str | None) -> Decimal | None:
+    if ts is None:
+        return None
+    try:
+        value = Decimal(ts)
+    except (InvalidOperation, ValueError):
+        return None
+    return value if value.is_finite() and value >= 0 else None
+
+
+def merge_event_streams(streams: Iterable[Iterable[Event]]) -> tuple[list[Event], int]:
+    """Merge overlapping transcript snapshots without trusting one view's ordering.
+
+    Slack search can lag a recent channel-tail read (or vice versa). Callers can
+    therefore supply both snapshots. Stable message identities are deduplicated,
+    and when every event has a numeric Slack timestamp the combined stream is
+    ordered by that timestamp before ownership is reconciled.
+    """
+    flattened: list[tuple[int, Event]] = []
+    seen: set[tuple[str, ...]] = set()
+    duplicates = 0
+    ingest = 0
+
+    for stream in streams:
+        for event in stream:
+            if event.permalink:
+                identity = ("permalink", event.permalink)
+            elif event.ts:
+                identity = ("ts_text", event.ts, event.text)
+            else:
+                identity = ("ingest", str(ingest))
+
+            if identity in seen:
+                duplicates += 1
+                ingest += 1
+                continue
+            seen.add(identity)
+            flattened.append((ingest, event))
+            ingest += 1
+
+    if len(flattened) > MAX_MESSAGES:
+        raise FenceError(f"combined transcript exceeds {MAX_MESSAGES} messages")
+
+    stamped = [(_numeric_slack_ts(event.ts), ingest, event) for ingest, event in flattened]
+    if stamped and all(ts is not None for ts, _, _ in stamped):
+        stamped.sort(key=lambda item: (item[0], item[1]))
+        ordered = [event for _, _, event in stamped]
+    else:
+        ordered = [event for _, event in flattened]
+
+    return [replace(event, sequence=sequence) for sequence, event in enumerate(ordered)], duplicates
+
+
 def reconcile(events: Iterable[Event]) -> dict[str, Any]:
     """Apply first-active-claim-wins with exact-claim releases in transcript order."""
     active: dict[str, Event] = {}
@@ -277,7 +333,16 @@ def preflight(report: dict[str, Any], work_key: str, claim_id: str) -> dict[str,
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", type=Path, required=True, help="JSON/NDJSON coordination transcript")
+    parser.add_argument(
+        "--input",
+        type=Path,
+        required=True,
+        action="append",
+        help=(
+            "JSON/NDJSON coordination transcript; repeat to combine views "
+            "(for Slack, prefer search export + recent channel-tail export)"
+        ),
+    )
     parser.add_argument("--work-key", help="optional GitHub issue key OWNER/REPO#N for a proposed claim")
     parser.add_argument("--claim-id", help="proposed claim id; requires --work-key")
     parser.add_argument("--output", type=Path, help="write JSON instead of stdout")
@@ -285,9 +350,25 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if bool(args.work_key) != bool(args.claim_id):
             raise FenceError("--work-key and --claim-id must be supplied together")
-        events, ignored = load_events(_read_bounded(args.input))
+        if len(args.input) > MAX_INPUTS:
+            raise FenceError(f"no more than {MAX_INPUTS} --input files are allowed")
+
+        raws = [_read_bounded(path) for path in args.input]
+        if sum(len(raw) for raw in raws) > MAX_TOTAL_BYTES:
+            raise FenceError("combined transcripts exceed the 8 MiB limit")
+
+        streams: list[list[Event]] = []
+        ignored: list[dict[str, Any]] = []
+        for path, raw in zip(args.input, raws):
+            stream, stream_ignored = load_events(raw)
+            streams.append(stream)
+            ignored.extend({**item, "source": str(path)} for item in stream_ignored)
+
+        events, duplicates = merge_event_streams(streams)
         report = reconcile(events)
+        report["sources_loaded"] = len(args.input)
         report["messages_parsed"] = len(events)
+        report["duplicate_messages_dropped"] = duplicates
         report["messages_ignored"] = ignored
         if args.work_key:
             report["preflight"] = preflight(report, args.work_key, args.claim_id)
