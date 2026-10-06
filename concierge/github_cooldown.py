@@ -9,6 +9,7 @@ import math
 import os
 from pathlib import Path
 import sqlite3
+from threading import Lock
 from time import time
 from typing import Iterator
 
@@ -64,6 +65,33 @@ class GitHubCooldown:
             + b"\0"
             + cooldown_scope.encode("utf-8")
         ).hexdigest()
+        self._schema_ready = False
+        self._schema_lock = Lock()
+
+    def _ensure_schema(self, connection: sqlite3.Connection) -> None:
+        """Initialize the shared schema once per helper instance."""
+        if self._schema_ready:
+            return
+        with self._schema_lock:
+            if self._schema_ready:
+                return
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS github_cooldown_v1 "
+                "(scope TEXT PRIMARY KEY, until_epoch REAL NOT NULL)"
+            )
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS github_quota_reserve_v1 "
+                "(scope TEXT PRIMARY KEY, until_epoch REAL NOT NULL)"
+            )
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS github_cooldown_unknown_v1 "
+                "(scope TEXT PRIMARY KEY, backoff_seconds REAL NOT NULL, "
+                "observed_epoch REAL NOT NULL)"
+            )
+            # Keep schema creation outside the caller's data transaction. If a
+            # later operation fails, subsequent calls must still see the tables.
+            connection.commit()
+            self._schema_ready = True
 
     @contextmanager
     def _connection(self) -> Iterator[sqlite3.Connection]:
@@ -77,20 +105,8 @@ class GitHubCooldown:
             else:
                 os.close(fd)
             connection = sqlite3.connect(self.path, timeout=1.0)
+            self._ensure_schema(connection)
             with connection:
-                connection.execute(
-                    "CREATE TABLE IF NOT EXISTS github_cooldown_v1 "
-                    "(scope TEXT PRIMARY KEY, until_epoch REAL NOT NULL)"
-                )
-                connection.execute(
-                    "CREATE TABLE IF NOT EXISTS github_quota_reserve_v1 "
-                    "(scope TEXT PRIMARY KEY, until_epoch REAL NOT NULL)"
-                )
-                connection.execute(
-                    "CREATE TABLE IF NOT EXISTS github_cooldown_unknown_v1 "
-                    "(scope TEXT PRIMARY KEY, backoff_seconds REAL NOT NULL, "
-                    "observed_epoch REAL NOT NULL)"
-                )
                 yield connection
         except (OSError, sqlite3.Error, ValueError, OverflowError) as exc:
             # Paths and database contents must not escape into capture reports.
