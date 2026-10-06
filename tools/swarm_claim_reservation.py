@@ -563,6 +563,21 @@ def _public_state(
     return result
 
 
+def _active_write_result(
+    state: dict[str, Any], *, disposition: str, commit_sha: str
+) -> tuple[dict[str, Any], int]:
+    """Do not authorize work when publication has already consumed the lease."""
+    expired = _parse_time(state["lease_expires_at"], "lease_expires_at") <= _now()
+    return (
+        _public_state(
+            state,
+            disposition="EXPIRED" if expired else disposition,
+            commit_sha=commit_sha,
+        ),
+        3 if expired else 0,
+    )
+
+
 def reserve(
     github: GitHub,
     *,
@@ -609,13 +624,8 @@ def reserve(
             f"custody: reserve {state['work_key_sha256'][:12]}",
         )
         if github.create_ref(branch, commit):
-            return (
-                _public_state(
-                    state,
-                    disposition="ACQUIRED",
-                    commit_sha=commit,
-                ),
-                0,
+            return _active_write_result(
+                state, disposition="ACQUIRED", commit_sha=commit
             )
         current_read = github.read_state_if_exists(branch)
         if current_read is None:
@@ -689,13 +699,8 @@ def reserve(
         ),
     )
     if github.fast_forward_ref(branch, commit):
-        return (
-            _public_state(
-                state,
-                disposition="ACQUIRED",
-                commit_sha=commit,
-            ),
-            0,
+        return _active_write_result(
+            state, disposition="ACQUIRED", commit_sha=commit
         )
     winner_head = github.ref_sha(branch)
     if winner_head is None:
@@ -769,13 +774,8 @@ def renew(
         ),
     )
     if github.fast_forward_ref(branch, commit):
-        return (
-            _public_state(
-                state,
-                disposition="RENEWED",
-                commit_sha=commit,
-            ),
-            0,
+        return _active_write_result(
+            state, disposition="RENEWED", commit_sha=commit
         )
     winner_head = github.ref_sha(branch)
     if winner_head is None:
