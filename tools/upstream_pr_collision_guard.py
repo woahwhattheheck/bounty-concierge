@@ -325,6 +325,8 @@ def evaluate(
             continue
         state = raw_pr.get("state")
         merged = raw_pr.get("merged") is True or raw_pr.get("merged_at") not in (None, "")
+        if not merged and (not isinstance(state, str) or state.lower() not in {"open", "closed"}):
+            raise GuardError(f"related pull request #{pr_num} needs state open or closed")
         live = merged or (isinstance(state, str) and state.lower() == "open")
         if not live:
             continue
