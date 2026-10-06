@@ -189,5 +189,27 @@ class UpstreamPrCollisionGuardEarlyPruneTest(unittest.TestCase):
         self.assertTrue(report["publish_allowed"])
 
 
+    def test_qualified_issue_reference_matches_only_expected_repository(self):
+        for body, expected in (
+            ("Closes Acme/widget#12", "COLLISION"),
+            ("Fixes acme/WIDGET#12", "COLLISION"),
+            ("Refs: Acme/widget#12", "COLLISION"),
+            ("Closes Other/widget#12", "PUBLISH_ALLOWED"),
+            ("Closes Acme/other#12", "PUBLISH_ALLOWED"),
+            ("Closes Acme/widget#123", "PUBLISH_ALLOWED"),
+        ):
+            with self.subTest(body=body):
+                payload = snapshot()
+                payload["pulls"] = [{
+                    "number": 99, "state": "open", "head_sha": "b" * 40,
+                    "title": "Existing carrier", "body": body,
+                }]
+                report = guard.evaluate(
+                    payload, expected_issue_key=ISSUE_KEY,
+                    self_head_sha=HEAD, now=NOW,
+                )
+                self.assertEqual(report["status"], expected)
+
+
 if __name__ == "__main__":
     unittest.main()
