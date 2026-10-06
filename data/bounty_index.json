@@ -1,5 +1,5 @@
 {
-  "started_at": "2026-10-05T13:40:52.623313+00:00",
+  "started_at": "2026-10-06T12:47:41.951217+00:00",
   "complete": true,
   "rate_limited": false,
   "retry_after_seconds": null,
@@ -797,7 +797,7 @@
         "bounty"
       ],
       "created_at": "2026-02-22T15:25:06Z",
-      "updated_at": "2026-10-04T23:09:48Z",
+      "updated_at": "2026-10-06T00:05:02Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 100.0,
@@ -1368,7 +1368,7 @@
         "bounty"
       ],
       "created_at": "2026-03-09T01:58:15Z",
-      "updated_at": "2026-09-24T01:12:43Z",
+      "updated_at": "2026-10-05T19:53:51Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 50.0,
@@ -2693,11 +2693,10 @@
       "body": "## The problem\n\nSome BoTTube pull requests fail four checks at once \u2014 `label`, `lint`, `security`, `test` \u2014 and every one reports a duration of **15m01s**. That is a job timeout, not a test failure.\n\nConfirmed examples: bottube#1640 and bottube#1639. On those two, `label` fails despite passing on all 30 other open PRs in the repo, which is what rules out the contributors' code as the cause.\n\nThe effect is that contributors are told their work failed CI when the runner hung. At least two people were asked to chase a failure that was never theirs.\n\n## What this bounty is\n\nFind out why those jobs hang, and fix it.\n\nLikely directions, not prescriptions:\n- A step with no timeout waiting on something that never returns (network fetch, package index, external API)\n- Runner resource exhaustion when several workflows fire on the same commit\n- A dependency install that hangs rather than failing\n\n## What qualifies for payment\n\n- A named root cause, evidenced from job logs rather than inferred\n- A fix that makes the hang either impossible or fast-failing with a clear message\n- **Explicit per-step timeouts** so that if it recurs, CI says \"timed out after N minutes\" instead of pretending the code failed\n\n## Reward\n\n**20 RTC.** Add **5 RTC** if the fix also distinguishes a genuine timeout from a genuine failure in what the contributor sees, since the current confusion is the actual damage.\n",
       "url": "https://github.com/Scottcjn/rustchain-bounties/issues/16472",
       "labels": [
-        "bounty",
-        "claimed"
+        "bounty"
       ],
       "created_at": "2026-08-10T17:31:53Z",
-      "updated_at": "2026-09-28T03:10:47Z",
+      "updated_at": "2026-10-06T03:20:11Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 20.0,
@@ -3149,7 +3148,7 @@
         "bounty"
       ],
       "created_at": "2026-06-06T15:41:33Z",
-      "updated_at": "2026-10-04T14:10:03Z",
+      "updated_at": "2026-10-06T01:54:48Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 17.0,
@@ -3544,7 +3543,7 @@
         "live-url-verified"
       ],
       "created_at": "2026-02-17T20:14:47Z",
-      "updated_at": "2026-10-05T04:28:28Z",
+      "updated_at": "2026-10-06T05:15:12Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 15.0,
@@ -3779,11 +3778,10 @@
         "bug",
         "bounty",
         "open",
-        "standard",
-        "claimed"
+        "standard"
       ],
       "created_at": "2026-07-19T21:43:36Z",
-      "updated_at": "2026-09-29T17:42:44Z",
+      "updated_at": "2026-10-06T03:20:14Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 10.0,
@@ -4884,7 +4882,7 @@
         "claimed"
       ],
       "created_at": "2026-06-06T16:02:32Z",
-      "updated_at": "2026-10-02T15:28:38Z",
+      "updated_at": "2026-10-06T02:03:59Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 7.0,
@@ -5558,7 +5556,7 @@
         "distribution"
       ],
       "created_at": "2026-03-17T02:05:49Z",
-      "updated_at": "2026-10-05T04:28:21Z",
+      "updated_at": "2026-10-06T05:15:04Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 5.0,
@@ -6152,7 +6150,7 @@
         "bounty"
       ],
       "created_at": "2026-05-27T21:56:08Z",
-      "updated_at": "2026-09-24T01:11:34Z",
+      "updated_at": "2026-10-06T01:53:28Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 3.0,
@@ -6180,7 +6178,7 @@
         "bounty"
       ],
       "created_at": "2026-05-27T21:56:06Z",
-      "updated_at": "2026-09-24T01:11:33Z",
+      "updated_at": "2026-10-06T01:57:24Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 3.0,
@@ -6731,7 +6729,7 @@
         "easy"
       ],
       "created_at": "2026-02-26T21:54:17Z",
-      "updated_at": "2026-09-29T17:38:54Z",
+      "updated_at": "2026-10-06T06:44:47Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 3.0,
@@ -6872,7 +6870,7 @@
         "bounty"
       ],
       "created_at": "2026-02-14T17:34:51Z",
-      "updated_at": "2026-10-05T04:27:21Z",
+      "updated_at": "2026-10-06T05:13:54Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 3.0,
@@ -6944,7 +6942,7 @@
         "bounty"
       ],
       "created_at": "2026-02-13T20:12:59Z",
-      "updated_at": "2026-10-04T10:25:38Z",
+      "updated_at": "2026-10-05T19:53:42Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 3.0,
@@ -6977,7 +6975,7 @@
         "bounty"
       ],
       "created_at": "2026-06-11T23:02:38Z",
-      "updated_at": "2026-10-05T04:27:31Z",
+      "updated_at": "2026-10-06T05:14:06Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 2.0,
@@ -7079,7 +7077,7 @@
         "bounty"
       ],
       "created_at": "2026-05-11T16:18:31Z",
-      "updated_at": "2026-10-05T04:27:20Z",
+      "updated_at": "2026-10-06T05:13:53Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 2.0,
@@ -7243,7 +7241,7 @@
         "bounty"
       ],
       "created_at": "2026-03-16T18:12:44Z",
-      "updated_at": "2026-10-05T04:27:33Z",
+      "updated_at": "2026-10-06T05:14:09Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 2.0,
@@ -7588,7 +7586,7 @@
         "community"
       ],
       "created_at": "2026-03-01T04:13:08Z",
-      "updated_at": "2026-10-04T13:19:08Z",
+      "updated_at": "2026-10-06T12:09:48Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 2.0,
@@ -7806,7 +7804,7 @@
         "stars"
       ],
       "created_at": "2026-07-19T21:33:49Z",
-      "updated_at": "2026-10-05T06:30:15Z",
+      "updated_at": "2026-10-06T06:48:16Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 1.0,
@@ -8655,7 +8653,7 @@
         "bounty"
       ],
       "created_at": "2026-02-20T18:43:46Z",
-      "updated_at": "2026-10-05T04:27:24Z",
+      "updated_at": "2026-10-06T05:13:57Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 1.0,
@@ -8726,7 +8724,7 @@
         "community"
       ],
       "created_at": "2026-02-14T21:05:30Z",
-      "updated_at": "2026-10-05T04:27:22Z",
+      "updated_at": "2026-10-06T05:13:56Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 1.0,
@@ -8976,7 +8974,7 @@
         "bounty"
       ],
       "created_at": "2026-09-18T00:06:02Z",
-      "updated_at": "2026-10-04T11:05:11Z",
+      "updated_at": "2026-10-06T06:47:06Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 0.0,
@@ -9104,6 +9102,6 @@
       }
     }
   ],
-  "updated_at": "2026-10-05T13:40:56.390514+00:00",
+  "updated_at": "2026-10-06T12:47:45.757875+00:00",
   "total_count": 266
 }
