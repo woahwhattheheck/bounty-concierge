@@ -16,6 +16,10 @@ SPEC.loader.exec_module(guard)
 NOW = datetime(2026, 10, 5, 23, 45, tzinfo=timezone.utc)
 ISSUE_KEY = "Acme/widget#12"
 HEAD = "a" * 40
+CANDIDATE_FILES = [
+    {"filename": "src/service.py", "sha": "1" * 40},
+    {"filename": "tests/test_service.py", "sha": "2" * 40},
+]
 
 
 def snapshot(*, state="open", captured_at=None, include_pulls=True):
@@ -64,6 +68,63 @@ class UpstreamPrCollisionGuardEarlyPruneTest(unittest.TestCase):
     def test_open_issue_with_empty_pull_snapshot_can_publish(self):
         report = guard.evaluate(
             snapshot(),
+            expected_issue_key=ISSUE_KEY,
+            self_head_sha=HEAD,
+            now=NOW,
+        )
+        self.assertEqual(report["status"], "PUBLISH_ALLOWED")
+        self.assertTrue(report["publish_allowed"])
+
+
+    def test_identical_content_blocks_cross_issue_duplicate(self):
+        payload = snapshot()
+        payload["candidate_files"] = CANDIDATE_FILES
+        payload["pulls"] = [
+            {
+                "number": 99,
+                "state": "open",
+                "head_sha": "b" * 40,
+                "title": "Fix a different child issue",
+                "body": "Closes #98",
+                "files": list(reversed(CANDIDATE_FILES)),
+            }
+        ]
+        report = guard.evaluate(
+            payload,
+            expected_issue_key=ISSUE_KEY,
+            self_head_sha=HEAD,
+            now=NOW,
+        )
+        self.assertEqual(report["status"], "CONTENT_COLLISION")
+        self.assertFalse(report["publish_allowed"])
+        self.assertEqual(report["competitors"][0]["number"], 99)
+        self.assertEqual(
+            report["competitors"][0]["match_reason"],
+            "content_fingerprint",
+        )
+        self.assertEqual(
+            report["competitors"][0]["content_fingerprint"],
+            report["content_fingerprint"],
+        )
+
+    def test_different_cross_issue_content_remains_publishable(self):
+        payload = snapshot()
+        payload["candidate_files"] = CANDIDATE_FILES
+        payload["pulls"] = [
+            {
+                "number": 99,
+                "state": "open",
+                "head_sha": "b" * 40,
+                "title": "Fix a different child issue",
+                "body": "Closes #98",
+                "files": [
+                    {"filename": "src/service.py", "sha": "3" * 40},
+                    {"filename": "tests/test_service.py", "sha": "2" * 40},
+                ],
+            }
+        ]
+        report = guard.evaluate(
+            payload,
             expected_issue_key=ISSUE_KEY,
             self_head_sha=HEAD,
             now=NOW,
