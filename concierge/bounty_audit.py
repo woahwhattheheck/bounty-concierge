@@ -30,6 +30,16 @@ from concierge.submission_packet import validate_submission_target
 
 
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
+_ISSUEHUNT_BLOCK_PATTERN = re.compile(
+    r"<!--\\s*Issuehunt content\\s*-->(.*?)<!--\\s*/Issuehunt content\\s*-->",
+    re.IGNORECASE | re.DOTALL,
+)
+_ISSUEHUNT_PR_PATTERN = re.compile(
+    r"https://(?:oss\\.)?issuehunt\\.io/r/"
+    r"([A-Za-z0-9][A-Za-z0-9_.-]*)/([A-Za-z0-9_.-]+)/pull/([1-9][0-9]*)",
+    re.IGNORECASE,
+)
+_ISSUEHUNT_PR_LIMIT = 8
 _MAINTAINER_EXPIRY_PATTERNS = (
     re.compile(
         r"(?:^|[.!:]\s+)(?:this|the)\s+bounty\s+(?:has\s+been\s+expired|has\s+expired|is\s+expired|expired)\b(?![^.!\n]*\?)",
@@ -158,6 +168,31 @@ def references_issue(
     text = f"{pr.get('title') or ''}\n{pr.get('body') or ''}"
     allow_short = pr_repo is None or pr_repo.casefold() == repo.casefold()
     return bool(_issue_reference_pattern(repo, number, allow_short=allow_short).search(text))
+
+
+def _issuehunt_submission_prs(body: Any) -> tuple[list[tuple[str, int]], bool]:
+    """Return bounded PR identities explicitly listed by IssueHunt.
+
+    Only links inside IssueHunt's generated marker block are authoritative here;
+    arbitrary issue-body links remain outside the canonical linkage surface.
+    The ninth distinct identity is observed only to fail closed as truncated.
+    """
+    if not isinstance(body, str):
+        return [], False
+    identities: list[tuple[str, int]] = []
+    seen: set[tuple[str, int]] = set()
+    for block in _ISSUEHUNT_BLOCK_PATTERN.finditer(body):
+        for match in _ISSUEHUNT_PR_PATTERN.finditer(block.group(1)):
+            pr_repo = f"{match.group(1)}/{match.group(2)}"
+            pr_number = int(match.group(3))
+            identity = (pr_repo.casefold(), pr_number)
+            if identity in seen:
+                continue
+            if len(identities) >= _ISSUEHUNT_PR_LIMIT:
+                return identities, True
+            seen.add(identity)
+            identities.append((pr_repo, pr_number))
+    return identities, False
 
 
 def _competition_level(open_pr_count: int) -> str:
@@ -404,20 +439,25 @@ def audit_bounty(
             f"issue {repo}#{number}",
         )
         if "pull_request" not in issue and _source_issue_cache is not None:
-            # Issue bodies/profile data are not inputs to the canonical audit.
+            # Retain only canonical fields needed by repeated target variants.
+            # The body is required solely for marker-bounded IssueHunt submission links.
             _source_issue_cache[source_identity] = {
-                key: deepcopy(issue[key]) for key in ("state", "html_url") if key in issue
+                key: deepcopy(issue[key]) for key in ("state", "html_url", "body") if key in issue
             }
     if "pull_request" in issue:
         raise ValueError(f"{repo}#{number} is a pull request, not an issue")
 
+    issuehunt_submissions, issuehunt_truncated = _issuehunt_submission_prs(issue.get("body"))
     search_repos = [repo]
     if (submission_target is not None
             and submission_target["repository"].casefold() != repo.casefold()):
         search_repos.append(submission_target["repository"])
-    cross_repository = len(search_repos) > 1
+    cross_repository = (
+        len(search_repos) > 1
+        or any(pr_repo.casefold() != repo.casefold() for pr_repo, _ in issuehunt_submissions)
+    )
     candidates: list[tuple[str, dict[str, Any]]] = []
-    search_truncated = False
+    search_truncated = issuehunt_truncated
     search_url = "https://api.github.com/search/issues"
     for search_repo in search_repos:
         query = f"repo:{search_repo} is:pr {number}"
@@ -501,11 +541,17 @@ def audit_bounty(
             _search_cache[search_key] = deepcopy(repository_candidates)
 
     exact_candidates: dict[tuple[str, int], tuple[str, dict[str, Any]]] = {}
+    for pr_repo, pr_number in issuehunt_submissions:
+        exact_candidates[(pr_repo.casefold(), pr_number)] = (
+            pr_repo,
+            {"number": pr_number, "_issuehunt_submission": True},
+        )
     for pr_repo, candidate in candidates:
         pr_number = candidate.get("number")
         if type(pr_number) is not int or pr_number <= 0:
             continue
         if (candidate.get("_timeline_cross_reference") is not True
+                and candidate.get("_issuehunt_submission") is not True
                 and not references_issue(candidate, repo, number, pr_repo=pr_repo)):
             continue
         exact_candidates[(pr_repo.casefold(), pr_number)] = (pr_repo, candidate)
@@ -529,6 +575,7 @@ def audit_bounty(
                 # Share only a successful payload; each consumer owns its copy.
                 _pr_detail_cache[identity] = deepcopy(detail)
         if (candidate.get("_timeline_cross_reference") is not True
+                and candidate.get("_issuehunt_submission") is not True
                 and not references_issue(detail, repo, number, pr_repo=pr_repo)):
             # Search discovery may lag an edited reference in either repository.
             # Timeline cross-reference events are already canonical linkage evidence.
