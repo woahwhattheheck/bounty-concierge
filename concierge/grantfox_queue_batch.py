@@ -45,6 +45,8 @@ _AUTHORITY = {
 _RESERVATION_SCHEMA = "swarm-custody-reservation/v1"
 _RESERVATION_BRANCH_PREFIX = "swarm-custody/v1"
 _RESERVATION_TOOL = "tools/swarm_claim_reservation.py"
+_ACTIVATION_RECEIPT_SCHEMA = "grantfox-activation-gate/v1"
+_RESERVABLE_DISPOSITIONS = frozenset({"APPLY_ELIGIBLE", "IMPLEMENTATION_ELIGIBLE"})
 
 
 def _sha256_json(value: Any) -> str:
@@ -83,6 +85,9 @@ def _swarm_reservation(receipt: dict[str, Any]) -> dict[str, str]:
         "work_key": work_key,
         "branch": f"{_RESERVATION_BRANCH_PREFIX}/{digest}",
         "tool": _RESERVATION_TOOL,
+        "dispatch_authority": False,
+        "activation_required": True,
+        "activation_receipt_schema": _ACTIVATION_RECEIPT_SCHEMA,
     }
 
 
@@ -140,6 +145,7 @@ def compile_grantfox_queue_batch(request: dict[str, Any]) -> dict[str, Any]:
     reservations = {
         _canonical_id(child): _swarm_reservation(child)
         for child in child_receipts
+        if child["disposition"] in _RESERVABLE_DISPOSITIONS
     }
 
     body = {
@@ -226,6 +232,7 @@ def verify_batch_receipt(receipt: dict[str, Any]) -> bool:
         expected_reservations = {
             _canonical_id(child): _swarm_reservation(child)
             for child in children
+            if child["disposition"] in _RESERVABLE_DISPOSITIONS
         }
         if reservations != expected_reservations:
             return False
