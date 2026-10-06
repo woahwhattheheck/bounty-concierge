@@ -22,6 +22,7 @@ from concierge.bounty_audit import BountyAuditError
 from concierge.bounty_capture import CaptureInputError, capture_digest
 from concierge.bounty_preflight import BountyPreflightError, preflight_bounty
 from concierge.config import GITHUB_TOKEN
+from concierge.github_breaker_ledger import BreakerStateError, GitHubBreakerLedger
 from concierge.github_cooldown import CooldownStateError, GitHubCooldown, cooldown_deadline
 from concierge.secure_output import (
     SecureOutputError,
@@ -104,7 +105,7 @@ class _BatchSession:
 
     def __init__(
         self, session: Any, max_requests: int, cooldown: GitHubCooldown | None = None,
-        reserve_requests: int = 0,
+        reserve_requests: int = 0, breaker: GitHubBreakerLedger | None = None,
     ) -> None:
         self.session = session
         self.max_requests = max_requests
@@ -118,6 +119,7 @@ class _BatchSession:
         self.request_origin_url: str | None = None
         self.issue_request = False
         self.cooldown = cooldown
+        self.breaker = breaker
         self.reserve_requests = reserve_requests
         self.request_headroom_reserved = False
         self.rate_limit_remaining: int | None = None
@@ -128,6 +130,9 @@ class _BatchSession:
         self.recovery_owner = os.urandom(16).hex()
         self.recovery_probe_held = False
         self.shared_recovery_deferred = False
+        self.breaker_probe_held = False
+        self.shared_breaker_deferred = False
+        self.breaker_state_error = False
 
     def get(self, url: str, **kwargs: Any) -> Any:
         self.request_origin_url = url
@@ -192,6 +197,33 @@ class _BatchSession:
                         "shared provider recovery probe already in flight; reads deferred"
                     )
                 self.recovery_probe_held = recovery_required and recovery_acquired
+        if self.breaker is not None:
+            try:
+                admission = self.breaker.admit(
+                    "read-known-coordinate", owner=self.recovery_owner
+                )
+            except BreakerStateError:
+                self.breaker_state_error = True
+                self.failure = {"code": "BREAKER_STATE_ERROR"}
+                raise requests.RequestException(
+                    "shared GitHub breaker state unavailable; reads deferred"
+                ) from None
+            if admission.decision == "SKIP":
+                self.shared_breaker_deferred = True
+                self.retry_after_seconds = max(
+                    self.retry_after_seconds or 0, admission.retry_after_seconds
+                )
+                self.failure = {
+                    "code": (
+                        "RATE_LIMITED"
+                        if admission.state == "OPEN_UNTIL"
+                        else admission.state
+                    )
+                }
+                raise requests.RequestException(
+                    "shared GitHub breaker denied this provider call"
+                )
+            self.breaker_probe_held = admission.decision == "PROBE"
         self.request_count += 1
         # Keep endpoint identity private for issue-local failure isolation.
         self.request_url = target if isinstance(target, str) else getattr(target, "url", None)
@@ -217,6 +249,7 @@ class _BatchSession:
             else:
                 self.failure = {"code": "TRANSPORT_ERROR", "error_type": type(exc).__name__}
                 self._defer_recovery_probe(time() + 60.0)
+                self._complete_breaker_probe(success=False)
             raise
         self._record_response(response)
         return response
@@ -277,6 +310,20 @@ class _BatchSession:
                         pass
             raise
 
+    def _complete_breaker_probe(self, *, success: bool) -> None:
+        if not self.breaker_probe_held or self.breaker is None:
+            return
+        try:
+            self.breaker.complete_probe(
+                "read-known-coordinate",
+                owner=self.recovery_owner,
+                success=success,
+            )
+        except BreakerStateError:
+            self.breaker_state_error = True
+        finally:
+            self.breaker_probe_held = False
+
     def _complete_recovery_probe(self) -> None:
         if not self.recovery_probe_held or self.cooldown is None:
             return
@@ -307,11 +354,13 @@ class _BatchSession:
         self.rate_limit_remaining = remaining
         self.rate_limit_reset_at = reset_at
         retry_at = None
+        retry_at_epoch: float | None = None
         raw_retry = headers.get("Retry-After")
         if retry_after is None and isinstance(raw_retry, str) and len(raw_retry) <= 128:
             try:
                 parsed = parsedate_to_datetime(raw_retry)
                 if parsed.tzinfo is not None:
+                    retry_at_epoch = parsed.timestamp()
                     retry_at = parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
             except (TypeError, ValueError, OverflowError):
                 pass
@@ -319,6 +368,7 @@ class _BatchSession:
             remaining == 0 or retry_after is not None or retry_at is not None
         ))
         primary_exhausted = remaining == 0
+        scope_denied = False
         if status in (403, 429):
             try:
                 error = response.json()
@@ -333,6 +383,10 @@ class _BatchSession:
                 primary_exhausted or "api rate limit exceeded" in normalized_message
             )
             throttled = throttled or "rate limit" in normalized_message
+            scope_denied = (
+                status == 403
+                and "resource not accessible by integration" in normalized_message
+            )
         if throttled or primary_exhausted:
             self.rate_limited = True
             self.retry_after_seconds = retry_after
@@ -374,6 +428,52 @@ class _BatchSession:
                 self._defer_recovery_probe(time() + 60.0)
         elif self.recovery_probe_held:
             self._complete_recovery_probe()
+
+        breaker_error_class = None
+        if throttled or primary_exhausted:
+            breaker_error_class = (
+                "PRIMARY_RATE_LIMIT" if primary_exhausted else "SECONDARY_RATE_LIMIT"
+            )
+        elif status == 401:
+            breaker_error_class = "AUTH_FAILED"
+        elif scope_denied:
+            breaker_error_class = "SCOPE_DENIED"
+
+        if self.breaker is not None:
+            if breaker_error_class is not None:
+                try:
+                    absolute_hint = (
+                        float(reset_at)
+                        if primary_exhausted and reset_at is not None
+                        else retry_at_epoch
+                    )
+                    self.breaker.record_receipt(
+                        "read-known-coordinate",
+                        breaker_error_class,
+                        retry_after_seconds=(
+                            retry_after
+                            if breaker_error_class in {
+                                "PRIMARY_RATE_LIMIT", "SECONDARY_RATE_LIMIT"
+                            }
+                            else None
+                        ),
+                        reset_epoch=(
+                            absolute_hint
+                            if breaker_error_class in {
+                                "PRIMARY_RATE_LIMIT", "SECONDARY_RATE_LIMIT"
+                            }
+                            else None
+                        ),
+                    )
+                except (BreakerStateError, ValueError):
+                    self.breaker_state_error = True
+                    self._complete_breaker_probe(success=False)
+                else:
+                    # record_receipt advances the generation and clears any lease.
+                    self.breaker_probe_held = False
+            elif self.breaker_probe_held:
+                # Any non-breaker response proves this route/op can reach GitHub.
+                self._complete_breaker_probe(success=True)
 
         reserve_headroom = (
             self.reserve_requests > 0
@@ -458,6 +558,14 @@ def collect_batch(
         )
         if cooldown_file is not None else None
     )
+    breaker = (
+        GitHubBreakerLedger(
+            cooldown_file,
+            provider_route=cooldown_scope or "github-rest-default",
+            credential=token or GITHUB_TOKEN,
+        )
+        if cooldown_file is not None else None
+    )
     output = Path(output_dir)
     parent_fd, leaf = open_verified_parent(output)
     try:
@@ -470,6 +578,7 @@ def collect_batch(
     provider = requests.Session() if owned else session
     transport = _BatchSession(
         provider, max_requests, cooldown, reserve_requests=reserve_requests,
+        breaker=breaker,
     )
     started = _now()
     timer = monotonic()
@@ -607,6 +716,11 @@ def collect_batch(
             "unknown_secondary_backoff_seconds": transport.shared_unknown_backoff_seconds,
             "recovery_deferred": transport.shared_recovery_deferred,
         },
+        "shared_breaker": {
+            "enabled": cooldown_file is not None,
+            "deferred": transport.shared_breaker_deferred,
+            "state_error": transport.breaker_state_error,
+        },
         "retry_after_seconds": transport.retry_after_seconds,
         "retry_after_at": transport.retry_after_at,
         "rate_limit_reset_at": transport.rate_limit_reset_at,
@@ -646,7 +760,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--operator-login", help="Optional identity assertion; existing authentication rules apply")
     parser.add_argument(
         "--cooldown-file", type=Path,
-        help="Opt-in shared SQLite quota deadline file; requires an existing private parent directory",
+        help="Opt-in shared SQLite quota/breaker file; requires an existing private parent directory",
     )
     parser.add_argument(
         "--cooldown-scope",
