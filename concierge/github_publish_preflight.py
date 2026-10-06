@@ -12,7 +12,7 @@ from concierge.github_rail_availability import availability_snapshot
 
 
 _SCHEMA = "github-publish-preflight/v1"
-_HEAD_SHA = re.compile(r"[0-9a-f]{40}\\Z")
+_HEAD_SHA = re.compile(r"[0-9a-f]{40}\Z")
 T = TypeVar("T")
 
 
@@ -21,7 +21,7 @@ def _label(value: str, name: str, maximum: int) -> str:
         not isinstance(value, str)
         or not value
         or len(value.encode("utf-8")) > maximum
-        or "\\0" in value
+        or "\0" in value
     ):
         raise ValueError(f"{name} must be a non-empty label up to {maximum} bytes")
     return value
