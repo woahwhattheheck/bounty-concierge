@@ -133,6 +133,7 @@ class _BatchSession:
         self.breaker_probe_held = False
         self.shared_breaker_deferred = False
         self.breaker_state_error = False
+        self.breaker_cleanup_done = False
 
     def get(self, url: str, **kwargs: Any) -> Any:
         self.request_origin_url = url
@@ -199,6 +200,9 @@ class _BatchSession:
                 self.recovery_probe_held = recovery_required and recovery_acquired
         if self.breaker is not None:
             try:
+                if not self.breaker_cleanup_done:
+                    self.breaker.cleanup_stale()
+                    self.breaker_cleanup_done = True
                 admission = self.breaker.admit(
                     "read-known-coordinate", owner=self.recovery_owner
                 )
