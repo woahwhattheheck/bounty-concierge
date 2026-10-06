@@ -186,6 +186,25 @@ class GitHubCooldown:
                 values[label] = float(value)
             return values.get("cooldown"), values.get("quota reservation")
 
+    def remaining_wait_seconds(self, *, read_only: bool = False) -> int:
+        """Return the shared wait still required by provider or quota state.
+
+        Read both deadlines from one SQLite snapshot, then clamp elapsed state
+        to zero. Rounding up prevents a scheduler from waking slightly before
+        the longest active deadline because of sub-second timing.
+        """
+        cooldown_deadline_value, quota_deadline_value = self.deadlines(
+            read_only=read_only
+        )
+        active = [
+            value
+            for value in (cooldown_deadline_value, quota_deadline_value)
+            if value is not None
+        ]
+        if not active:
+            return 0
+        return max(0, math.ceil(max(active) - time()))
+
     def extend(self, until_epoch: float) -> None:
         if not math.isfinite(until_epoch) or until_epoch < 0:
             raise CooldownStateError("shared GitHub cooldown deadline invalid")
