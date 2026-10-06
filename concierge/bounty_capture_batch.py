@@ -12,6 +12,7 @@ import math
 import os
 from pathlib import Path
 import re
+from secrets import token_hex
 import sys
 from time import monotonic, time
 from typing import Any
@@ -125,6 +126,8 @@ class _BatchSession:
         self.shared_headroom_deferred = False
         self.shared_unknown_backoff_seconds: int | None = None
         self.cooldown_state_error = False
+        self.recovery_owner = token_hex(16)
+        self.recovery_probe_acquired = False
 
     def get(self, url: str, **kwargs: Any) -> Any:
         self.request_origin_url = url
@@ -170,6 +173,28 @@ class _BatchSession:
                 raise requests.RequestException(
                     "shared provider request headroom reserved; remaining reads deferred"
                 )
+            if deadline is not None and deadline <= now:
+                try:
+                    required, acquired, lease_until = self.cooldown.claim_recovery_probe(
+                        self.recovery_owner,
+                    )
+                except CooldownStateError:
+                    self.cooldown_state_error = True
+                    self.failure = {"code": "COOLDOWN_STATE_ERROR"}
+                    raise requests.RequestException(
+                        "shared cooldown unavailable; reads deferred"
+                    ) from None
+                if required and not acquired:
+                    self.rate_limited = True
+                    self.shared_cooldown_deferred = True
+                    self.retry_after_seconds = max(
+                        1, math.ceil((lease_until or now + 1.0) - now),
+                    )
+                    self.failure = {"code": "RATE_LIMITED"}
+                    raise requests.RequestException(
+                        "shared provider recovery probe already leased; reads deferred"
+                    )
+                self.recovery_probe_acquired = required and acquired
         self.request_count += 1
         # Keep endpoint identity private for issue-local failure isolation.
         self.request_url = target if isinstance(target, str) else getattr(target, "url", None)
@@ -194,6 +219,14 @@ class _BatchSession:
                         pass
             else:
                 self.failure = {"code": "TRANSPORT_ERROR", "error_type": type(exc).__name__}
+                if self.cooldown is not None and self.recovery_probe_acquired:
+                    try:
+                        self.cooldown.defer_recovery_probe(
+                            self.recovery_owner, time() + 60.0,
+                        )
+                        self.recovery_probe_acquired = False
+                    except CooldownStateError:
+                        self.cooldown_state_error = True
             raise
         self._record_response(response)
         return response
@@ -306,13 +339,24 @@ class _BatchSession:
                         0, math.ceil(deadline - time()),
                     )
                 else:
-                    self.cooldown.extend(cooldown_deadline(
+                    deadline = cooldown_deadline(
                         retry_seconds=retry_after, retry_at=retry_at,
                         reset_at=self.rate_limit_reset_at, primary_exhausted=remaining == 0,
-                    ))
+                    )
+                    if not self.recovery_probe_acquired:
+                        self.cooldown.extend(deadline)
+                if self.recovery_probe_acquired:
+                    self.cooldown.defer_recovery_probe(self.recovery_owner, deadline)
+                    self.recovery_probe_acquired = False
             except CooldownStateError:
                 # Keep the actual response and provider evidence. This batch
                 # is already stopped; report that sharing its stop failed.
+                self.cooldown_state_error = True
+        elif self.cooldown is not None and self.recovery_probe_acquired:
+            try:
+                self.cooldown.complete_recovery_probe(self.recovery_owner)
+                self.recovery_probe_acquired = False
+            except CooldownStateError:
                 self.cooldown_state_error = True
 
         reserve_headroom = (
