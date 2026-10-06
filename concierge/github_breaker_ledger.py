@@ -23,7 +23,19 @@ OPEN_UNTIL = "OPEN_UNTIL"
 SCOPE_DENIED = "SCOPE_DENIED"
 AUTH_FAILED = "AUTH_FAILED"
 _ALLOWED_STATES = {CLOSED, OPEN_UNTIL, SCOPE_DENIED, AUTH_FAILED}
-_ALLOWED_OPS = {"search", "read-known-coordinate", "write", "fork"}
+# Keep the legacy broad "write" class for existing callers. New callers should use
+# the narrowest write family they can identify so a repository/integration scope
+# denial on one surface does not suppress unrelated healthy write paths.
+_ALLOWED_OPS = {
+    "search",
+    "read-known-coordinate",
+    "write",
+    "write-content",
+    "write-issue-comment",
+    "write-pr-metadata",
+    "write-pr-create",
+    "fork",
+}
 _RATE_ERRORS = {"PRIMARY_RATE_LIMIT", "SECONDARY_RATE_LIMIT"}
 _TERMINAL_ERRORS = {"SCOPE_DENIED": SCOPE_DENIED, "AUTH_FAILED": AUTH_FAILED}
 _DEFAULT_UNKNOWN_WAIT = 60.0
