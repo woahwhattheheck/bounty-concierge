@@ -45,7 +45,8 @@ The guard recognizes narrow, explicit syntactic families:
 - accepted/winner language bound to a submission, claim, PR, work item, pack, or
   GitHub mention;
 - explicit award-to language;
-- explicit full/closed/filled/exhausted capacity or "no more submissions";
+- explicit full/closed/filled/exhausted capacity, "no more/stop submissions", or
+  "not/no longer accepting new bounty attempts/submissions";
 - explicit bounty/reward/task cancellation, withdrawal, or voiding.
 
 Questions, quoted lines, fenced code, and locally negated statements are ignored
