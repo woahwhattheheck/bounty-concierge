@@ -349,7 +349,7 @@ class _BatchSession:
                 "code": "RATE_LIMITED" if throttled else "HTTP_ERROR",
                 "http_status": status,
             }
-        if (throttled or remaining == 0) and self.cooldown is not None:
+        if (throttled or primary_exhausted) and self.cooldown is not None:
             try:
                 if unknown_secondary:
                     deadline = self.cooldown.extend_unknown_secondary()
