@@ -76,6 +76,22 @@ def acquire_closeout(
     )
 
     disposition = claimed.get("disposition")
+    # An owner label identifies a seat, not an individual operation. Never
+    # let another operation on the same seat reuse a live closeout lease.
+    if reserve_code == 0 and disposition == "OWNED" and (
+        claimed.get("owner") != owner or claimed.get("event_id") != event_id
+    ):
+        return (
+            {
+                "schema": SCHEMA,
+                "status": "COLLISION",
+                "post_claim": False,
+                "work_key": work_key,
+                "reservation": claimed,
+            },
+            3,
+        )
+
     if reserve_code == 0 and disposition in {"ACQUIRED", "OWNED"}:
         return (
             {
