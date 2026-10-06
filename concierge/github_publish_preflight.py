@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
+import math
 import re
 from secrets import token_hex
 from typing import Any, Callable, Optional, TypeVar, Union
 
+from concierge.github_breaker_ledger import (
+    BreakerStateError,
+    GitHubBreakerLedger,
+    SCOPE_DENIED,
+)
 from concierge.github_cooldown import CooldownStateError, GitHubCooldown
 from concierge.github_rail_availability import availability_snapshot
 
@@ -14,6 +21,11 @@ from concierge.github_rail_availability import availability_snapshot
 _HEAD_SHA = re.compile(r"[0-9a-f]{40}\Z")
 _REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
 T = TypeVar("T")
+_RESOURCE_SCOPE_TTL_SECONDS = 15.0 * 60.0
+_INTEGRATION_SCOPE_DENIAL_MARKERS = (
+    "resource not accessible by integration",
+    "insufficient permissions for integration",
+)
 
 
 def _label(value: str, name: str, maximum: int) -> str:
@@ -43,6 +55,24 @@ def _repo(value: str) -> str:
     ):
         raise ValueError("repo must be owner/name")
     return value
+
+
+def _resource_breaker_route(rail: str, repo: str, action: str) -> str:
+    """Hash one exact publish destination into a bounded breaker route label."""
+    payload = (
+        b"github-publish-resource-breaker-v1\0"
+        + rail.encode("utf-8")
+        + b"\0"
+        + repo.casefold().encode("utf-8")
+        + b"\0"
+        + action.encode("utf-8")
+    )
+    return "publish-resource:" + hashlib.sha256(payload).hexdigest()
+
+
+def _integration_scope_denied(exc: Exception) -> bool:
+    folded = " ".join(str(exc).casefold().split())
+    return any(marker in folded for marker in _INTEGRATION_SCOPE_DENIAL_MARKERS)
 
 
 def _deferred(
@@ -80,6 +110,7 @@ def execute_publish_operation(
     transport: Callable[[], T],
     cooldown_scope: Optional[str] = None,
     recovery_owner: Optional[str] = None,
+    scope_breaker_path: Optional[Union[str, Path]] = None,
 ) -> Union[T, dict[str, Any]]:
     """Execute one GitHub provider operation only when shared rail state admits it.
 
@@ -94,6 +125,8 @@ def execute_publish_operation(
     existing CAS cleanup clears only the stale cooldown protected by the lease
     and preserves any newer provider deadline recorded during transport.
     """
+    rail = _label(rail, "rail", 128)
+    actor = _label(actor, "actor", 128)
     operation = _label(operation, "operation", 160)
     action = _label(action, "action", 128)
     repo = _repo(repo)
@@ -103,6 +136,32 @@ def execute_publish_operation(
         recovery_owner = _label(recovery_owner, "recovery_owner", 128)
     if not callable(transport):
         raise ValueError("transport must be callable")
+
+    resource_breaker = None
+    if scope_breaker_path is not None:
+        resource_breaker = GitHubBreakerLedger(
+            scope_breaker_path,
+            provider_route=_resource_breaker_route(rail, repo, action),
+            credential=token,
+            stale_ttl_seconds=_RESOURCE_SCOPE_TTL_SECONDS,
+        )
+        resource_breaker.cleanup_stale()
+        resource_status = resource_breaker.status_snapshot()
+        write_status = resource_status.get("operations", {}).get("write")
+        if isinstance(write_status, dict) and write_status.get("state") == SCOPE_DENIED:
+            age = float(write_status.get("observation_age_seconds", 0.0))
+            retry_after = max(1, math.ceil(_RESOURCE_SCOPE_TTL_SECONDS - age))
+            result = _deferred(
+                {"retry_after_seconds": retry_after},
+                operation=operation,
+                action=action,
+                repo=repo,
+                carrier=carrier,
+                expected_head=expected_head,
+            )
+            result["reason"] = "INTEGRATION_SCOPE_DENIED"
+            result["scope"] = "rail+repo+action"
+            return result
 
     snapshot = availability_snapshot(
         path,
@@ -166,7 +225,17 @@ def execute_publish_operation(
                 )
         recovery_held = required and acquired
 
-    result = transport()
+    try:
+        result = transport()
+    except Exception as exc:
+        if resource_breaker is not None and _integration_scope_denied(exc):
+            try:
+                resource_breaker.record_receipt("write", "SCOPE_DENIED")
+            except BreakerStateError:
+                # Preserve the original provider failure if local coordination
+                # state becomes unavailable after the provider attempt.
+                pass
+        raise
     if recovery_held:
         assert cooldown is not None and owner is not None
         cooldown.complete_recovery_probe(owner)
