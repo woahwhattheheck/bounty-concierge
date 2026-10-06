@@ -97,3 +97,48 @@ def test_remaining_wait_seconds_uses_longest_shared_deadline(tmp_path, monkeypat
     clock[0] = 1090.1
     assert cooldown.remaining_wait_seconds() == 0
 
+def test_unknown_secondary_samples_clock_after_write_lock(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+    from concierge import github_cooldown
+
+    clock = [1000.0]
+    monkeypatch.setattr(github_cooldown, "time", lambda: clock[0])
+    cooldown = GitHubCooldown(tmp_path / "cooldown.sqlite", "test-credential")
+
+    class Result:
+        def __init__(self, row=None):
+            self.row = row
+        def fetchone(self):
+            return self.row
+
+    class Connection:
+        observed_epoch = None
+        deadline = None
+
+        def execute(self, sql, params=()):
+            if sql == "BEGIN IMMEDIATE":
+                clock[0] = 1060.0
+                return Result()
+            if sql.startswith("SELECT backoff_seconds"):
+                return Result(None)
+            if sql.startswith("INSERT INTO github_cooldown_unknown_v1"):
+                self.observed_epoch = params[2]
+                return Result()
+            if sql.startswith("INSERT INTO github_cooldown_v1"):
+                self.deadline = params[1]
+                return Result()
+            if sql.startswith("SELECT until_epoch"):
+                return Result((self.deadline,))
+            raise AssertionError(f"unexpected SQL: {sql}")
+
+    connection = Connection()
+
+    @contextmanager
+    def fake_connection():
+        yield connection
+
+    monkeypatch.setattr(cooldown, "_connection", fake_connection)
+
+    assert cooldown.extend_unknown_secondary() == 1120.0
+    assert connection.observed_epoch == 1060.0
+
