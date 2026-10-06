@@ -11,7 +11,12 @@ python -m concierge.bountyhub_fresh_targets \
   work/supply/bountyhub/2026-10-04-catalog-56f3.json \
   --min-funded-usd 15.00 \
   --exclude-issues work/supply/bountyhub/2026-10-04-canonical-exclusions.json \
-  --output fresh-targets.json
+  --output fresh-targets.json \
+  --preflight-output fresh-preflight-shortlist.json
+
+python -m concierge.bounty_capture_batch fresh-preflight-shortlist.json \
+  --output-dir fresh-canonical-capture --max-issues 25 --max-pages 10 \
+  --max-requests 100 --json
 ```
 
 The command makes **zero provider requests**. Input can be an existing
@@ -28,6 +33,16 @@ excluded by this additional rule. When two listings refer to one issue, an
 assigned exclusive listing does **not** suppress the other eligible listing.
 Nonexclusive listings are unchanged. Missing or nonboolean assignment evidence
 is an input error rather than evidence of availability.
+
+Fresh-target output is explicitly **lead-only**. It carries
+`dispatch_status="LEAD"`, `green_authorized=false`,
+`requires_canonical_preflight=true`, and `requires_work_order_lease=true`.
+The `canonical_preflight_candidates` field contains only the exact
+`repo`/`number`/optional-`submission_target` shape accepted by
+`bounty_capture_batch`. `--preflight-output` writes that envelope directly.
+This removes the former manual field-stripping step; it does **not** turn a
+retained marketplace row into GREEN work. Builders still consume only the later
+live canonical/preflight result and the normal work-order lease.
 
 Three additional fields make the filter inspectable:
 

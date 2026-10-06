@@ -86,6 +86,24 @@ def _exclude_assigned_exclusive(
         }
         annotated_targets.append(target)
     result["targets"] = annotated_targets
+    # These rows are discovery leads, never implementation authority.  Keep the
+    # rich reservation metadata for coordination, but also expose a projection
+    # whose schema is accepted verbatim by bounty_capture_batch so callers do
+    # not need to hand-strip fields before the live canonical preflight.
+    result["dispatch_status"] = "LEAD"
+    result["green_authorized"] = False
+    result["requires_canonical_preflight"] = True
+    result["requires_work_order_lease"] = True
+    result["canonical_preflight_candidates"] = {
+        "candidates": [
+            {
+                key: target[key]
+                for key in ("repo", "number", "submission_target")
+                if key in target
+            }
+            for target in annotated_targets
+        ]
+    }
     return result
 
 
@@ -120,6 +138,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--submission-targets", type=Path)
     parser.add_argument("--exclude-issues", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--preflight-output", type=Path,
+        help=(
+            "Optional exact repo/number envelope for bounty_capture_batch; "
+            "still requires live canonical preflight before GREEN dispatch"
+        ),
+    )
     args = parser.parse_args(argv)
     try:
         from concierge.bountyhub_catalog import _emit_json
@@ -130,7 +155,15 @@ def main(argv: list[str] | None = None) -> int:
             submission_targets=_load(args.submission_targets),
             excluded_issues=_load(args.exclude_issues),
         )
+        if (
+            args.output is not None
+            and args.preflight_output is not None
+            and args.output.absolute() == args.preflight_output.absolute()
+        ):
+            raise ValueError("--output and --preflight-output must differ")
         _emit_json(result, args.output)
+        if args.preflight_output is not None:
+            _emit_json(result["canonical_preflight_candidates"], args.preflight_output)
     except (OSError, ValueError, TypeError, KeyError):
         # Do not echo paths, raw retained fields or JSON payloads on input failure.
         print("bountyhub-fresh-targets: invalid input or output destination", file=sys.stderr)
