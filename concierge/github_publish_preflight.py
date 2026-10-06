@@ -159,8 +159,6 @@ def execute_publish_operation(
                 carrier=carrier,
                 expected_head=expected_head,
             )
-            result["reason"] = "INTEGRATION_SCOPE_DENIED"
-            result["scope"] = "rail+repo+action"
             return result
 
     snapshot = availability_snapshot(
