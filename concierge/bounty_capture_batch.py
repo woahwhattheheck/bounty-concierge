@@ -261,6 +261,8 @@ class _BatchSession:
         remaining = _integer_header(headers, "X-RateLimit-Remaining")
         reset_at = _integer_header(headers, "X-RateLimit-Reset")
         retry_after = _integer_header(headers, "Retry-After")
+        self.rate_limit_remaining = remaining
+        self.rate_limit_reset_at = reset_at
         retry_at = None
         raw_retry = headers.get("Retry-After")
         if retry_after is None and isinstance(raw_retry, str) and len(raw_retry) <= 128:
