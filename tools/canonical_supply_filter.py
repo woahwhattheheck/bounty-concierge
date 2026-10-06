@@ -136,6 +136,25 @@ def classify(
     if reward_state not in AVAILABLE_REWARD_STATES:
         reasons.append("reward_state_unknown")
 
+    # Optional canonical context from fresh repository/reward discovery. These
+    # fields are additive for v1 snapshots so existing callers keep R1 behavior,
+    # while collectors that have stronger evidence can fail closed.
+    if "repository_archived" in item:
+        repository_archived = item.get("repository_archived")
+        if repository_archived is True:
+            return "PRUNE", ["repository_archived"]
+        if repository_archived is not False:
+            reasons.append("repository_archived_invalid")
+
+    if "reward_scope" in item:
+        reward_scope_raw = item.get("reward_scope")
+        if not isinstance(reward_scope_raw, str) or not reward_scope_raw.strip():
+            reasons.append("reward_scope_invalid")
+        else:
+            reward_scope = reward_scope_raw.strip().casefold()
+            if reward_scope != "issue":
+                reasons.append(f"reward_scope_not_issue:{reward_scope}")
+
     assignees_raw = require_list(item, "assignees", reasons)
     claims_raw = require_list(item, "claims", reasons)
     prs_raw = require_list(item, "same_scope_prs", reasons)
