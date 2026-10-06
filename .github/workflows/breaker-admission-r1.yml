@@ -1,0 +1,40 @@
+name: Breaker admission R1 focused validation
+
+on:
+  push:
+    branches: ["sol56/breaker-admission-r1-20261006"]
+    paths:
+      - "concierge/bounty_capture_batch.py"
+      - "concierge/github_breaker_ledger.py"
+      - "tests/test_bounty_capture_batch_breaker.py"
+      - "tests/test_github_breaker_ledger.py"
+      - "tests/test_batch_primary_limit_body.py"
+      - "tests/test_bounty_capture_batch_cooldown_scope.py"
+      - "tests/test_bounty_capture_batch_rate_visibility.py"
+      - ".github/workflows/breaker-admission-r1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --disable-pip-version-check pytest requests
+      - name: Compile touched modules
+        run: python -m py_compile concierge/github_breaker_ledger.py concierge/bounty_capture_batch.py
+      - name: Run focused breaker and adjacent rate-limit checks
+        run: |
+          pytest -q \
+            tests/test_github_breaker_ledger.py \
+            tests/test_bounty_capture_batch_breaker.py \
+            tests/test_batch_primary_limit_body.py \
+            tests/test_bounty_capture_batch_cooldown_scope.py \
+            tests/test_bounty_capture_batch_rate_visibility.py
