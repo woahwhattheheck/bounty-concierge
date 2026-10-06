@@ -1,16 +1,19 @@
 "use strict";
 
 // Pure inspection of the caller's current deferred-tool registry. No I/O.
-const NATIVE_TOOL_PREFIXES = Object.freeze({
-  github: "mcp__codex_apps__github_",
-  slack: "mcp__codex_apps__slack_slack_",
-});
-
-// Exact namespace families observed in the ChatGPT connector harness.
+// Exact namespace families observed across the supported ChatGPT connector harnesses.
 // Accept the caller's actual names; do not synthesize registry entries or permissions.
-const CONNECTOR_TOOL_PREFIXES = Object.freeze({
-  github: "GitHub.",
-  slack: "Slack.slack_",
+const TOOL_PREFIXES = Object.freeze({
+  github: Object.freeze([
+    "mcp__codex_apps__github_",
+    "mcp__GitHub__",
+    "GitHub.",
+  ]),
+  slack: Object.freeze([
+    "mcp__codex_apps__slack_slack_",
+    "mcp__Slack__slack_",
+    "Slack.slack_",
+  ]),
 });
 
 const NATIVE_WRITE_ACTIONS = Object.freeze({
@@ -34,8 +37,7 @@ function inspectToolInventory(registry, { includeNames = false } = {}) {
     .filter(name => typeof name === "string"))].sort();
   const observed = new Set(allNames);
   const providers = {};
-  for (const [provider, prefix] of Object.entries(NATIVE_TOOL_PREFIXES)) {
-    const prefixes = [prefix, CONNECTOR_TOOL_PREFIXES[provider]];
+  for (const [provider, prefixes] of Object.entries(TOOL_PREFIXES)) {
     const names = allNames.filter(name => prefixes.some(candidate => name.startsWith(candidate)));
     const writes = {};
     for (const action of NATIVE_WRITE_ACTIONS[provider]) {
@@ -54,6 +56,7 @@ function inspectToolInventory(registry, { includeNames = false } = {}) {
   const discovery = allNames.filter(name =>
     /(?:^|__)(?:[^_]+__)?(?:tool_search|search_tools|list_resources)$/.test(name)
       || name === "mcp__codex_apps__plugin_management_search_plugins"
+      || name === "mcp__Plugin_Management__search_plugins"
       || name === "api_tool.list_resources"
   );
   return {
