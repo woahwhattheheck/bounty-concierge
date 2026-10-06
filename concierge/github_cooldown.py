@@ -385,11 +385,13 @@ class GitHubCooldown:
         payload, endpoint or credential is retained. Return the effective shared
         deadline, including any later deadline already recorded by another worker.
         """
-        now = time()
         with self._connection() as connection:
             # Serialize the read/advance/write so simultaneous workers cannot
             # all publish the same fallback step after one limiter burst.
             connection.execute("BEGIN IMMEDIATE")
+            # Sample after acquiring the write lock so lock contention cannot
+            # consume part of the cooldown we are about to publish.
+            now = time()
             row = connection.execute(
                 "SELECT backoff_seconds, observed_epoch "
                 "FROM github_cooldown_unknown_v1 WHERE scope = ?",
