@@ -334,9 +334,13 @@ class GitHubBreakerLedger:
                     or float(previous_deadline) < 0
                 ):
                     raise BreakerStateError("shared GitHub breaker deadline invalid")
-                retry_until = max(now, float(lease_until), float(previous_deadline))
+                retry_until = max(
+                    now + _DEFAULT_LEASE_SECONDS,
+                    float(lease_until),
+                    float(previous_deadline),
+                )
             else:
-                retry_until = max(now, float(lease_until))
+                retry_until = max(now + _DEFAULT_LEASE_SECONDS, float(lease_until))
             cursor = connection.execute(
                 "UPDATE github_breaker_v1 SET state=?, until_epoch=?, observed_epoch=?, "
                 "generation=?, lease_owner=NULL, lease_until_epoch=NULL, lease_generation=NULL "
