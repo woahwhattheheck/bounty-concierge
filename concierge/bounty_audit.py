@@ -31,11 +31,11 @@ from concierge.submission_packet import validate_submission_target
 
 _MAINTAINER_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
 _ISSUEHUNT_BLOCK_PATTERN = re.compile(
-    r"<!--\\s*Issuehunt content\\s*-->(.*?)<!--\\s*/Issuehunt content\\s*-->",
+    r"<!--\s*Issuehunt content\s*-->(.*?)<!--\s*/Issuehunt content\s*-->",
     re.IGNORECASE | re.DOTALL,
 )
 _ISSUEHUNT_PR_PATTERN = re.compile(
-    r"https://(?:oss\\.)?issuehunt\\.io/r/"
+    r"https://(?:oss\.)?issuehunt\.io/r/"
     r"([A-Za-z0-9][A-Za-z0-9_.-]*)/([A-Za-z0-9_.-]+)/pull/([1-9][0-9]*)",
     re.IGNORECASE,
 )
