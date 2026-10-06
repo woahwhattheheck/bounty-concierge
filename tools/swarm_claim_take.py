@@ -235,6 +235,25 @@ def acquire_take(
     )
 
     disposition = claimed.get("disposition")
+    if (
+        reserve_code == 0
+        and disposition == "OWNED"
+        and (
+            claimed.get("owner") != owner
+            or claimed.get("event_id") != event_id
+        )
+    ):
+        return (
+            {
+                "schema": SCHEMA,
+                "status": "COLLISION",
+                "post_take": False,
+                "canonicalization": canonicalization,
+                "reservation": claimed,
+            },
+            3,
+        )
+
     if reserve_code == 0 and disposition in {"ACQUIRED", "OWNED"}:
         return (
             {
