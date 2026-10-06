@@ -104,6 +104,7 @@ _PRIVATE_CONTEXT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         "startup_initialization",
         re.compile(
             r"\b(?:complete|full|entire|verbatim)\s+"
+            r"(?:raw\s+)?(?:text\s+of\s+(?:your\s+)?)?"
             r"(?:(?:session|runtime|conversation)\s+)?"
             r"(?:initiali[sz]ation|startup|boot)\s+"
             r"(?:text|instructions?|context|configuration|directives?)\b",
