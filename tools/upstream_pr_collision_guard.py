@@ -9,6 +9,7 @@ immediately before creating a new pull request.
 from __future__ import annotations
 
 import argparse
+import hashlib
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -86,6 +87,43 @@ def _head_sha(pr: dict[str, Any]) -> str | None:
         if isinstance(nested, str) and nested.strip():
             return nested.strip().lower()
     return None
+
+
+def _content_fingerprint(files: Any, *, field: str) -> str | None:
+    """Hash an exact changed-path/postimage-blob set when one is supplied."""
+    if files is None:
+        return None
+    if not isinstance(files, list) or not files:
+        raise GuardError(f"{field} must be a non-empty list when provided")
+
+    normalized: list[tuple[str, str]] = []
+    seen_paths: set[str] = set()
+    for raw_file in files:
+        if not isinstance(raw_file, dict):
+            raise GuardError(f"{field} entries must be objects")
+        path = raw_file.get("filename")
+        if not isinstance(path, str) or not path.strip():
+            path = raw_file.get("path")
+        sha = raw_file.get("sha")
+        if not isinstance(sha, str) or not sha.strip():
+            sha = raw_file.get("blob_sha")
+        if not isinstance(path, str) or not path.strip():
+            raise GuardError(f"{field} entries need filename or path")
+        if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-fA-F]{40,64}", sha.strip()):
+            raise GuardError(f"{field} entries need a 40-64 character hex blob SHA")
+        clean_path = path.strip()
+        if clean_path in seen_paths:
+            raise GuardError(f"{field} contains duplicate path {clean_path!r}")
+        seen_paths.add(clean_path)
+        normalized.append((clean_path, sha.strip().lower()))
+
+    digest = hashlib.sha256()
+    for path, sha in sorted(normalized):
+        digest.update(path.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(sha.encode("ascii"))
+        digest.update(b"\n")
+    return digest.hexdigest()
 
 
 def _references_issue(
@@ -181,6 +219,10 @@ def evaluate(
     own_sha = self_head_sha.strip().lower()
     if not own_sha:
         raise GuardError("self_head_sha must not be empty")
+    candidate_fingerprint = _content_fingerprint(
+        snapshot.get("candidate_files"),
+        field="snapshot.candidate_files",
+    )
 
     self_carriers: list[dict[str, Any]] = []
     competitors: list[dict[str, Any]] = []
@@ -192,19 +234,33 @@ def evaluate(
         if pr_num in seen_numbers:
             raise GuardError(f"duplicate pull request #{pr_num} in snapshot")
         seen_numbers.add(pr_num)
-        if not _references_issue(
+        references_issue = _references_issue(
             raw_pr,
             owner=owner,
             repo=repo,
             number=number,
             submitted=submitted,
-        ):
+        )
+        pr_fingerprint = _content_fingerprint(
+            raw_pr.get("files"),
+            field=f"snapshot.pulls[#{pr_num}].files",
+        )
+        same_content = (
+            candidate_fingerprint is not None
+            and pr_fingerprint == candidate_fingerprint
+        )
+        if not references_issue and not same_content:
             continue
         state = raw_pr.get("state")
         merged = raw_pr.get("merged") is True or raw_pr.get("merged_at") not in (None, "")
         live = merged or (isinstance(state, str) and state.lower() == "open")
         if not live:
             continue
+        match_reasons = []
+        if references_issue:
+            match_reasons.append("issue_reference")
+        if same_content:
+            match_reasons.append("content_fingerprint")
         record = {
             "number": pr_num,
             "state": state,
@@ -212,6 +268,8 @@ def evaluate(
             "head_sha": _head_sha(raw_pr),
             "url": raw_pr.get("html_url") or raw_pr.get("url"),
             "title": raw_pr.get("title"),
+            "content_fingerprint": pr_fingerprint,
+            "match_reason": "+".join(match_reasons),
         }
         if record["head_sha"] == own_sha:
             self_carriers.append(record)
@@ -219,14 +277,23 @@ def evaluate(
             competitors.append(record)
 
     if competitors:
+        content_collision = any(
+            "content_fingerprint" in record["match_reason"]
+            for record in competitors
+        )
         return _report(
             expected_key,
-            "COLLISION",
-            "another live or merged pull request already carries this issue",
+            "CONTENT_COLLISION" if content_collision else "COLLISION",
+            (
+                "another live or merged pull request has the same changed-path/blob fingerprint"
+                if content_collision
+                else "another live or merged pull request already carries this issue"
+            ),
             captured_at,
             self_carriers,
             competitors,
             age,
+            content_fingerprint=candidate_fingerprint,
         )
     if self_carriers:
         return _report(
@@ -237,6 +304,7 @@ def evaluate(
             self_carriers,
             [],
             age,
+            content_fingerprint=candidate_fingerprint,
         )
     return _report(
         expected_key,
@@ -246,6 +314,7 @@ def evaluate(
         [],
         [],
         age,
+        content_fingerprint=candidate_fingerprint,
     )
 
 
@@ -257,6 +326,7 @@ def _report(
     self_carriers: list[dict[str, Any]],
     competitors: list[dict[str, Any]],
     age_seconds: float,
+    content_fingerprint: str | None = None,
 ) -> dict[str, Any]:
     return {
         "schema": "upstream-pr-collision-guard/v1",
@@ -268,6 +338,7 @@ def _report(
         "snapshot_age_seconds": round(age_seconds, 3),
         "self_carriers": self_carriers,
         "competitors": competitors,
+        "content_fingerprint": content_fingerprint,
         "instruction": (
             "create one pull request"
             if status == "PUBLISH_ALLOWED"
