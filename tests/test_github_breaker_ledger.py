@@ -102,3 +102,35 @@ def test_stale_terminal_state_is_cleaned_up(tmp_path):
     assert ledger.admit("write", owner="worker", now_epoch=1050.0).state == AUTH_FAILED
     assert ledger.cleanup_stale(now_epoch=1200.0) == 1
     assert ledger.admit("write", owner="worker", now_epoch=1200.0).decision == "ALLOW"
+
+def test_failed_probe_retains_cooldown_until_lease_expires(tmp_path):
+    ledger = GitHubBreakerLedger(
+        tmp_path / "breaker.sqlite", provider_route="github-app", credential="app"
+    )
+    ledger.record_receipt(
+        "search", "SECONDARY_RATE_LIMIT", observed_epoch=1000.0, retry_after_seconds=1
+    )
+    first = ledger.admit(
+        "search", owner="worker-a", now_epoch=1002.0, lease_seconds=5.0
+    )
+    assert first.decision == "PROBE"
+    assert first.until_epoch == 1007.0
+
+    assert ledger.complete_probe(
+        "search", owner="worker-a", success=False, now_epoch=1003.0
+    )
+
+    during_cooldown = [
+        ledger.admit("search", owner=owner, now_epoch=1004.0)
+        for owner in ("worker-a", "worker-b")
+    ]
+    assert [item.decision for item in during_cooldown] == ["SKIP", "SKIP"]
+    assert {item.until_epoch for item in during_cooldown} == {1007.0}
+
+    after_cooldown = [
+        ledger.admit("search", owner=owner, now_epoch=1008.0)
+        for owner in ("worker-a", "worker-b")
+    ]
+    assert [item.decision for item in after_cooldown].count("PROBE") == 1
+    assert [item.decision for item in after_cooldown].count("SKIP") == 1
+
