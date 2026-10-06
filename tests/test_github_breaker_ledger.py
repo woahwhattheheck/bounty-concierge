@@ -102,3 +102,44 @@ def test_stale_terminal_state_is_cleaned_up(tmp_path):
     assert ledger.admit("write", owner="worker", now_epoch=1050.0).state == AUTH_FAILED
     assert ledger.cleanup_stale(now_epoch=1200.0) == 1
     assert ledger.admit("write", owner="worker", now_epoch=1200.0).decision == "ALLOW"
+
+
+def test_failed_probe_keeps_followers_cool_until_lease_window_expires(tmp_path):
+    ledger = GitHubBreakerLedger(
+        tmp_path / "breaker.sqlite",
+        provider_route="github-app-installation-7",
+    )
+    ledger.record_receipt(
+        "read-known-coordinate",
+        "SECONDARY_RATE_LIMIT",
+        observed_epoch=1000.0,
+        retry_after_seconds=1,
+    )
+
+    first = ledger.admit(
+        "read-known-coordinate", owner="worker-a", now_epoch=1002.0
+    )
+    assert first.decision == "PROBE"
+    assert first.until_epoch == 1017.0
+    assert ledger.complete_probe(
+        "read-known-coordinate",
+        owner="worker-a",
+        success=False,
+        now_epoch=1003.0,
+    )
+
+    for owner in ("worker-a", "worker-b"):
+        blocked = ledger.admit(
+            "read-known-coordinate", owner=owner, now_epoch=1004.0
+        )
+        assert blocked.decision == "SKIP"
+        assert blocked.until_epoch == 1017.0
+
+    decisions = [
+        ledger.admit(
+            "read-known-coordinate", owner=f"worker-{index}", now_epoch=1018.0
+        ).decision
+        for index in range(100)
+    ]
+    assert decisions.count("PROBE") == 1
+    assert decisions.count("SKIP") == 99

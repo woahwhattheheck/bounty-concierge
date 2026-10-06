@@ -285,13 +285,20 @@ class GitHubBreakerLedger:
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
-                "SELECT generation, lease_owner, lease_generation FROM github_breaker_v1 "
-                "WHERE route_key=? AND operation_class=?",
+                "SELECT generation, lease_owner, lease_until_epoch, lease_generation, until_epoch "
+                "FROM github_breaker_v1 WHERE route_key=? AND operation_class=?",
                 (self.route_key, operation_class),
             ).fetchone()
-            if row is None or row[1] != owner or row[2] != row[0]:
+            if row is None or row[1] != owner or row[3] != row[0]:
                 return False
             generation = int(row[0])
+            lease_until = row[2]
+            if (
+                lease_until is None
+                or not math.isfinite(float(lease_until))
+                or float(lease_until) < 0
+            ):
+                raise BreakerStateError("shared GitHub breaker lease invalid")
             if success:
                 cursor = connection.execute(
                     "UPDATE github_breaker_v1 SET state=?, reason=NULL, until_epoch=NULL, "
@@ -307,13 +314,31 @@ class GitHubBreakerLedger:
                     ),
                 )
                 return cursor.rowcount == 1
-            connection.execute(
-                "UPDATE github_breaker_v1 SET lease_owner=NULL, lease_until_epoch=NULL, "
-                "lease_generation=NULL, observed_epoch=? WHERE route_key=? AND operation_class=? "
-                "AND generation=?",
-                (now, self.route_key, operation_class, generation),
+            previous_deadline = row[4]
+            if previous_deadline is not None:
+                if (
+                    not math.isfinite(float(previous_deadline))
+                    or float(previous_deadline) < 0
+                ):
+                    raise BreakerStateError("shared GitHub breaker deadline invalid")
+                retry_until = max(now, float(lease_until), float(previous_deadline))
+            else:
+                retry_until = max(now, float(lease_until))
+            cursor = connection.execute(
+                "UPDATE github_breaker_v1 SET state=?, until_epoch=?, observed_epoch=?, "
+                "generation=?, lease_owner=NULL, lease_until_epoch=NULL, lease_generation=NULL "
+                "WHERE route_key=? AND operation_class=? AND generation=?",
+                (
+                    OPEN_UNTIL,
+                    retry_until,
+                    now,
+                    generation + 1,
+                    self.route_key,
+                    operation_class,
+                    generation,
+                ),
             )
-            return True
+            return cursor.rowcount == 1
 
     def cleanup_stale(self, *, now_epoch: float | None = None) -> int:
         """Delete stale rows and expired leases so dead workers cannot accumulate state."""
