@@ -70,5 +70,23 @@ class SwarmClaimCloseoutTest(unittest.TestCase):
         self.assertNotIn("claim_text", result)
 
 
+    def test_same_seat_different_operation_cannot_reuse_closeout(self):
+        for observed_event, expected_code in (("GF-7-R1", 0), ("GF-7-OTHER", 3), (None, 3)):
+            with self.subTest(observed_event=observed_event), patch.object(
+                closeout.reservation, "reserve", return_value=(
+                    {"disposition": "OWNED", "owner": "same-seat", "event_id": observed_event}, 0
+                ),
+            ):
+                result, code = closeout.acquire_closeout(
+                    object(), issue="Owner/Repo#7", owner="same-seat",
+                    event_id="GF-7-R1", lease_seconds=900, base_branch="main",
+                )
+            self.assertEqual(code, expected_code)
+            self.assertEqual(result["post_claim"], expected_code == 0)
+            if expected_code:
+                self.assertEqual(result["status"], "COLLISION")
+                self.assertNotIn("claim_text", result)
+
+
 if __name__ == "__main__":
     unittest.main()
