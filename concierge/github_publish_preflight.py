@@ -11,8 +11,8 @@ from concierge.github_cooldown import CooldownStateError, GitHubCooldown
 from concierge.github_rail_availability import availability_snapshot
 
 
-_SCHEMA = "github-publish-preflight/v1"
 _HEAD_SHA = re.compile(r"[0-9a-f]{40}\Z")
+_REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
 T = TypeVar("T")
 
 
@@ -36,60 +36,73 @@ def _head(value: str) -> str:
     return value
 
 
+def _repo(value: str) -> str:
+    value = _label(value, "repo", 256).strip()
+    if _REPOSITORY.fullmatch(value) is None or any(
+        part in {".", ".."} for part in value.split("/")
+    ):
+        raise ValueError("repo must be owner/name")
+    return value
+
+
 def _deferred(
     snapshot: dict[str, Any],
     *,
-    operation_id: str,
+    operation: str,
+    action: str,
+    repo: str,
     carrier: str,
     expected_head: str,
 ) -> dict[str, Any]:
     return {
-        "schema": _SCHEMA,
-        "decision": "RAIL_DEFERRED",
-        "handoff_reason": "RAIL_DEFERRED",
-        "rail": snapshot["rail"],
-        "actor": snapshot["actor"],
-        "availability": snapshot["availability"],
-        "retry_after_seconds": snapshot["retry_after_seconds"],
-        "operation_id": operation_id,
+        "status": "RAIL_DEFERRED",
+        "provider_called": False,
+        "retry_after": snapshot["retry_after_seconds"],
+        "operation": operation,
+        "action": action,
+        "repo": repo,
         "carrier": carrier,
         "expected_head": expected_head,
     }
 
 
-def run_github_provider_operation(
+def execute_publish_operation(
     path: Union[str, Path],
     token: Optional[str],
     *,
     rail: str,
     actor: str,
-    operation_id: str,
+    operation: str,
+    action: str,
+    repo: str,
     carrier: str,
     expected_head: str,
-    provider_call: Callable[[], T],
+    transport: Callable[[], T],
     cooldown_scope: Optional[str] = None,
     recovery_owner: Optional[str] = None,
 ) -> Union[T, dict[str, Any]]:
-    """Run one provider operation only when the selected GitHub rail is admitted.
+    """Execute one GitHub provider operation only when shared rail state admits it.
 
-    Known-hot rails return a machine-readable RAIL_DEFERRED handoff without
-    touching the provider. A credential-global RECOVERY_READY state must first
-    win the existing atomic recovery lease; followers defer while the winner
-    owns the lease. AVAILABLE rails proceed directly.
+    HOT and RECOVERY_PROBE_IN_FLIGHT return an exact RAIL_DEFERRED handoff and
+    never call transport. RECOVERY_READY must win the existing credential-global
+    recovery lease before transport is allowed; followers re-read and defer.
+    AVAILABLE proceeds directly.
 
-    The provider result is returned unchanged. Provider exceptions likewise
-    propagate unchanged; a recovery lease then expires naturally rather than
-    guessing a new provider deadline. On a successful recovery call, existing
-    CAS cleanup clears only the stale cooldown protected by the lease and
-    preserves any newer deadline recorded during the call.
+    Normal provider payloads are returned by identity, unchanged. Provider
+    exceptions propagate unchanged and deliberately do not complete the recovery
+    lease, leaving its bounded expiry in place. On a normal recovery return, the
+    existing CAS cleanup clears only the stale cooldown protected by the lease
+    and preserves any newer provider deadline recorded during transport.
     """
-    operation_id = _label(operation_id, "operation_id", 160)
+    operation = _label(operation, "operation", 160)
+    action = _label(action, "action", 128)
+    repo = _repo(repo)
     carrier = _label(carrier, "carrier", 1024)
     expected_head = _head(expected_head)
     if recovery_owner is not None:
         recovery_owner = _label(recovery_owner, "recovery_owner", 128)
-    if not callable(provider_call):
-        raise ValueError("provider_call must be callable")
+    if not callable(transport):
+        raise ValueError("transport must be callable")
 
     snapshot = availability_snapshot(
         path,
@@ -102,7 +115,9 @@ def run_github_provider_operation(
     if availability in {"HOT", "RECOVERY_PROBE_IN_FLIGHT"}:
         return _deferred(
             snapshot,
-            operation_id=operation_id,
+            operation=operation,
+            action=action,
+            repo=repo,
             carrier=carrier,
             expected_head=expected_head,
         )
@@ -126,7 +141,9 @@ def run_github_provider_operation(
             )
             return _deferred(
                 follower,
-                operation_id=operation_id,
+                operation=operation,
+                action=action,
+                repo=repo,
                 carrier=carrier,
                 expected_head=expected_head,
             )
@@ -141,13 +158,15 @@ def run_github_provider_operation(
             if refreshed.get("availability") != "AVAILABLE":
                 return _deferred(
                     refreshed,
-                    operation_id=operation_id,
+                    operation=operation,
+                    action=action,
+                    repo=repo,
                     carrier=carrier,
                     expected_head=expected_head,
                 )
         recovery_held = required and acquired
 
-    result = provider_call()
+    result = transport()
     if recovery_held:
         assert cooldown is not None and owner is not None
         cooldown.complete_recovery_probe(owner)
