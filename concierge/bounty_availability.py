@@ -53,7 +53,10 @@ _AWARD_RE = re.compile(
 _CAP_CLOSED_RE = re.compile(
     r"(?i)\b(?:bounty|submissions?|slots?|capacity)\b.{0,64}"
     r"\b(?:full|closed|filled|exhausted|reached)\b|"
-    r"\b(?:(?P<stop_no>no)\s+more|stop)\s+(?:new\s+)?submissions?\b"
+    r"\b(?:(?P<stop_no>no)\s+more|stop)\s+(?:new\s+)?submissions?\b|"
+    r"\b(?P<decline_no>not|no\s+longer)\s+"
+    r"(?:going\s+to\s+(?:be\s+)?)?accept(?:ing)?\s+"
+    r"(?:new\s+)?(?:bounty\s+attempts?|submissions?)\b"
 )
 _CANCELLED_RE = re.compile(
     r"(?i)\b(?:bounty|reward|task)\b.{0,48}"
@@ -249,11 +252,25 @@ def _terminal_signals(text: str) -> tuple[str, ...]:
                 while (match := pattern.search(clause, offset)) is not None:
                     context_start = max(0, match.start() - 40)
                     context = clause[context_start : match.end()]
-                    if code == "MAINTAINER_CAP_CLOSED_SIGNAL" and match.group("stop_no"):
-                        # The "no" in "no more submissions" asserts closure; keep
-                        # any surrounding negation subject to the normal filter.
-                        start, end = match.span("stop_no")
-                        context = clause[context_start:start] + clause[end : match.end()]
+                    if code == "MAINTAINER_CAP_CLOSED_SIGNAL":
+                        # "no more submissions" and "not/no longer accepting"
+                        # assert closure themselves. Remove only that closure
+                        # negation; surrounding negation still uses the normal
+                        # false-positive filter below.
+                        closure_group = next(
+                            (
+                                name
+                                for name in ("stop_no", "decline_no")
+                                if match.group(name)
+                            ),
+                            None,
+                        )
+                        if closure_group:
+                            start, end = match.span(closure_group)
+                            context = (
+                                clause[context_start:start]
+                                + clause[end : match.end()]
+                            )
                     if not _NEGATION_RE.search(context):
                         found.add(code)
                         # Later clauses cannot remove a signal already found.
