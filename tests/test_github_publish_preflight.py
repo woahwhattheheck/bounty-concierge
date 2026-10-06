@@ -3,22 +3,25 @@
 
 from concierge import github_cooldown, github_rail_availability
 from concierge.github_cooldown import GitHubCooldown
-from concierge.github_publish_preflight import run_github_provider_operation
+from concierge.github_publish_preflight import execute_publish_operation
+from concierge.github_rail_availability import availability_snapshot
 
 
 HEAD = "a" * 40
 
 
-def _run(path, provider_call, *, operation_id, recovery_owner):
-    return run_github_provider_operation(
+def _run(path, transport, *, operation, recovery_owner):
+    return execute_publish_operation(
         path,
         "credential",
         rail="private-token",
         actor="actor-293",
-        operation_id=operation_id,
+        operation=operation,
+        action="update-pr-body",
+        repo="owner/repo",
         carrier="owner/repo#123",
         expected_head=HEAD,
-        provider_call=provider_call,
+        transport=transport,
         recovery_owner=recovery_owner,
     )
 
@@ -33,20 +36,18 @@ def test_hot_rail_defers_without_transport(tmp_path, monkeypatch):
     result = _run(
         path,
         lambda: calls.append("provider"),
-        operation_id="publish-123",
+        operation="publish-123",
         recovery_owner="worker-a",
     )
 
     assert calls == []
     assert result == {
-        "schema": "github-publish-preflight/v1",
-        "decision": "RAIL_DEFERRED",
-        "handoff_reason": "RAIL_DEFERRED",
-        "rail": "private-token",
-        "actor": "actor-293",
-        "availability": "HOT",
-        "retry_after_seconds": 200,
-        "operation_id": "publish-123",
+        "status": "RAIL_DEFERRED",
+        "provider_called": False,
+        "retry_after": 200,
+        "operation": "publish-123",
+        "action": "update-pr-body",
+        "repo": "owner/repo",
         "carrier": "owner/repo#123",
         "expected_head": HEAD,
     }
@@ -61,27 +62,45 @@ def test_recovery_ready_admits_one_operation_and_defers_follower(
     GitHubCooldown(path, "credential").extend(900.0)
     calls = []
     follower = {}
+    provider_collision = {
+        "status": "PROVIDER_COLLISION",
+        "expected_head": HEAD,
+        "observed_head": "b" * 40,
+    }
 
-    def provider():
+    def transport():
         calls.append("leader")
         follower["result"] = _run(
             path,
             lambda: calls.append("follower"),
-            operation_id="publish-follower",
+            operation="publish-follower",
             recovery_owner="worker-b",
         )
-        return {"provider": "ok"}
+        return provider_collision
 
     result = _run(
         path,
-        provider,
-        operation_id="publish-leader",
+        transport,
+        operation="publish-leader",
         recovery_owner="worker-a",
     )
 
-    assert result == {"provider": "ok"}
+    assert result is provider_collision
     assert calls == ["leader"]
-    assert follower["result"]["decision"] == "RAIL_DEFERRED"
-    assert follower["result"]["availability"] == "RECOVERY_PROBE_IN_FLIGHT"
-    assert follower["result"]["operation_id"] == "publish-follower"
-    assert GitHubCooldown(path, "credential").deadline() is None
+    assert follower["result"] == {
+        "status": "RAIL_DEFERRED",
+        "provider_called": False,
+        "retry_after": 15,
+        "operation": "publish-follower",
+        "action": "update-pr-body",
+        "repo": "owner/repo",
+        "carrier": "owner/repo#123",
+        "expected_head": HEAD,
+    }
+    assert availability_snapshot(
+        path,
+        "credential",
+        rail="private-token",
+        actor="actor-293",
+        now_epoch=1000.0,
+    )["availability"] == "AVAILABLE"
