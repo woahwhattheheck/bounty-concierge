@@ -256,9 +256,9 @@ class GitHubCooldown:
             raise ValueError("recovery owner must be a non-empty value up to 128 bytes")
         if not math.isfinite(lease_seconds) or lease_seconds <= 0 or lease_seconds > 120:
             raise ValueError("recovery lease must be between 0 and 120 seconds")
-        now = time()
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
+            now = time()
             row = connection.execute(
                 "SELECT until_epoch FROM github_cooldown_v1 WHERE scope = ?",
                 (self.scope,),
