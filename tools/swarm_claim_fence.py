@@ -226,18 +226,19 @@ def merge_event_streams(streams: Iterable[Iterable[Event]]) -> tuple[list[Event]
 
     for stream in streams:
         for event in stream:
+            identities: list[tuple[str, ...]] = []
             if event.permalink:
-                identity = ("permalink", event.permalink)
-            elif event.ts:
-                identity = ("ts_text", event.ts, event.text)
-            else:
-                identity = ("ingest", str(ingest))
+                identities.append(("permalink", event.permalink))
+            if event.ts:
+                identities.append(("ts_text", event.ts, event.text))
+            if not identities:
+                identities.append(("ingest", str(ingest)))
 
-            if identity in seen:
+            if any(identity in seen for identity in identities):
                 duplicates += 1
                 ingest += 1
                 continue
-            seen.add(identity)
+            seen.update(identities)
             flattened.append((ingest, event))
             ingest += 1
 
