@@ -76,6 +76,62 @@ class UpstreamPrCollisionGuardEarlyPruneTest(unittest.TestCase):
         self.assertTrue(report["publish_allowed"])
 
 
+    def test_provider_duplicate_422_overrides_false_negative_pull_search(self):
+        payload = snapshot()
+        payload["create_error"] = {
+            "status": 422,
+            "message": "Validation Failed",
+            "errors": [
+                {
+                    "resource": "PullRequest",
+                    "code": "custom",
+                    "message": (
+                        "A pull request already exists for "
+                        "woahwhattheheck:sol56/example-branch."
+                    ),
+                }
+            ],
+        }
+        report = guard.evaluate(
+            payload,
+            expected_issue_key=ISSUE_KEY,
+            self_head_sha=HEAD,
+            now=NOW,
+        )
+        self.assertEqual(report["status"], "PROVIDER_COLLISION")
+        self.assertFalse(report["publish_allowed"])
+        self.assertFalse(report["retry_create"])
+        self.assertEqual(
+            report["provider_collision_head"],
+            "woahwhattheheck:sol56/example-branch",
+        )
+        self.assertIn("do not retry", report["instruction"])
+
+    def test_unrelated_422_does_not_masquerade_as_collision(self):
+        payload = snapshot()
+        payload["create_error"] = {
+            "status": 422,
+            "message": "Validation Failed",
+            "errors": [
+                {
+                    "resource": "PullRequest",
+                    "code": "custom",
+                    "message": "base is invalid",
+                }
+            ],
+        }
+        with self.assertRaisesRegex(
+            guard.GuardError,
+            "not a recognized duplicate-pull-request collision",
+        ):
+            guard.evaluate(
+                payload,
+                expected_issue_key=ISSUE_KEY,
+                self_head_sha=HEAD,
+                now=NOW,
+            )
+
+
     def test_identical_content_blocks_cross_issue_duplicate(self):
         payload = snapshot()
         payload["candidate_files"] = CANDIDATE_FILES
