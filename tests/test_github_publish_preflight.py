@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: MIT
 """Focused tests for GitHub publication admission before provider I/O."""
 
+import pytest
+
 from concierge import github_cooldown, github_rail_availability
 from concierge.github_cooldown import GitHubCooldown
 from concierge.github_publish_preflight import execute_publish_operation
@@ -10,19 +12,29 @@ from concierge.github_rail_availability import availability_snapshot
 HEAD = "a" * 40
 
 
-def _run(path, transport, *, operation, recovery_owner):
+def _run(
+    path,
+    transport,
+    *,
+    operation,
+    recovery_owner,
+    action="update-pr-body",
+    repo="owner/repo",
+    scope_breaker_path=None,
+):
     return execute_publish_operation(
         path,
         "credential",
         rail="private-token",
         actor="actor-293",
         operation=operation,
-        action="update-pr-body",
-        repo="owner/repo",
+        action=action,
+        repo=repo,
         carrier="owner/repo#123",
         expected_head=HEAD,
         transport=transport,
         recovery_owner=recovery_owner,
+        scope_breaker_path=scope_breaker_path,
     )
 
 
@@ -104,3 +116,64 @@ def test_recovery_ready_admits_one_operation_and_defers_follower(
         actor="actor-293",
         now_epoch=1000.0,
     )["availability"] == "AVAILABLE"
+
+
+def test_integration_scope_denial_is_local_to_exact_repo_and_action(tmp_path):
+    path = tmp_path / "cooldown.sqlite"
+    breaker_path = tmp_path / "breaker.sqlite"
+    calls = []
+
+    def denied_transport():
+        calls.append("denied-provider")
+        raise RuntimeError(
+            "GitHub API error 403: Resource not accessible by integration"
+        )
+
+    with pytest.raises(RuntimeError, match="Resource not accessible by integration"):
+        _run(
+            path,
+            denied_transport,
+            operation="publish-first",
+            recovery_owner="worker-a",
+            scope_breaker_path=breaker_path,
+        )
+
+    repeated = _run(
+        path,
+        lambda: calls.append("repeated-provider"),
+        operation="publish-repeat",
+        recovery_owner="worker-b",
+        scope_breaker_path=breaker_path,
+    )
+    assert calls == ["denied-provider"]
+    assert repeated["status"] == "RAIL_DEFERRED"
+    assert repeated["provider_called"] is False
+    assert set(repeated) == {
+        "status",
+        "provider_called",
+        "retry_after",
+        "operation",
+        "action",
+        "repo",
+        "carrier",
+        "expected_head",
+    }
+    assert 1 <= repeated["retry_after"] <= 900
+
+    assert _run(
+        path,
+        lambda: "other-repo-ok",
+        operation="publish-other-repo",
+        recovery_owner="worker-c",
+        repo="owner/other",
+        scope_breaker_path=breaker_path,
+    ) == "other-repo-ok"
+
+    assert _run(
+        path,
+        lambda: "other-action-ok",
+        operation="publish-other-action",
+        recovery_owner="worker-d",
+        action="create-issue-comment",
+        scope_breaker_path=breaker_path,
+    ) == "other-action-ok"
