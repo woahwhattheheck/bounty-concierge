@@ -357,6 +357,68 @@ class GitHubBreakerLedger:
             )
             return cursor.rowcount == 1
 
+    def status_snapshot(self, *, now_epoch: float | None = None) -> dict:
+        """Observe existing per-operation receipts without creating state or leases.
+
+        No credential hash, path, raw provider payload or lease owner is emitted.
+        Request counts are not stored by this ledger, so budget remains unknown.
+        """
+        now = time() if now_epoch is None else float(now_epoch)
+        if not math.isfinite(now) or now < 0:
+            raise ValueError("now_epoch must be finite and non-negative")
+        result = {
+            "schema": "github-breaker-status/v1",
+            "state": "ABSENT",
+            "operations": {},
+            "request_budget": {"state": "UNKNOWN", "remaining": None},
+        }
+        if not self.path.exists():
+            return result
+        connection = None
+        try:
+            connection = sqlite3.connect(
+                self.path.absolute().as_uri() + "?mode=ro", timeout=1.0, uri=True,
+            )
+            rows = connection.execute(
+                "SELECT operation_class, state, reason, until_epoch, observed_epoch, "
+                "lease_until_epoch FROM github_breaker_v1 WHERE route_key=?",
+                (self.route_key,),
+            ).fetchall()
+        except (OSError, sqlite3.Error, ValueError, OverflowError) as exc:
+            raise BreakerStateError("shared GitHub breaker state unavailable") from exc
+        finally:
+            if connection is not None:
+                connection.close()
+
+        for operation, state, reason, deadline, observed, lease_until in rows:
+            if operation not in _ALLOWED_OPS or state not in _ALLOWED_STATES:
+                raise BreakerStateError("shared GitHub breaker state invalid")
+            if reason is not None and reason not in _RATE_ERRORS | set(_TERMINAL_ERRORS):
+                raise BreakerStateError("shared GitHub breaker reason invalid")
+            for value in (deadline, observed, lease_until):
+                if value is not None and (
+                    not isinstance(value, (int, float))
+                    or not math.isfinite(value) or value < 0
+                ):
+                    raise BreakerStateError("shared GitHub breaker timestamp invalid")
+            if observed is None or (state == OPEN_UNTIL and deadline is None):
+                raise BreakerStateError("shared GitHub breaker timestamp missing")
+            cooling = state == OPEN_UNTIL and deadline > now
+            probing = state == OPEN_UNTIL and lease_until is not None and lease_until > now
+            until = max(deadline if cooling else now, lease_until if probing else now)
+            result["operations"][operation] = {
+                "state": state,
+                "last_error": reason,
+                "observed_epoch": observed,
+                "observation_age_seconds": max(0, now - observed),
+                "cooldown_until_epoch": deadline,
+                "recovery_probe_in_flight": probing,
+                "blocked": state in (SCOPE_DENIED, AUTH_FAILED) or cooling or probing,
+                "retry_after_seconds": max(0, math.ceil(until - now)),
+            }
+        result["state"] = "READY"
+        return result
+
     def cleanup_stale(self, *, now_epoch: float | None = None) -> int:
         """Delete stale rows and expired leases so dead workers cannot accumulate state."""
         now = time() if now_epoch is None else float(now_epoch)
