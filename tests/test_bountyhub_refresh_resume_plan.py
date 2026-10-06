@@ -123,6 +123,14 @@ class RefreshResumePlanTests(unittest.TestCase):
         self.assertIsNone(plan["cooldown_remaining_seconds"])
         self.assertFalse(plan["ready_for_requests"])
 
+        with patch.object(self.feed, "get", wraps=self.feed.get) as transport:
+            with self.assertRaisesRegex(ValueError, "duration is unknown"):
+                refresh.refresh_listings(
+                    self.snapshot, self.ids,
+                    previous_refresh=unknown, max_requests=3, session=self.feed,
+                )
+            transport.assert_not_called()
+
         wrong_source = copy.deepcopy(self.previous)
         wrong_source["source_sha256"] = "0" * 64
         with self.assertRaisesRegex(ValueError, "same retained catalog"):
