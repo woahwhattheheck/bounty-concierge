@@ -12,6 +12,7 @@ from time import time
 from typing import Any
 
 from concierge.github_cooldown import CooldownStateError, GitHubCooldown
+from concierge.github_breaker_ledger import BreakerStateError, GitHubBreakerLedger
 
 _SCHEMA = "github-rail-availability/v1"
 
@@ -46,6 +47,7 @@ def availability_snapshot(
     actor: str,
     cooldown_scope: str | None = None,
     now_epoch: float | None = None,
+    breaker_path: str | Path | None = None,
 ) -> dict[str, Any]:
     """Return local rail/account readiness without claiming recovery or calling GitHub."""
     rail = _label(rail, "rail")
@@ -67,6 +69,10 @@ def availability_snapshot(
         "recovery_lease": _deadline_status(None, now),
         "note": "Local shared state only; no GitHub request or recovery claim was made.",
     }
+    if breaker_path is not None:
+        empty["operation_breaker"] = GitHubBreakerLedger(
+            breaker_path, provider_route=rail, credential=token,
+        ).status_snapshot(now_epoch=now)
     if not store_path.exists():
         return {**empty, "state": "ABSENT"}
 
@@ -170,6 +176,10 @@ def _parser() -> argparse.ArgumentParser:
         help="Environment variable containing the credential used to select stored state.",
     )
     parser.add_argument("--cooldown-scope", default=None)
+    parser.add_argument(
+        "--breaker-file", default=None,
+        help="Optional existing breaker SQLite file; --rail selects its provider route.",
+    )
     parser.add_argument("--json", action="store_true")
     return parser
 
@@ -187,9 +197,10 @@ def main(argv: list[str] | None = None) -> int:
             rail=args.rail,
             actor=args.actor,
             cooldown_scope=args.cooldown_scope,
+            breaker_path=args.breaker_file,
         )
-    except CooldownStateError:
-        print("shared GitHub cooldown state unavailable", file=os.sys.stderr)
+    except (CooldownStateError, BreakerStateError):
+        print("shared GitHub rail state unavailable", file=os.sys.stderr)
         return 2
     except (OSError, ValueError):
         print("invalid GitHub rail availability input", file=os.sys.stderr)
@@ -203,6 +214,16 @@ def main(argv: list[str] | None = None) -> int:
             f"blocked={str(snapshot['blocked']).lower()} "
             f"retry_after_seconds={snapshot['retry_after_seconds']}"
         )
+        if "operation_breaker" in snapshot:
+            breaker = snapshot["operation_breaker"]
+            print(f"operation_breaker state={breaker['state']} request_budget=UNKNOWN")
+            for operation, status in sorted(breaker["operations"].items()):
+                print(
+                    f"{operation} state={status['state']} last_error={status['last_error']} "
+                    f"observed_epoch={status['observed_epoch']} "
+                    f"blocked={str(status['blocked']).lower()} "
+                    f"retry_after_seconds={status['retry_after_seconds']}"
+                )
     return 0
 
 
