@@ -163,7 +163,11 @@ def compile_notification_queue(
         # generation before applying unread filtering; otherwise an older unread
         # copy could survive after a newer copy has already been marked read.
         previous = retained.get(row["notification_id"])
-        if previous is None or row["updated_at"] > previous["updated_at"]:
+        # ISO text omits fractional seconds when zero, so lexical ordering
+        # would rank "...00Z" above the newer "...00.500000Z".
+        if previous is None or datetime.fromisoformat(
+            row["updated_at"].replace("Z", "+00:00")
+        ) > datetime.fromisoformat(previous["updated_at"].replace("Z", "+00:00")):
             retained[row["notification_id"]] = row
 
     eligible = []
