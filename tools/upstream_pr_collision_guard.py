@@ -89,8 +89,8 @@ def _head_sha(pr: dict[str, Any]) -> str | None:
     return None
 
 
-def _provider_duplicate_pr_head(create_error: Any) -> str | None:
-    """Return the conflicting head from GitHub's authoritative duplicate-PR 422."""
+def _provider_create_outcome(create_error: Any) -> tuple[str, str | None] | None:
+    """Classify authoritative GitHub pull-request creation outcomes."""
     if create_error is None:
         return None
     if not isinstance(create_error, dict):
@@ -124,8 +124,21 @@ def _provider_duplicate_pr_head(create_error: Any) -> str | None:
             if isinstance(error_message, str) and error_message.strip():
                 messages.append(error_message.strip())
 
+    if status == 403:
+        if any(
+            message.casefold() == "resource not accessible by integration"
+            for message in messages
+        ):
+            return "REROUTE", None
+        raise GuardError(
+            "GitHub 403 response is not a recognized integration-scope block"
+        )
+
     if status != 422:
-        raise GuardError("snapshot.create_error must be a GitHub 422 response")
+        raise GuardError(
+            "snapshot.create_error must be a recognized GitHub 422 collision "
+            "or integration-scope 403"
+        )
 
     duplicate = re.compile(
         r"^A pull request already exists for\s+(.+?)(?:\.\s*)?$",
@@ -137,12 +150,11 @@ def _provider_duplicate_pr_head(create_error: Any) -> str | None:
             head = match.group(1).strip()
             if not head or any(char.isspace() for char in head):
                 raise GuardError("duplicate-PR response contains an invalid head")
-            return head
+            return "COLLISION", head
 
     raise GuardError(
         "GitHub 422 response is not a recognized duplicate-pull-request collision"
     )
-
 
 def _content_fingerprint(files: Any, *, field: str) -> str | None:
     """Hash an exact changed-path/postimage-blob set when one is supplied."""
@@ -260,20 +272,36 @@ def evaluate(
             age,
         )
 
-    provider_collision_head = _provider_duplicate_pr_head(snapshot.get("create_error"))
-    if provider_collision_head is not None:
+    provider_outcome = _provider_create_outcome(snapshot.get("create_error"))
+    if provider_outcome is not None:
+        provider_kind, provider_detail = provider_outcome
+        if provider_kind == "REROUTE":
+            return _report(
+                expected_key,
+                "PROVIDER_REROUTE_REQUIRED",
+                (
+                    "current GitHub integration cannot create this upstream pull request; "
+                    "preserve the exact carrier and hand it to an upstream-PR-capable publisher"
+                ),
+                captured_at,
+                [],
+                [],
+                age,
+            )
+        if provider_kind != "COLLISION" or provider_detail is None:
+            raise GuardError("unrecognized provider create outcome")
         return _report(
             expected_key,
             "PROVIDER_COLLISION",
             (
                 "GitHub authoritatively rejected pull-request creation because "
-                f"a carrier already exists for {provider_collision_head}"
+                f"a carrier already exists for {provider_detail}"
             ),
             captured_at,
             [],
             [],
             age,
-            provider_collision_head=provider_collision_head,
+            provider_collision_head=provider_detail,
         )
 
     pulls = snapshot.get("pulls")
@@ -423,7 +451,12 @@ def _report(
                 "do not retry pull-request creation; resolve the canonical carrier "
                 "by exact head/branch read"
                 if status == "PROVIDER_COLLISION"
-                else "do not create a new pull request; refresh/reconcile first"
+                else (
+                    "do not retry on this provider rail; hand off the exact fenced "
+                    "carrier to an upstream-PR-capable publisher"
+                    if status == "PROVIDER_REROUTE_REQUIRED"
+                    else "do not create a new pull request; refresh/reconcile first"
+                )
             )
         ),
     }

@@ -107,6 +107,24 @@ class UpstreamPrCollisionGuardEarlyPruneTest(unittest.TestCase):
         )
         self.assertIn("do not retry", report["instruction"])
 
+    def test_provider_integration_403_requires_reroute_without_retry(self):
+        payload = snapshot()
+        payload["create_error"] = {
+            "status": 403,
+            "message": "Resource not accessible by integration",
+        }
+        report = guard.evaluate(
+            payload,
+            expected_issue_key=ISSUE_KEY,
+            self_head_sha=HEAD,
+            now=NOW,
+        )
+        self.assertEqual(report["status"], "PROVIDER_REROUTE_REQUIRED")
+        self.assertFalse(report["publish_allowed"])
+        self.assertFalse(report["retry_create"])
+        self.assertIn("hand off", report["instruction"])
+        self.assertIn("upstream-PR-capable publisher", report["instruction"])
+
     def test_unrelated_422_does_not_masquerade_as_collision(self):
         payload = snapshot()
         payload["create_error"] = {
