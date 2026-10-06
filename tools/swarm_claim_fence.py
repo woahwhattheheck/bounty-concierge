@@ -72,6 +72,20 @@ def _read_bounded(path: Path) -> bytes:
 def _normalize_work_key(raw: str) -> str:
     value = raw.strip().strip("\x60<>()[]{}.,")
     lowered = value.lower()
+    if lowered.startswith("swarm:"):
+        match = re.fullmatch(
+            r"swarm:(build|repair|qa|publish|metadata|claim|mutation):"
+            r"github:([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)([#!])([0-9]+)",
+            value,
+            re.I,
+        )
+        if not match or int(match.group(5)) < 1:
+            raise FenceError(f"invalid swarm custody work key: {raw!r}")
+        lane, owner, repo, separator, number = match.groups()
+        return (
+            f"swarm:{lane.lower()}:github:{owner.lower()}/{repo.lower()}"
+            f"{separator}{int(number)}"
+        )
     for prefix in ("operation:", "op:"):
         if lowered.startswith(prefix):
             operation = value[len(prefix):]
