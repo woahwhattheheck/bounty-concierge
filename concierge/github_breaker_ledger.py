@@ -166,13 +166,26 @@ class GitHubBreakerLedger:
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
-                "SELECT state, until_epoch, generation FROM github_breaker_v1 "
+                "SELECT state, until_epoch, observed_epoch, generation FROM github_breaker_v1 "
                 "WHERE route_key = ? AND operation_class = ?",
                 (self.route_key, operation_class),
             ).fetchone()
             generation = 1
             if row is not None:
-                previous_state, previous_deadline, previous_generation = row
+                (
+                    previous_state,
+                    previous_deadline,
+                    previous_observed,
+                    previous_generation,
+                ) = row
+                if (
+                    not isinstance(previous_observed, (int, float))
+                    or not math.isfinite(previous_observed)
+                    or previous_observed < 0
+                ):
+                    raise BreakerStateError("shared GitHub breaker observation invalid")
+                if observed < float(previous_observed):
+                    return
                 generation = int(previous_generation) + 1
                 if previous_state in (SCOPE_DENIED, AUTH_FAILED) and state == OPEN_UNTIL:
                     state = previous_state
