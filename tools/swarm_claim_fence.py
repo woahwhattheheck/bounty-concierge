@@ -27,6 +27,7 @@ _RELEASE = {"RELEASE", "DONE", "COMPLETE", "COMPLETED", "BLOCKED", "SHIPPED", "R
 _ACTION_RE = re.compile(r"\b(TAKE|CLAIM|RELEASE|DONE|COMPLETE|COMPLETED|BLOCKED|SHIPPED|RECONCILED)\b", re.I)
 _EXPLICIT_WORK_RE = re.compile(r"\bwork[_ -]?key\s*[:=]\s*([^\s,;]+)", re.I)
 _ISSUE_URL_RE = re.compile(r"https?://github\.com/([^/\s]+)/([^/\s]+)/issues/(\d+)", re.I)
+_PR_URL_RE = re.compile(r"https?://github\.com/([^/\s]+)/([^/\s]+)/pull/(\d+)", re.I)
 _COMPACT_ISSUE_RE = re.compile(r"(?<![\w.-])([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)#(\d+)\b")
 _EXPLICIT_CLAIM_RE = re.compile(r"\bclaim[_ -]?id\s*[:=]\s*([^\s,;]+)", re.I)
 _EXPLICIT_ACTOR_RE = re.compile(r"\b(?:owner|actor|identity)\s*[:=]\s*([^\s,;]+)", re.I)
@@ -84,14 +85,15 @@ def extract_work_key(text: str) -> str:
     if explicit:
         return _normalize_work_key(explicit.group(1))
 
+    url_matches = [*_ISSUE_URL_RE.findall(text), *_PR_URL_RE.findall(text)]
     url_keys = {
         _normalize_work_key(f"{owner}/{repo}#{number}")
-        for owner, repo, number in _ISSUE_URL_RE.findall(text)
+        for owner, repo, number in url_matches
     }
     if len(url_keys) == 1:
         return next(iter(url_keys))
     if len(url_keys) > 1:
-        raise FenceError("message contains multiple GitHub issue URLs; add explicit work_key")
+        raise FenceError("message contains multiple GitHub issue/PR URLs; add explicit work_key")
 
     compact_keys = {
         _normalize_work_key(f"{owner}/{repo}#{number}")
