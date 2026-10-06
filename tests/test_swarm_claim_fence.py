@@ -51,6 +51,29 @@ class SwarmClaimFenceTest(unittest.TestCase):
         self.assertEqual(report["active"][key]["claim_id"], "MERIDIAN")
         self.assertEqual(report["counts"]["conflicts"], 1)
 
+    def test_multisource_merge_deduplicates_release_when_permalink_is_missing_in_one_view(self):
+        take = {
+            "message_ts": "1791253200.000000",
+            "text": "TAKE · OP-1 · model\nAcme/widget#12",
+        }
+        release = {
+            "message_ts": "1791253297.846179",
+            "permalink": "https://example.slack.com/archives/C123/p1791253297846179",
+            "text": "BLOCKED / RELEASE · OP-1 · model\nAcme/widget#12",
+        }
+        release_without_permalink = dict(release)
+        release_without_permalink.pop("permalink")
+
+        search_stream = load([release_without_permalink])
+        channel_tail_stream = load([take, release])
+        events, duplicates = fence.merge_event_streams([search_stream, channel_tail_stream])
+        report = fence.reconcile(events)
+
+        self.assertEqual(duplicates, 1)
+        self.assertEqual(report["counts"]["releases"], 1)
+        self.assertEqual(report["counts"]["unmatched_releases"], 0)
+        self.assertEqual(report["counts"]["active_claims"], 0)
+
     def test_exact_release_opens_lane_for_next_claim(self):
         rows = [
             "TAKE · OP-1 · GPT-5.6 Sol\nTarget Acme/widget#12",
