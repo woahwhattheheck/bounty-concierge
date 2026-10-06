@@ -30,6 +30,27 @@ class SwarmClaimFenceTest(unittest.TestCase):
         self.assertEqual(report["counts"]["conflicts"], 2)
         self.assertEqual(fence.preflight(report, "Thalamii/StellarGrid#8", "new-seat")["status"], "COLLISION")
 
+    def test_multisource_merge_catches_late_visible_take_and_deduplicates_overlap(self):
+        later = {
+            "message_ts": "1791246406.838289",
+            "text": "TAKE · SOL-TORSION · model\nStellar-PocketPay/pocketpay-mobile#320",
+        }
+        earlier = {
+            "message_ts": "1791246328.000000",
+            "text": "TAKE · MERIDIAN · model\nStellar-PocketPay/pocketpay-mobile#320",
+        }
+
+        search_stream = load([later])
+        channel_tail_stream = load([earlier, later])
+        events, duplicates = fence.merge_event_streams([search_stream, channel_tail_stream])
+        report = fence.reconcile(events)
+
+        key = "github:stellar-pocketpay/pocketpay-mobile#320"
+        self.assertEqual(duplicates, 1)
+        self.assertEqual([event.claim_id for event in events], ["MERIDIAN", "SOL-TORSION"])
+        self.assertEqual(report["active"][key]["claim_id"], "MERIDIAN")
+        self.assertEqual(report["counts"]["conflicts"], 1)
+
     def test_exact_release_opens_lane_for_next_claim(self):
         rows = [
             "TAKE · OP-1 · GPT-5.6 Sol\nTarget Acme/widget#12",
