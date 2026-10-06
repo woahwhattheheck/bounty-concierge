@@ -173,6 +173,8 @@ def normalize_row(row: Any, index: int, minimum: Decimal) -> dict[str, Any]:
         **states,
         "deleted": deleted,
         "catalog_candidate": not reasons,
+        "dispatch_status": "LEAD",
+        "requires_canonical_preflight": True,
         "reconciliation_reasons": reasons,
     }
 
@@ -218,7 +220,7 @@ def normalize(raw: bytes, minimum: Decimal, *, retrieved_at: str | None = None,
         "interpretation": [
             "PAID is provider sponsor-funding metadata, not an award or payment to this account.",
             "PROMISED offers are retained; escrow, eligibility and actual payout require provider reconciliation.",
-            "Candidates are catalog leads only. Reconcile current GitHub state and the existing team claim/PR before building.",
+            "Candidates are catalog leads only. A row is never GREEN/dispatchable until canonical preflight and a fresh work-order lease authorize source mutation.",
             "Duplicate work keys share one implementation. Multiple card amounts are not summed or assumed independently claimable.",
         ],
         "duplicate_work_keys": {key: ids for key, ids in groups.items() if len(ids) > 1},
