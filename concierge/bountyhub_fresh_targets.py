@@ -75,9 +75,17 @@ def _exclude_assigned_exclusive(
     annotated_targets = []
     for retained_target in result["targets"]:
         target = dict(retained_target)
-        work_key = (
-            f"bountyhub:{target['repo'].casefold()}#{target['number']}"
+        from tools import swarm_claim_take
+
+        canonicalization = swarm_claim_take._reservation_identity(
+            {
+                "repository": target["repo"],
+                "issue_number": target["number"],
+            },
+            lane="build",
+            mutation_resource=None,
         )
+        work_key = canonicalization["reservation_key"]
         digest = hashlib.sha256(work_key.encode("utf-8")).hexdigest()
         target["swarm_reservation"] = {
             "schema": result["swarm_reservation_schema"],
@@ -86,7 +94,10 @@ def _exclude_assigned_exclusive(
             "tool": "tools/swarm_claim_reservation.py",
             "take_schema": result["swarm_take_schema"],
             "take_tool": "tools/swarm_claim_take.py",
-            "take_protocol": "reserve_before_slack_take",
+            "take_protocol": "canonicalize_then_reserve_before_slack_take",
+            "take_lane": canonicalization["lane"],
+            "take_resource": canonicalization["resource"],
+            "canonicalization_status": canonicalization["status"],
         }
         annotated_targets.append(target)
     result["targets"] = annotated_targets

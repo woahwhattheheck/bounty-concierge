@@ -15,8 +15,8 @@ custody branch closes that race: only the winner may render a new TAKE payload.
 
 The sequence is:
 
-1. identify one canonical work key;
-2. run `swarm_claim_take.py`;
+1. identify an explicit GitHub issue/PR resource and operation lane;
+2. run `swarm_claim_take.py` so canonicalization happens before reservation;
 3. post the returned `slack_text` only when `status=TAKE_READY`;
 4. refresh canonical source/provider state before any source write;
 5. renew long-running work with `swarm_claim_reservation.py renew`;
@@ -28,6 +28,7 @@ The sequence is:
 export GITHUB_TOKEN=...
 python3 tools/swarm_claim_take.py \
   github:owner/repo#123 \
+  --lane build \
   --owner sol56-revenue-021x \
   --event-id GF-REPO123-R1 \
   --identity "GPT-5.6 Sol / revenue seat / ChatGPT cloud harness" \
@@ -90,7 +91,37 @@ This reduces internal duplicate work; it does not replace:
 - repository head/preimage checks before source mutation;
 - provider rate-limit handling.
 
-Use the most specific stable work identity available. For a GitHub issue lane,
-prefer `github:owner/repo#number`. Platform-specific intake may deliberately
-use a stronger namespace such as `bountyhub:owner/repo#number`; all contenders
-for that lane must use the same key.
+Use the most specific explicit GitHub resource identity available. Catalog
+provenance stays in intake evidence; the custody key must converge on the
+underlying GitHub issue or pull request.
+
+
+## Canonical resource keys and operation lanes
+
+The wrapper canonicalizes only explicit GitHub identities; it never searches
+Slack, GitHub, prose, or provider state to guess what a key meant.
+
+Equivalent issue forms `Owner/Repo#17`, `github:owner/repo#17`,
+`https://github.com/Owner/Repo/issues/17`, and the programmatic
+`{"repository":"Owner/Repo","issue_number":17}` all map to
+`github:owner/repo#17`. Equivalent PR forms use `!N` and `/pull/N`.
+Repository identity is case-folded.
+
+A normalized reservation key is `swarm:<lane>:<resource>`, where lane is one
+of `build`, `repair`, `qa`, `publish`, `metadata`, or `claim`.
+This keeps intentionally distinct operations separate while collapsing aliases
+for the same operation.
+
+Build and repair can intentionally share custody when they mutate the same
+carrier by supplying `--mutation-resource`. Both then reserve
+`swarm:mutation:<canonical-resource>`. Mutation resources are rejected for
+QA, publish, metadata, and claim lanes.
+
+Free-form legacy keys are not guessed. They remain literal reservation keys
+and the result plus TAKE text expose
+`canonicalization=UNNORMALIZED_KEY`. Migrate those callers to explicit
+GitHub resource forms instead of adding prose heuristics.
+
+For renew/release, use the exact reservation `work_key` emitted by the TAKE
+result. For normalized work this is the `swarm:...` key, not necessarily the
+source resource string supplied on the command line.
