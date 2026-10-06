@@ -153,7 +153,7 @@ class SnapshotReadTest(unittest.TestCase):
             result["swarm_reservation_schema"], reservation.SCHEMA
         )
         self.assertEqual(annotation["schema"], reservation.SCHEMA)
-        self.assertEqual(annotation["work_key"], "bountyhub:owner/repo#7")
+        self.assertEqual(annotation["work_key"], "swarm:build:github:owner/repo#7")
         self.assertEqual(
             annotation["branch"],
             reservation._branch(annotation["work_key"]),
@@ -161,6 +161,9 @@ class SnapshotReadTest(unittest.TestCase):
         self.assertEqual(
             annotation["tool"], "tools/swarm_claim_reservation.py"
         )
+        self.assertEqual(annotation["take_lane"], "build")
+        self.assertEqual(annotation["take_resource"], "github:owner/repo#7")
+        self.assertEqual(annotation["canonicalization_status"], "NORMALIZED")
 
 
 class CanonicalTakeKeyTest(unittest.TestCase):
