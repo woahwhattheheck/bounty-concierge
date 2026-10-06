@@ -201,7 +201,8 @@ def _references_issue(
     if issue_url.search(text):
         return True
     keyword_ref = re.compile(
-        rf"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs?|references?|for)\s*:?\s*#{number}\b",
+        rf"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs?|references?|for)\s*:?\s*"
+        rf"(?:{re.escape(owner)}/{re.escape(repo)})?#{number}\b",
         re.I,
     )
     return bool(keyword_ref.search(text))
