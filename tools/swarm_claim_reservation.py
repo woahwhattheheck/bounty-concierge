@@ -475,7 +475,7 @@ def _validate_state(value: Any, branch: str) -> dict[str, Any]:
         raise ReservationError(
             "invalid_state", "reservation work identity mismatch"
         )
-    if value["status"] not in {"ACTIVE", "RELEASED"}:
+    if value["status"] not in {"ACTIVE", "RELEASED", "PUBLISHED"}:
         raise ReservationError(
             "invalid_state", "reservation status is invalid"
         )
@@ -625,6 +625,14 @@ def reserve(
             )
 
     current, _blob_sha = current_read
+    if current["status"] == "PUBLISHED":
+        return (
+            _public_state(
+                current,
+                disposition="PUBLISHED",
+            ),
+            3,
+        )
     expires = _parse_time(
         current["lease_expires_at"], "lease_expires_at"
     )
@@ -651,6 +659,15 @@ def reserve(
         )
     current, _blob_sha = github.read_state(branch, ref=head)
     now = _now()
+    if current["status"] == "PUBLISHED":
+        return (
+            _public_state(
+                current,
+                disposition="PUBLISHED",
+                commit_sha=head,
+            ),
+            3,
+        )
     expires = _parse_time(
         current["lease_expires_at"], "lease_expires_at"
     )
@@ -868,6 +885,88 @@ def release(
     )
 
 
+def publish(
+    github: GitHub,
+    *,
+    work_key: str,
+    owner: str,
+    event_id: str,
+    artifact: str,
+) -> tuple[dict[str, Any], int]:
+    """Mark an owned reservation terminal after an upstream carrier is published."""
+    work_key = _work_key(work_key)
+    owner = _owner(owner)
+    event_id = _event_id(event_id)
+    artifact = _artifact(artifact)
+    if artifact is None:
+        raise ReservationError(
+            "invalid_artifact", "publish artifact is required"
+        )
+    branch = _branch(work_key)
+    head = github.ref_sha(branch)
+    if head is None:
+        raise ReservationError(
+            "not_found", "reservation does not exist"
+        )
+    current, _ = github.read_state(branch, ref=head)
+    if current["status"] != "ACTIVE" or current["owner"] != owner:
+        return (
+            _public_state(
+                current,
+                disposition=(
+                    "PUBLISHED"
+                    if current["status"] == "PUBLISHED"
+                    else "NOT_OWNER"
+                ),
+                commit_sha=head,
+            ),
+            3,
+        )
+    now = _now()
+    state = dict(current)
+    state.update(
+        {
+            "status": "PUBLISHED",
+            "event_id": event_id,
+            "updated_at": _time(now),
+            "lease_expires_at": _time(now),
+            "artifact": artifact,
+        }
+    )
+    commit = github.build_commit(
+        head,
+        state,
+        (
+            f"custody: publish {state['work_key_sha256'][:12]} "
+            f"gen {state['generation']}"
+        ),
+    )
+    if github.fast_forward_ref(branch, commit):
+        return (
+            _public_state(
+                state,
+                disposition="PUBLISHED",
+                commit_sha=commit,
+            ),
+            0,
+        )
+    winner_head = github.ref_sha(branch)
+    if winner_head is None:
+        raise ReservationError(
+            "reservation_race",
+            "reservation ref disappeared during publish",
+        )
+    winner, _ = github.read_state(branch, ref=winner_head)
+    return (
+        _public_state(
+            winner,
+            disposition="LOST_RACE",
+            commit_sha=winner_head,
+        ),
+        3,
+    )
+
+
 def status(
     github: GitHub,
     *,
@@ -948,6 +1047,12 @@ def _parser() -> argparse.ArgumentParser:
     release_p.add_argument("--event-id", required=True)
     release_p.add_argument("--artifact")
 
+    publish_p = sub.add_parser("publish")
+    publish_p.add_argument("work_key")
+    publish_p.add_argument("--owner", required=True)
+    publish_p.add_argument("--event-id", required=True)
+    publish_p.add_argument("--artifact", required=True)
+
     return parser
 
 
@@ -994,8 +1099,16 @@ def main(argv: list[str] | None = None) -> int:
                 lease_seconds=args.lease_seconds,
                 artifact=args.artifact,
             )
-        else:
+        elif args.command == "release":
             result, code = release(
+                github,
+                work_key=args.work_key,
+                owner=args.owner,
+                event_id=args.event_id,
+                artifact=args.artifact,
+            )
+        else:
+            result, code = publish(
                 github,
                 work_key=args.work_key,
                 owner=args.owner,
