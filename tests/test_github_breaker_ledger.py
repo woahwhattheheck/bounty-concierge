@@ -52,6 +52,29 @@ def test_scope_denied_is_not_a_quota_breaker(tmp_path):
     assert admission.until_epoch is None
 
 
+def test_scope_denied_comment_write_isolated_from_other_write_families(tmp_path):
+    ledger = GitHubBreakerLedger(
+        tmp_path / "breaker.sqlite", provider_route="github-app", credential="app"
+    )
+    ledger.record_receipt(
+        "write-issue-comment", "SCOPE_DENIED", observed_epoch=1000.0
+    )
+
+    denied = ledger.admit(
+        "write-issue-comment", owner="comment-worker", now_epoch=1001.0
+    )
+    assert denied.state == SCOPE_DENIED
+    assert denied.reason == "SCOPE_DENIED"
+    assert denied.decision == "SKIP"
+
+    # The denial is specific to the failed write surface. Healthy internal
+    # content and PR write families remain usable on the same credential/route.
+    for operation in ("write-content", "write-pr-metadata", "write-pr-create"):
+        assert ledger.admit(
+            operation, owner=f"{operation}-worker", now_epoch=1001.0
+        ).decision == "ALLOW"
+
+
 def test_later_longer_reset_extends_deadline_monotonically(tmp_path):
     ledger = GitHubBreakerLedger(
         tmp_path / "breaker.sqlite", provider_route="token-primary", credential="token"
