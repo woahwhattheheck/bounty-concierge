@@ -145,6 +145,47 @@ def test_failed_probe_keeps_followers_cool_until_lease_window_expires(tmp_path):
     assert decisions.count("SKIP") == 99
 
 
+def test_failed_probe_that_finishes_after_lease_gets_fresh_cooldown(tmp_path):
+    ledger = GitHubBreakerLedger(
+        tmp_path / "breaker.sqlite",
+        provider_route="github-app-installation-7",
+    )
+    ledger.record_receipt(
+        "read-known-coordinate",
+        "SECONDARY_RATE_LIMIT",
+        observed_epoch=1000.0,
+        retry_after_seconds=1,
+    )
+
+    first = ledger.admit(
+        "read-known-coordinate", owner="worker-a", now_epoch=1002.0
+    )
+    assert first.decision == "PROBE"
+    assert first.until_epoch == 1017.0
+    assert ledger.complete_probe(
+        "read-known-coordinate",
+        owner="worker-a",
+        success=False,
+        now_epoch=1020.0,
+    )
+
+    for owner in ("worker-a", "worker-b"):
+        blocked = ledger.admit(
+            "read-known-coordinate", owner=owner, now_epoch=1034.0
+        )
+        assert blocked.decision == "SKIP"
+        assert blocked.until_epoch == 1035.0
+
+    decisions = [
+        ledger.admit(
+            "read-known-coordinate", owner=f"worker-{index}", now_epoch=1036.0
+        ).decision
+        for index in range(100)
+    ]
+    assert decisions.count("PROBE") == 1
+    assert decisions.count("SKIP") == 99
+
+
 def test_older_receipt_cannot_overwrite_newer_provider_evidence(tmp_path):
     ledger = GitHubBreakerLedger(
         tmp_path / "breaker.sqlite",
