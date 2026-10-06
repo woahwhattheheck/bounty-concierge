@@ -64,7 +64,10 @@ def acquire_closeout(
     lease_seconds: int,
     base_branch: str,
 ) -> tuple[dict[str, Any], int]:
-    work_key, issue_number = canonical_issue(issue)
+    resource, issue_number = canonical_issue(issue)
+    # Share the claim lane with swarm_claim_take --lane claim. The bare
+    # GitHub issue identity remains available separately in the receipt.
+    work_key = f"swarm:claim:{resource}"
     claimed, reserve_code = reservation.reserve(
         github,
         work_key=work_key,
@@ -87,6 +90,7 @@ def acquire_closeout(
                 "status": "COLLISION",
                 "post_claim": False,
                 "work_key": work_key,
+                "resource": resource,
                 "reservation": claimed,
             },
             3,
@@ -100,6 +104,7 @@ def acquire_closeout(
                 "post_claim": True,
                 "claim_text": f"/claim #{issue_number}",
                 "work_key": work_key,
+                "resource": resource,
                 "fresh_provider_fence_required": True,
                 "reservation": claimed,
             },
@@ -113,6 +118,7 @@ def acquire_closeout(
                 "status": "COLLISION",
                 "post_claim": False,
                 "work_key": work_key,
+                "resource": resource,
                 "reservation": claimed,
             },
             3,
@@ -124,6 +130,7 @@ def acquire_closeout(
             "status": "BLOCKED",
             "post_claim": False,
             "work_key": work_key,
+            "resource": resource,
             "reservation": claimed,
         },
         reserve_code if reserve_code else 2,
