@@ -302,9 +302,10 @@ class GitHub:
             )
         return sha
 
-    def read_state(
+    def read_state_if_exists(
         self, branch: str, *, ref: str | None = None
-    ) -> tuple[dict[str, Any], str]:
+    ) -> tuple[dict[str, Any], str] | None:
+        """Read reservation state in one request, returning None when absent."""
         response = self.request(
             "GET",
             f"/contents/{STATE_PATH}",
@@ -312,10 +313,7 @@ class GitHub:
             params={"ref": ref or branch},
         )
         if response.status_code == 404:
-            raise ReservationError(
-                "reservation_initializing",
-                "reservation ref exists without state",
-            )
+            return None
         payload = response.json()
         if not isinstance(payload, dict):
             raise ReservationError(
@@ -344,6 +342,17 @@ class GitHub:
                 "reservation state is not valid UTF-8 JSON",
             ) from exc
         return _validate_state(state, branch), blob_sha
+
+    def read_state(
+        self, branch: str, *, ref: str | None = None
+    ) -> tuple[dict[str, Any], str]:
+        result = self.read_state_if_exists(branch, ref=ref)
+        if result is None:
+            raise ReservationError(
+                "reservation_initializing",
+                "reservation ref exists without state",
+            )
+        return result
 
     def build_commit(
         self,
@@ -571,9 +580,13 @@ def reserve(
     artifact = _artifact(artifact)
     branch = _branch(work_key)
     now = _now()
-    head = github.ref_sha(branch)
 
-    if head is None:
+    # The custody branch is deterministic, so the contents endpoint can answer
+    # both "does this reservation exist?" and "what is its state?" in one GET.
+    # Busy/owned hot paths stop here instead of paying an extra ref lookup.
+    current_read = github.read_state_if_exists(branch)
+
+    if current_read is None:
         base_sha = github.ref_sha(base_branch)
         if base_sha is None:
             raise ReservationError(
@@ -604,14 +617,40 @@ def reserve(
                 ),
                 0,
             )
-        head = github.ref_sha(branch)
-        if head is None:
+        current_read = github.read_state_if_exists(branch)
+        if current_read is None:
             raise ReservationError(
-                "reservation_race",
-                "reservation ref race did not settle",
+                "reservation_initializing",
+                "reservation ref race settled without readable state",
             )
 
+    current, _blob_sha = current_read
+    expires = _parse_time(
+        current["lease_expires_at"], "lease_expires_at"
+    )
+    if current["status"] == "ACTIVE" and expires > now:
+        disposition = (
+            "OWNED" if current["owner"] == owner else "BUSY"
+        )
+        return (
+            _public_state(
+                current,
+                disposition=disposition,
+            ),
+            0 if disposition == "OWNED" else 3,
+        )
+
+    # A takeover needs the exact parent SHA. Pin and re-read only on this cold
+    # path because another contender may have renewed or released after the
+    # first state read.
+    head = github.ref_sha(branch)
+    if head is None:
+        raise ReservationError(
+            "reservation_race",
+            "reservation ref disappeared before takeover",
+        )
     current, _blob_sha = github.read_state(branch, ref=head)
+    now = _now()
     expires = _parse_time(
         current["lease_expires_at"], "lease_expires_at"
     )
@@ -670,7 +709,6 @@ def reserve(
         ),
         3,
     )
-
 
 def renew(
     github: GitHub,
@@ -837,8 +875,8 @@ def status(
 ) -> tuple[dict[str, Any], int]:
     work_key = _work_key(work_key)
     branch = _branch(work_key)
-    head = github.ref_sha(branch)
-    if head is None:
+    current_read = github.read_state_if_exists(branch)
+    if current_read is None:
         return (
             {
                 "schema": SCHEMA,
@@ -849,7 +887,7 @@ def status(
             },
             0,
         )
-    current, _ = github.read_state(branch, ref=head)
+    current, _ = current_read
     now = _now()
     expires = _parse_time(
         current["lease_expires_at"], "lease_expires_at"
@@ -861,11 +899,9 @@ def status(
         _public_state(
             current,
             disposition=disposition,
-            commit_sha=head,
         ),
         0,
     )
-
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
