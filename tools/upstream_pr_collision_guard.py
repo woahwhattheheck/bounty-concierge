@@ -145,8 +145,12 @@ def _references_issue(
     )
     if issue_url.search(text):
         return True
+    qualified_or_local = (
+        rf"(?:{re.escape(owner)}/{re.escape(repo)})?#{number}\b"
+    )
     keyword_ref = re.compile(
-        rf"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs?|references?|for)\s*:?\s*#{number}\b",
+        rf"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs?|references?|for)"
+        rf"\s*:?\s*{qualified_or_local}",
         re.I,
     )
     return bool(keyword_ref.search(text))
