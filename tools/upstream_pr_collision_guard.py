@@ -89,6 +89,61 @@ def _head_sha(pr: dict[str, Any]) -> str | None:
     return None
 
 
+def _provider_duplicate_pr_head(create_error: Any) -> str | None:
+    """Return the conflicting head from GitHub's authoritative duplicate-PR 422."""
+    if create_error is None:
+        return None
+    if not isinstance(create_error, dict):
+        raise GuardError("snapshot.create_error must be an object when provided")
+
+    payloads = [create_error]
+    nested = create_error.get("data")
+    if nested is not None:
+        if not isinstance(nested, dict):
+            raise GuardError("snapshot.create_error.data must be an object")
+        payloads.append(nested)
+
+    status: int | None = None
+    messages: list[str] = []
+    for payload in payloads:
+        raw_status = payload.get("status")
+        if isinstance(raw_status, int) and not isinstance(raw_status, bool):
+            status = raw_status
+        message = payload.get("message")
+        if isinstance(message, str) and message.strip():
+            messages.append(message.strip())
+        errors = payload.get("errors")
+        if errors is None:
+            continue
+        if not isinstance(errors, list):
+            raise GuardError("snapshot.create_error.errors must be a list")
+        for error in errors:
+            if not isinstance(error, dict):
+                raise GuardError("snapshot.create_error.errors entries must be objects")
+            error_message = error.get("message")
+            if isinstance(error_message, str) and error_message.strip():
+                messages.append(error_message.strip())
+
+    if status != 422:
+        raise GuardError("snapshot.create_error must be a GitHub 422 response")
+
+    duplicate = re.compile(
+        r"^A pull request already exists for\s+(.+?)(?:\.\s*)?$",
+        re.I,
+    )
+    for message in messages:
+        match = duplicate.match(message)
+        if match:
+            head = match.group(1).strip()
+            if not head or any(char.isspace() for char in head):
+                raise GuardError("duplicate-PR response contains an invalid head")
+            return head
+
+    raise GuardError(
+        "GitHub 422 response is not a recognized duplicate-pull-request collision"
+    )
+
+
 def _content_fingerprint(files: Any, *, field: str) -> str | None:
     """Hash an exact changed-path/postimage-blob set when one is supplied."""
     if files is None:
@@ -202,6 +257,22 @@ def evaluate(
             [],
             [],
             age,
+        )
+
+    provider_collision_head = _provider_duplicate_pr_head(snapshot.get("create_error"))
+    if provider_collision_head is not None:
+        return _report(
+            expected_key,
+            "PROVIDER_COLLISION",
+            (
+                "GitHub authoritatively rejected pull-request creation because "
+                f"a carrier already exists for {provider_collision_head}"
+            ),
+            captured_at,
+            [],
+            [],
+            age,
+            provider_collision_head=provider_collision_head,
         )
 
     pulls = snapshot.get("pulls")
@@ -327,6 +398,7 @@ def _report(
     competitors: list[dict[str, Any]],
     age_seconds: float,
     content_fingerprint: str | None = None,
+    provider_collision_head: str | None = None,
 ) -> dict[str, Any]:
     return {
         "schema": "upstream-pr-collision-guard/v1",
@@ -339,10 +411,17 @@ def _report(
         "self_carriers": self_carriers,
         "competitors": competitors,
         "content_fingerprint": content_fingerprint,
+        "provider_collision_head": provider_collision_head,
+        "retry_create": status == "PUBLISH_ALLOWED",
         "instruction": (
             "create one pull request"
             if status == "PUBLISH_ALLOWED"
-            else "do not create a new pull request; refresh/reconcile first"
+            else (
+                "do not retry pull-request creation; resolve the canonical carrier "
+                "by exact head/branch read"
+                if status == "PROVIDER_COLLISION"
+                else "do not create a new pull request; refresh/reconcile first"
+            )
         ),
     }
 
