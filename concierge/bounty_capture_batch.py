@@ -184,6 +184,22 @@ class _BatchSession:
                     raise requests.RequestException(
                         "shared cooldown recovery state unavailable; reads deferred"
                     ) from None
+                if (
+                    not recovery_required
+                    and not recovery_acquired
+                    and lease_until is not None
+                    and lease_until > now
+                ):
+                    # The deadline may have been refreshed after the first
+                    # shared read but before the recovery-lease transaction.
+                    # Honor the newer provider stop instead of probing through it.
+                    self.rate_limited = True
+                    self.shared_cooldown_deferred = True
+                    self.retry_after_seconds = max(1, math.ceil(lease_until - now))
+                    self.failure = {"code": "RATE_LIMITED"}
+                    raise requests.RequestException(
+                        "shared provider cooldown active; reads deferred"
+                    )
                 if recovery_required and not recovery_acquired:
                     self.shared_recovery_deferred = True
                     self.retry_after_seconds = max(1, math.ceil((lease_until or now) - now))
