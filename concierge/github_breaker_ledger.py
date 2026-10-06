@@ -277,7 +277,7 @@ class GitHubBreakerLedger:
         success: bool,
         now_epoch: float | None = None,
     ) -> bool:
-        """CAS-close only the generation protected by this successful probe."""
+        """CAS-close success or retain the failed probe lease as a recovery cooldown."""
         self._validate_operation(operation_class)
         now = time() if now_epoch is None else float(now_epoch)
         if not math.isfinite(now) or now < 0:
@@ -285,13 +285,15 @@ class GitHubBreakerLedger:
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
-                "SELECT generation, lease_owner, lease_generation FROM github_breaker_v1 "
-                "WHERE route_key=? AND operation_class=?",
+                "SELECT generation, until_epoch, lease_owner, lease_until_epoch, lease_generation "
+                "FROM github_breaker_v1 WHERE route_key=? AND operation_class=?",
                 (self.route_key, operation_class),
             ).fetchone()
-            if row is None or row[1] != owner or row[2] != row[0]:
+            if row is None or row[2] != owner or row[4] != row[0]:
                 return False
             generation = int(row[0])
+            prior_deadline = row[1]
+            lease_deadline = row[3]
             if success:
                 cursor = connection.execute(
                     "UPDATE github_breaker_v1 SET state=?, reason=NULL, until_epoch=NULL, "
@@ -307,13 +309,27 @@ class GitHubBreakerLedger:
                     ),
                 )
                 return cursor.rowcount == 1
-            connection.execute(
-                "UPDATE github_breaker_v1 SET lease_owner=NULL, lease_until_epoch=NULL, "
-                "lease_generation=NULL, observed_epoch=? WHERE route_key=? AND operation_class=? "
-                "AND generation=?",
-                (now, self.route_key, operation_class, generation),
+            if lease_deadline is None or not math.isfinite(float(lease_deadline)) or float(lease_deadline) < 0:
+                raise BreakerStateError("shared GitHub breaker lease invalid")
+            failure_deadline = max(now, float(lease_deadline))
+            if prior_deadline is not None:
+                if not math.isfinite(float(prior_deadline)) or float(prior_deadline) < 0:
+                    raise BreakerStateError("shared GitHub breaker deadline invalid")
+                failure_deadline = max(failure_deadline, float(prior_deadline))
+            cursor = connection.execute(
+                "UPDATE github_breaker_v1 SET state=?, until_epoch=?, lease_owner=NULL, "
+                "lease_until_epoch=NULL, lease_generation=NULL, observed_epoch=? "
+                "WHERE route_key=? AND operation_class=? AND generation=?",
+                (
+                    OPEN_UNTIL,
+                    failure_deadline,
+                    now,
+                    self.route_key,
+                    operation_class,
+                    generation,
+                ),
             )
-            return True
+            return cursor.rowcount == 1
 
     def cleanup_stale(self, *, now_epoch: float | None = None) -> int:
         """Delete stale rows and expired leases so dead workers cannot accumulate state."""
