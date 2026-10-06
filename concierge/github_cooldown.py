@@ -21,6 +21,7 @@ class CooldownStateError(RuntimeError):
 _UNKNOWN_BACKOFF_BASE_SECONDS = 60.0
 _UNKNOWN_BACKOFF_MAX_SECONDS = 15.0 * 60.0
 _UNKNOWN_BACKOFF_RESET_SECONDS = 30.0 * 60.0
+_RECOVERY_LEASE_SECONDS = 15.0
 
 
 class GitHubCooldown:
@@ -87,6 +88,11 @@ class GitHubCooldown:
                 "CREATE TABLE IF NOT EXISTS github_cooldown_unknown_v1 "
                 "(scope TEXT PRIMARY KEY, backoff_seconds REAL NOT NULL, "
                 "observed_epoch REAL NOT NULL)"
+            )
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS github_recovery_lease_v1 "
+                "(scope TEXT PRIMARY KEY, owner TEXT NOT NULL, "
+                "lease_until_epoch REAL NOT NULL, cooldown_epoch REAL NOT NULL)"
             )
             # Keep schema creation outside the caller's data transaction. If a
             # later operation fails, subsequent calls must still see the tables.
@@ -208,6 +214,148 @@ class GitHubCooldown:
                 "MAX(github_quota_reserve_v1.until_epoch, excluded.until_epoch)",
                 (self.scope, until_epoch),
             )
+
+    def claim_recovery_probe(
+        self, owner: str, *, lease_seconds: float = _RECOVERY_LEASE_SECONDS,
+    ) -> tuple[bool, bool, float | None]:
+        """Claim the single recovery probe for an expired credential cooldown.
+
+        Return (required, acquired, lease_until). Route-scoped secondary
+        cooldowns deliberately do not use this credential-global lease. Callers
+        must still honor an active deadline before asking to recover an expired
+        one. The stored owner is an opaque per-worker nonce, not an account or
+        credential identifier.
+        """
+        if self.cooldown_scope != self.scope:
+            return False, False, None
+        if (
+            not isinstance(owner, str)
+            or not owner
+            or len(owner.encode("utf-8")) > 128
+            or "\0" in owner
+        ):
+            raise ValueError("recovery owner must be a non-empty value up to 128 bytes")
+        if not math.isfinite(lease_seconds) or lease_seconds <= 0 or lease_seconds > 120:
+            raise ValueError("recovery lease must be between 0 and 120 seconds")
+        now = time()
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT until_epoch FROM github_cooldown_v1 WHERE scope = ?",
+                (self.scope,),
+            ).fetchone()
+            if row is None:
+                return False, False, None
+            deadline = row[0]
+            if (
+                not isinstance(deadline, (int, float))
+                or not math.isfinite(deadline)
+                or deadline < 0
+            ):
+                raise CooldownStateError("shared GitHub cooldown deadline invalid")
+            deadline = float(deadline)
+            if deadline > now:
+                return False, False, deadline
+
+            lease = connection.execute(
+                "SELECT owner, lease_until_epoch, cooldown_epoch "
+                "FROM github_recovery_lease_v1 WHERE scope = ?",
+                (self.scope,),
+            ).fetchone()
+            if lease is not None:
+                lease_owner, lease_until, lease_deadline = lease
+                if (
+                    not isinstance(lease_owner, str)
+                    or not lease_owner
+                    or not isinstance(lease_until, (int, float))
+                    or not math.isfinite(lease_until)
+                    or lease_until < 0
+                    or not isinstance(lease_deadline, (int, float))
+                    or not math.isfinite(lease_deadline)
+                    or lease_deadline < 0
+                ):
+                    raise CooldownStateError("shared GitHub recovery lease invalid")
+                if float(lease_until) > now and lease_owner != owner:
+                    return True, False, float(lease_until)
+                if float(lease_until) > now and lease_owner == owner:
+                    return True, True, float(lease_until)
+
+            lease_until = now + float(lease_seconds)
+            connection.execute(
+                "INSERT INTO github_recovery_lease_v1"
+                "(scope, owner, lease_until_epoch, cooldown_epoch) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(scope) DO UPDATE SET owner = excluded.owner, "
+                "lease_until_epoch = excluded.lease_until_epoch, "
+                "cooldown_epoch = excluded.cooldown_epoch",
+                (self.scope, owner, lease_until, deadline),
+            )
+            return True, True, lease_until
+
+    def complete_recovery_probe(self, owner: str) -> bool:
+        """Atomically clear only the stale cooldown protected by owner.
+
+        A later cooldown written by another in-flight request wins the CAS and
+        is preserved. The lease itself is always released when this owner still
+        holds it.
+        """
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            lease = connection.execute(
+                "SELECT owner, cooldown_epoch FROM github_recovery_lease_v1 "
+                "WHERE scope = ?",
+                (self.scope,),
+            ).fetchone()
+            if lease is None or lease[0] != owner:
+                return False
+            anchor = lease[1]
+            if (
+                not isinstance(anchor, (int, float))
+                or not math.isfinite(anchor)
+                or anchor < 0
+            ):
+                raise CooldownStateError("shared GitHub recovery lease invalid")
+            cursor = connection.execute(
+                "DELETE FROM github_cooldown_v1 "
+                "WHERE scope = ? AND until_epoch <= ?",
+                (self.scope, float(anchor)),
+            )
+            cleared = cursor.rowcount > 0
+            if cleared:
+                connection.execute(
+                    "DELETE FROM github_cooldown_unknown_v1 WHERE scope = ?",
+                    (self.scope,),
+                )
+            connection.execute(
+                "DELETE FROM github_recovery_lease_v1 "
+                "WHERE scope = ? AND owner = ?",
+                (self.scope, owner),
+            )
+            return cleared
+
+    def defer_recovery_probe(self, owner: str, until_epoch: float) -> bool:
+        """Extend the credential cooldown and release this recovery lease."""
+        if not math.isfinite(until_epoch) or until_epoch < 0:
+            raise CooldownStateError("shared GitHub cooldown deadline invalid")
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            lease = connection.execute(
+                "SELECT owner FROM github_recovery_lease_v1 WHERE scope = ?",
+                (self.scope,),
+            ).fetchone()
+            if lease is None or lease[0] != owner:
+                return False
+            connection.execute(
+                "INSERT INTO github_cooldown_v1(scope, until_epoch) VALUES (?, ?) "
+                "ON CONFLICT(scope) DO UPDATE SET until_epoch = "
+                "MAX(github_cooldown_v1.until_epoch, excluded.until_epoch)",
+                (self.scope, until_epoch),
+            )
+            connection.execute(
+                "DELETE FROM github_recovery_lease_v1 "
+                "WHERE scope = ? AND owner = ?",
+                (self.scope, owner),
+            )
+            return True
 
     def extend_unknown_secondary(self) -> float:
         """Escalate repeated secondary throttles that expose no provider deadline.
