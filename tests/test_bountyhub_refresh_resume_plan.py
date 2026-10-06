@@ -136,6 +136,67 @@ class RefreshResumePlanTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "same retained catalog"):
             refresh.plan_refresh_resume(self.snapshot, self.ids, wrong_source)
 
+    def test_zero_remaining_403_uses_reset_window(self):
+        original_get = self.feed.get
+
+        def quota_exhausted(url, params=None, timeout=None, allow_redirects=False):
+            if url == f"{catalog.API}/{self.ids[0]}":
+                response = requests.Response()
+                response._content_consumed = True
+                response.status_code = 403
+                response.headers["X-RateLimit-Remaining"] = "0"
+                response.headers["X-RateLimit-Reset"] = "4102444800"
+                response._content = b"{}"
+                return response
+            return original_get(
+                url, params=params, timeout=timeout, allow_redirects=allow_redirects,
+            )
+
+        with patch.object(self.feed, "get", side_effect=quota_exhausted) as transport:
+            result = refresh.refresh_listings(
+                self.snapshot, self.ids, max_requests=3, session=self.feed,
+            )
+
+        self.assertTrue(result["rate_limited"])
+        self.assertGreater(result["retry_after_seconds"], 0)
+        self.assertEqual(result["requests_made"], 1)
+        self.assertEqual(transport.call_count, 1)
+        self.assertEqual(result["records"][0]["status"], "READ_FAILED")
+        self.assertEqual(result["records"][1]["status"], "NOT_ATTEMPTED")
+
+    def test_zero_remaining_403_without_reset_fails_next_refresh_closed(self):
+        original_get = self.feed.get
+
+        def quota_exhausted(url, params=None, timeout=None, allow_redirects=False):
+            if url == f"{catalog.API}/{self.ids[0]}":
+                response = requests.Response()
+                response._content_consumed = True
+                response.status_code = 403
+                response.headers["X-RateLimit-Remaining"] = "0"
+                response._content = b"{}"
+                return response
+            return original_get(
+                url, params=params, timeout=timeout, allow_redirects=allow_redirects,
+            )
+
+        with patch.object(self.feed, "get", side_effect=quota_exhausted):
+            previous = refresh.refresh_listings(
+                self.snapshot, self.ids, max_requests=3, session=self.feed,
+            )
+
+        self.assertTrue(previous["rate_limited"])
+        self.assertIsNone(previous["retry_after_seconds"])
+        with patch.object(self.feed, "get", wraps=original_get) as transport:
+            with self.assertRaisesRegex(ValueError, "duration is unknown"):
+                refresh.refresh_listings(
+                    self.snapshot,
+                    self.ids,
+                    previous_refresh=previous,
+                    max_requests=3,
+                    session=self.feed,
+                )
+            transport.assert_not_called()
+
     def test_live_refresh_rejects_previous_record_identity_drift_before_transport(self):
         drifted = copy.deepcopy(self.previous)
         # Keep the receipt internally self-consistent so the shared receipt
