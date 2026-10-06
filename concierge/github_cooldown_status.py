@@ -32,9 +32,10 @@ def status_snapshot(
     path: str | Path,
     token: str | None,
     *,
+    cooldown_scope: str | None = None,
     now_epoch: float | None = None,
 ) -> dict[str, Any]:
-    """Return local cooldown/quota state for one credential scope."""
+    """Return local cooldown/quota state for one credential and route scope."""
     now = time() if now_epoch is None else float(now_epoch)
     if not math.isfinite(now) or now < 0:
         raise ValueError("now_epoch must be a finite non-negative number")
@@ -52,7 +53,9 @@ def status_snapshot(
             "note": "Local shared state only; no GitHub request was made.",
         }
 
-    cooldown, quota = GitHubCooldown(store_path, token).deadlines(read_only=True)
+    cooldown, quota = GitHubCooldown(
+        store_path, token, cooldown_scope=cooldown_scope
+    ).deadlines(read_only=True)
     provider_status = _deadline_status(cooldown, now)
     quota_status = _deadline_status(quota, now)
     active_deadlines = [
@@ -95,6 +98,15 @@ def _parser() -> argparse.ArgumentParser:
             "existing cooldown scope. The variable name is not included in output."
         ),
     )
+    parser.add_argument(
+        "--cooldown-scope",
+        default=None,
+        help=(
+            "Optional route-family scope used by GitHubCooldown secondary-limit "
+            "rows (for example: search). Primary quota reservation remains "
+            "credential-global."
+        ),
+    )
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     return parser
 
@@ -109,7 +121,9 @@ def main(argv: list[str] | None = None) -> int:
 
     token = os.environ.get(args.token_env) or None
     try:
-        snapshot = status_snapshot(args.cooldown_file, token)
+        snapshot = status_snapshot(
+            args.cooldown_file, token, cooldown_scope=args.cooldown_scope
+        )
     except CooldownStateError:
         print("shared GitHub cooldown state unavailable", file=os.sys.stderr)
         return 2
