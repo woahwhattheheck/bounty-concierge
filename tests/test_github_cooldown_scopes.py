@@ -51,3 +51,30 @@ def test_scoped_unknown_secondary_backoff_is_independent(tmp_path, monkeypatch):
     clock[0] = 1060.0
     assert search.extend_unknown_secondary() == 1180.0
     assert core.extend_unknown_secondary() == 1120.0
+
+def test_schema_ddl_runs_once_per_helper_instance(tmp_path, monkeypatch):
+    path = tmp_path / "cooldown.sqlite"
+    from concierge import github_cooldown
+
+    statements: list[str] = []
+    real_connect = github_cooldown.sqlite3.connect
+
+    def traced_connect(*args, **kwargs):
+        connection = real_connect(*args, **kwargs)
+        connection.set_trace_callback(statements.append)
+        return connection
+
+    monkeypatch.setattr(github_cooldown.sqlite3, "connect", traced_connect)
+
+    cooldown = GitHubCooldown(path, "test-credential")
+    assert cooldown.deadline() is None
+    cooldown.extend(1200.0)
+    assert cooldown.quota_reserve_deadline() is None
+
+    schema_statements = [
+        statement
+        for statement in statements
+        if statement.lstrip().upper().startswith("CREATE TABLE")
+    ]
+    assert len(schema_statements) == 3
+
