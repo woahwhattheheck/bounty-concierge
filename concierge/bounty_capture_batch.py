@@ -12,6 +12,7 @@ import math
 import os
 from pathlib import Path
 import re
+import secrets
 import sys
 from time import monotonic, time
 from typing import Any
@@ -40,6 +41,7 @@ _ISSUE_API = re.compile(
 )
 _MAX_INPUT_BYTES = 1024 * 1024
 _MAX_CANDIDATES = 1000
+_RECOVERY_FAILURE_SECONDS = 60.0
 
 
 def _now() -> str:
@@ -125,6 +127,11 @@ class _BatchSession:
         self.shared_headroom_deferred = False
         self.shared_unknown_backoff_seconds: int | None = None
         self.cooldown_state_error = False
+        self.recovery_owner = secrets.token_hex(16) if cooldown is not None else None
+        self.recovery_probe_active = False
+        self.shared_recovery_probe = False
+        self.shared_recovery_deferred = False
+        self.shared_recovery_stale = False
 
     def get(self, url: str, **kwargs: Any) -> Any:
         self.request_origin_url = url
@@ -170,6 +177,46 @@ class _BatchSession:
                 raise requests.RequestException(
                     "shared provider request headroom reserved; remaining reads deferred"
                 )
+            if deadline is not None and self.recovery_owner is not None:
+                try:
+                    required, acquired, lease_until = self.cooldown.claim_recovery_probe(
+                        self.recovery_owner
+                    )
+                except CooldownStateError:
+                    self.cooldown_state_error = True
+                    self.failure = {"code": "COOLDOWN_STATE_ERROR"}
+                    raise requests.RequestException(
+                        "shared cooldown recovery state unavailable; reads deferred"
+                    ) from None
+                # The helper rechecks under SQLite's write lock. A sibling can
+                # extend the cooldown between the snapshot above and this claim.
+                if (
+                    not required
+                    and not acquired
+                    and lease_until is not None
+                    and lease_until > now
+                ):
+                    self.rate_limited = True
+                    self.shared_cooldown_deferred = True
+                    self.retry_after_seconds = max(1, math.ceil(lease_until - now))
+                    self.failure = {"code": "RATE_LIMITED"}
+                    raise requests.RequestException(
+                        "shared provider cooldown renewed; reads deferred"
+                    )
+                if required and not acquired:
+                    self.rate_limited = True
+                    self.shared_cooldown_deferred = True
+                    self.shared_recovery_deferred = True
+                    self.retry_after_seconds = max(
+                        1, math.ceil((lease_until or now) - now),
+                    )
+                    self.failure = {"code": "RATE_LIMITED"}
+                    raise requests.RequestException(
+                        "shared provider recovery probe already leased; reads deferred"
+                    )
+                if required and acquired:
+                    self.recovery_probe_active = True
+                    self.shared_recovery_probe = True
         self.request_count += 1
         # Keep endpoint identity private for issue-local failure isolation.
         self.request_url = target if isinstance(target, str) else getattr(target, "url", None)
@@ -194,6 +241,8 @@ class _BatchSession:
                         pass
             else:
                 self.failure = {"code": "TRANSPORT_ERROR", "error_type": type(exc).__name__}
+                if self.recovery_probe_active:
+                    self._defer_recovery_probe(time() + _RECOVERY_FAILURE_SECONDS)
             raise
         self._record_response(response)
         return response
@@ -254,6 +303,30 @@ class _BatchSession:
                         pass
             raise
 
+    def _defer_recovery_probe(self, until_epoch: float) -> None:
+        owner = self.recovery_owner
+        if not self.recovery_probe_active or self.cooldown is None or owner is None:
+            return
+        try:
+            if not self.cooldown.defer_recovery_probe(owner, until_epoch):
+                self.shared_recovery_stale = True
+        except CooldownStateError:
+            self.cooldown_state_error = True
+        finally:
+            self.recovery_probe_active = False
+
+    def _complete_recovery_probe(self) -> None:
+        owner = self.recovery_owner
+        if not self.recovery_probe_active or self.cooldown is None or owner is None:
+            return
+        try:
+            if not self.cooldown.complete_recovery_probe(owner):
+                self.shared_recovery_stale = True
+        except CooldownStateError:
+            self.cooldown_state_error = True
+        finally:
+            self.recovery_probe_active = False
+
     def _record_response(self, response: Any) -> None:
         """Classify returned responses and HTTP errors raised by session hooks."""
         status = response.status_code
@@ -298,22 +371,31 @@ class _BatchSession:
                 "code": "RATE_LIMITED" if throttled else "HTTP_ERROR",
                 "http_status": status,
             }
+        shared_deadline: float | None = None
         if (throttled or remaining == 0) and self.cooldown is not None:
             try:
                 if unknown_secondary:
-                    deadline = self.cooldown.extend_unknown_secondary()
+                    shared_deadline = self.cooldown.extend_unknown_secondary()
                     self.shared_unknown_backoff_seconds = max(
-                        0, math.ceil(deadline - time()),
+                        0, math.ceil(shared_deadline - time()),
                     )
                 else:
-                    self.cooldown.extend(cooldown_deadline(
+                    shared_deadline = cooldown_deadline(
                         retry_seconds=retry_after, retry_at=retry_at,
                         reset_at=self.rate_limit_reset_at, primary_exhausted=remaining == 0,
-                    ))
+                    )
+                    self.cooldown.extend(shared_deadline)
             except CooldownStateError:
                 # Keep the actual response and provider evidence. This batch
                 # is already stopped; report that sharing its stop failed.
                 self.cooldown_state_error = True
+            if self.recovery_probe_active and shared_deadline is not None:
+                self._defer_recovery_probe(shared_deadline)
+        elif self.recovery_probe_active:
+            # Any non-throttled provider response proves the expired shared
+            # cooldown recovered, even if this particular endpoint returned
+            # an ordinary application/permission error.
+            self._complete_recovery_probe()
 
         reserve_headroom = (
             self.reserve_requests > 0
@@ -545,6 +627,9 @@ def collect_batch(
             "headroom_deferred": transport.shared_headroom_deferred,
             "state_error": transport.cooldown_state_error,
             "unknown_secondary_backoff_seconds": transport.shared_unknown_backoff_seconds,
+            "recovery_probe": transport.shared_recovery_probe,
+            "recovery_deferred": transport.shared_recovery_deferred,
+            "recovery_stale": transport.shared_recovery_stale,
         },
         "retry_after_seconds": transport.retry_after_seconds,
         "retry_after_at": transport.retry_after_at,
