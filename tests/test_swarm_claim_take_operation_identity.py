@@ -15,12 +15,15 @@ class TakeOperationIdentityTests(unittest.TestCase):
         # Load the real wrapper with an inert reservation module. This test
         # cannot initialize a provider transport or perform a reservation.
         reservation = types.ModuleType("swarm_claim_reservation")
+        tools_stub = types.ModuleType("tools")
+        tools_stub.swarm_claim_reservation = reservation
         source = Path(__file__).resolve().parents[1] / "tools" / "swarm_claim_take.py"
         spec = importlib.util.spec_from_file_location("take_identity_under_test", source)
         self.assertIsNotNone(spec)
         self.assertIsNotNone(spec.loader)
         wrapper = importlib.util.module_from_spec(spec)
         with patch.dict(sys.modules, {
+            "tools": tools_stub,
             "swarm_claim_reservation": reservation,
             "tools.swarm_claim_reservation": reservation,
         }):
