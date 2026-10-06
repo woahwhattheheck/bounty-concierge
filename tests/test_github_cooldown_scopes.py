@@ -78,3 +78,22 @@ def test_schema_ddl_runs_once_per_helper_instance(tmp_path, monkeypatch):
     ]
     assert len(schema_statements) == 3
 
+def test_remaining_wait_seconds_uses_longest_shared_deadline(tmp_path, monkeypatch):
+    path = tmp_path / "cooldown.sqlite"
+    from concierge import github_cooldown
+
+    clock = [1000.25]
+    monkeypatch.setattr(github_cooldown, "time", lambda: clock[0])
+
+    cooldown = GitHubCooldown(path, "test-credential")
+    assert cooldown.remaining_wait_seconds() == 0
+
+    cooldown.extend(1060.0)
+    assert cooldown.remaining_wait_seconds() == 60
+
+    cooldown.reserve_quota_until(1090.1)
+    assert cooldown.remaining_wait_seconds() == 90
+
+    clock[0] = 1090.1
+    assert cooldown.remaining_wait_seconds() == 0
+
