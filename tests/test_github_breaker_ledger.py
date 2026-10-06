@@ -143,3 +143,28 @@ def test_failed_probe_keeps_followers_cool_until_lease_window_expires(tmp_path):
     ]
     assert decisions.count("PROBE") == 1
     assert decisions.count("SKIP") == 99
+
+
+def test_older_receipt_cannot_overwrite_newer_provider_evidence(tmp_path):
+    ledger = GitHubBreakerLedger(
+        tmp_path / "breaker.sqlite",
+        provider_route="token-primary",
+        credential="token",
+    )
+    ledger.record_receipt(
+        "write",
+        "SECONDARY_RATE_LIMIT",
+        observed_epoch=1100.0,
+        reset_epoch=1300.0,
+    )
+
+    # A slower in-flight request reports an older auth failure after the newer
+    # limiter receipt has already been stored. It must not replace newer state.
+    ledger.record_receipt("write", "AUTH_FAILED", observed_epoch=1000.0)
+
+    admission = ledger.admit("write", owner="worker", now_epoch=1150.0)
+    assert admission.decision == "SKIP"
+    assert admission.state == OPEN_UNTIL
+    assert admission.reason == "SECONDARY_RATE_LIMIT"
+    assert admission.until_epoch == 1300.0
+    assert admission.retry_after_seconds == 150
