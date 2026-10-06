@@ -135,6 +135,20 @@ class SwarmClaimFenceTest(unittest.TestCase):
         self.assertEqual(fence.preflight(report, "Acme/b#2", "OP-B")["status"], "TAKE_ALLOWED")
         self.assertEqual(fence.preflight(report, "Acme/a#1", "OP-A")["status"], "ALREADY_OWNED")
 
+    def test_explicit_operation_key_fences_non_github_work(self):
+        rows = [
+            "TAKE · COMP-A · model work_key=op:COMP-AMAZON-ALEXA\ncompetition packet",
+            "TAKE · COMP-B · model work_key=operation:comp-amazon-alexa\nsame packet",
+        ]
+        report = fence.reconcile(load(rows))
+        key = "operation:comp-amazon-alexa"
+        self.assertEqual(report["active"][key]["claim_id"], "COMP-A")
+        self.assertEqual(report["counts"]["conflicts"], 1)
+        self.assertEqual(
+            fence.preflight(report, "op:COMP-AMAZON-ALEXA", "COMP-C")["status"],
+            "COLLISION",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
