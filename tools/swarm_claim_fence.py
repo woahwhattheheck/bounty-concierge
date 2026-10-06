@@ -4,7 +4,7 @@
 
 The tool performs no network requests and does not create provider claims. It is a
 small collision fence for agents that share a coordination feed: the first active
-claim for one canonical GitHub issue wins until that exact claim is released.
+claim for one canonical work key wins until that exact claim is released.
 """
 from __future__ import annotations
 
@@ -71,7 +71,14 @@ def _read_bounded(path: Path) -> bytes:
 
 def _normalize_work_key(raw: str) -> str:
     value = raw.strip().strip("\x60<>()[]{}.,")
-    if value.lower().startswith("github:"):
+    lowered = value.lower()
+    for prefix in ("operation:", "op:"):
+        if lowered.startswith(prefix):
+            operation = value[len(prefix):]
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,239}", operation):
+                raise FenceError(f"invalid operation work key: {raw!r}")
+            return f"operation:{operation.lower()}"
+    if lowered.startswith("github:"):
         value = value[7:]
     match = re.fullmatch(r"([^/\s]+)/([^#\s]+)#(\d+)", value)
     if not match:
@@ -304,7 +311,7 @@ def reconcile(events: Iterable[Event]) -> dict[str, Any]:
             "unmatched_releases": len(unmatched_releases),
         },
         "interpretation": [
-            "The first active TAKE/CLAIM for one canonical GitHub issue wins in transcript order.",
+            "The first active TAKE/CLAIM for one canonical work key wins in transcript order.",
             "Only the exact winning claim_id releases that ownership; ambiguous releases fail closed.",
             "A conflict does not become active ownership and should be released/reconciled by that worker.",
             "This is an offline coordination fence, not a provider assignment, payment claim, or distributed lock.",
@@ -346,7 +353,7 @@ def main(argv: list[str] | None = None) -> int:
             "(for Slack, prefer search export + recent channel-tail export)"
         ),
     )
-    parser.add_argument("--work-key", help="optional GitHub issue key OWNER/REPO#N for a proposed claim")
+    parser.add_argument("--work-key", help="optional OWNER/REPO#N or op:<operation-id> key for a proposed claim")
     parser.add_argument("--claim-id", help="proposed claim id; requires --work-key")
     parser.add_argument("--output", type=Path, help="write JSON instead of stdout")
     args = parser.parse_args(argv)
