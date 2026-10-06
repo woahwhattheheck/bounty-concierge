@@ -42,9 +42,10 @@ class SwarmClaimCloseoutTest(unittest.TestCase):
         self.assertEqual(result["status"], "CLAIM_READY")
         self.assertTrue(result["post_claim"])
         self.assertEqual(result["claim_text"], "/claim #42")
-        self.assertEqual(result["work_key"], "github:githuborg/repo#42")
-        self.assertEqual(captured["work_key"], "github:githuborg/repo#42")
+        self.assertEqual(result["work_key"], "swarm:claim:github:githuborg/repo#42")
+        self.assertEqual(captured["work_key"], "swarm:claim:github:githuborg/repo#42")
         self.assertTrue(result["fresh_provider_fence_required"])
+        self.assertEqual(result["resource"], "github:githuborg/repo#42")
 
     def test_busy_lane_never_emits_claim_text(self):
         with patch.object(
