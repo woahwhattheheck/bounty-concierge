@@ -58,6 +58,33 @@ _CONDITIONAL = re.compile(
     re.IGNORECASE,
 )
 
+_ISSUE_PROHIBITIONS = (
+    re.compile(
+        r"\b(?:AI|artificial\s+intelligence)\s+(?:coding\s+)?agents?\b"
+        r"[^.!?\n]{0,160}\b(?:are\s+)?(?:forbidden|prohibited|not\s+allowed)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:AI|artificial\s+intelligence)\s+(?:coding\s+)?agents?\b"
+        r"[^.!?\n]{0,100}\b(?:must|may|shall)\s+not\b"
+        r"[^.!?\n]{0,100}\b(?:engage|submit|open|author|write|contribute)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:fully\s+)?AI[- ]generated\s+"
+        r"(?:PRs?|pull\s+requests?|submissions?|contributions?)\b"
+        r"[^.!?\n]{0,120}\b(?:is|are)?\s*"
+        r"(?:not\s+accepted|forbidden|prohibited|not\s+allowed)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:do|does|will)\s+not\s+accept\b[^.!?\n]{0,120}"
+        r"\b(?:fully\s+)?AI[- ]generated\s+"
+        r"(?:PRs?|pull\s+requests?|submissions?|contributions?)\b",
+        re.IGNORECASE,
+    ),
+)
+
 
 class RepositoryPolicyInputError(ValueError):
     """A supplied repository-policy observation is malformed or inconsistent."""
@@ -89,6 +116,17 @@ def _sentences(text: str) -> list[str]:
         for part in re.split(r"(?<=[.!?])\s+|\n\s*\n", "\n".join(lines))
         if part.strip()
     ]
+
+
+def issue_body_prohibits_automated_submission(body: str) -> bool:
+    """Recognize an explicit issue-body prohibition without exposing its text."""
+    if not isinstance(body, str):
+        raise RepositoryPolicyInputError("issue body must be a string")
+    return any(
+        not _CONDITIONAL.search(sentence) and pattern.search(sentence)
+        for sentence in _sentences(body)
+        for pattern in _ISSUE_PROHIBITIONS
+    )
 
 
 def _document_rule(document: dict[str, Any], repo: str, revision: str) -> dict[str, Any]:
