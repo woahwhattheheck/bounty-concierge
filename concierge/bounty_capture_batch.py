@@ -318,21 +318,29 @@ class _BatchSession:
         throttled = status == 429 or (status == 403 and (
             remaining == 0 or retry_after is not None or retry_at is not None
         ))
-        if status == 403 and not throttled:
+        primary_exhausted = remaining == 0
+        if status in (403, 429):
             try:
                 error = response.json()
             except (TypeError, ValueError):
                 error = {}
             message = error.get("message", "") if isinstance(error, dict) else ""
-            throttled = isinstance(message, str) and "rate limit" in message.casefold()
-        if throttled or remaining == 0:
+            normalized_message = message.casefold() if isinstance(message, str) else ""
+            # GitHub's explicit primary-limit body is useful when an
+            # intermediary omits X-RateLimit-Remaining. Preserve a supplied
+            # reset floor instead of treating that response as secondary.
+            primary_exhausted = (
+                primary_exhausted or "api rate limit exceeded" in normalized_message
+            )
+            throttled = throttled or "rate limit" in normalized_message
+        if throttled or primary_exhausted:
             self.rate_limited = True
             self.retry_after_seconds = retry_after
             self.retry_after_at = retry_at
             self.rate_limit_reset_at = reset_at
         unknown_secondary = (
             throttled
-            and remaining != 0
+            and not primary_exhausted
             and retry_after is None
             and retry_at is None
         )
@@ -341,7 +349,7 @@ class _BatchSession:
                 "code": "RATE_LIMITED" if throttled else "HTTP_ERROR",
                 "http_status": status,
             }
-        if (throttled or remaining == 0) and self.cooldown is not None:
+        if (throttled or primary_exhausted) and self.cooldown is not None:
             try:
                 if unknown_secondary:
                     deadline = self.cooldown.extend_unknown_secondary()
@@ -353,7 +361,7 @@ class _BatchSession:
                 else:
                     deadline = cooldown_deadline(
                         retry_seconds=retry_after, retry_at=retry_at,
-                        reset_at=self.rate_limit_reset_at, primary_exhausted=remaining == 0,
+                        reset_at=self.rate_limit_reset_at, primary_exhausted=primary_exhausted,
                     )
                     if self.recovery_probe_held:
                         self._defer_recovery_probe(deadline)
