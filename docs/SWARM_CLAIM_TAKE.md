@@ -78,8 +78,10 @@ python3 tools/swarm_claim_reservation.py release \
 ```
 
 An expired or explicitly released reservation can be taken by another worker.
-A same-owner active reservation returns `OWNED` and is safe to re-render; it
-does not create a second custody generation.
+A same-owner active reservation returns `OWNED`. The TAKE wrapper re-renders it
+only when both owner and event ID match the caller's current operation; a
+mismatched or missing event ID returns `COLLISION` without TAKE text. Matching
+reuse does not create a second custody generation.
 
 ## Boundaries
 
