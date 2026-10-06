@@ -188,6 +188,11 @@ def refresh_listings(snapshot: dict[str, Any], listing_ids: list[str], *,
         delay = source.get("retry_after_seconds")
         if delay is not None and (type(delay) is not int or not 0 <= delay < 10**12):
             raise ValueError("invalid retained retry guidance")
+        rate_limited = source.get("rate_limited")
+        if type(rate_limited) is not bool:
+            raise ValueError("invalid retained rate-limit flag")
+        if rate_limited and delay is None:
+            raise ValueError("retained rate-limit cooldown duration is unknown")
         if now < completed:
             raise ValueError("refresh time predates retained observation")
         if delay is not None and (now - completed).total_seconds() < delay:
