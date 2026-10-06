@@ -136,6 +136,22 @@ class RefreshResumePlanTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "same retained catalog"):
             refresh.plan_refresh_resume(self.snapshot, self.ids, wrong_source)
 
+    def test_live_refresh_rejects_previous_record_identity_drift_before_transport(self):
+        drifted = copy.deepcopy(self.previous)
+        # Keep the receipt internally self-consistent so the shared receipt
+        # validator passes; only the retained-catalog identity should reject it.
+        drifted["records"][0]["repo"] = "other/project"
+        drifted["records"][0]["listing"]["repo"] = "other/project"
+
+        with patch.object(self.feed, "get", wraps=self.feed.get) as transport:
+            with self.assertRaisesRegex(
+                    ValueError, "previous refresh record disagrees with the retained catalog"):
+                refresh.refresh_listings(
+                    self.snapshot, self.ids,
+                    previous_refresh=drifted, max_requests=3, session=self.feed,
+                )
+            transport.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

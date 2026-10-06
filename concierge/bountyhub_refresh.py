@@ -23,6 +23,28 @@ SCHEMA = "bountyhub-target-refresh/v1"
 RESUME_PLAN_SCHEMA = "bountyhub-refresh-resume-plan/v1"
 
 
+def _validated_previous_refresh(previous_refresh: dict[str, Any], *,
+                                source_digest: str,
+                                rows: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Validate a retained refresh receipt before trusting any of its state."""
+    if (not isinstance(previous_refresh, dict)
+            or previous_refresh.get("schema") != SCHEMA
+            or previous_refresh.get("source_sha256") != source_digest):
+        raise ValueError("previous refresh must reference the same retained catalog")
+    catalog._refresh_target_source(previous_refresh)
+    previous_records: dict[str, dict[str, Any]] = {}
+    for record in previous_refresh["records"]:
+        listing_id = record["listing_id"]
+        expected = rows.get(listing_id)
+        if (expected is None
+                or record.get("repo", "").casefold() != expected["repo"].casefold()
+                or record.get("number") != expected["number"]
+                or record.get("source_url") != expected["source_url"]):
+            raise ValueError("previous refresh record disagrees with the retained catalog")
+        previous_records[listing_id] = record
+    return previous_records
+
+
 def plan_refresh_resume(snapshot: dict[str, Any], listing_ids: list[str],
                         previous_refresh: dict[str, Any]) -> dict[str, Any]:
     """Plan the next partial refresh without making a provider request.
@@ -54,23 +76,11 @@ def plan_refresh_resume(snapshot: dict[str, Any], listing_ids: list[str],
     except (TypeError, ValueError):
         raise ValueError("retained refresh inputs must contain finite JSON values") from None
 
-    if (not isinstance(previous_refresh, dict)
-            or previous_refresh.get("schema") != SCHEMA
-            or previous_refresh.get("source_sha256") != source_digest):
-        raise ValueError("previous refresh must reference the same retained catalog")
     # Validate the complete receipt structure and every successful detail row
     # before using its status as a reason to skip a future provider request.
-    catalog._refresh_target_source(previous_refresh)
-    previous_records: dict[str, dict[str, Any]] = {}
-    for record in previous_refresh["records"]:
-        listing_id = record["listing_id"]
-        expected = rows.get(listing_id)
-        if (expected is None
-                or record.get("repo", "").casefold() != expected["repo"].casefold()
-                or record.get("number") != expected["number"]
-                or record.get("source_url") != expected["source_url"]):
-            raise ValueError("previous refresh record disagrees with the retained catalog")
-        previous_records[listing_id] = record
+    previous_records = _validated_previous_refresh(
+        previous_refresh, source_digest=source_digest, rows=rows,
+    )
 
     completed_ids = [
         listing_id for listing_id in selected
@@ -178,10 +188,9 @@ def refresh_listings(snapshot: dict[str, Any], listing_ids: list[str], *,
     now = catalog._instant(started_at)
     cooldown_sources = [retained]
     if previous_refresh is not None:
-        if (not isinstance(previous_refresh, dict)
-                or previous_refresh.get("schema") != SCHEMA
-                or previous_refresh.get("source_sha256") != source_digest):
-            raise ValueError("previous refresh must reference the same retained catalog")
+        _validated_previous_refresh(
+            previous_refresh, source_digest=source_digest, rows=rows,
+        )
         cooldown_sources.append(previous_refresh)
     for source in cooldown_sources:
         completed = catalog._instant(source.get("completed_at"))
