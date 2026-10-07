@@ -177,3 +177,42 @@ def test_integration_scope_denial_is_local_to_exact_repo_and_action(tmp_path):
         action="create-issue-comment",
         scope_breaker_path=breaker_path,
     ) == "other-action-ok"
+
+
+def test_stale_handoff_reconciles_before_admission_or_publish(tmp_path):
+    path = tmp_path / "cooldown.sqlite"
+    calls = []
+    provider_match = {
+        "pull_request": 52,
+        "head_sha": HEAD,
+        "head_branch": "sol56/backend34-husky-20261006",
+        "issue_ref": "#34",
+        "content_fingerprint": "sha256:exact-carrier",
+    }
+
+    result = execute_publish_operation(
+        path,
+        "credential",
+        rail="private-token",
+        actor="actor-293",
+        operation="publish-stale-handoff",
+        action="create-pull-request",
+        repo="Owner/Repo",
+        carrier="owner/repo#34",
+        expected_head=HEAD.upper(),
+        transport=lambda: calls.append("provider-write"),
+        provider_reconcile=lambda: provider_match,
+    )
+
+    assert calls == []
+    assert not path.exists()
+    assert result == {
+        "status": "PROVIDER_RECONCILED",
+        "provider_called": False,
+        "operation": "publish-stale-handoff",
+        "action": "create-pull-request",
+        "repo": "Owner/Repo",
+        "carrier": "owner/repo#34",
+        "expected_head": HEAD,
+        "provider_match": provider_match,
+    }
