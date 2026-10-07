@@ -156,7 +156,11 @@ def lifecycle_stage(text: str) -> str:
 
 def extract_action(text: str) -> str:
     stage = lifecycle_stage(text)
-    return "RELEASE" if stage in {"RELEASE", "RETIRE", "SHIPPED"} else "TAKE"
+    if stage == "TAKE":
+        return "TAKE"
+    if stage in {"RELEASE", "RETIRE", "SHIPPED"}:
+        return "RELEASE"
+    return "PROGRESS"
 
 
 def _claim_id_from_first_line(text: str) -> str:
@@ -307,10 +311,21 @@ def reconcile(events: Iterable[Event]) -> dict[str, Any]:
     reassertions: list[dict[str, Any]] = []
     releases: list[dict[str, Any]] = []
     unmatched_releases: list[dict[str, Any]] = []
+    progress: list[dict[str, Any]] = []
+    orphan_progress: list[dict[str, Any]] = []
     accepted: list[dict[str, Any]] = []
 
     for event in events:
         current = active.get(event.work_key)
+        if event.action == "PROGRESS":
+            if current is not None and current.claim_id == event.claim_id:
+                progress.append({"event": event.public(), "active": current.public()})
+            else:
+                orphan_progress.append({
+                    "event": event.public(),
+                    "active": current.public() if current else None,
+                })
+            continue
         if event.action == "TAKE":
             if current is None:
                 active[event.work_key] = event
@@ -338,6 +353,8 @@ def reconcile(events: Iterable[Event]) -> dict[str, Any]:
         "reassertions": reassertions,
         "releases": releases,
         "unmatched_releases": unmatched_releases,
+        "progress": progress,
+        "orphan_progress": orphan_progress,
         "counts": {
             "accepted_claims": len(accepted),
             "active_claims": len(active),
@@ -345,6 +362,8 @@ def reconcile(events: Iterable[Event]) -> dict[str, Any]:
             "reassertions": len(reassertions),
             "releases": len(releases),
             "unmatched_releases": len(unmatched_releases),
+            "progress": len(progress),
+            "orphan_progress": len(orphan_progress),
         },
         "interpretation": [
             "The first active TAKE/CLAIM for one canonical work key wins in transcript order.",
@@ -415,6 +434,8 @@ def durable_report(
             "ambiguities": len(ambiguity),
             "conflicts": reconciled["counts"]["conflicts"],
             "active_claims": reconciled["counts"]["active_claims"],
+            "progress": reconciled["counts"]["progress"],
+            "orphan_progress": reconciled["counts"]["orphan_progress"],
         },
     }
 
