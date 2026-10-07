@@ -87,8 +87,12 @@ function selectToolSchemas(registry, names) {
   }
   const entries = new Map();
   for (const entry of registry) {
-    if (typeof entry?.name === "string" && !entries.has(entry.name)) {
-      entries.set(entry.name, entry);
+    if (typeof entry?.name === "string") {
+      // A retained name-only export must not hide a later recovered schema.
+      // A later name-only record likewise keeps every earlier supplied field.
+      const supplied = Object.fromEntries(Object.entries(entry)
+        .filter(([, value]) => value != null));
+      entries.set(entry.name, { ...entries.get(entry.name), ...supplied });
     }
   }
   return [...new Set(names)].map(name => {
