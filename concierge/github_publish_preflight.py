@@ -112,6 +112,9 @@ def execute_publish_operation(
     recovery_owner: Optional[str] = None,
     scope_breaker_path: Optional[Union[str, Path]] = None,
     provider_reconcile: Optional[Callable[[], Optional[dict[str, Any]]]] = None,
+    provider_capability_denial: Optional[
+        Callable[[], Optional[dict[str, Any]]]
+    ] = None,
 ) -> Union[T, dict[str, Any]]:
     """Execute one GitHub provider operation only when shared rail state admits it.
 
@@ -125,6 +128,13 @@ def execute_publish_operation(
     handoff is already satisfied upstream; the publish transport is skipped and a
     terminal PROVIDER_RECONCILED receipt is returned without mutating admission
     state. The callback is read-only and owns issue/branch/fingerprint matching.
+
+    When provider_capability_denial is supplied, it runs after reconciliation but
+    before breaker/cooldown admission. A non-None mapping means read-only provider
+    inventory has authoritatively proven that this exact actor/rail cannot perform
+    the requested write. The write transport is skipped and a terminal
+    PROVIDER_REROUTE_REQUIRED receipt preserves the evidence for another publisher.
+    Returning None means no denial is proven and normal admission continues.
 
     Normal provider payloads are returned by identity, unchanged. Provider
     exceptions propagate unchanged and deliberately do not complete the recovery
@@ -145,6 +155,8 @@ def execute_publish_operation(
         raise ValueError("transport must be callable")
     if provider_reconcile is not None and not callable(provider_reconcile):
         raise ValueError("provider_reconcile must be callable")
+    if provider_capability_denial is not None and not callable(provider_capability_denial):
+        raise ValueError("provider_capability_denial must be callable")
 
     if provider_reconcile is not None:
         provider_match = provider_reconcile()
@@ -163,6 +175,27 @@ def execute_publish_operation(
                 "carrier": carrier,
                 "expected_head": expected_head,
                 "provider_match": dict(provider_match),
+            }
+
+
+    if provider_capability_denial is not None:
+        capability_evidence = provider_capability_denial()
+        if capability_evidence is not None:
+            if not isinstance(capability_evidence, dict):
+                raise ValueError(
+                    "provider_capability_denial must return a mapping or None"
+                )
+            return {
+                "status": "PROVIDER_REROUTE_REQUIRED",
+                "provider_called": False,
+                "provider_capability_called": True,
+                "provider_write_called": False,
+                "operation": operation,
+                "action": action,
+                "repo": repo,
+                "carrier": carrier,
+                "expected_head": expected_head,
+                "capability_evidence": dict(capability_evidence),
             }
 
     resource_breaker = None
