@@ -42,6 +42,7 @@ class GitHubCooldown:
         token: str | None,
         *,
         cooldown_scope: str | None = None,
+        quota_principal: str | None = None,
     ) -> None:
         if str(path) == ":memory:":
             raise ValueError("cooldown file must persist between processes")
@@ -51,11 +52,25 @@ class GitHubCooldown:
             or "\0" in cooldown_scope
         ):
             raise ValueError("cooldown_scope must be a non-empty label up to 64 bytes")
+        if quota_principal is not None and (
+            not quota_principal
+            or len(quota_principal.encode("utf-8")) > 128
+            or "\0" in quota_principal
+        ):
+            raise ValueError("quota_principal must be a non-empty label up to 128 bytes")
         self.path = Path(path)
-        # Keep the v1 credential scope byte-for-byte for legacy callers and for
-        # primary-quota reservations, which apply across GitHub REST resources.
+        # Keep the v1 credential scope byte-for-byte for legacy callers,
+        # provider cooldowns, and recovery leases.
         self.scope = hashlib.sha256(
             b"github-rest-cooldown-v1\0" + (token or "").encode("utf-8")
+        ).hexdigest()
+        # GitHub user-authenticated tokens can share one primary REST quota
+        # across multiple token strings. Callers that know the provider quota
+        # principal (for example user:<login> or installation:<id>) may share
+        # only the primary-quota reservation across those credentials. Omitted
+        # principal preserves the legacy token-scoped row identity.
+        self.quota_scope = self.scope if quota_principal is None else hashlib.sha256(
+            b"github-rest-quota-principal-v1\0" + quota_principal.encode("utf-8")
         ).hexdigest()
         # Provider secondary limits can be resource-family specific. Opted-in
         # callers get an isolated provider-cooldown row without exposing the
@@ -139,7 +154,7 @@ class GitHubCooldown:
         with self._connection() as connection:
             row = connection.execute(
                 "SELECT until_epoch FROM github_quota_reserve_v1 WHERE scope = ?",
-                (self.scope,),
+                (self.quota_scope,),
             ).fetchone()
             if row is None:
                 return None
@@ -183,7 +198,7 @@ class GitHubCooldown:
                 "FROM github_cooldown_v1 WHERE scope = ? "
                 "UNION ALL SELECT 'quota reservation', until_epoch "
                 "FROM github_quota_reserve_v1 WHERE scope = ?",
-                (self.cooldown_scope, self.scope),
+                (self.cooldown_scope, self.quota_scope),
             ).fetchall()
             values: dict[str, float] = {}
             for label, value in rows:
@@ -231,7 +246,7 @@ class GitHubCooldown:
                 "INSERT INTO github_quota_reserve_v1(scope, until_epoch) VALUES (?, ?) "
                 "ON CONFLICT(scope) DO UPDATE SET until_epoch = "
                 "MAX(github_quota_reserve_v1.until_epoch, excluded.until_epoch)",
-                (self.scope, until_epoch),
+                (self.quota_scope, until_epoch),
             )
 
     def claim_recovery_probe(
