@@ -25,6 +25,8 @@ text(selectToolSchemas(ALL_TOOLS, [
 ]));
 ```
 
+When combining retained exports with newly recovered definitions, repeated exact names preserve the supplied definition fields. A name-only entry does not erase a full schema supplied earlier or later. `selectToolSchemas` still returns only the requested exact names from the supplied registry.
+
 The functions also work in Node.js with `require("./tools/native_tool_inventory.js")` and an array of registry entries. They perform no I/O; the caller decides when to inspect or print.
 
 ## What the result means
