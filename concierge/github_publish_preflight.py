@@ -153,7 +153,10 @@ def execute_publish_operation(
                 raise ValueError("provider_reconcile must return a mapping or None")
             return {
                 "status": "PROVIDER_RECONCILED",
+                # Legacy field: whether the write transport was invoked.
                 "provider_called": False,
+                "provider_reconcile_called": True,
+                "provider_write_called": False,
                 "operation": operation,
                 "action": action,
                 "repo": repo,
