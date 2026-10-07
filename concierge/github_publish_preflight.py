@@ -111,6 +111,7 @@ def execute_publish_operation(
     cooldown_scope: Optional[str] = None,
     recovery_owner: Optional[str] = None,
     scope_breaker_path: Optional[Union[str, Path]] = None,
+    provider_reconcile: Optional[Callable[[], Optional[dict[str, Any]]]] = None,
 ) -> Union[T, dict[str, Any]]:
     """Execute one GitHub provider operation only when shared rail state admits it.
 
@@ -118,6 +119,12 @@ def execute_publish_operation(
     never call transport. RECOVERY_READY must win the existing credential-global
     recovery lease before transport is allowed; followers re-read and defer.
     AVAILABLE proceeds directly.
+
+    When provider_reconcile is supplied, it runs after repo/head canonicalization
+    but before breaker/cooldown admission. A non-None mapping means the released
+    handoff is already satisfied upstream; the publish transport is skipped and a
+    terminal PROVIDER_RECONCILED receipt is returned without mutating admission
+    state. The callback is read-only and owns issue/branch/fingerprint matching.
 
     Normal provider payloads are returned by identity, unchanged. Provider
     exceptions propagate unchanged and deliberately do not complete the recovery
@@ -136,6 +143,24 @@ def execute_publish_operation(
         recovery_owner = _label(recovery_owner, "recovery_owner", 128)
     if not callable(transport):
         raise ValueError("transport must be callable")
+    if provider_reconcile is not None and not callable(provider_reconcile):
+        raise ValueError("provider_reconcile must be callable")
+
+    if provider_reconcile is not None:
+        provider_match = provider_reconcile()
+        if provider_match is not None:
+            if not isinstance(provider_match, dict):
+                raise ValueError("provider_reconcile must return a mapping or None")
+            return {
+                "status": "PROVIDER_RECONCILED",
+                "provider_called": False,
+                "operation": operation,
+                "action": action,
+                "repo": repo,
+                "carrier": carrier,
+                "expected_head": expected_head,
+                "provider_match": dict(provider_match),
+            }
 
     resource_breaker = None
     if scope_breaker_path is not None:
