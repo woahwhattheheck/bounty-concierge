@@ -23,8 +23,12 @@ MAX_INPUTS = 8
 MAX_MESSAGES = 10000
 
 _ACQUIRE = {"TAKE", "CLAIM"}
-_RELEASE = {"RELEASE", "DONE", "COMPLETE", "COMPLETED", "BLOCKED", "SHIPPED", "RECONCILED"}
-_ACTION_RE = re.compile(r"\b(TAKE|CLAIM|RELEASE|DONE|COMPLETE|COMPLETED|BLOCKED|SHIPPED|RECONCILED)\b", re.I)
+_RELEASE = {"RELEASE", "DONE", "COMPLETE", "COMPLETED", "BLOCKED", "SHIPPED", "RECONCILED", "RETIRE", "RETIRED"}
+_ACTION_RE = re.compile(
+    r"\b(SOURCE[ _-]?COMPLETE|QA(?:[ _-]?(?:CLEAN|COMPLETE))?|PUBLISH(?:ED)?|"
+    r"TAKE|CLAIM|RELEASE|DONE|COMPLETE|COMPLETED|BLOCKED|SHIPPED|RECONCILED|RETIRE|RETIRED)\b",
+    re.I,
+)
 _EXPLICIT_WORK_RE = re.compile(r"\bwork[_ -]?key\s*[:=]\s*([^\s,;]+)", re.I)
 _ISSUE_URL_RE = re.compile(r"https?://github\.com/([^/\s]+)/([^/\s]+)/issues/(\d+)", re.I)
 _PR_URL_RE = re.compile(r"https?://github\.com/([^/\s]+)/([^/\s]+)/pull/(\d+)", re.I)
@@ -127,14 +131,36 @@ def extract_work_key(text: str) -> str:
     raise FenceError("message has no canonical GitHub issue work key")
 
 
-def extract_action(text: str) -> str:
+def lifecycle_stage(text: str) -> str:
+    """Classify one coordination headline without changing v1 ownership semantics."""
     first = text.splitlines()[0] if text.splitlines() else text
-    actions = [m.group(1).upper() for m in _ACTION_RE.finditer(first)]
-    if not actions:
-        raise FenceError("message first line has no TAKE/CLAIM/release action")
-    if any(action in _RELEASE for action in actions):
+    upper = first.upper().replace("_", " ").replace("-", " ")
+    if re.search(r"\bSHIPPED\b", upper):
+        return "SHIPPED"
+    if re.search(r"\bRETIRE(?:D)?\b", upper):
+        return "RETIRE"
+    if re.search(r"\bRELEASE\b", upper):
         return "RELEASE"
-    return "TAKE"
+    if re.search(r"\bSOURCE\s+COMPLETE\b", upper):
+        return "SOURCE_COMPLETE"
+    if re.search(r"\bQA(?:\s+(?:CLEAN|COMPLETE))?\b", upper):
+        return "QA"
+    if re.search(r"\bPUBLISH(?:ED)?\b", upper):
+        return "PUBLISH"
+    if re.search(r"\b(?:TAKE|CLAIM)\b", upper):
+        return "TAKE"
+    if re.search(r"\b(?:DONE|COMPLETE|COMPLETED|BLOCKED|RECONCILED)\b", upper):
+        return "RELEASE"
+    raise FenceError("message first line has no recognized lifecycle action")
+
+
+def extract_action(text: str) -> str:
+    stage = lifecycle_stage(text)
+    if stage == "TAKE":
+        return "TAKE"
+    if stage in {"RELEASE", "RETIRE", "SHIPPED"}:
+        return "RELEASE"
+    return "PROGRESS"
 
 
 def _claim_id_from_first_line(text: str) -> str:
@@ -285,10 +311,21 @@ def reconcile(events: Iterable[Event]) -> dict[str, Any]:
     reassertions: list[dict[str, Any]] = []
     releases: list[dict[str, Any]] = []
     unmatched_releases: list[dict[str, Any]] = []
+    progress: list[dict[str, Any]] = []
+    orphan_progress: list[dict[str, Any]] = []
     accepted: list[dict[str, Any]] = []
 
     for event in events:
         current = active.get(event.work_key)
+        if event.action == "PROGRESS":
+            if current is not None and current.claim_id == event.claim_id:
+                progress.append({"event": event.public(), "active": current.public()})
+            else:
+                orphan_progress.append({
+                    "event": event.public(),
+                    "active": current.public() if current else None,
+                })
+            continue
         if event.action == "TAKE":
             if current is None:
                 active[event.work_key] = event
@@ -316,6 +353,8 @@ def reconcile(events: Iterable[Event]) -> dict[str, Any]:
         "reassertions": reassertions,
         "releases": releases,
         "unmatched_releases": unmatched_releases,
+        "progress": progress,
+        "orphan_progress": orphan_progress,
         "counts": {
             "accepted_claims": len(accepted),
             "active_claims": len(active),
@@ -323,6 +362,8 @@ def reconcile(events: Iterable[Event]) -> dict[str, Any]:
             "reassertions": len(reassertions),
             "releases": len(releases),
             "unmatched_releases": len(unmatched_releases),
+            "progress": len(progress),
+            "orphan_progress": len(orphan_progress),
         },
         "interpretation": [
             "The first active TAKE/CLAIM for one canonical work key wins in transcript order.",
@@ -355,6 +396,94 @@ def preflight(report: dict[str, Any], work_key: str, claim_id: str) -> dict[str,
     }
 
 
+def durable_report(
+    events: Iterable[Event],
+    *,
+    history_complete: bool,
+    ignored: Iterable[dict[str, Any]] = (),
+) -> dict[str, Any]:
+    """Summarize durable lifecycle evidence without performing network I/O.
+
+    BUILD_ALLOWED is intentionally conservative: callers must explicitly attest
+    that the supplied transcript window is complete, there must be no ambiguous
+    ignored coordination rows, and the proposed claim must already be the active
+    owner before source work begins.
+    """
+    rows = list(events)
+    by_work: dict[str, list[dict[str, Any]]] = {}
+    for event in rows:
+        record = event.public()
+        record["stage"] = lifecycle_stage(event.text)
+        by_work.setdefault(event.work_key, []).append(record)
+
+    ambiguity = [
+        item for item in ignored
+        if "multiple" in str(item.get("reason", "")).lower()
+        or "ambiguous" in str(item.get("reason", "")).lower()
+    ]
+    reconciled = reconcile(rows)
+    return {
+        "schema": "swarm-durable-ownership/v1",
+        "history_complete": history_complete,
+        "ambiguity_evidence": ambiguity,
+        "work": {key: by_work[key] for key in sorted(by_work)},
+        "active": reconciled["active"],
+        "conflicts": reconciled["conflicts"],
+        "counts": {
+            "work_keys": len(by_work),
+            "ambiguities": len(ambiguity),
+            "conflicts": reconciled["counts"]["conflicts"],
+            "active_claims": reconciled["counts"]["active_claims"],
+            "progress": reconciled["counts"]["progress"],
+            "orphan_progress": reconciled["counts"]["orphan_progress"],
+        },
+    }
+
+
+def durable_preflight(
+    durable: dict[str, Any],
+    *,
+    work_key: str,
+    claim_id: str,
+) -> dict[str, Any]:
+    key = _normalize_work_key(work_key)
+    claim = claim_id.strip()
+    if not claim:
+        raise FenceError("claim-id must not be empty")
+
+    active = durable["active"].get(key)
+    if not durable["history_complete"]:
+        status = "HISTORY_INCOMPLETE"
+        build_allowed = False
+        reason = "caller has not attested that the supplied coordination history is complete"
+    elif durable["ambiguity_evidence"]:
+        status = "AMBIGUOUS_HISTORY"
+        build_allowed = False
+        reason = "coordination history contains ambiguous work identity; reconcile it first"
+    elif active is None:
+        status = "CLAIM_REQUIRED"
+        build_allowed = False
+        reason = "no active claim exists; post and re-read the TAKE before building"
+    elif active["claim_id"] != claim:
+        status = "COLLISION"
+        build_allowed = False
+        reason = "another active claim owns the canonical work key"
+    else:
+        status = "BUILD_ALLOWED"
+        build_allowed = True
+        reason = "complete unambiguous history confirms this exact claim as active owner"
+
+    return {
+        "schema": "swarm-durable-preflight/v1",
+        "status": status,
+        "build_allowed": build_allowed,
+        "work_key": key,
+        "claim_id": claim,
+        "active_claim": active,
+        "reason": reason,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -370,6 +499,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--work-key", help="optional OWNER/REPO#N or op:<operation-id> key for a proposed claim")
     parser.add_argument("--claim-id", help="proposed claim id; requires --work-key")
     parser.add_argument("--output", type=Path, help="write JSON instead of stdout")
+    parser.add_argument(
+        "--durable",
+        action="store_true",
+        help="also emit durable lifecycle evidence and a fail-closed build preflight",
+    )
+    parser.add_argument(
+        "--history-complete",
+        action="store_true",
+        help="attest that the supplied transcript window is complete (used only with --durable)",
+    )
     args = parser.parse_args(argv)
     try:
         if bool(args.work_key) != bool(args.claim_id):
@@ -396,6 +535,19 @@ def main(argv: list[str] | None = None) -> int:
         report["messages_ignored"] = ignored
         if args.work_key:
             report["preflight"] = preflight(report, args.work_key, args.claim_id)
+        if args.durable:
+            durable = durable_report(
+                events,
+                history_complete=args.history_complete,
+                ignored=ignored,
+            )
+            report["durable"] = durable
+            if args.work_key:
+                report["durable_preflight"] = durable_preflight(
+                    durable,
+                    work_key=args.work_key,
+                    claim_id=args.claim_id,
+                )
         rendered = json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
         if args.output:
             args.output.write_text(rendered, encoding="utf-8")
