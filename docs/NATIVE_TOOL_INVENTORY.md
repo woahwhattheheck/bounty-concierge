@@ -32,6 +32,7 @@ The functions also work in Node.js with `require("./tools/native_tool_inventory.
 - `OBSERVED` means the exact tool name appears now.
 - `NOT_OBSERVED_IN_THIS_SNAPSHOT` does **not** mean the provider lacks the capability. Repeat discovery alongside useful work and use any discovered plugin/tool discovery mechanism.
 - The writer map includes Git objects, branches, files, PR creation/update/merge, issue comments, Slack sends/edits, and conversation creation.
+- `additionalWrites` lists exact observed generic write tools, including the connected GitHub Token Connection repository REST writer and comment writer. These routes remain separate from the native primitive map. Read their actual schemas with `selectToolSchemas`, probe the connected account and target permission, and preserve the publication route and provider outcome before using one. An entry records tool visibility, not authentication, authorization or a successful write.
 - Counts are observations, not a 127-tool permission gate. Future larger or smaller registries still report their observed names.
 - Authentication, installation scope, repository permission, provider policy and operation outcomes remain separate facts. The inspector always reports `NOT_PROBED_BY_THIS_INSPECTOR`; a registry entry cannot establish authorization.
 - The inspector does not cache capabilities, invoke writes, retry failures, create schedules, or change sessions. A subsequent call examines the newly supplied registry.
@@ -172,7 +173,7 @@ objects, not a new client or automatic retry loop.
 | `create_blob` | `{"repository_full_name":"OWNER/REPOSITORY","content":"FULL_TEXT","encoding":"utf-8"}` |
 | `create_tree` | `{"repository_full_name":"OWNER/REPOSITORY","base_tree_sha":"BASE_TREE_SHA","tree_elements":[{"path":"docs/example.md","mode":"100644","type":"blob","sha":"BLOB_SHA"}]}` |
 | `create_commit` | `{"repository_full_name":"OWNER/REPOSITORY","message":"Describe the source change","parent_sha":"PARENT_COMMIT_SHA","tree_sha":"NEW_TREE_SHA"}` |
-| `update_ref` | `{"repository_full_name":"OWNER/REPOSITORY","branch_name":"EXISTING/BRANCH","sha":"NEW_COMMIT_SHA","force":false}` |
+| `update_ref` | `{"repository_full_name":"OWNER/REPOSITORY","branch_name":"EXISTING/BRANCH","sha":"NEW_COMMIT_SHA","expected_sha":"PARENT_COMMIT_SHA","force":false}` |
 
 Create a blob for each complete file, collect their actual returned SHAs into
 one tree, then create one commit with the observed parent. Supplying
@@ -182,9 +183,12 @@ writes do not publish a branch change until `update_ref` succeeds.
 
 Read the current ref and affected file preimages before advancing it. If another
 writer changed the branch, compose the intended edits onto that current source
-and tree. Do not replace a newer file with an old complete string. The native
-`update_ref` schema has no expected-old-SHA argument: `force:false` requires a
-fast-forward but is not an atomic compare-and-swap against the earlier read.
+and tree. Do not replace a newer file with an old complete string. The current native
+`update_ref` schema exposes optional `expected_sha` and rejects a mismatched
+expected head. Inspect the actual schema in this harness, supply the observed
+parent as `expected_sha` when supported, and keep `force:false`. By contrast,
+a raw REST `PATCH /git/refs/heads/<branch>` with only `{sha, force:false}`
+requires a fast-forward but does not provide expected-head compare-and-swap.
 Retain a rejected or uncertain write's actual result and reconcile the branch
 before another attempt.
 
