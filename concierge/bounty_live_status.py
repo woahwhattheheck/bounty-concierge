@@ -17,6 +17,7 @@ from email.utils import parsedate_to_datetime
 import hashlib
 import json
 import math
+import os
 import re
 from typing import Any
 from urllib.parse import urlsplit
@@ -24,6 +25,7 @@ from urllib.parse import urlsplit
 import requests
 
 from concierge.config import GITHUB_TOKEN
+from concierge.github_read_preflight import GitHubReadFailure, execute_read_operation
 
 _RECEIPT_SCHEMA = "bounty-live-status/v3"
 _DECISION_SCHEMA = "bounty-live-qualification-decision/v1"
@@ -320,6 +322,7 @@ def _result(
     repository_redirected: bool = False,
     clear_at_capture: bool = False,
     http_response: Any = None,
+    read_admission: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], bool]:
     canonical_url = (
         f"https://github.com/{canonical_repo}/issues/{number}"
@@ -350,6 +353,7 @@ def _result(
         "discovery": discovery,
         "authority": {
             "provider_response_code_owned": provider_response_code_owned,
+            "fresh_code_owned_acquisition_in_this_call": provider_response_code_owned,
             "github_live_state_is_authoritative_at_capture": provider_state_authoritative,
             "retained_receipt_is_qualification_authority": False,
             "clear_requires_fresh_code_owned_acquisition": True,
@@ -361,6 +365,8 @@ def _result(
             "network_fetches_discovery_source_url": False,
         },
     }
+    if read_admission is not None:
+        receipt["live"]["read_admission"] = deepcopy(read_admission)
     cooldown = _provider_cooldown(http_response, captured_at)
     if cooldown is not None:
         receipt["live"]["provider_cooldown"] = cooldown
@@ -417,8 +423,56 @@ def _acquire_live_status(
     api_url = f"https://api.github.com/repos/{requested_repo}/issues/{number}"
     resolved_token = GITHUB_TOKEN if token is None else token
 
-    try:
+    def transport():
         response = _github_get(api_url, headers=_headers(resolved_token))
+        cooldown = _provider_cooldown(response, _current_utc())
+        if cooldown is None:
+            return response
+
+        response_headers = getattr(response, "headers", None)
+        if not isinstance(response_headers, Mapping):
+            response_headers = {}
+        remaining = response_headers.get(
+            "X-RateLimit-Remaining",
+            response_headers.get("x-ratelimit-remaining"),
+        )
+        reset = response_headers.get(
+            "X-RateLimit-Reset",
+            response_headers.get("x-ratelimit-reset"),
+        )
+        primary = remaining == "0"
+        reset_at = (
+            int(reset)
+            if primary
+            and isinstance(reset, str)
+            and reset.isascii()
+            and reset.isdigit()
+            and len(reset) <= 12
+            else None
+        )
+        raise GitHubReadFailure(
+            "PRIMARY_RATE_LIMIT" if primary else "SECONDARY_RATE_LIMIT",
+            retry_after_seconds=cooldown["retry_after_seconds"],
+            reset_at=reset_at,
+        )
+
+    cooldown_path = os.environ.get("CONCIERGE_BOUNTY_COOLDOWN")
+    try:
+        if cooldown_path:
+            response = execute_read_operation(
+                cooldown_path,
+                resolved_token,
+                rail="github-rest",
+                actor="bounty-live-status",
+                operation=f"issue-live-status-{number}",
+                operation_class="issue-pr-read",
+                repo=requested_repo,
+                target=f"issues/{number}",
+                transport=transport,
+                cooldown_scope="issue-pr-read",
+            )
+        else:
+            response = _github_get(api_url, headers=_headers(resolved_token))
     except requests.RequestException:
         return _result(
             requested_url=normalized_url,
@@ -428,6 +482,26 @@ def _acquire_live_status(
             classification="UNVERIFIABLE",
             reason_code="GITHUB_REQUEST_FAILED",
             provider_response_code_owned=True,
+        )
+
+    if isinstance(response, dict) and response.get("status") in {
+        "READ_DEFERRED",
+        "READ_FAILED",
+    }:
+        provider_called = response.get("provider_called") is True
+        return _result(
+            requested_url=normalized_url,
+            requested_repo=requested_repo,
+            number=number,
+            discovery=discovery_data,
+            classification="UNVERIFIABLE",
+            reason_code=(
+                "GITHUB_READ_DEFERRED"
+                if response["status"] == "READ_DEFERRED"
+                else "GITHUB_READ_FAILED"
+            ),
+            provider_response_code_owned=provider_called,
+            read_admission=response,
         )
 
     status = getattr(response, "status_code", None)
@@ -658,7 +732,9 @@ def preflight_further_qualification(
         "clear_for_further_qualification": clear,
         "receipt": receipt,
         "authority": {
-            "fresh_code_owned_acquisition_in_this_call": True,
+            "fresh_code_owned_acquisition_in_this_call": bool(
+                receipt["authority"]["fresh_code_owned_acquisition_in_this_call"]
+            ),
             "decision_is_durable_or_replayable": False,
             "retained_receipt_is_qualification_authority": False,
             "decision_is_dispatch_authority": False,
