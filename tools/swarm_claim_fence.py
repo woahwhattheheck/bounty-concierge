@@ -135,22 +135,24 @@ def lifecycle_stage(text: str) -> str:
     """Classify one coordination headline without changing v1 ownership semantics."""
     first = text.splitlines()[0] if text.splitlines() else text
     upper = first.upper().replace("_", " ").replace("-", " ")
+    # Terminal lifecycle labels win even when a handoff headline also names
+    # TAKE/QA/PUBLISH. Otherwise a terminal release can accidentally acquire or
+    # preserve ownership. Among non-terminal labels, TAKE/CLAIM must win over
+    # progress words so "TAKE QA" and "TAKE ... PUBLISH" really claim the lane.
     if re.search(r"\bSHIPPED\b", upper):
         return "SHIPPED"
     if re.search(r"\bRETIRE(?:D)?\b", upper):
         return "RETIRE"
-    if re.search(r"\bRELEASE\b", upper):
+    if re.search(r"\b(?:RELEASE|DONE|COMPLETE|COMPLETED|BLOCKED|RECONCILED)\b", upper):
         return "RELEASE"
+    if re.search(r"\b(?:TAKE|CLAIM)\b", upper):
+        return "TAKE"
     if re.search(r"\bSOURCE\s+COMPLETE\b", upper):
         return "SOURCE_COMPLETE"
     if re.search(r"\bQA(?:\s+(?:CLEAN|COMPLETE))?\b", upper):
         return "QA"
     if re.search(r"\bPUBLISH(?:ED)?\b", upper):
         return "PUBLISH"
-    if re.search(r"\b(?:TAKE|CLAIM)\b", upper):
-        return "TAKE"
-    if re.search(r"\b(?:DONE|COMPLETE|COMPLETED|BLOCKED|RECONCILED)\b", upper):
-        return "RELEASE"
     raise FenceError("message first line has no recognized lifecycle action")
 
 
