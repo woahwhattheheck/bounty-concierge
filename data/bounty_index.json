@@ -1,5 +1,5 @@
 {
-  "started_at": "2026-10-06T12:47:41.951217+00:00",
+  "started_at": "2026-10-07T12:41:59.794178+00:00",
   "complete": true,
   "rate_limited": false,
   "retry_after_seconds": null,
@@ -328,7 +328,7 @@
         "bounty"
       ],
       "created_at": "2026-02-22T15:26:50Z",
-      "updated_at": "2026-09-27T00:20:38Z",
+      "updated_at": "2026-10-07T04:23:29Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 200.0,
@@ -794,10 +794,11 @@
       "body": "## Quest Chain: Harden the Chain\n\nFor security-minded contributors. Complete each step to earn up to **100 RTC** and the **Guardian** title.\n\n---\n\n### Step 1: Read the Architecture (10 RTC)\nRead the codebase and write a 500+ word security assessment covering:\n- How attestation works (the \\`/attest/submit\\` flow)\n- How hardware fingerprinting prevents VM farms\n- How epoch rewards are calculated and distributed\n- One potential attack vector you identified\n\n**Prove it:** Post your assessment as a comment or gist link.\n\n---\n\n### Step 2: Reproduce a Known Fix (15 RTC)\nPick one vulnerability from BuilderFred's audit (all 6 are fixed):\n1. VM Fingerprint Bypass\n2. Antiquity Spoofing\n3. Mock Signature Mode\n4. Inline PubKey Hijack\n5. SQL Schema Mismatch\n6. Hardware Binding Bypass\n\nSet up a local test environment and demonstrate you understand HOW the fix works by:\n- Describing the attack before the fix\n- Showing the fix in the code\n- Explaining why the fix is sufficient (or isn't)\n\n**Prove it:** Write-up with code references.\n\n---\n\n### Step 3: Find Something New (75 RTC)\nFind and report a previously unknown security issue. Must include:\n- Clear description of the vulnerability\n- Steps to reproduce\n- Severity assessment (Critical/High/Medium/Low)\n- Suggested fix\n\n**Prove it:** File a responsible disclosure via the SECURITY.md process. If confirmed, earn the full 75 RTC + Guardian title.\n\n---\n\n### Completion\n\n| Steps | Reward | Title |\n|-------|--------|-------|\n| Step 1 only | 10 RTC | Security Explorer |\n| Steps 1 + 2 | 25 RTC | Security Analyst |\n| Steps 1 + 2 + 3 | **100 RTC** | **Guardian** |\n\n*You don't have to find a new vulnerability to earn from Steps 1 and 2. Those reward understanding, not just discovery.*",
       "url": "https://github.com/Scottcjn/rustchain-bounties/issues/398",
       "labels": [
-        "bounty"
+        "bounty",
+        "claimed"
       ],
       "created_at": "2026-02-22T15:25:06Z",
-      "updated_at": "2026-10-06T00:05:02Z",
+      "updated_at": "2026-10-07T04:55:50Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 100.0,
@@ -3543,7 +3544,7 @@
         "live-url-verified"
       ],
       "created_at": "2026-02-17T20:14:47Z",
-      "updated_at": "2026-10-06T05:15:12Z",
+      "updated_at": "2026-10-07T04:43:18Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 15.0,
@@ -5556,7 +5557,7 @@
         "distribution"
       ],
       "created_at": "2026-03-17T02:05:49Z",
-      "updated_at": "2026-10-06T05:15:04Z",
+      "updated_at": "2026-10-07T04:43:08Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 5.0,
@@ -6150,7 +6151,7 @@
         "bounty"
       ],
       "created_at": "2026-05-27T21:56:08Z",
-      "updated_at": "2026-10-06T01:53:28Z",
+      "updated_at": "2026-10-07T04:32:04Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 3.0,
@@ -6178,7 +6179,7 @@
         "bounty"
       ],
       "created_at": "2026-05-27T21:56:06Z",
-      "updated_at": "2026-10-06T01:57:24Z",
+      "updated_at": "2026-10-07T04:42:51Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 3.0,
@@ -6870,7 +6871,7 @@
         "bounty"
       ],
       "created_at": "2026-02-14T17:34:51Z",
-      "updated_at": "2026-10-06T05:13:54Z",
+      "updated_at": "2026-10-07T04:41:53Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 3.0,
@@ -6975,7 +6976,7 @@
         "bounty"
       ],
       "created_at": "2026-06-11T23:02:38Z",
-      "updated_at": "2026-10-06T05:14:06Z",
+      "updated_at": "2026-10-07T04:42:07Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 2.0,
@@ -7077,7 +7078,7 @@
         "bounty"
       ],
       "created_at": "2026-05-11T16:18:31Z",
-      "updated_at": "2026-10-06T05:13:53Z",
+      "updated_at": "2026-10-07T04:41:52Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 2.0,
@@ -7241,7 +7242,7 @@
         "bounty"
       ],
       "created_at": "2026-03-16T18:12:44Z",
-      "updated_at": "2026-10-06T05:14:09Z",
+      "updated_at": "2026-10-07T04:42:10Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 2.0,
@@ -7586,7 +7587,7 @@
         "community"
       ],
       "created_at": "2026-03-01T04:13:08Z",
-      "updated_at": "2026-10-06T12:09:48Z",
+      "updated_at": "2026-10-07T04:22:34Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 2.0,
@@ -7804,7 +7805,7 @@
         "stars"
       ],
       "created_at": "2026-07-19T21:33:49Z",
-      "updated_at": "2026-10-06T06:48:16Z",
+      "updated_at": "2026-10-07T04:41:51Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 1.0,
@@ -8653,7 +8654,7 @@
         "bounty"
       ],
       "created_at": "2026-02-20T18:43:46Z",
-      "updated_at": "2026-10-06T05:13:57Z",
+      "updated_at": "2026-10-07T04:41:56Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 1.0,
@@ -8724,7 +8725,7 @@
         "community"
       ],
       "created_at": "2026-02-14T21:05:30Z",
-      "updated_at": "2026-10-06T05:13:56Z",
+      "updated_at": "2026-10-07T04:41:55Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 1.0,
@@ -9102,6 +9103,6 @@
       }
     }
   ],
-  "updated_at": "2026-10-06T12:47:45.757875+00:00",
+  "updated_at": "2026-10-07T12:42:03.932045+00:00",
   "total_count": 266
 }
