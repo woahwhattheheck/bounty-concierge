@@ -28,6 +28,15 @@ const NATIVE_WRITE_ACTIONS = Object.freeze({
   ]),
 });
 
+// Generic writers are independent routes, not proof that a native primitive exists.
+const ADDITIONAL_WRITE_TOOLS = Object.freeze({
+  github: Object.freeze([
+    "mcp__codex_apps__github_token_connection_github_repository_write",
+    "mcp__codex_apps__github_token_connection_github_comment",
+  ]),
+  slack: Object.freeze([]),
+});
+
 /** Return current observations, never inferred account or provider permission. */
 function inspectToolInventory(registry, { includeNames = false } = {}) {
   if (!Array.isArray(registry)) {
@@ -50,6 +59,7 @@ function inspectToolInventory(registry, { includeNames = false } = {}) {
     providers[provider] = {
       count: names.length,
       writes,
+      additionalWrites: ADDITIONAL_WRITE_TOOLS[provider].filter(name => observed.has(name)),
       ...(includeNames ? { names } : {}),
     };
   }
