@@ -245,5 +245,28 @@ class SwarmClaimFenceTest(unittest.TestCase):
         )
 
 
+    def test_durable_unresolved_collision_blocks_until_loser_releases(self):
+        rows = [
+            "TAKE · OWNER-A · model\nAcme/widget#12",
+            "TAKE · OWNER-B · model\nAcme/widget#12",
+        ]
+        events, ignored = fence.load_events(json.dumps(rows).encode())
+        durable = fence.durable_report(events, history_complete=True, ignored=ignored)
+        blocked = fence.durable_preflight(
+            durable, work_key="Acme/widget#12", claim_id="OWNER-A"
+        )
+        self.assertEqual(blocked["status"], "UNRESOLVED_COLLISION")
+        self.assertFalse(blocked["build_allowed"])
+
+        released_rows = rows + ["BLOCKED / RELEASE · OWNER-B · model\nAcme/widget#12"]
+        events, ignored = fence.load_events(json.dumps(released_rows).encode())
+        durable = fence.durable_report(events, history_complete=True, ignored=ignored)
+        allowed = fence.durable_preflight(
+            durable, work_key="Acme/widget#12", claim_id="OWNER-A"
+        )
+        self.assertEqual(allowed["status"], "BUILD_ALLOWED")
+        self.assertTrue(allowed["build_allowed"])
+
+
 if __name__ == "__main__":
     unittest.main()
