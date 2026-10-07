@@ -452,6 +452,17 @@ def durable_preflight(
         raise FenceError("claim-id must not be empty")
 
     active = durable["active"].get(key)
+    unresolved_conflicts: set[str] = set()
+    if active is not None:
+        for event in durable.get("work", {}).get(key, []):
+            if event["sequence"] <= active["sequence"]:
+                continue
+            other_claim = event["claim_id"]
+            if event["stage"] == "TAKE" and other_claim != active["claim_id"]:
+                unresolved_conflicts.add(other_claim)
+            elif event["stage"] in {"RELEASE", "RETIRE", "SHIPPED"}:
+                unresolved_conflicts.discard(other_claim)
+
     if not durable["history_complete"]:
         status = "HISTORY_INCOMPLETE"
         build_allowed = False
@@ -464,6 +475,10 @@ def durable_preflight(
         status = "CLAIM_REQUIRED"
         build_allowed = False
         reason = "no active claim exists; post and re-read the TAKE before building"
+    elif unresolved_conflicts:
+        status = "UNRESOLVED_COLLISION"
+        build_allowed = False
+        reason = "another claim collided with the active owner and has not released"
     elif active["claim_id"] != claim:
         status = "COLLISION"
         build_allowed = False
