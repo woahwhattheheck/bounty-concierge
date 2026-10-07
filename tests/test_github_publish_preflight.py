@@ -209,6 +209,8 @@ def test_stale_handoff_reconciles_before_admission_or_publish(tmp_path):
     assert result == {
         "status": "PROVIDER_RECONCILED",
         "provider_called": False,
+        "provider_reconcile_called": True,
+        "provider_write_called": False,
         "operation": "publish-stale-handoff",
         "action": "create-pull-request",
         "repo": "Owner/Repo",
