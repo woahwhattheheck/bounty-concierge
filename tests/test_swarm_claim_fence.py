@@ -150,5 +150,83 @@ class SwarmClaimFenceTest(unittest.TestCase):
         )
 
 
+    def test_durable_frontend71_incomplete_history_fails_closed(self):
+        # Reproduces the shallow-history failure mode: seeing only our later TAKE
+        # is not enough to authorize a build when an older owner may be missing.
+        rows = [{
+            "message_ts": "1791314416.325179",
+            "text": (
+                "TAKE · GF-WAVELUM-FRONTEND71-I18N-CHECK-R1 · model\n"
+                "stellar-network-builders/wavelum-frontend#71"
+            ),
+        }]
+        events, ignored = fence.load_events(json.dumps(rows).encode())
+        durable = fence.durable_report(
+            events,
+            history_complete=False,
+            ignored=ignored,
+        )
+        decision = fence.durable_preflight(
+            durable,
+            work_key="stellar-network-builders/wavelum-frontend#71",
+            claim_id="GF-WAVELUM-FRONTEND71-I18N-CHECK-R1",
+        )
+        self.assertEqual(decision["status"], "HISTORY_INCOMPLETE")
+        self.assertFalse(decision["build_allowed"])
+
+    def test_durable_core30_full_lifecycle_releases_then_allows_exact_new_owner(self):
+        rows = [
+            {
+                "message_ts": "1791314000.000001",
+                "text": (
+                    "TAKE · GF-WAVELUM-CORE30-R1 · model\n"
+                    "stellar-network-builders/wavelum-core#30"
+                ),
+            },
+            {
+                "message_ts": "1791314010.000001",
+                "text": (
+                    "SOURCE COMPLETE · GF-WAVELUM-CORE30-R1 · model\n"
+                    "stellar-network-builders/wavelum-core#30"
+                ),
+            },
+            {
+                "message_ts": "1791314020.000001",
+                "text": (
+                    "PUBLISHER HANDOFF / RELEASE · GF-WAVELUM-CORE30-R1 · model\n"
+                    "stellar-network-builders/wavelum-core#30"
+                ),
+            },
+            {
+                "message_ts": "1791314030.000001",
+                "text": (
+                    "TAKE · GF-WAVELUM-CORE30-R2 · model\n"
+                    "stellar-network-builders/wavelum-core#30"
+                ),
+            },
+        ]
+        events, ignored = fence.load_events(json.dumps(rows).encode())
+        self.assertEqual(
+            [fence.lifecycle_stage(event.text) for event in events],
+            ["TAKE", "SOURCE_COMPLETE", "RELEASE", "TAKE"],
+        )
+        durable = fence.durable_report(
+            events,
+            history_complete=True,
+            ignored=ignored,
+        )
+        decision = fence.durable_preflight(
+            durable,
+            work_key="stellar-network-builders/wavelum-core#30",
+            claim_id="GF-WAVELUM-CORE30-R2",
+        )
+        self.assertEqual(decision["status"], "BUILD_ALLOWED")
+        self.assertTrue(decision["build_allowed"])
+        self.assertEqual(
+            durable["active"]["github:stellar-network-builders/wavelum-core#30"]["claim_id"],
+            "GF-WAVELUM-CORE30-R2",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
