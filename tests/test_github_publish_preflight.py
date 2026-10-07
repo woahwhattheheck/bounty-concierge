@@ -218,3 +218,47 @@ def test_stale_handoff_reconciles_before_admission_or_publish(tmp_path):
         "expected_head": HEAD,
         "provider_match": provider_match,
     }
+
+
+def test_known_provider_capability_denial_reroutes_before_admission_or_publish(tmp_path):
+    path = tmp_path / "cooldown.sqlite"
+    calls = []
+    capability_evidence = {
+        "actor": "actor-293",
+        "target_repo": "Sponsor/Repo",
+        "repository_access": False,
+        "source": "installation-inventory",
+    }
+
+    def capability_denial():
+        calls.append("capability-read")
+        return capability_evidence
+
+    result = execute_publish_operation(
+        path,
+        "credential",
+        rail="github-app",
+        actor="actor-293",
+        operation="publish-capability-blocked",
+        action="create-pull-request",
+        repo="Sponsor/Repo",
+        carrier="owner/repo#43",
+        expected_head=HEAD,
+        transport=lambda: calls.append("provider-write"),
+        provider_capability_denial=capability_denial,
+    )
+
+    assert calls == ["capability-read"]
+    assert not path.exists()
+    assert result == {
+        "status": "PROVIDER_REROUTE_REQUIRED",
+        "provider_called": False,
+        "provider_capability_called": True,
+        "provider_write_called": False,
+        "operation": "publish-capability-blocked",
+        "action": "create-pull-request",
+        "repo": "Sponsor/Repo",
+        "carrier": "owner/repo#43",
+        "expected_head": HEAD,
+        "capability_evidence": capability_evidence,
+    }
