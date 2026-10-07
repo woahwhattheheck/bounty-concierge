@@ -210,6 +210,23 @@ class SwarmClaimFenceTest(unittest.TestCase):
             [fence.lifecycle_stage(event.text) for event in events],
             ["TAKE", "SOURCE_COMPLETE", "RELEASE", "TAKE"],
         )
+        self.assertEqual(
+            [event.action for event in events],
+            ["TAKE", "PROGRESS", "RELEASE", "TAKE"],
+        )
+
+        orphan_events, orphan_ignored = fence.load_events(json.dumps([rows[1]]).encode())
+        orphan = fence.durable_report(
+            orphan_events,
+            history_complete=True,
+            ignored=orphan_ignored,
+        )
+        self.assertNotIn(
+            "github:stellar-network-builders/wavelum-core#30",
+            orphan["active"],
+        )
+        self.assertEqual(orphan["counts"]["orphan_progress"], 1)
+
         durable = fence.durable_report(
             events,
             history_complete=True,
