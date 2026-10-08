@@ -279,7 +279,7 @@ def evaluate(
     # decision on identical evidence and remove all repeated dispatch candidates.
     # If the duplicates disagree, block every alias until evidence is refreshed.
     for key, indices in canonical_groups.items():
-        if len(indices) < 2:
+        if stale or len(indices) < 2:
             continue
         first = items[indices[0]]
         conflict = any(
