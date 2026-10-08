@@ -50,6 +50,7 @@ class WriteIntent:
     lease_owner: str | None
     lease_until_epoch: float | None
     last_error_code: str | None
+    required_actor: str | None
 
     def public_record(self, *, include_body: bool = True) -> dict[str, Any]:
         record = asdict(self)
@@ -143,8 +144,20 @@ class GitHubWriteIntentLedger:
                 "not_before_epoch REAL NOT NULL, "
                 "lease_owner TEXT, "
                 "lease_until_epoch REAL, "
-                "last_error_code TEXT)"
+                "last_error_code TEXT, "
+                "required_actor TEXT)"
             )
+            columns = {
+                row["name"]
+                for row in connection.execute(
+                    "PRAGMA table_info(github_write_intent_v1)"
+                ).fetchall()
+            }
+            if "required_actor" not in columns:
+                connection.execute(
+                    "ALTER TABLE github_write_intent_v1 "
+                    "ADD COLUMN required_actor TEXT"
+                )
             connection.commit()
             with connection:
                 yield connection
@@ -171,8 +184,11 @@ class GitHubWriteIntentLedger:
             lease_owner=row["lease_owner"],
             lease_until_epoch=row["lease_until_epoch"],
             last_error_code=row["last_error_code"],
+            required_actor=row["required_actor"],
         )
-        if intent.state not in {"PENDING", "LEASED", "DONE"}:
+        if intent.state not in {
+            "PENDING", "LEASED", "TOKEN_REQUIRED", "TOKEN_LEASED", "DONE"
+        }:
             raise WriteIntentError("GitHub write-intent state invalid")
         if _payload_sha256(intent.body) != intent.payload_sha256:
             raise WriteIntentError("GitHub write-intent payload checksum mismatch")
@@ -184,6 +200,10 @@ class GitHubWriteIntentLedger:
         _finite_epoch(intent.not_before_epoch, "not_before_epoch")
         if intent.lease_until_epoch is not None:
             _finite_epoch(intent.lease_until_epoch, "lease_until_epoch")
+        if intent.required_actor is not None:
+            _label(intent.required_actor, "required_actor", _MAX_OWNER_BYTES)
+        if intent.state in {"TOKEN_REQUIRED", "TOKEN_LEASED"} and intent.required_actor is None:
+            raise WriteIntentError("token-routed intent is missing required_actor")
         return intent
 
     def enqueue_pr_body(
@@ -236,7 +256,7 @@ class GitHubWriteIntentLedger:
             active = connection.execute(
                 "SELECT * FROM github_write_intent_v1 "
                 "WHERE lower(repository) = lower(?) AND pull_number = ? "
-                "AND state IN ('PENDING', 'LEASED') "
+                "AND state IN ('PENDING', 'LEASED', 'TOKEN_REQUIRED', 'TOKEN_LEASED') "
                 "ORDER BY created_epoch, operation_id LIMIT 1",
                 (repository, pull_number),
             ).fetchone()
@@ -258,8 +278,8 @@ class GitHubWriteIntentLedger:
                 "INSERT INTO github_write_intent_v1("
                 "operation_id, repository, pull_number, expected_head, body, "
                 "payload_sha256, state, created_epoch, not_before_epoch, "
-                "lease_owner, lease_until_epoch, last_error_code"
-                ") VALUES (?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, NULL, NULL, NULL)",
+                "lease_owner, lease_until_epoch, last_error_code, required_actor"
+                ") VALUES (?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, NULL, NULL, NULL, NULL)",
                 (
                     operation_id,
                     repository,
@@ -357,14 +377,15 @@ class GitHubWriteIntentLedger:
             if row is None:
                 raise WriteIntentError("write intent does not exist")
             current = self._decode(row)
-            if current.state != "LEASED" or current.lease_owner != owner:
+            if current.state not in {"LEASED", "TOKEN_LEASED"} or current.lease_owner != owner:
                 raise WriteIntentError("write intent is not leased by this owner")
+            next_state = "TOKEN_REQUIRED" if current.state == "TOKEN_LEASED" else "PENDING"
             connection.execute(
-                "UPDATE github_write_intent_v1 SET state = 'PENDING', "
+                "UPDATE github_write_intent_v1 SET state = ?, "
                 "not_before_epoch = MAX(not_before_epoch, ?), "
                 "lease_owner = NULL, lease_until_epoch = NULL, "
                 "last_error_code = ? WHERE operation_id = ?",
-                (not_before, error_code, operation_id),
+                (next_state, not_before, error_code, operation_id),
             )
             updated = connection.execute(
                 "SELECT * FROM github_write_intent_v1 WHERE operation_id = ?",
@@ -372,6 +393,109 @@ class GitHubWriteIntentLedger:
             ).fetchone()
             assert updated is not None
             return self._decode(updated)
+
+    def handoff_integration_denial(
+        self,
+        operation_id: str,
+        owner: str,
+        *,
+        required_actor: str,
+        provider_status: int,
+        provider_message: str,
+    ) -> WriteIntent:
+        """Route a deterministic GitHub App permission denial to the original token actor."""
+        operation_id = _label(
+            operation_id, "operation_id", _MAX_OPERATION_ID_BYTES
+        )
+        owner = _label(owner, "owner", _MAX_OWNER_BYTES)
+        required_actor = _label(
+            required_actor, "required_actor", _MAX_OWNER_BYTES
+        )
+        if provider_status != 403 or provider_message.strip() != (
+            "Resource not accessible by integration"
+        ):
+            raise ValueError(
+                "token handoff requires GitHub 403 Resource not accessible by integration"
+            )
+
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM github_write_intent_v1 WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if row is None:
+                raise WriteIntentError("write intent does not exist")
+            current = self._decode(row)
+            if current.state != "LEASED" or current.lease_owner != owner:
+                raise WriteIntentError("write intent is not leased by this owner")
+            connection.execute(
+                "UPDATE github_write_intent_v1 SET state = 'TOKEN_REQUIRED', "
+                "required_actor = ?, lease_owner = NULL, lease_until_epoch = NULL, "
+                "last_error_code = 'INTEGRATION_FORBIDDEN' WHERE operation_id = ?",
+                (required_actor, operation_id),
+            )
+            updated = connection.execute(
+                "SELECT * FROM github_write_intent_v1 WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            assert updated is not None
+            return self._decode(updated)
+
+    def claim_token_ready(
+        self,
+        owner: str,
+        *,
+        actor: str,
+        now_epoch: float | None = None,
+        lease_seconds: float = _DEFAULT_LEASE_SECONDS,
+    ) -> WriteIntent | None:
+        """Claim one integration-blocked intent only for its required GitHub actor."""
+        owner = _label(owner, "owner", _MAX_OWNER_BYTES)
+        actor = _label(actor, "actor", _MAX_OWNER_BYTES)
+        now = _finite_epoch(now_epoch, "now_epoch")
+        if (
+            not isinstance(lease_seconds, (int, float))
+            or not math.isfinite(float(lease_seconds))
+            or not 1 <= float(lease_seconds) <= 15 * 60
+        ):
+            raise ValueError("lease_seconds must be between 1 and 900 seconds")
+        lease_until = now + float(lease_seconds)
+
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            owned = connection.execute(
+                "SELECT * FROM github_write_intent_v1 "
+                "WHERE state = 'TOKEN_LEASED' AND lease_owner = ? "
+                "AND lower(required_actor) = lower(?) AND lease_until_epoch > ? "
+                "ORDER BY created_epoch, operation_id LIMIT 1",
+                (owner, actor, now),
+            ).fetchone()
+            if owned is not None:
+                return self._decode(owned)
+
+            row = connection.execute(
+                "SELECT * FROM github_write_intent_v1 "
+                "WHERE lower(required_actor) = lower(?) AND not_before_epoch <= ? AND ("
+                "state = 'TOKEN_REQUIRED' OR "
+                "(state = 'TOKEN_LEASED' AND lease_until_epoch <= ?)"
+                ") ORDER BY created_epoch, operation_id LIMIT 1",
+                (actor, now, now),
+            ).fetchone()
+            if row is None:
+                return None
+            operation_id = row["operation_id"]
+            connection.execute(
+                "UPDATE github_write_intent_v1 SET state = 'TOKEN_LEASED', "
+                "lease_owner = ?, lease_until_epoch = ? WHERE operation_id = ?",
+                (owner, lease_until, operation_id),
+            )
+            claimed = connection.execute(
+                "SELECT * FROM github_write_intent_v1 WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            assert claimed is not None
+            return self._decode(claimed)
 
     def complete(
         self,
@@ -396,7 +520,7 @@ class GitHubWriteIntentLedger:
             if row is None:
                 raise WriteIntentError("write intent does not exist")
             current = self._decode(row)
-            if current.state != "LEASED" or current.lease_owner != owner:
+            if current.state not in {"LEASED", "TOKEN_LEASED"} or current.lease_owner != owner:
                 raise WriteIntentError("write intent is not leased by this owner")
             if current.expected_head != observed_head:
                 raise WriteIntentError(
@@ -460,6 +584,18 @@ def _parser() -> argparse.ArgumentParser:
     claim.add_argument("--owner", required=True)
     claim.add_argument("--lease-seconds", type=float, default=_DEFAULT_LEASE_SECONDS)
 
+    claim_token = subparsers.add_parser("claim-token")
+    claim_token.add_argument("--owner", required=True)
+    claim_token.add_argument("--actor", required=True)
+    claim_token.add_argument("--lease-seconds", type=float, default=_DEFAULT_LEASE_SECONDS)
+
+    integration_denied = subparsers.add_parser("integration-denied")
+    integration_denied.add_argument("--operation-id", required=True)
+    integration_denied.add_argument("--owner", required=True)
+    integration_denied.add_argument("--required-actor", required=True)
+    integration_denied.add_argument("--provider-status", required=True, type=int)
+    integration_denied.add_argument("--provider-message", required=True)
+
     defer = subparsers.add_parser("defer")
     defer.add_argument("--operation-id", required=True)
     defer.add_argument("--owner", required=True)
@@ -498,6 +634,21 @@ def main(argv: list[str] | None = None) -> int:
                 args.owner, lease_seconds=args.lease_seconds
             )
             result = None if intent is None else intent.public_record(include_body=True)
+        elif args.command == "claim-token":
+            intent = ledger.claim_token_ready(
+                args.owner,
+                actor=args.actor,
+                lease_seconds=args.lease_seconds,
+            )
+            result = None if intent is None else intent.public_record(include_body=True)
+        elif args.command == "integration-denied":
+            result = ledger.handoff_integration_denial(
+                args.operation_id,
+                args.owner,
+                required_actor=args.required_actor,
+                provider_status=args.provider_status,
+                provider_message=args.provider_message,
+            ).public_record(include_body=False)
         elif args.command == "defer":
             result = ledger.defer(
                 args.operation_id,

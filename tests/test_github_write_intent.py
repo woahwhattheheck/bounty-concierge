@@ -192,6 +192,51 @@ class GitHubWriteIntentLedgerTests(unittest.TestCase):
             self.assertEqual(replay.operation_id, owned.operation_id)
             self.assertEqual(replay.lease_owner, "publisher-b")
 
+    def test_integration_403_routes_to_matching_token_actor_without_app_replay(self):
+        with tempfile.TemporaryDirectory() as root:
+            ledger = self.ledger(root)
+            original = self.enqueue(ledger, operation_id="sponsor-body")
+            app = ledger.claim_ready("managed-app", now_epoch=110.0)
+            self.assertEqual(app.operation_id, original.operation_id)
+
+            routed = ledger.handoff_integration_denial(
+                app.operation_id,
+                "managed-app",
+                required_actor="woahwhattheheck",
+                provider_status=403,
+                provider_message="Resource not accessible by integration",
+            )
+            self.assertEqual(routed.state, "TOKEN_REQUIRED")
+            self.assertEqual(routed.required_actor, "woahwhattheheck")
+            self.assertEqual(routed.last_error_code, "INTEGRATION_FORBIDDEN")
+            self.assertIsNone(ledger.claim_ready("another-app", now_epoch=111.0))
+
+            duplicate = self.enqueue(
+                ledger, operation_id="duplicate-app", now_epoch=111.0
+            )
+            self.assertEqual(duplicate.operation_id, routed.operation_id)
+            self.assertIsNone(
+                ledger.claim_token_ready(
+                    "wrong-token-seat",
+                    actor="tokenjunkielabs",
+                    now_epoch=112.0,
+                )
+            )
+
+            token = ledger.claim_token_ready(
+                "original-token-seat",
+                actor="woahwhattheheck",
+                now_epoch=112.0,
+            )
+            self.assertEqual(token.state, "TOKEN_LEASED")
+            self.assertEqual(token.lease_owner, "original-token-seat")
+            done = ledger.complete(
+                token.operation_id,
+                "original-token-seat",
+                observed_head=HEAD_A,
+            )
+            self.assertEqual(done.state, "DONE")
+
     def test_complete_fails_closed_on_head_drift_without_losing_lease(self):
         with tempfile.TemporaryDirectory() as root:
             ledger = self.ledger(root)
