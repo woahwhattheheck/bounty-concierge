@@ -10,20 +10,227 @@ comparison itself is offline and performs no provider reads.
 from __future__ import annotations
 
 import argparse
+import hashlib
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import re
 from typing import Any
 
 from concierge.bounty_capture import CaptureInputError, replay_capture
 
 
 LEASE_SCHEMA = "bounty-work-order-lease/v1"
+HEAD_RECONCILIATION_SCHEMA = "bounty-work-order-head-reconciliation/v1"
 _MAX_CAPTURE_BYTES = 4 * 1024 * 1024
+_MAX_RECONCILIATION_JSON_BYTES = 64 * 1024
+_MAX_RECONCILIATION_PATHS = 512
+_GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
+_REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 
 class WorkOrderLeaseError(ValueError):
     """A lease input cannot be safely compared."""
+
+
+def _reconciliation_text(value: Any, name: str, *, maximum: int = 256) -> str:
+    if (
+        not isinstance(value, str)
+        or not value
+        or value != value.strip()
+        or "\0" in value
+        or len(value.encode("utf-8")) > maximum
+    ):
+        raise WorkOrderLeaseError(f"{name} must be a non-empty bounded string")
+    return value
+
+
+def _reconciliation_sha(value: Any, name: str) -> str:
+    value = _reconciliation_text(value, name, maximum=40).lower()
+    if _GIT_SHA.fullmatch(value) is None:
+        raise WorkOrderLeaseError(f"{name} must be a 40-character Git SHA")
+    return value
+
+
+def _reconciliation_path(value: Any, name: str, *, scope: bool = False) -> str:
+    raw = _reconciliation_text(value, name, maximum=4096).replace("\\", "/")
+    recursive = scope and raw.endswith("/**")
+    if recursive:
+        raw = raw[:-3]
+    prefix = scope and raw.endswith("/")
+    raw = raw.rstrip("/")
+    if (
+        not raw
+        or raw.startswith("/")
+        or "//" in raw
+        or any(part in {"", ".", ".."} for part in raw.split("/"))
+    ):
+        raise WorkOrderLeaseError(f"{name} must be a relative repository path")
+    if recursive or prefix:
+        return raw + "/"
+    return raw
+
+
+def _scope_contains(scope: str, path: str) -> bool:
+    return path.startswith(scope) if scope.endswith("/") else path == scope
+
+
+def _canonical_receipt_sha256(value: dict[str, Any]) -> str:
+    raw = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _provider_readback(value: Any) -> Any:
+    try:
+        raw = json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise WorkOrderLeaseError("provider_readback must be canonical JSON") from exc
+    if len(raw) > _MAX_RECONCILIATION_JSON_BYTES:
+        raise WorkOrderLeaseError("provider_readback exceeds 64 KiB")
+    return json.loads(raw.decode("utf-8"))
+
+
+def reconcile_tracked_head(
+    *,
+    operation_id: str,
+    repo: str,
+    branch: str,
+    expected_head: str,
+    observed_head: str,
+    claimed_paths: list[str],
+    touched_paths: list[str],
+    owner: str,
+    source: str,
+    provider_readback: Any,
+) -> dict[str, Any]:
+    """Classify one stale-boundary head read without polling the provider.
+
+    The caller performs exactly one fresh head read and one expected->observed
+    compare at a recovery, collision, or publication boundary. This pure helper
+    then decides whether the lease should be tombstoned, rebased, or held.
+    """
+    operation_id = _reconciliation_text(operation_id, "operation_id", maximum=256)
+    repo = _reconciliation_text(repo, "repo", maximum=256)
+    if _REPOSITORY.fullmatch(repo) is None:
+        raise WorkOrderLeaseError("repo must be owner/name")
+    branch = _reconciliation_text(branch, "branch", maximum=512)
+    expected_head = _reconciliation_sha(expected_head, "expected_head")
+    observed_head = _reconciliation_sha(observed_head, "observed_head")
+    owner = _reconciliation_text(owner, "owner", maximum=256)
+    source = _reconciliation_text(source, "source", maximum=512)
+    if not isinstance(claimed_paths, list) or not isinstance(touched_paths, list):
+        raise WorkOrderLeaseError("claimed_paths and touched_paths must be lists")
+    if len(claimed_paths) > _MAX_RECONCILIATION_PATHS or len(touched_paths) > _MAX_RECONCILIATION_PATHS:
+        raise WorkOrderLeaseError("reconciliation path list exceeds 512 entries")
+
+    claimed = sorted(
+        set(
+            _reconciliation_path(value, f"claimed_paths[{index}]", scope=True)
+            for index, value in enumerate(claimed_paths)
+        )
+    )
+    touched = sorted(
+        set(
+            _reconciliation_path(value, f"touched_paths[{index}]")
+            for index, value in enumerate(touched_paths)
+        )
+    )
+    if not claimed:
+        raise WorkOrderLeaseError("claimed_paths must contain at least one path")
+
+    moved = observed_head != expected_head
+    overlap = sorted(
+        path for path in touched if any(_scope_contains(scope, path) for scope in claimed)
+    )
+
+    if not moved:
+        classification = "UNCHANGED_STALE"
+        status = "STALE"
+        action = "RETAIN_STALE_LEASE"
+        dispatch = False
+        tombstone = False
+        rebase = False
+        next_expected_head = expected_head
+    elif not touched:
+        classification = "MISSING_COMPARE"
+        status = "STALE"
+        action = "HOLD_FOR_COMPARE"
+        dispatch = False
+        tombstone = False
+        rebase = False
+        next_expected_head = expected_head
+    elif overlap:
+        all_touched_scoped = all(
+            any(_scope_contains(scope, path) for scope in claimed) for path in touched
+        )
+        all_claimed_touched = all(
+            any(_scope_contains(scope, path) for path in touched) for scope in claimed
+        )
+        classification = (
+            "CLAIMED_SCOPE_COMPLETE"
+            if all_touched_scoped and all_claimed_touched
+            else "CLAIMED_SCOPE_OVERLAP"
+        )
+        status = "COLLISION_RECONCILIATION"
+        action = "TOMBSTONE_DUPLICATE"
+        dispatch = False
+        tombstone = True
+        rebase = False
+        next_expected_head = observed_head
+    else:
+        classification = "ORTHOGONAL_ADVANCE"
+        status = "READY"
+        action = "REBASE_EXPECTED_HEAD"
+        dispatch = True
+        tombstone = False
+        rebase = True
+        next_expected_head = observed_head
+
+    core = {
+        "schema": HEAD_RECONCILIATION_SCHEMA,
+        "operation_id": operation_id,
+        "repo": repo,
+        "branch": branch,
+        "expected_head": expected_head,
+        "observed_head": observed_head,
+        "next_expected_head": next_expected_head,
+        "claimed_paths": claimed,
+        "touched_paths": touched,
+        "overlap_paths": overlap,
+        "owner": owner,
+        "source": source,
+        "provider_readback": _provider_readback(provider_readback),
+        "classification": classification,
+        "status": status,
+        "action": action,
+        "dispatch": dispatch,
+        "tombstone": tombstone,
+        "rebase": rebase,
+        "authority": {
+            "boundary_only": True,
+            "continuous_provider_polling": False,
+            "provider_mutation": False,
+            "source_mutation": False,
+            "claim_mutation": False,
+            "payment_mutation": False,
+        },
+    }
+    receipt = dict(core)
+    receipt["receipt_sha256"] = _canonical_receipt_sha256(core)
+    return receipt
+
 
 
 def _timestamp(value: Any, name: str) -> datetime:
