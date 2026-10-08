@@ -102,7 +102,10 @@ def _compare_projections(
     # Finishing a replay or processing job later is not itself a fresh remote
     # observation. A cached GitHub/marketplace snapshot can be stale even when
     # its wrapper's completed_at and hash were generated just now.
-    if refreshed_observed <= original_observed:
+    # Preserve the existing single REFRESH_NOT_NEWER reason for a replay
+    # with no later completion at all. The observation fence distinguishes
+    # newly finished but still stale provider snapshots.
+    if refreshed_completed > original_completed and refreshed_observed <= original_observed:
         reasons.append("REFRESH_OBSERVATION_NOT_NEWER")
     if refreshed_observed > refreshed_completed:
         reasons.append("REFRESH_OBSERVATION_AFTER_COMPLETION")
