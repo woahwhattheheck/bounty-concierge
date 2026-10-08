@@ -46,6 +46,58 @@ class GitHubWriteIntentLedgerTests(unittest.TestCase):
             with self.assertRaises(WriteIntentError):
                 self.enqueue(ledger, body="different body")
 
+    def test_different_operation_ids_for_same_live_pr_head_deduplicate(self):
+        with tempfile.TemporaryDirectory() as root:
+            first_ledger = self.ledger(root)
+            second_ledger = self.ledger(root)  # A different publisher process.
+            first = self.enqueue(first_ledger, operation_id="seat-a-body")
+            duplicate = self.enqueue(
+                second_ledger, operation_id="seat-b-body", now_epoch=101.0
+            )
+            self.assertEqual(duplicate.operation_id, first.operation_id)
+            self.assertEqual(len(first_ledger.records()), 1)
+            owner = second_ledger.claim_ready("publisher-b", now_epoch=102.0)
+            self.assertEqual(owner.operation_id, first.operation_id)
+            self.assertIsNone(
+                first_ledger.claim_ready("publisher-a", now_epoch=102.5)
+            )
+
+    def test_conflicting_live_body_fails_closed_but_done_head_is_reusable(self):
+        with tempfile.TemporaryDirectory() as root:
+            ledger = self.ledger(root)
+            first = self.enqueue(ledger, operation_id="first", body="A")
+            with self.assertRaisesRegex(WriteIntentError, "different body"):
+                self.enqueue(
+                    ledger, operation_id="other-seat", body="B", now_epoch=101.0
+                )
+            self.assertEqual(len(ledger.records()), 1)
+
+            leased = ledger.claim_ready("publisher-a", now_epoch=102.0)
+            ledger.complete(
+                leased.operation_id, "publisher-a", observed_head=HEAD_A
+            )
+            follow_up = self.enqueue(
+                ledger, operation_id="second-revision", body="B",
+                now_epoch=105.0
+            )
+            self.assertEqual(follow_up.state, "PENDING")
+            self.assertEqual(len(ledger.records()), 2)
+
+    def test_case_insensitive_repository_identity_reuses_active_intent(self):
+        with tempfile.TemporaryDirectory() as root:
+            ledger = self.ledger(root)
+            first = self.enqueue(ledger, operation_id="source")
+            replay = ledger.enqueue_pr_body(
+                operation_id="different-operation",
+                repository="centurylong/SANCTIFIER",
+                pull_number=988,
+                expected_head=HEAD_A,
+                body="current technical body",
+                now_epoch=150.0,
+            )
+            self.assertEqual(replay.operation_id, first.operation_id)
+            self.assertEqual(len(ledger.records()), 1)
+
     def test_claim_serializes_publishers_and_expired_lease_is_reclaimable(self):
         with tempfile.TemporaryDirectory() as root:
             ledger = self.ledger(root)

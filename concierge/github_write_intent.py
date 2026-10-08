@@ -229,6 +229,26 @@ class GitHubWriteIntentLedger:
                     )
                 return existing
 
+            # A provider PR-body update has one live destination, even when
+            # two fleet seats chose different operation IDs. Hold the SQLite
+            # write lock while checking that target to prevent concurrent
+            # enqueues from creating competing publisher leases.
+            active = connection.execute(
+                "SELECT * FROM github_write_intent_v1 "
+                "WHERE lower(repository) = lower(?) AND pull_number = ? "
+                "AND expected_head = ? AND state IN ('PENDING', 'LEASED') "
+                "ORDER BY created_epoch, operation_id LIMIT 1",
+                (repository, pull_number, expected_head),
+            ).fetchone()
+            if active is not None:
+                canonical = self._decode(active)
+                if canonical.payload_sha256 != payload_sha256:
+                    raise WriteIntentError(
+                        "active PR-head write intent has a different body; "
+                        "reconcile the existing operation before publishing"
+                    )
+                return canonical
+
             connection.execute(
                 "INSERT INTO github_write_intent_v1("
                 "operation_id, repository, pull_number, expected_head, body, "
