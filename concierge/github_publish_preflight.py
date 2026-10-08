@@ -115,6 +115,7 @@ def execute_publish_operation(
     provider_capability_denial: Optional[
         Callable[[], Optional[dict[str, Any]]]
     ] = None,
+    provider_repository_state: Optional[Callable[[], dict[str, Any]]] = None,
 ) -> Union[T, dict[str, Any]]:
     """Execute one GitHub provider operation only when shared rail state admits it.
 
@@ -123,7 +124,14 @@ def execute_publish_operation(
     recovery lease before transport is allowed; followers re-read and defer.
     AVAILABLE proceeds directly.
 
-    For create-pull-request (including create_pull_request and pull.create),\n    provider_reconcile is mandatory unless an independently observed capability\n    denial has already terminally rerouted the request. Missing reconciliation\n    returns PROVIDER_RECONCILIATION_REQUIRED before provider or quota admission.\n    Callers must obtain a live all-states (open, closed, merged) matching-head\n    read and current-base source reconciliation; this wrapper never treats a\n    historical open-only census as proof that a new write is safe.\n\n    When provider_reconcile is supplied, it runs after repo/head canonicalization
+    For create-pull-request (including create_pull_request and pull.create),\n    provider_reconcile is mandatory unless an independently observed capability\n    denial has already terminally rerouted the request. Missing reconciliation\n    returns PROVIDER_RECONCILIATION_REQUIRED before provider or quota admission.\n    Callers must obtain a live all-states (open, closed, merged) matching-head\n    read and current-base source reconciliation; this wrapper never treats a\n    historical open-only census as proof that a new write is safe.\n\n    An optional provider_repository_state callback must return fresh first-party
+    GitHub repository metadata with matching full_name and a boolean archived.
+    Archived destinations are terminally blocked before PR reconciliation,
+    cooldown admission, or write I/O; this is not an integration-scope failure.
+    Missing or mismatched archive evidence fails closed when supplied. This
+    avoids wasting retries on read-only archived sponsor repositories.
+
+    When provider_reconcile is supplied, it runs after repo/head canonicalization
     but before breaker/cooldown admission. A non-None mapping means the released
     handoff is already satisfied upstream; the publish transport is skipped and a
     terminal PROVIDER_RECONCILED receipt is returned without mutating admission
@@ -157,6 +165,33 @@ def execute_publish_operation(
         raise ValueError("provider_reconcile must be callable")
     if provider_capability_denial is not None and not callable(provider_capability_denial):
         raise ValueError("provider_capability_denial must be callable")
+    if provider_repository_state is not None and not callable(provider_repository_state):
+        raise ValueError("provider_repository_state must be callable")
+
+    if provider_repository_state is not None:
+        repository_state = provider_repository_state()
+        if (
+            not isinstance(repository_state, dict)
+            or type(repository_state.get("archived")) is not bool
+            or not isinstance(repository_state.get("full_name"), str)
+            or repository_state["full_name"].casefold() != repo.casefold()
+        ):
+            raise ValueError(
+                "provider_repository_state must return matching full_name and boolean archived"
+            )
+        if repository_state["archived"]:
+            return {
+                "status": "PROVIDER_REPOSITORY_ARCHIVED",
+                "provider_called": False,
+                "provider_repository_state_called": True,
+                "provider_write_called": False,
+                "operation": operation,
+                "action": action,
+                "repo": repo,
+                "carrier": carrier,
+                "expected_head": expected_head,
+                "repository_archived": True,
+            }
 
     if provider_reconcile is not None:
         provider_match = provider_reconcile()

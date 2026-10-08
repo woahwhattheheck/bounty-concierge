@@ -306,3 +306,90 @@ def test_pr_create_with_current_provider_clear_check_can_write(tmp_path):
     )
     assert calls == ["all-states-reconcile", "provider-write"]
     assert result == {"number": 32399}
+
+
+def test_archived_sponsor_repository_blocks_publication_before_any_other_calls(tmp_path):
+    """A read-only sponsor must not consume PR census or write quota."""
+    calls = []
+
+    def archived_repository():
+        calls.append("repository-metadata")
+        return {"full_name": "Sponsor/Repo", "archived": True}
+
+    result = execute_publish_operation(
+        tmp_path / "cooldown.sqlite",
+        "credential",
+        rail="private-token",
+        actor="actor-293",
+        operation="archived-sponsor-pr",
+        action="create-pull-request",
+        repo="Sponsor/Repo",
+        carrier="Sponsor/Repo#152",
+        expected_head=HEAD,
+        transport=lambda: calls.append("provider-write"),
+        provider_reconcile=lambda: calls.append("pr-census"),
+        provider_repository_state=archived_repository,
+    )
+    assert calls == ["repository-metadata"]
+    assert result == {
+        "status": "PROVIDER_REPOSITORY_ARCHIVED",
+        "provider_called": False,
+        "provider_repository_state_called": True,
+        "provider_write_called": False,
+        "operation": "archived-sponsor-pr",
+        "action": "create-pull-request",
+        "repo": "Sponsor/Repo",
+        "carrier": "Sponsor/Repo#152",
+        "expected_head": HEAD,
+        "repository_archived": True,
+    }
+    assert not (tmp_path / "cooldown.sqlite").exists()
+
+
+def test_repository_metadata_must_bind_destination_and_archive_state(tmp_path):
+    """Malformed or another repository's metadata must never permit a write."""
+    for bad in (
+        {"full_name": "Elsewhere/Repo", "archived": False},
+        {"full_name": "Sponsor/Repo", "archived": "false"},
+        {"full_name": "Sponsor/Repo"},
+    ):
+        calls = []
+        with pytest.raises(ValueError, match="matching full_name and boolean archived"):
+            execute_publish_operation(
+                tmp_path / "cooldown.sqlite",
+                "credential",
+                rail="private-token",
+                actor="actor-293",
+                operation="untrusted-repository-metadata",
+                action="update-pr-body",
+                repo="Sponsor/Repo",
+                carrier="Sponsor/Repo#152",
+                expected_head=HEAD,
+                transport=lambda: calls.append("provider-write"),
+                provider_repository_state=lambda: bad,
+            )
+        assert calls == []
+
+
+def test_active_sponsor_repository_continues_through_existing_pr_gate(tmp_path):
+    """The archive guard must not change normal all-state PR reconciliation."""
+    calls = []
+    result = execute_publish_operation(
+        tmp_path / "cooldown.sqlite",
+        "credential",
+        rail="private-token",
+        actor="actor-293",
+        operation="active-sponsor-pr",
+        action="create-pull-request",
+        repo="Sponsor/Repo",
+        carrier="Sponsor/Repo#152",
+        expected_head=HEAD,
+        transport=lambda: (calls.append("provider-write") or {"number": 153}),
+        provider_reconcile=lambda: (calls.append("pr-census") or None),
+        provider_repository_state=lambda: (
+            calls.append("repository-metadata")
+            or {"full_name": "sponsor/repo", "archived": False}
+        ),
+    )
+    assert calls == ["repository-metadata", "pr-census", "provider-write"]
+    assert result == {"number": 153}
