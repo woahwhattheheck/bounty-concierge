@@ -26,13 +26,27 @@ mappings and canonical issue exclusions. The existing atomic output writer is
 reused. `--submission-targets` and `--include-promised` are forwarded to the
 ordinary reducer; promised money does not become funded money.
 
+To prioritize less-contended *new* opportunities, optionally supply
+`--max-open-claims N` (nonnegative integer, at most 100000). For example,
+`--max-open-claims 1` retains listings with zero or one currently open claim
+*in the retained detail report* and excludes listings with two or more.
+This option makes **no network requests** and does not change the ordinary
+`targets` command or the default fresh-intake output when omitted. It is a
+ranking/intake choice, not a platform rule: competing claims do **not** make a
+bounty ineligible, and this option should not be used for existing-claim recovery.
+Open claim counts may include our own active submissions.
+
 ## What changes
 
 `targets` and `listing_ids_by_issue` retain only the qualifying listing IDs not
 excluded by this additional rule. When two listings refer to one issue, an
 assigned exclusive listing does **not** suppress the other eligible listing.
-Nonexclusive listings are unchanged. Missing or nonboolean assignment evidence
-is an input error rather than evidence of availability.
+Nonexclusive listings are unchanged *by default*. When `--max-open-claims`
+is provided, each otherwise-eligible listing is checked independently against
+its retained `open_claim_count`. Missing, noninteger or negative counts are
+an input error, never evidence of zero competition. The whole issue remains
+in the shortlist when another listing for it survives. Missing or nonboolean
+assignment evidence is also an input error rather than evidence of availability.
 
 Fresh-target output is explicitly **lead-only**. It carries
 `dispatch_status="LEAD"`, `green_authorized=false`,
@@ -50,6 +64,13 @@ Three additional fields make the filter inspectable:
 - `assigned_exclusive_exclusion_count`: number of qualifying listing IDs removed
 - `assigned_exclusive_exclusions`: listing ID, repository, issue number and
   `exclusive_listing_already_assigned` reason for each removal
+
+With `--max-open-claims`, the output additionally includes the numeric
+`max_open_claims`, `open_claim_exclusion_count`, and `open_claim_exclusions`
+with only each omitted listing's ID, repository, issue, count and
+`open_claim_competition_over_threshold` reason; the policy label reflects
+both filters. The canonical-preflight envelope still contains only surviving
+issue identities and never treats stale claim counts as live qualification.
 
 No assignee identity, pledge record, claim mutation or payout is produced. The
 source report and ordinary reducer are unchanged. `source_complete` still means
