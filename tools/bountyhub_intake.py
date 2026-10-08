@@ -83,9 +83,13 @@ def fetch_page(url: str) -> bytes:
         with urlopen(request, timeout=60) as response:
             return read_bounded(response)
     except HTTPError as exc:
-        retry_after = safe_text(exc.headers.get("Retry-After"), 100)
-        suffix = f"; Retry-After={retry_after}" if retry_after else ""
-        raise IntakeError(f"provider HTTP {exc.code}{suffix}; no retry performed") from exc
+        try:
+            retry_after = safe_text(exc.headers.get("Retry-After"), 100)
+            suffix = f"; Retry-After={retry_after}" if retry_after else ""
+            message = f"provider HTTP {exc.code}{suffix}; no retry performed"
+        finally:
+            exc.close()
+        raise IntakeError(message) from exc
     except (URLError, TimeoutError, OSError) as exc:
         # Do not echo remote response bodies or environment/proxy credentials.
         raise IntakeError("public catalog request failed; no retry performed") from exc
