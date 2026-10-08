@@ -154,7 +154,7 @@ fresh intake targets from a retained catalog. The optional JSON object maps each
 python -m concierge.bountyhub_catalog targets \
   work/supply/bountyhub/2026-10-04-catalog-56f3.json \
   --include-promised \
-  --exclude-issues work/supply/bountyhub/2026-10-04-canonical-exclusions.json \
+  --exclude-issues work/supply/bountyhub/2026-10-08-canonical-exclusions.json \
   > shortlist.json
 ```
 
