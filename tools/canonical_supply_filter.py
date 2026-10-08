@@ -7,6 +7,7 @@ import argparse
 from collections import Counter
 from datetime import datetime, timezone
 import json
+import re
 from pathlib import Path
 import sys
 from typing import Any
@@ -30,6 +31,43 @@ INACTIVE_CLAIM_STATES = {"released", "rejected", "expired", "withdrawn", "closed
 ACTIVE_PR_STATES = {"open", "draft"}
 TERMINAL_PR_STATES = {"merged"}
 INACTIVE_PR_STATES = {"closed"}
+_CANONICAL_RESOURCE = re.compile(r"([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)#([0-9]+)\Z")
+# Marketplace card IDs are not separate payout-eligible GitHub issues.
+_DUPLICATE_EVIDENCE_FIELDS = (
+    "issue_state",
+    "reward_state",
+    "repository_archived",
+    "reward_scope",
+    "assignees",
+    "claims",
+    "same_scope_prs",
+    "reward_usd",
+    "reward_amount",
+    "reward_currency",
+)
+
+
+def canonical_resource(item: dict[str, Any]) -> str | None:
+    """Fold owner/repo case and leading-zero issue aliases into one target."""
+    raw = item.get("resource")
+    if not isinstance(raw, str):
+        return None
+    match = _CANONICAL_RESOURCE.fullmatch(raw.strip())
+    if match is None:
+        return None
+    issue_number = int(match.group(3))
+    if issue_number == 0:
+        return None
+    return f"{match.group(1).casefold()}/{match.group(2).casefold()}#{issue_number}"
+
+
+def duplicate_evidence_matches(first: dict[str, Any], second: dict[str, Any]) -> bool:
+    """Conflicting issue/reward/ownership states require renewed verification."""
+    missing = object()
+    return all(
+        first.get(field, missing) == second.get(field, missing)
+        for field in _DUPLICATE_EVIDENCE_FIELDS
+    )
 
 
 class FilterError(ValueError):
@@ -215,7 +253,7 @@ def evaluate(
         raise FilterError("snapshot items must be an array")
 
     output_items: list[dict[str, Any]] = []
-    counts: Counter[str] = Counter()
+    canonical_groups: dict[str, list[int]] = {}
     for index, item in enumerate(items):
         if not isinstance(item, dict):
             decision = "VERIFY_REQUIRED"
@@ -224,7 +262,9 @@ def evaluate(
         else:
             decision, reasons = classify(item, owner=owner, stale=stale)
             rendered = dict(item)
-        counts[decision] += 1
+            key = canonical_resource(item)
+            if key is not None:
+                canonical_groups.setdefault(key, []).append(index)
         rendered.update(
             {
                 "canonical_decision": decision,
@@ -235,6 +275,36 @@ def evaluate(
         )
         output_items.append(rendered)
 
+    # Duplicate listings can refer to a single eligible issue. Keep the first
+    # decision on identical evidence and remove all repeated dispatch candidates.
+    # If the duplicates disagree, block every alias until evidence is refreshed.
+    for key, indices in canonical_groups.items():
+        if stale or len(indices) < 2:
+            continue
+        first = items[indices[0]]
+        conflict = any(
+            not duplicate_evidence_matches(first, items[index])
+            for index in indices[1:]
+        )
+        affected = indices if conflict else indices[1:]
+        for index in affected:
+            row = output_items[index]
+            decision = "VERIFY_REQUIRED" if conflict else "PRUNE"
+            reasons = (
+                [f"conflicting_duplicate_canonical_target:{key}"]
+                if conflict
+                else [f"duplicate_canonical_target:{key}", f"canonical_primary_row:{indices[0]}"]
+            )
+            row.update({
+                "canonical_decision": decision,
+                "build_allowed": False,
+                "new_build_allowed": False,
+                "decision_reasons": reasons,
+            })
+
+    counts: Counter[str] = Counter(
+        row["canonical_decision"] for row in output_items
+    )
     return {
         "schema": OUTPUT_SCHEMA,
         "source_schema": SCHEMA,
