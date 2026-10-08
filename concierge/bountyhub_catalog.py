@@ -2,7 +2,8 @@
 """Read BountyHub's public catalog and export existing-preflight targets.
 
 Only allowlisted listing fields and aggregate pledge/claim counts leave this
-module. A funded listing is discovery evidence, not our assignment or payment.
+module. The provider-marked paid-claim count is not an award, wallet receipt,
+or proof of actual payout. Funded listings are not our assignment or payment.
 Named-file checkpoint examples: docs/BOUNTYHUB_CATALOG_OUTPUT.md.
 """
 
@@ -112,7 +113,7 @@ def _row(value: Any) -> dict[str, Any]:
         "funding_status": "NOT_REQUESTED", "reported_funded_usd": None,
         "reported_promised_usd": None, "other_payment_status_usd": None,
         "payout_marked_usd": None, "active_pledge_count": None,
-        "claim_count": None, "open_claim_count": None,
+        "claim_count": None, "open_claim_count": None, "provider_paid_claim_count": None,
     }
     language = value.get("language")
     if isinstance(language, str) and language.strip():
@@ -171,6 +172,8 @@ def _detail(value: Any, expected: dict[str, Any]) -> dict[str, Any]:
         claim_count=len(current_claims),
         open_claim_count=sum(_boolean(claim, "isOpen") and claim.get("rejectedAt") is None
                              for claim in current_claims),
+        # Provider-marked paid claims, not bank settlement or contributor receipts.
+        provider_paid_claim_count=sum(_boolean(claim, "isPaid") for claim in current_claims),
     )
     return row
 
@@ -692,6 +695,13 @@ def _resume_input(snapshot: Any) -> dict[str, Any]:
                 row[key] = saved[key]
             if row["open_claim_count"] > row["claim_count"]:
                 raise ValueError("invalid retained open claim count")
+            # Legacy v1 captures did not store provider claim payment flags.
+            # Unknown stays null; a retained zero must have explicit evidence.
+            paid_count = saved.get("provider_paid_claim_count")
+            if paid_count is not None:
+                if type(paid_count) is not int or not 0 <= paid_count <= row["claim_count"]:
+                    raise ValueError("invalid retained provider paid claim count")
+                row["provider_paid_claim_count"] = paid_count
         result["listings"].append(row)
     if type(snapshot.get("listing_count")) is not int or snapshot["listing_count"] != len(seen):
         raise ValueError("retained listing count disagrees")
