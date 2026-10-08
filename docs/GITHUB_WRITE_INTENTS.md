@@ -18,9 +18,12 @@ ledger also deduplicates **different operation IDs targeting the same live
 repository/PR/head** (repository matching is case-insensitive) while an intent is
 PENDING or LEASED. An identical second enqueue returns the existing canonical
 intent; a different proposed body is refused until its original writer resolves
-that intent. This prevents two independently named publisher operations from
-racing to replace the same PR description. After a previous intent reaches DONE,
-a new intentional body revision may be enqueued for the same head.
+that intent. An intent for the **same repository and PR on a different head**
+is also refused while an earlier job is pending or leased. This is deliberate:
+new-head metadata must not race a stale publisher lease and waste provider quota.
+Reconcile the old job explicitly (including fresh provider readback) before
+enqueuing the next head. After the previous intent reaches DONE, a new
+intentional revision may be enqueued on either the same or a later head.
 
 Only one publisher may hold the intent lease at a time; an abandoned lease can
 be reclaimed after expiry.
