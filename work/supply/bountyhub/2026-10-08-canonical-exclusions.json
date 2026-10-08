@@ -1,0 +1,67 @@
+{
+  "freelensapp/freelens#1280": {
+    "reason": "The canonical issue warns that the bounty is reserved and asks for no new pull requests.",
+    "source_url": "https://github.com/freelensapp/freelens/issues/1280",
+    "observed_at": "2026-10-04T12:04:44Z"
+  },
+  "inventree/InvenTree#12064": {
+    "reason": "The maintainer states that the funding is spoken for.",
+    "source_url": "https://github.com/inventree/InvenTree/issues/12064#issuecomment-5764043674",
+    "observed_at": "2026-10-04T06:51:52.136229Z"
+  },
+  "react/react#37620": {
+    "reason": "Existing owned submission https://github.com/react/react/pull/37729; the retained observation records the exclusive platform assignment as PENDING at 2026-10-04T07:38:21Z. Continue the existing submission instead of opening a duplicate intake.",
+    "source_url": "https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1791099603791749",
+    "observed_at": "2026-10-04T07:38:21Z"
+  },
+  "azerothcore/azerothcore-wotlk#22571": {
+    "reason": "The canonical issue is closed as not_planned and locked (closed 2026-07-14), although the retained BountyHub listing records it as open.",
+    "source_url": "https://github.com/azerothcore/azerothcore-wotlk/issues/22571",
+    "observed_at": "2026-10-04T12:26:27Z"
+  },
+  "moorcheh-ai/memanto#1852": {
+    "reason": "Existing owned submission https://github.com/moorcheh-ai/memanto/pull/2024 remains open at head 2894052fa74bdb66924d60ff3ee303fb6d1536f2. Continue the original submission; exclude only duplicate fresh intake.",
+    "source_url": "https://github.com/moorcheh-ai/memanto/pull/2024",
+    "observed_at": "2026-10-04T12:25:33Z"
+  },
+  "SPLURT-Station/S.P.L.U.R.T-tg#76": {
+    "reason": "The canonical issue is closed with state_reason completed (closed at 2025-04-01T07:23:10Z).",
+    "source_url": "https://github.com/SPLURT-Station/S.P.L.U.R.T-tg/issues/76",
+    "observed_at": "2026-10-04T12:25:33Z"
+  },
+  "SPLURT-Station/S.P.L.U.R.T-tg#31": {
+    "reason": "The canonical issue is closed with state_reason completed (closed at 2026-09-30T03:12:32Z).",
+    "source_url": "https://github.com/SPLURT-Station/S.P.L.U.R.T-tg/issues/31",
+    "observed_at": "2026-10-04T12:25:33Z"
+  },
+  "fluxerapp/fluxer-meta#5": {
+    "reason": "The current delivery repository's contributor policy prohibits LLM-authored submissions by contributors without upstream write access; the authenticated woahwhattheheck account has pull access but no push permission. This excludes new agent-authored intake for this listing, without asserting a newly verified issue hold or payment outcome.",
+    "source_url": "https://github.com/fluxerapp/fluxer/blob/main/.github/LLM_USAGE_POLICY.md",
+    "observed_at": "2026-10-04T12:29:17Z"
+  },
+  "fluxerapp/fluxer-meta#2": {
+    "reason": "The retained delivery record work/high-value/fluxer-2/evidence.json (captured 2026-09-19) links this Polls bounty to fluxerapp/fluxer#1129 and its required API/gateway/app changes. That recorded delivery repository's current policy prohibits LLM-authored submissions without upstream write access; the authenticated woahwhattheheck account has pull access but no push permission. Exclude new automated upstream-submission intake through this recorded route; preserve existing branches, claims and private/fork work. No fresh issue-state or payment outcome is asserted.",
+    "source_url": "https://github.com/fluxerapp/fluxer/blob/main/.github/LLM_USAGE_POLICY.md",
+    "observed_at": "2026-10-04T12:29:17Z"
+  },
+  "fluxerapp/fluxer-meta#3": {
+    "reason": "The retained delivery records work/high-value/fluxer-3/snapshot.json and work/high-value/fluxer-3/SOURCE_REFRESH.md (captured 2026-09-19) bind the Events bounty's full-stack contract to fluxerapp/fluxer. That recorded delivery repository's current policy prohibits LLM-authored submissions without upstream write access; the authenticated woahwhattheheck account has pull access but no push permission. Exclude new automated upstream-submission intake through this recorded route; preserve existing branches, claims and private/fork work. No fresh issue-state or payment outcome is asserted.",
+    "source_url": "https://github.com/fluxerapp/fluxer/blob/main/.github/LLM_USAGE_POLICY.md",
+    "observed_at": "2026-10-04T12:29:17Z"
+  },
+  "SPLURT-Station/S.P.L.U.R.T-tg#115": {
+    "reason": "The canonical issue is closed with state_reason completed (closed at 2025-04-09T19:06:53Z); the canonical issue also remains assigned.",
+    "source_url": "https://github.com/SPLURT-Station/S.P.L.U.R.T-tg/issues/115",
+    "observed_at": "2026-10-08T09:19:59Z"
+  },
+  "fluxerapp/fluxer-meta#8": {
+    "reason": "The retained Fluxer RPC bounty is delivered through fluxerapp/fluxer. That repository's current LLM usage policy applies to contributors without write access and prohibits model-authored upstream submissions; the authenticated woahwhattheheck connection reports pull access but no push permission. Exclude new automated upstream-submission intake for this listing while preserving existing owner-fork work.",
+    "source_url": "https://github.com/fluxerapp/fluxer/blob/main/.github/LLM_USAGE_POLICY.md",
+    "observed_at": "2026-10-04T14:51:49.529Z"
+  },
+  "superplanehq/superplane#2338": {
+    "reason": "The canonical issue is closed with state_reason completed (closed at 2026-02-17T16:11:17Z).",
+    "source_url": "https://github.com/superplanehq/superplane/issues/2338",
+    "observed_at": "2026-10-08T09:19:59Z"
+  }
+}
