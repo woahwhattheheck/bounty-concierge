@@ -63,5 +63,25 @@
     "reason": "The canonical issue is closed with state_reason completed (closed at 2026-02-17T16:11:17Z).",
     "source_url": "https://github.com/superplanehq/superplane/issues/2338",
     "observed_at": "2026-10-08T09:19:59Z"
+  },
+  "microg/GmsCore#580": {
+    "reason": "Existing owned submission https://github.com/microg/GmsCore/pull/3845 remains open under original @woahwhattheheck at exact head 6684239983f6d80142194100e239bfa4a1db94fc. Continue the existing Google Cast carrier instead of redispatching fresh intake.",
+    "source_url": "https://github.com/microg/GmsCore/pull/3845",
+    "observed_at": "2026-10-08T09:38:17.250Z"
+  },
+  "microg/GmsCore#2843": {
+    "reason": "Existing owned submission https://github.com/microg/GmsCore/pull/3852 remains open under original @woahwhattheheck at exact head ab3017cd173f8e04eebd410c22ef17a0ceb33fa5. Continue the existing Wear OS carrier instead of redispatching fresh intake.",
+    "source_url": "https://github.com/microg/GmsCore/pull/3852",
+    "observed_at": "2026-10-08T09:38:17.250Z"
+  },
+  "microg/GmsCore#2851": {
+    "reason": "Existing owned submission https://github.com/microg/GmsCore/pull/3841 remains open under original @woahwhattheheck at exact head 264d2b485d08aabb68de2aab9dcb8ed806fe6a0b. Continue the existing remote DroidGuard carrier instead of redispatching fresh intake.",
+    "source_url": "https://github.com/microg/GmsCore/pull/3841",
+    "observed_at": "2026-10-08T09:38:17.250Z"
+  },
+  "microg/GmsCore#2994": {
+    "reason": "Existing owned submission https://github.com/microg/GmsCore/pull/3851 remains open under original @woahwhattheheck at exact head a757d9cdcb700d0cd25cb04bb7fb1fd1d7596b18. Continue the existing RCS carrier and its preserved BountyHub claim instead of redispatching fresh intake.",
+    "source_url": "https://github.com/microg/GmsCore/pull/3851",
+    "observed_at": "2026-10-08T09:38:17.250Z"
   }
 }
