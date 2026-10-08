@@ -1,5 +1,5 @@
 {
-  "started_at": "2026-10-07T12:41:59.794178+00:00",
+  "started_at": "2026-10-08T12:51:47.443658+00:00",
   "complete": true,
   "rate_limited": false,
   "retry_after_seconds": null,
@@ -322,13 +322,13 @@
       "repo": "Scottcjn/rustchain-bounties",
       "number": 402,
       "title": "[GRANTS] RustChain Micro-Grants \u2014 Build Your Own Thing (100-200 RTC)",
-      "body": "## RustChain Micro-Grants\n\n**Not a bounty \u2014 a grant.** Bounties solve OUR problems. Grants fund YOUR ideas.\n\nPropose a project that uses, extends, or promotes RustChain. If approved, you get funding to build it.\n\n---\n\n### Grant Tiers\n\n| Tier | Amount | Scope |\n|------|--------|-------|\n| **Builder** | 100 RTC | Tool, integration, or app using RustChain |\n| **Researcher** | 150 RTC | Paper or analysis of RustChain consensus/tokenomics/security |\n| **Pioneer** | 200 RTC | Port the miner to a new architecture (RISC-V, MIPS, s390x, etc.) |\n\n### How to Apply\n\nComment on this issue with a 1-page proposal:\n\n\\`\\`\\`\n## Grant Proposal\n\n**Title**: Your project name\n**Tier**: Builder / Researcher / Pioneer\n**What**: What you want to build (2-3 sentences)\n**Why**: Why it matters for RustChain (2-3 sentences)\n**How**: Your approach and tech stack\n**Timeline**: Expected completion (2-8 weeks)\n**Deliverable**: What you'll deliver (code, paper, demo, etc.)\n**RTC Wallet**: your-wallet-name\n\\`\\`\\`\n\n### Review Process\n\n- Proposals reviewed within 1 week\n- Community can comment and vote (thumbs up/down)\n- Maintainers make final decision\n- 50% paid upfront, 50% on completion\n\n### What We're Excited About\n\n- RustChain block explorer improvements\n- Mobile wallet app\n- Miner dashboard / monitoring tool\n- RustChain SDKs in new languages (Rust, Go, JavaScript)\n- Academic analysis of Proof-of-Antiquity consensus\n- Miner ports to exotic hardware (SPARC, MIPS, Haiku OS, etc.)\n- RTC payment integrations for existing apps\n- Educational content series\n\n### What We Won't Fund\n\n- Vaporware proposals with no clear deliverable\n- Projects that require us to change our core consensus\n- \"I'll build a DEX\" with no exchange development experience\n- Anything that already exists and just needs to be forked\n\n---\n\n### Funded Projects\n\n| # | Builder | Project | Grant | Status |\n|---|---------|---------|-------|--------|\n| *Applications open!* | | | | |\n\n---\n\n*The best open source projects are the ones the community builds without being asked. We just want to make it easier.*",
+      "body": "## RustChain Micro-Grants\n\n**Not a bounty \u2014 a grant.** Bounties solve OUR problems. Grants fund YOUR ideas.\n\nPropose a project that uses, extends, or promotes RustChain. If approved, you get funding to build it.\n\n---\n\n### Grant Tiers\n\n| Tier | Amount | Scope |\n|------|--------|-------|\n| **Builder** | 100 RTC | Tool, integration, or app using RustChain |\n| **Researcher** | 150 RTC | Paper or analysis of RustChain consensus/tokenomics/security |\n| **Pioneer** | 200 RTC | Port the miner to a new architecture (RISC-V, MIPS, s390x, etc.) |\n\n### How to Apply\n\nComment on this issue with a 1-page proposal:\n\n\\`\\`\\`\n## Grant Proposal\n\n**Title**: Your project name\n**Tier**: Builder / Researcher / Pioneer\n**What**: What you want to build (2-3 sentences)\n**Why**: Why it matters for RustChain (2-3 sentences)\n**How**: Your approach and tech stack\n**Timeline**: Expected completion (2-8 weeks)\n**Deliverable**: What you'll deliver (code, paper, demo, etc.)\n**RTC Wallet**: your-wallet-name\n\\`\\`\\`\n\n### Review Process\n\n- Proposals reviewed within 1 week\n- Community can comment and vote (thumbs up/down)\n- Maintainers make final decision\n- **Paid by milestone, on acceptance.** When a proposal is approved, maintainers and the contributor agree publicly on 2\u20133 milestones, each with its RTC amount and an \"accepted when\" check. No RTC is sent upfront. Each milestone's RTC is sent when that milestone is reviewed and accepted, so genuinely useful work gets paid when it lands. Changes to scope, checks or amounts are agreed in writing before the affected work starts.\n\n### How Milestones Are Judged\n\n- **Verifiable over voluminous.** Code must run; where applicable, tests must fail on the old behaviour and pass on the new; research must cite current source lines we can check.\n- **Delivered against the approved scope.** If a deliverable leaves out part of the agreed scope, maintainers return a specific gap list and review again after revision.\n- **AI assistance is welcome; disclose it.** You're responsible for checking the result before you submit.\n- **Partial delivery isn't automatically accepted**, but independently useful work can be split into its own milestone by written agreement, so it can be accepted and paid on its own.\n\n*These terms apply to proposals approved after this update. Grants approved earlier keep the terms in their approval comment; RTC already sent is unaffected.*\n\n### What We're Excited About\n\n- RustChain block explorer improvements\n- Mobile wallet app\n- Miner dashboard / monitoring tool\n- RustChain SDKs in new languages (Rust, Go, JavaScript)\n- Academic analysis of Proof-of-Antiquity consensus\n- Miner ports to exotic hardware (SPARC, MIPS, Haiku OS, etc.)\n- RTC payment integrations for existing apps\n- Educational content series\n\n### What We Won't Fund\n\n- Vaporware proposals with no clear deliverable\n- Projects that require us to change our core consensus\n- \"I'll build a DEX\" with no exchange development experience\n- Anything that already exists and just needs to be forked\n\n---\n\n### Funded Projects\n\n| # | Builder | Project | Grant | Status |\n|---|---------|---------|-------|--------|\n| *Applications open!* | | | | |\n\n---\n\n*The best open source projects are the ones the community builds without being asked. We just want to make it easier.*\n",
       "url": "https://github.com/Scottcjn/rustchain-bounties/issues/402",
       "labels": [
         "bounty"
       ],
       "created_at": "2026-02-22T15:26:50Z",
-      "updated_at": "2026-10-07T04:23:29Z",
+      "updated_at": "2026-10-07T15:55:58Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 200.0,
@@ -798,7 +798,7 @@
         "claimed"
       ],
       "created_at": "2026-02-22T15:25:06Z",
-      "updated_at": "2026-10-07T04:55:50Z",
+      "updated_at": "2026-10-07T18:02:29Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 100.0,
@@ -3544,7 +3544,7 @@
         "live-url-verified"
       ],
       "created_at": "2026-02-17T20:14:47Z",
-      "updated_at": "2026-10-07T04:43:18Z",
+      "updated_at": "2026-10-08T04:53:16Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 15.0,
@@ -4883,7 +4883,7 @@
         "claimed"
       ],
       "created_at": "2026-06-06T16:02:32Z",
-      "updated_at": "2026-10-06T02:03:59Z",
+      "updated_at": "2026-10-07T16:00:01Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 7.0,
@@ -5557,7 +5557,7 @@
         "distribution"
       ],
       "created_at": "2026-03-17T02:05:49Z",
-      "updated_at": "2026-10-07T04:43:08Z",
+      "updated_at": "2026-10-08T04:53:09Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 5.0,
@@ -6151,7 +6151,7 @@
         "bounty"
       ],
       "created_at": "2026-05-27T21:56:08Z",
-      "updated_at": "2026-10-07T04:32:04Z",
+      "updated_at": "2026-10-07T15:55:32Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 3.0,
@@ -6179,7 +6179,7 @@
         "bounty"
       ],
       "created_at": "2026-05-27T21:56:06Z",
-      "updated_at": "2026-10-07T04:42:51Z",
+      "updated_at": "2026-10-07T15:55:29Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 3.0,
@@ -6355,7 +6355,7 @@
         "miner"
       ],
       "created_at": "2026-04-02T15:41:51Z",
-      "updated_at": "2026-10-04T13:43:43Z",
+      "updated_at": "2026-10-08T04:29:39Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 3.0,
@@ -6871,7 +6871,7 @@
         "bounty"
       ],
       "created_at": "2026-02-14T17:34:51Z",
-      "updated_at": "2026-10-07T04:41:53Z",
+      "updated_at": "2026-10-08T04:52:18Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 3.0,
@@ -6976,7 +6976,7 @@
         "bounty"
       ],
       "created_at": "2026-06-11T23:02:38Z",
-      "updated_at": "2026-10-07T04:42:07Z",
+      "updated_at": "2026-10-08T04:52:28Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 2.0,
@@ -7078,7 +7078,7 @@
         "bounty"
       ],
       "created_at": "2026-05-11T16:18:31Z",
-      "updated_at": "2026-10-07T04:41:52Z",
+      "updated_at": "2026-10-08T04:52:16Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 2.0,
@@ -7242,7 +7242,7 @@
         "bounty"
       ],
       "created_at": "2026-03-16T18:12:44Z",
-      "updated_at": "2026-10-07T04:42:10Z",
+      "updated_at": "2026-10-08T04:52:30Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 2.0,
@@ -7587,7 +7587,7 @@
         "community"
       ],
       "created_at": "2026-03-01T04:13:08Z",
-      "updated_at": "2026-10-07T04:22:34Z",
+      "updated_at": "2026-10-07T15:55:35Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 2.0,
@@ -7805,7 +7805,7 @@
         "stars"
       ],
       "created_at": "2026-07-19T21:33:49Z",
-      "updated_at": "2026-10-07T04:41:51Z",
+      "updated_at": "2026-10-08T04:52:15Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 1.0,
@@ -8654,7 +8654,7 @@
         "bounty"
       ],
       "created_at": "2026-02-20T18:43:46Z",
-      "updated_at": "2026-10-07T04:41:56Z",
+      "updated_at": "2026-10-08T04:52:20Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 1.0,
@@ -8725,7 +8725,7 @@
         "community"
       ],
       "created_at": "2026-02-14T21:05:30Z",
-      "updated_at": "2026-10-07T04:41:55Z",
+      "updated_at": "2026-10-08T04:52:19Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 1.0,
@@ -8903,11 +8903,10 @@
       "labels": [
         "good first issue",
         "bounty",
-        "micro",
-        "claimed"
+        "micro"
       ],
       "created_at": "2026-09-05T23:48:51Z",
-      "updated_at": "2026-10-03T21:12:07Z",
+      "updated_at": "2026-10-07T21:29:49Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 0.1,
@@ -9103,6 +9102,6 @@
       }
     }
   ],
-  "updated_at": "2026-10-07T12:42:03.932045+00:00",
+  "updated_at": "2026-10-08T12:51:52.060676+00:00",
   "total_count": 266
 }
