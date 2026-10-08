@@ -73,11 +73,20 @@ def reconciliation_status(snapshot: dict[str, Any]) -> str:
         if not isinstance(meta, dict):
             return "invalid"
         observed = datetime.fromisoformat(meta["observed_at"].replace("Z", "+00:00"))
-        maximum = meta["max_age_seconds"]
-        if observed.tzinfo is None or type(maximum) is not int or maximum <= 0:
+        catalog_stamp = meta["catalog_observed_at"]
+        if not isinstance(catalog_stamp, str) or meta.get("catalog_freshness") != "fresh":
             return "invalid"
-        age = (datetime.now(timezone.utc) - observed).total_seconds()
-        return "future" if age < 0 else "stale" if age > maximum else "fresh"
+        catalog_observed = datetime.fromisoformat(catalog_stamp.replace("Z", "+00:00"))
+        maximum = meta["max_age_seconds"]
+        if (observed.tzinfo is None or catalog_observed.tzinfo is None
+                or type(maximum) is not int or maximum <= 0):
+            return "invalid"
+        now = datetime.now(timezone.utc)
+        ages = ((now - observed).total_seconds(),
+                (now - catalog_observed).total_seconds())
+        return "future" if any(age < 0 for age in ages) else (
+            "stale" if any(age > maximum for age in ages) else "fresh"
+        )
     except (KeyError, TypeError, ValueError, AttributeError):
         return "invalid"
 
