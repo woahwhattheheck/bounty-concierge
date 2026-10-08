@@ -18,9 +18,14 @@ from concierge.bountyhub_exclusions import unique_exclusion_fields
 
 
 def _exclude_assigned_exclusive(
-    report: dict[str, Any], selected: dict[str, Any]
+    report: dict[str, Any], selected: dict[str, Any], *,
+    max_open_claims: int | None = None,
 ) -> dict[str, Any]:
-    """Filter qualifying listing IDs, not entire issues with mixed listings."""
+    """Filter listing IDs, preserving other eligible listings on the same issue."""
+    if max_open_claims is not None and (
+        type(max_open_claims) is not int or not 0 <= max_open_claims <= 100000
+    ):
+        raise ValueError("max_open_claims must be an integer from 0 to 100000")
     if report.get("schema") == "bountyhub-target-refresh/v1":
         rows = [record.get("listing") for record in report["records"]]
     else:
@@ -38,6 +43,7 @@ def _exclude_assigned_exclusive(
 
     associations: dict[str, list[str]] = {}
     excluded = []
+    open_claim_excluded: list[dict[str, Any]] = []
     for issue_key, listing_ids in selected["listing_ids_by_issue"].items():
         remaining = []
         for listing_id in listing_ids:
@@ -56,6 +62,20 @@ def _exclude_assigned_exclusive(
                     "number": row["number"],
                     "reason": "exclusive_listing_already_assigned",
                 })
+            elif max_open_claims is not None:
+                open_claim_count = row.get("open_claim_count")
+                if type(open_claim_count) is not int or open_claim_count < 0:
+                    raise ValueError("missing retained open claim count")
+                if open_claim_count > max_open_claims:
+                    open_claim_excluded.append({
+                        "listing_id": listing_id,
+                        "repo": row["repo"],
+                        "number": row["number"],
+                        "reason": "open_claim_competition_over_threshold",
+                        "open_claim_count": open_claim_count,
+                    })
+                else:
+                    remaining.append(listing_id)
             else:
                 remaining.append(listing_id)
         if remaining:
@@ -70,6 +90,11 @@ def _exclude_assigned_exclusive(
     result["fresh_intake_policy"] = "exclude_assigned_exclusive_listings"
     result["assigned_exclusive_exclusions"] = excluded
     result["assigned_exclusive_exclusion_count"] = len(excluded)
+    if max_open_claims is not None:
+        result["fresh_intake_policy"] = "exclude_assigned_exclusive_and_crowded_listings"
+        result["max_open_claims"] = max_open_claims
+        result["open_claim_exclusion_count"] = len(open_claim_excluded)
+        result["open_claim_exclusions"] = open_claim_excluded
     result["swarm_reservation_schema"] = "swarm-custody-reservation/v1"
     result["swarm_take_schema"] = "swarm-claim-take/v1"
     annotated_targets = []
@@ -128,6 +153,7 @@ def select_fresh_targets(
     include_promised: bool = False,
     submission_targets: dict[str, Any] | None = None,
     excluded_issues: dict[str, Any] | None = None,
+    max_open_claims: int | None = None,
 ) -> dict[str, Any]:
     """Reuse funding, identity, refresh and canonical-exclusion rules unchanged."""
     from concierge.bountyhub_catalog import select_targets
@@ -136,7 +162,7 @@ def select_fresh_targets(
         report, minimum_funded_usd, include_promised=include_promised,
         submission_targets=submission_targets, excluded_issues=excluded_issues,
     )
-    return _exclude_assigned_exclusive(report, selected)
+    return _exclude_assigned_exclusive(report, selected, max_open_claims=max_open_claims)
 
 
 def _load(path: Path | None) -> Any:
@@ -151,6 +177,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("report", type=Path, help="Retained catalog or target-refresh JSON")
     parser.add_argument("--min-funded-usd", default="15.00")
     parser.add_argument("--include-promised", action="store_true")
+    parser.add_argument(
+        "--max-open-claims", type=int,
+        help="Optional discovery-only filter: skip listings with more open claims than N",
+    )
     parser.add_argument("--submission-targets", type=Path)
     parser.add_argument("--exclude-issues", type=Path)
     parser.add_argument("--output", type=Path)
@@ -170,6 +200,7 @@ def main(argv: list[str] | None = None) -> int:
             include_promised=args.include_promised,
             submission_targets=_load(args.submission_targets),
             excluded_issues=_load(args.exclude_issues),
+            max_open_claims=args.max_open_claims,
         )
         if (
             args.output is not None
