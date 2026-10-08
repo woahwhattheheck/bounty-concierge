@@ -428,16 +428,23 @@ def compile_bounty_value_routing(request: dict[str, Any]) -> dict[str, Any]:
         for index, raw in enumerate(candidates)
     ]
     work_ids: set[str] = set()
-    source_urls: set[str] = set()
+    source_identities: set[tuple[Any, ...]] = set()
     for candidate in normalized_candidates:
         if candidate["work_id"] in work_ids:
             raise BountyValueRoutingInputError("candidate work_id values must be unique")
-        if candidate["canonical_source_url"] in source_urls:
+        source_url = candidate["canonical_source_url"]
+        github_identity = _github_issue_identity(source_url, allow_comment=False)
+        source_identity: tuple[Any, ...] = (
+            ("github_issue", *github_identity)
+            if github_identity is not None
+            else ("url", source_url)
+        )
+        if source_identity in source_identities:
             raise BountyValueRoutingInputError(
                 "candidate canonical_source_url values must be unique"
             )
         work_ids.add(candidate["work_id"])
-        source_urls.add(candidate["canonical_source_url"])
+        source_identities.add(source_identity)
 
     routed = [_route_candidate(candidate, policy) for candidate in normalized_candidates]
     dispositions = (
