@@ -76,6 +76,33 @@ def test_same_capture_is_not_a_refresh():
     assert result["reason_codes"] == ["REFRESH_NOT_NEWER"]
 
 
+def test_new_envelope_with_old_observation_is_not_fresh_evidence():
+    original = _projection(completed="2026-10-04T20:00:00Z")
+    refreshed = _projection(completed="2026-10-04T20:01:00Z")
+    # A cached provider read was processed later without collecting a new
+    # issue/PR/assignment snapshot. The late completion is insufficient.
+    refreshed["observed_at"] = original["observed_at"]
+
+    result = _compare_projections(original, refreshed)
+    assert result["status"] == "STALE"
+    assert result["dispatch"] is False
+    assert "REFRESH_OBSERVATION_NOT_NEWER" in result["reason_codes"]
+
+
+def test_regressed_or_future_observation_fails_closed():
+    original = _projection(completed="2026-10-04T20:00:00Z")
+    refreshed = _projection(completed="2026-10-04T20:01:00Z")
+    refreshed["observed_at"] = "2026-10-04T19:59:00Z"
+
+    stale = _compare_projections(original, refreshed)
+    assert "REFRESH_OBSERVATION_NOT_NEWER" in stale["reason_codes"]
+
+    refreshed["observed_at"] = "2026-10-04T20:02:00Z"
+    invalid = _compare_projections(original, refreshed)
+    assert invalid["status"] == "STALE"
+    assert "REFRESH_OBSERVATION_AFTER_COMPLETION" in invalid["reason_codes"]
+
+
 def test_unknown_semantic_delta_fails_closed():
     original = _projection(completed="2026-10-04T20:00:00Z")
     refreshed = _projection(completed="2026-10-04T20:01:00Z", semantic="b")
