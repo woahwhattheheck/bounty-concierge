@@ -69,13 +69,32 @@ python -m concierge.github_write_intent complete \
 ```
 
 Completion rejects head drift and leaves the lease intact for explicit
-reconciliation. `list` omits body content while exposing state, checksum,
-retry floor, and lease metadata.
+reconciliation. If a fresh provider read shows that the PR has moved to a
+different head, the current lease owner may terminalize the stale intent:
+
+```bash
+python -m concierge.github_write_intent supersede-head \
+  --operation-id sanctifier-988-body-r1 \
+  --owner publisher-seat-17 \
+  --observed-head 8afed8b87494730fa6704b28e0a2a5a70292731e
+```
+
+`supersede-head` requires an active lease owned by the caller and a valid
+provider-observed head that differs from the immutable `expected_head`. It
+changes only the ledger lifecycle state to `SUPERSEDED` and clears the lease;
+it never rewrites the old expected head/body and never creates or replays an
+intent for the new head. Re-read the provider state and enqueue a separate
+new-head operation only when that replacement body has been deliberately
+reconciled.
+
+`list` omits body content while exposing state, checksum, retry floor, and
+lease metadata.
 
 ## Boundaries
 
 - PR-body updates only; no issue comments, source writes, merges, or claims.
 - No credentials or provider responses are stored.
 - No automatic retries and no scheduler.
+- `SUPERSEDED` is terminal history; it is never claimable or replayed.
 - Provider retry/reset evidence belongs in the existing cooldown/breaker rails;
   this ledger only keeps the mutation durable until a healthy publisher claims it.
