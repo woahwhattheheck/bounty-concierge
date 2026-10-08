@@ -265,6 +265,65 @@ class GitHubWriteIntentLedgerTests(unittest.TestCase):
             self.assertIsNone(done.lease_owner)
             self.assertIsNone(ledger.claim_ready("publisher-b", now_epoch=500.0))
 
+    def test_supersede_head_releases_only_owned_active_drifted_intent(self):
+        for token_route in (False, True):
+            with self.subTest(token_route=token_route), tempfile.TemporaryDirectory() as root:
+                ledger = self.ledger(root)
+                original = self.enqueue(ledger, operation_id="obsolete")
+                with self.assertRaisesRegex(WriteIntentError, "active lease"):
+                    ledger.supersede_head(
+                        original.operation_id, "publisher", observed_head=HEAD_B,
+                        now_epoch=101.0,
+                    )
+                owned = ledger.claim_ready("publisher", now_epoch=110.0, lease_seconds=10)
+                if token_route:
+                    ledger.handoff_integration_denial(
+                        owned.operation_id, "publisher",
+                        required_actor="woahwhattheheck", provider_status=403,
+                        provider_message="Resource not accessible by integration",
+                    )
+                    owned = ledger.claim_token_ready(
+                        "publisher", actor="woahwhattheheck",
+                        now_epoch=110.0, lease_seconds=10,
+                    )
+
+                for owner, head, now, message in (
+                    ("other", HEAD_B, 111.0, "active lease"),
+                    ("publisher", HEAD_A, 111.0, "has not drifted"),
+                    ("publisher", HEAD_B, 120.0, "active lease"),
+                ):
+                    with self.assertRaisesRegex(WriteIntentError, message):
+                        ledger.supersede_head(
+                            owned.operation_id, owner, observed_head=head, now_epoch=now
+                        )
+                    self.assertEqual(ledger.records()[0], owned)
+
+                retired = ledger.supersede_head(
+                    owned.operation_id, "publisher", observed_head=HEAD_B, now_epoch=119.0
+                )
+                self.assertEqual(retired.state, "SUPERSEDED")
+                self.assertEqual(retired.expected_head, HEAD_A)
+                self.assertEqual(retired.body, original.body)
+                self.assertEqual(retired.payload_sha256, original.payload_sha256)
+                self.assertEqual(retired.required_actor, owned.required_actor)
+                self.assertEqual(retired.last_error_code, "HEAD_DRIFT:" + HEAD_B)
+                self.assertIsNone(retired.lease_owner)
+                self.assertIsNone(retired.lease_until_epoch)
+                self.assertEqual(self.enqueue(ledger, operation_id="obsolete"), retired)
+                self.assertIsNone(ledger.claim_ready("next", now_epoch=121.0))
+                self.assertIsNone(ledger.claim_token_ready(
+                    "next", actor="woahwhattheheck", now_epoch=121.0
+                ))
+
+                replacement = ledger.enqueue_pr_body(
+                    operation_id="fresh-head", repository="Centurylong/sanctifier",
+                    pull_number=988, expected_head=HEAD_B, body="fresh head body",
+                    now_epoch=122.0,
+                )
+                self.assertEqual(replacement.state, "PENDING")
+                self.assertEqual(ledger.claim_ready("next", now_epoch=123.0),
+                                 ledger.records()[1])
+
 
 if __name__ == "__main__":
     unittest.main()

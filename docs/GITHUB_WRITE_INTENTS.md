@@ -16,13 +16,13 @@ The ledger stores that immutable payload in a private SQLite file. Reusing an
 operation ID with different coordinates, head, or body fails closed. The
 ledger also deduplicates **different operation IDs targeting the same live
 repository/PR/head** (repository matching is case-insensitive) while an intent is
-PENDING or LEASED. An identical second enqueue returns the existing canonical
+PENDING, LEASED, TOKEN_REQUIRED, or TOKEN_LEASED. An identical second enqueue returns the existing canonical
 intent; a different proposed body is refused until its original writer resolves
 that intent. An intent for the **same repository and PR on a different head**
-is also refused while an earlier job is pending or leased. This is deliberate:
+is also refused while an earlier job is pending, leased, or routed to a matching token publisher. This is deliberate:
 new-head metadata must not race a stale publisher lease and waste provider quota.
 Reconcile the old job explicitly (including fresh provider readback) before
-enqueuing the next head. After the previous intent reaches DONE, a new
+enqueuing the next head. After the previous intent reaches DONE or SUPERSEDED, a new
 intentional revision may be enqueued on either the same or a later head.
 
 Only one publisher may hold the intent lease at a time; an abandoned lease can
@@ -71,6 +71,29 @@ python -m concierge.github_write_intent complete \
 Completion rejects head drift and leaves the lease intact for explicit
 reconciliation. `list` omits body content while exposing state, checksum,
 retry floor, and lease metadata.
+
+## Recovering a changed PR head
+
+If a fresh provider read shows a different head, first reconcile any earlier
+uncertain PATCH. The current active lease owner can then retire the old intent:
+
+```bash
+python -m concierge.github_write_intent supersede-head \
+  --operation-id sanctifier-988-body-r1 \
+  --owner publisher-seat-17 \
+  --observed-head 1111111111111111111111111111111111111111
+```
+
+Use the exact SHA from the fresh provider response, not a guessed or cached head.
+The command refuses pending, unowned, expired, and same-head intents. Both ordinary
+and matching-token leases are supported; an expired lease must first be reclaimed
+through its existing route. The atomic SUPERSEDED transition clears the lease and
+records `HEAD_DRIFT:<observed SHA>` in `last_error_code`. Original coordinates,
+expected head, body, checksum, retry floor, and required actor stay unchanged.
+
+No replacement is enqueued or published automatically. Reconcile the current PR
+body and source, then explicitly enqueue a fresh payload under a new operation ID.
+Replaying the old operation ID returns its retained terminal record.
 
 ## Boundaries
 
