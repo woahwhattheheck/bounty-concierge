@@ -262,3 +262,47 @@ def test_known_provider_capability_denial_reroutes_before_admission_or_publish(t
         "expected_head": HEAD,
         "capability_evidence": capability_evidence,
     }
+
+
+def test_pr_create_without_all_state_reconciliation_never_writes(tmp_path):
+    """A stale open-PR scan is insufficient; missing fresh match check must stop."""
+    path = tmp_path / "cooldown.sqlite"
+    calls = []
+    receipt = execute_publish_operation(
+        path,
+        "credential",
+        rail="private-token",
+        actor="actor-293",
+        operation="same-head-second-publisher",
+        action="create_pull_request",
+        repo="Owner/Repo",
+        carrier="Owner/Repo#32398",
+        expected_head=HEAD,
+        transport=lambda: calls.append("write"),
+    )
+    assert calls == []
+    assert not path.exists()
+    assert receipt["status"] == "PROVIDER_RECONCILIATION_REQUIRED"
+    assert receipt["provider_write_called"] is False
+    assert receipt["provider_reconcile_called"] is False
+    assert receipt["expected_head"] == HEAD
+
+
+def test_pr_create_with_current_provider_clear_check_can_write(tmp_path):
+    path = tmp_path / "cooldown.sqlite"
+    calls = []
+    result = execute_publish_operation(
+        path,
+        "credential",
+        rail="private-token",
+        actor="actor-293",
+        operation="verified-first-publisher",
+        action="create-pull-request",
+        repo="Owner/Repo",
+        carrier="Owner/Repo#32398",
+        expected_head=HEAD,
+        provider_reconcile=lambda: (calls.append("all-states-reconcile") or None),
+        transport=lambda: (calls.append("provider-write") or {"number": 32399}),
+    )
+    assert calls == ["all-states-reconcile", "provider-write"]
+    assert result == {"number": 32399}
