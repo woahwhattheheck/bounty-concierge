@@ -265,6 +265,11 @@ def execute_read_operation(
                 reset_at=failure.reset_at,
                 primary_exhausted=failure.error_class == "PRIMARY_RATE_LIMIT",
             )
+            # GitHub primary quota is shared by all route families using
+            # this credential. A route-scoped secondary cooldown alone cannot
+            # stop sibling endpoints from retrying an exhausted primary limit.
+            if failure.error_class == "PRIMARY_RATE_LIMIT":
+                cooldown.reserve_quota_until(deadline)
             if recovery_held:
                 cooldown.defer_recovery_probe(owner, deadline)
                 recovery_held = False

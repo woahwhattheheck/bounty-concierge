@@ -74,23 +74,36 @@ def test_live_recovery_probe_is_visible_to_followers(tmp_path, monkeypatch):
     }
 
 
-def test_expired_route_scoped_secondary_is_immediately_available(tmp_path):
+def test_expired_route_scoped_secondary_serializes_recovery(tmp_path, monkeypatch):
+    monkeypatch.setattr(github_cooldown, "time", lambda: 1000.0)
     path = tmp_path / "cooldown.sqlite"
     cooldown = GitHubCooldown(path, "credential", cooldown_scope="search")
     cooldown.extend(900.0)
 
-    snapshot = availability_snapshot(
-        path,
-        "credential",
-        rail="managed-app",
-        actor="actor-293",
-        cooldown_scope="search",
-        now_epoch=1000.0,
+    ready = availability_snapshot(
+        path, "credential", rail="managed-app", actor="actor-293",
+        cooldown_scope="search", now_epoch=1000.0,
     )
+    assert ready["availability"] == "RECOVERY_READY"
+    assert ready["blocked"] is False
+    assert cooldown.claim_recovery_probe("worker-a") == (True, True, 1015.0)
 
-    assert snapshot["availability"] == "AVAILABLE"
-    assert snapshot["blocked"] is False
-    assert snapshot["recovery_lease"]["active"] is False
+    follower = availability_snapshot(
+        path, "credential", rail="managed-app", actor="actor-293",
+        cooldown_scope="search", now_epoch=1001.0,
+    )
+    assert follower["availability"] == "RECOVERY_PROBE_IN_FLIGHT"
+    assert follower["blocked"] is True
+    assert follower["retry_after_seconds"] == 14
+    assert cooldown.claim_recovery_probe("worker-b") == (True, False, 1015.0)
+
+    assert cooldown.complete_recovery_probe("worker-a") is True
+    recovered = availability_snapshot(
+        path, "credential", rail="managed-app", actor="actor-293",
+        cooldown_scope="search", now_epoch=1001.0,
+    )
+    assert recovered["availability"] == "AVAILABLE"
+    assert recovered["blocked"] is False
 
 
 def test_absent_store_is_available_and_never_exposes_credential(tmp_path):

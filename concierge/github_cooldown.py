@@ -237,16 +237,13 @@ class GitHubCooldown:
     def claim_recovery_probe(
         self, owner: str, *, lease_seconds: float = _RECOVERY_LEASE_SECONDS,
     ) -> tuple[bool, bool, float | None]:
-        """Claim the single recovery probe for an expired credential cooldown.
+        """Claim the single recovery probe for an expired provider cooldown.
 
-        Return (required, acquired, lease_until). Route-scoped secondary
-        cooldowns deliberately do not use this credential-global lease. Callers
-        must still honor an active deadline before asking to recover an expired
-        one. The stored owner is an opaque per-worker nonce, not an account or
-        credential identifier.
+        Return (required, acquired, lease_until). Serialize recovery by the
+        provider cooldown scope: credential-global for legacy/primary limits,
+        or route-family specific for opted-in secondary limits. Quota reserves
+        remain credential-global. The owner is an opaque per-worker nonce.
         """
-        if self.cooldown_scope != self.scope:
-            return False, False, None
         if (
             not isinstance(owner, str)
             or not owner
@@ -261,7 +258,7 @@ class GitHubCooldown:
             now = time()
             row = connection.execute(
                 "SELECT until_epoch FROM github_cooldown_v1 WHERE scope = ?",
-                (self.scope,),
+                (self.cooldown_scope,),
             ).fetchone()
             if row is None:
                 return False, False, None
@@ -279,7 +276,7 @@ class GitHubCooldown:
             lease = connection.execute(
                 "SELECT owner, lease_until_epoch, cooldown_epoch "
                 "FROM github_recovery_lease_v1 WHERE scope = ?",
-                (self.scope,),
+                (self.cooldown_scope,),
             ).fetchone()
             if lease is not None:
                 lease_owner, lease_until, lease_deadline = lease
@@ -306,7 +303,7 @@ class GitHubCooldown:
                 "ON CONFLICT(scope) DO UPDATE SET owner = excluded.owner, "
                 "lease_until_epoch = excluded.lease_until_epoch, "
                 "cooldown_epoch = excluded.cooldown_epoch",
-                (self.scope, owner, lease_until, deadline),
+                (self.cooldown_scope, owner, lease_until, deadline),
             )
             return True, True, lease_until
 
@@ -322,7 +319,7 @@ class GitHubCooldown:
             lease = connection.execute(
                 "SELECT owner, cooldown_epoch FROM github_recovery_lease_v1 "
                 "WHERE scope = ?",
-                (self.scope,),
+                (self.cooldown_scope,),
             ).fetchone()
             if lease is None or lease[0] != owner:
                 return False
@@ -336,18 +333,18 @@ class GitHubCooldown:
             cursor = connection.execute(
                 "DELETE FROM github_cooldown_v1 "
                 "WHERE scope = ? AND until_epoch <= ?",
-                (self.scope, float(anchor)),
+                (self.cooldown_scope, float(anchor)),
             )
             cleared = cursor.rowcount > 0
             if cleared:
                 connection.execute(
                     "DELETE FROM github_cooldown_unknown_v1 WHERE scope = ?",
-                    (self.scope,),
+                    (self.cooldown_scope,),
                 )
             connection.execute(
                 "DELETE FROM github_recovery_lease_v1 "
                 "WHERE scope = ? AND owner = ?",
-                (self.scope, owner),
+                (self.cooldown_scope, owner),
             )
             return cleared
 
@@ -359,7 +356,7 @@ class GitHubCooldown:
             connection.execute("BEGIN IMMEDIATE")
             lease = connection.execute(
                 "SELECT owner FROM github_recovery_lease_v1 WHERE scope = ?",
-                (self.scope,),
+                (self.cooldown_scope,),
             ).fetchone()
             if lease is None or lease[0] != owner:
                 return False
@@ -367,12 +364,12 @@ class GitHubCooldown:
                 "INSERT INTO github_cooldown_v1(scope, until_epoch) VALUES (?, ?) "
                 "ON CONFLICT(scope) DO UPDATE SET until_epoch = "
                 "MAX(github_cooldown_v1.until_epoch, excluded.until_epoch)",
-                (self.scope, until_epoch),
+                (self.cooldown_scope, until_epoch),
             )
             connection.execute(
                 "DELETE FROM github_recovery_lease_v1 "
                 "WHERE scope = ? AND owner = ?",
-                (self.scope, owner),
+                (self.cooldown_scope, owner),
             )
             return True
 

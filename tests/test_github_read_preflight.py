@@ -17,6 +17,7 @@ def _run(
     operation_class="search",
     target="issues:q=is%3Aopen",
     recovery_owner="worker-a",
+    cooldown_scope=None,
 ):
     return execute_read_operation(
         path,
@@ -29,6 +30,7 @@ def _run(
         target=target,
         transport=transport,
         recovery_owner=recovery_owner,
+        cooldown_scope=cooldown_scope,
     )
 
 
@@ -96,6 +98,38 @@ def test_recovery_ready_admits_one_reader_and_defers_follower(tmp_path, monkeypa
         rail="private-token",
         actor="actor-293",
         now_epoch=1000.0,
+    )["availability"] == "AVAILABLE"
+
+
+def test_route_scoped_search_recovery_defers_follower(tmp_path, monkeypatch):
+    _freeze(monkeypatch)
+    path = tmp_path / "cooldown.sqlite"
+    cooldown = GitHubCooldown(path, "credential", cooldown_scope="search")
+    cooldown.extend(900.0)
+    calls = []
+    follower = {}
+
+    def transport():
+        calls.append("leader")
+        follower["result"] = _run(
+            path,
+            lambda: calls.append("follower"),
+            cooldown_scope="search",
+            recovery_owner="worker-b",
+        )
+        return {"ok": True}
+
+    assert _run(
+        path, transport, cooldown_scope="search", recovery_owner="worker-a",
+    ) == {"ok": True}
+    assert calls == ["leader"]
+    assert follower["result"]["status"] == "READ_DEFERRED"
+    assert follower["result"]["provider_called"] is False
+    assert follower["result"]["reason"] == "RECOVERY_PROBE_IN_FLIGHT"
+    assert follower["result"]["retry_after"] == 15
+    assert availability_snapshot(
+        path, "credential", rail="private-token", actor="actor-293",
+        cooldown_scope="search", now_epoch=1000.0,
     )["availability"] == "AVAILABLE"
 
 
