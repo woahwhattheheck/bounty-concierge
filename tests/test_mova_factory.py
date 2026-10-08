@@ -80,6 +80,18 @@ def test_rejects_stale_or_mismatched_lease_before_dispatch():
         compile_mova_packet(value)
 
 
+def test_ready_lease_binds_capture_and_source_generation():
+    stale = candidate()
+    stale["canonical_capture_sha256"] = "f" * 64
+    with pytest.raises(MovaFactoryError, match="canonical capture"):
+        compile_mova_packet(stale)
+
+    drifted = candidate()
+    drifted["lease_receipt"]["original"]["source_generation_sha256"] = "f" * 64
+    with pytest.raises(MovaFactoryError, match="source generation drift"):
+        compile_mova_packet(drifted)
+
+
 def test_paid_work_cannot_omit_compensation_claim():
     value = candidate()
     value["compensation_claim"] = {"required": False, "text": None}
@@ -112,5 +124,6 @@ def test_batch_rejects_conflicting_source_snapshot_same_issue():
     first = candidate()
     drifted = deepcopy(first)
     drifted["canonical_capture_sha256"] = "f" * 64
+    drifted["lease_receipt"]["original"]["capture_receipt_sha256"] = "f" * 64
     with pytest.raises(MovaFactoryError, match="conflicting READY"):
         compile_mova_batch([first, drifted])
