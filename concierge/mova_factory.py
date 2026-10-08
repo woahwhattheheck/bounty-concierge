@@ -19,6 +19,7 @@ from typing import Any
 
 
 SCHEMA = "mova-bounty-factory/v1"
+BATCH_SCHEMA = "mova-paid-bounty-wave/v1"
 LEASE_SCHEMA = "bounty-work-order-lease/v1"
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -156,14 +157,13 @@ def _claim(value: Any) -> dict[str, Any]:
     text = value.get("text")
     if type(required) is not bool:
         raise MovaFactoryError("compensation_claim.required must be boolean")
-    if required:
-        text = _text(text, "compensation_claim.text", maximum=4096)
-        folded = " ".join(text.casefold().split())
-        if any(phrase in folded for phrase in _FORBIDDEN_CLAIM_PHRASES):
-            raise MovaFactoryError("compensation_claim.text contains waiver language")
-    elif text is not None:
-        text = _text(text, "compensation_claim.text", maximum=4096)
-    return {"required": required, "text": text}
+    if not required:
+        raise MovaFactoryError("paid candidate requires an affirmative compensation claim")
+    text = _text(text, "compensation_claim.text", maximum=4096)
+    folded = " ".join(text.casefold().split())
+    if any(phrase in folded for phrase in _FORBIDDEN_CLAIM_PHRASES):
+        raise MovaFactoryError("compensation_claim.text contains waiver language")
+    return {"required": True, "text": text}
 
 
 def _constraints(value: Any) -> list[str]:
@@ -309,6 +309,72 @@ def compile_mova_packet(
     return packet
 
 
+def compile_mova_batch(
+    candidates: list[dict[str, Any]],
+    *,
+    owners: dict[str, dict[str, str]] | None = None,
+    minimum_reward_usd: Decimal = Decimal("15"),
+) -> dict[str, Any]:
+    """Compile a bounded wave without permitting conflicting claims on a target.
+
+    Identical repeated candidates are idempotent. Two different READY snapshots
+    for one repo/issue are a collision, not permission for two parallel builders.
+    This offline manifest does not claim a lease or publish to the provider.
+    """
+    if not isinstance(candidates, list) or not 1 <= len(candidates) <= 128:
+        raise MovaFactoryError("batch must contain 1 to 128 paid candidates")
+    if owners is None:
+        owners = {}
+    if not isinstance(owners, dict):
+        raise MovaFactoryError("batch owners must be a target-keyed object")
+    packets: dict[str, dict[str, Any]] = {}
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            raise MovaFactoryError("batch candidate must be an object")
+        repo = candidate.get("repo")
+        issue = candidate.get("issue_number")
+        if not isinstance(repo, str) or _REPO.fullmatch(repo) is None:
+            raise MovaFactoryError("batch candidate repo must be owner/name")
+        if type(issue) is not int or issue <= 0:
+            raise MovaFactoryError("batch issue number must be positive")
+        target_key = f"{repo.casefold()}#{issue}"
+        packet = compile_mova_packet(
+            candidate, owners=owners.get(target_key),
+            minimum_reward_usd=minimum_reward_usd,
+        )
+        previous = packets.get(target_key)
+        if previous is not None and previous["packet_sha256"] != packet["packet_sha256"]:
+            raise MovaFactoryError(
+                f"conflicting READY snapshots or owners for target {target_key}"
+            )
+        packets[target_key] = packet
+    unused = set(owners) - set(packets)
+    if unused:
+        raise MovaFactoryError("batch owners contains unknown target keys")
+    ordered = [packets[key] for key in sorted(packets)]
+    core = {
+        "schema": BATCH_SCHEMA,
+        "count": len(ordered),
+        "deduplicated_count": len(candidates) - len(ordered),
+        "targets": [
+            {
+                "target_key": packet["target"]["target_key"],
+                "operation_id": packet["operation_id"],
+                "packet_sha256": packet["packet_sha256"],
+            }
+            for packet in ordered
+        ],
+        "packets": ordered,
+        "authority": {
+            "offline_compilation_only": True,
+            "provider_reads": False,
+            "provider_writes": False,
+            "claims_submitted": False,
+        },
+    }
+    return {**core, "batch_sha256": _canonical_hash(core)}
+
+
 def _load(path: Path) -> Any:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -322,6 +388,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("candidate", type=Path)
     parser.add_argument("--owners", type=Path)
+    parser.add_argument("--batch", action="store_true", help="compile a list of paid candidates with collision checks")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--minimum-reward-usd", default="15")
     args = parser.parse_args(argv)
@@ -331,8 +398,11 @@ def main(argv: list[str] | None = None) -> int:
         if not minimum.is_finite() or minimum < 0:
             raise MovaFactoryError("minimum reward must be a non-negative number")
         owners = _load(args.owners) if args.owners is not None else None
-        packet = compile_mova_packet(
-            _load(args.candidate), owners=owners, minimum_reward_usd=minimum
+        data = _load(args.candidate)
+        packet = (
+            compile_mova_batch(data, owners=owners, minimum_reward_usd=minimum)
+            if args.batch
+            else compile_mova_packet(data, owners=owners, minimum_reward_usd=minimum)
         )
         rendered = json.dumps(packet, indent=2, sort_keys=True) + "\n"
         if args.output is None:
