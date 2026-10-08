@@ -42,6 +42,11 @@ def reconcile(gh, portal, *, now=None):
     u = urlsplit(source)
     if u.scheme != "https" or u.netloc not in HOSTS[provider] or u.query or u.fragment:
         raise RegistrationGapError("portal source must be first-party HTTPS")
+    expected_issue = "https://github.com/" + repo + "/issues/" + str(issue)
+    if provider == "issuehunt" and u.path.rstrip("/") != "/r/" + repo + "/issues/" + str(issue):
+        raise RegistrationGapError("IssueHunt page is not for this GitHub issue")
+    if provider == "bountyhub" and portal.get("canonical_issue_url") != expected_issue:
+        raise RegistrationGapError("BountyHub snapshot does not bind this issue")
     try:
         captured = datetime.strptime(created, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
     except (TypeError, ValueError) as exc:
@@ -58,7 +63,10 @@ def reconcile(gh, portal, *, now=None):
         if type(url) is not str or not url.startswith("https://github.com/"):
             raise RegistrationGapError("invalid registered pull URL")
         registered_set.add(url.lower())
-    matches = [x for x in claims if type(x) is dict and x.get("pr_url", "").lower() == target and x.get("claimant", "").lower() == claimant]
+    for row in claims:
+        if type(row) is not dict or type(row.get("pr_url")) is not str or type(row.get("claimant")) is not str:
+            raise RegistrationGapError("invalid solver-specific claim row")
+    matches = [x for x in claims if x["pr_url"].lower() == target and x["claimant"].lower() == claimant]
     if len(matches) > 1:
         raise RegistrationGapError("conflicting provider rows for one claimant")
     key = "portal:" + provider + ":" + repo + "#" + str(issue) + ":" + claimant + ":pr" + str(pr)
