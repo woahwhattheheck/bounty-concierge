@@ -17,6 +17,7 @@ def candidate():
         "platform": "Algora",
         "platform_green": True,
         "canonical_open": True,
+        "repository_archived": False,
         "repo": "owner/repo",
         "issue_number": 42,
         "canonical_issue_url": "https://github.com/owner/repo/issues/42",
@@ -63,6 +64,17 @@ def test_compiles_deterministic_pipeline_with_account_routing():
     assert first["roles"][3]["account"] == "woahwhattheheck"
     assert first["roles"][4]["depends_on"] == ["PUBLICATION_RECEIPT"]
     assert first["economics"]["compensation_claim"]["required"] is True
+
+
+def test_rejects_archived_or_unverified_sponsor_repositories():
+    for value in (True, "false", None):
+        blocked = candidate()
+        if value is None:
+            del blocked["repository_archived"]
+        else:
+            blocked["repository_archived"] = value
+        with pytest.raises(MovaFactoryError, match="provider-verified as unarchived"):
+            compile_mova_packet(blocked)
 
 
 def test_rejects_waiver_language_in_required_compensation_claim():
