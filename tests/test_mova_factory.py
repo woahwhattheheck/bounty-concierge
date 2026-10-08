@@ -139,3 +139,25 @@ def test_batch_rejects_conflicting_source_snapshot_same_issue():
     drifted["lease_receipt"]["original"]["capture_receipt_sha256"] = "f" * 64
     with pytest.raises(MovaFactoryError, match="conflicting READY"):
         compile_mova_batch([first, drifted])
+
+
+@pytest.mark.parametrize("override", [
+    Decimal("0"), Decimal("-1"), Decimal("14.99"),
+    Decimal("NaN"), Decimal("Infinity"), Decimal("-Infinity"), "0",
+])
+def test_configured_reward_floor_cannot_bypass_15_usd_policy(override):
+    """Packet and batch entrypoints reject zero, subfloor and malformed floors."""
+    with pytest.raises(MovaFactoryError, match="minimum_reward_usd"):
+        compile_mova_packet(candidate(), minimum_reward_usd=override)
+    with pytest.raises(MovaFactoryError, match="minimum_reward_usd"):
+        compile_mova_batch([candidate()], minimum_reward_usd=override)
+
+
+def test_higher_reward_floor_still_restricts_claims():
+    value = candidate()
+    value["reward_usd"] = "24.99"
+    with pytest.raises(MovaFactoryError, match="active-work floor"):
+        compile_mova_packet(value, minimum_reward_usd=Decimal("25"))
+    value["reward_usd"] = "25"
+    accepted = compile_mova_packet(value, minimum_reward_usd=Decimal("25"))
+    assert accepted["economics"]["minimum_reward_usd"] == "25"
