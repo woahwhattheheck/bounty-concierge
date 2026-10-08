@@ -194,6 +194,13 @@ def compile_mova_packet(
         raise MovaFactoryError("candidate must be canonically open")
     if candidate.get("platform_green") is not True:
         raise MovaFactoryError("candidate platform is not green for paid work")
+    # An open issue and a bounty label are not publishability evidence: archived
+    # sponsor repositories reject new pull requests even when issues stay open.
+    # Intake must read this directly from the canonical repository metadata.
+    if candidate.get("repository_archived") is not False:
+        raise MovaFactoryError(
+            "sponsor repository must be provider-verified as unarchived"
+        )
 
     repo = _text(candidate.get("repo"), "repo", maximum=256)
     if _REPO.fullmatch(repo) is None:
@@ -275,6 +282,7 @@ def compile_mova_packet(
             "issue_number": issue_number,
             "canonical_issue_url": canonical_issue_url,
             "target_key": target_key,
+            "repository_archived": False,
             "expected_head": expected_head,
         },
         "economics": {
