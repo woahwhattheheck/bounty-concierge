@@ -10,7 +10,7 @@ our own.
 python -m concierge.bountyhub_fresh_targets \
   work/supply/bountyhub/2026-10-04-catalog-56f3.json \
   --min-funded-usd 15.00 \
-  --exclude-issues work/supply/bountyhub/2026-10-04-canonical-exclusions.json \
+  --exclude-issues work/supply/bountyhub/2026-10-08-canonical-exclusions.json \
   --output fresh-targets.json \
   --preflight-output fresh-preflight-shortlist.json
 
