@@ -90,13 +90,12 @@ def availability_snapshot(
             "UNION ALL SELECT 'quota reservation', until_epoch "
             "FROM github_quota_reserve_v1 WHERE scope = ? "
             "UNION ALL SELECT 'recovery lease', lease_until_epoch "
-            "FROM github_recovery_lease_v1 WHERE scope = ? AND ? = ?",
+            "FROM github_recovery_lease_v1 WHERE scope = ?",
             (
                 cooldown.cooldown_scope,
                 cooldown.scope,
                 cooldown.scope,
                 cooldown.cooldown_scope,
-                cooldown.scope,
             ),
         ).fetchall()
     except (OSError, sqlite3.Error, ValueError, OverflowError) as exc:
@@ -137,7 +136,6 @@ def availability_snapshot(
     elif (
         provider is not None
         and provider <= now
-        and cooldown.cooldown_scope == cooldown.scope
     ):
         availability = "RECOVERY_READY"
         blocked = False
