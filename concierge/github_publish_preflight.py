@@ -123,7 +123,7 @@ def execute_publish_operation(
     recovery lease before transport is allowed; followers re-read and defer.
     AVAILABLE proceeds directly.
 
-    When provider_reconcile is supplied, it runs after repo/head canonicalization
+    For create-pull-request (including create_pull_request and pull.create),\n    provider_reconcile is mandatory unless an independently observed capability\n    denial has already terminally rerouted the request. Missing reconciliation\n    returns PROVIDER_RECONCILIATION_REQUIRED before provider or quota admission.\n    Callers must obtain a live all-states (open, closed, merged) matching-head\n    read and current-base source reconciliation; this wrapper never treats a\n    historical open-only census as proof that a new write is safe.\n\n    When provider_reconcile is supplied, it runs after repo/head canonicalization
     but before breaker/cooldown admission. A non-None mapping means the released
     handoff is already satisfied upstream; the publish transport is skipped and a
     terminal PROVIDER_RECONCILED receipt is returned without mutating admission
@@ -197,6 +197,29 @@ def execute_publish_operation(
                 "expected_head": expected_head,
                 "capability_evidence": dict(capability_evidence),
             }
+
+    # Creating a sponsor PR is uniquely vulnerable to stale all-open-only
+    # censuses: another publisher can merge the same source head between the
+    # prior check and this write. Do not spend provider write quota without a
+    # supplied fresh, all-states same-source reconciliation callback. The
+    # callback may return None after a genuine clear read; capability-denied
+    # rails are still rerouted above without requiring a redundant read.
+    create_action = action.casefold().replace("_", "-")
+    if create_action in {
+        "create-pull-request", "create-pr", "pull.create", "pull-request.create"
+    } and provider_reconcile is None:
+        return {
+            "status": "PROVIDER_RECONCILIATION_REQUIRED",
+            "provider_called": False,
+            "provider_reconcile_called": False,
+            "provider_write_called": False,
+            "operation": operation,
+            "action": action,
+            "repo": repo,
+            "carrier": carrier,
+            "expected_head": expected_head,
+            "reason": "fresh all-states source-head reconciliation callback required before PR create",
+        }
 
     resource_breaker = None
     if scope_breaker_path is not None:
