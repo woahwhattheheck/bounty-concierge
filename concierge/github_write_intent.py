@@ -187,7 +187,7 @@ class GitHubWriteIntentLedger:
             required_actor=row["required_actor"],
         )
         if intent.state not in {
-            "PENDING", "LEASED", "TOKEN_REQUIRED", "TOKEN_LEASED", "DONE"
+            "PENDING", "LEASED", "TOKEN_REQUIRED", "TOKEN_LEASED", "DONE", "SUPERSEDED"
         }:
             raise WriteIntentError("GitHub write-intent state invalid")
         if _payload_sha256(intent.body) != intent.payload_sha256:
@@ -539,6 +539,58 @@ class GitHubWriteIntentLedger:
             assert updated is not None
             return self._decode(updated)
 
+    def supersede_head(
+        self,
+        operation_id: str,
+        owner: str,
+        *,
+        observed_head: str,
+        now_epoch: float | None = None,
+    ) -> WriteIntent:
+        """Retire an active owned intent after fresh provider head-drift readback.
+
+        This transition never publishes, changes the retained payload, or
+        enqueues a replacement. The caller must reconcile any uncertain write
+        before deciding that the old expected-head intent is obsolete.
+        """
+        operation_id = _label(
+            operation_id, "operation_id", _MAX_OPERATION_ID_BYTES
+        )
+        owner = _label(owner, "owner", _MAX_OWNER_BYTES)
+        observed_head = _head(observed_head, "observed_head")
+        now = _finite_epoch(now_epoch, "now_epoch")
+
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM github_write_intent_v1 WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            if row is None:
+                raise WriteIntentError("write intent does not exist")
+            current = self._decode(row)
+            if (
+                current.state not in {"LEASED", "TOKEN_LEASED"}
+                or current.lease_owner != owner
+                or current.lease_until_epoch is None
+                or current.lease_until_epoch <= now
+            ):
+                raise WriteIntentError("write intent has no active lease for this owner")
+            if current.expected_head == observed_head:
+                raise WriteIntentError("provider head has not drifted")
+            connection.execute(
+                "UPDATE github_write_intent_v1 SET state = 'SUPERSEDED', "
+                "lease_owner = NULL, lease_until_epoch = NULL, "
+                "last_error_code = ? WHERE operation_id = ?",
+                ("HEAD_DRIFT:" + observed_head, operation_id),
+            )
+            updated = connection.execute(
+                "SELECT * FROM github_write_intent_v1 WHERE operation_id = ?",
+                (operation_id,),
+            ).fetchone()
+            assert updated is not None
+            return self._decode(updated)
+
     def records(self, *, limit: int = 100) -> list[WriteIntent]:
         if type(limit) is not int or not 1 <= limit <= 1000:
             raise ValueError("limit must be an integer between 1 and 1000")
@@ -607,6 +659,13 @@ def _parser() -> argparse.ArgumentParser:
     complete.add_argument("--owner", required=True)
     complete.add_argument("--observed-head", required=True)
 
+    supersede = subparsers.add_parser(
+        "supersede-head", help="Retire an owned intent after fresh provider head drift."
+    )
+    supersede.add_argument("--operation-id", required=True)
+    supersede.add_argument("--owner", required=True)
+    supersede.add_argument("--observed-head", required=True)
+
     listing = subparsers.add_parser("list")
     listing.add_argument("--limit", type=int, default=100)
     return parser
@@ -658,6 +717,12 @@ def main(argv: list[str] | None = None) -> int:
             ).public_record(include_body=False)
         elif args.command == "complete":
             result = ledger.complete(
+                args.operation_id,
+                args.owner,
+                observed_head=args.observed_head,
+            ).public_record(include_body=False)
+        elif args.command == "supersede-head":
+            result = ledger.supersede_head(
                 args.operation_id,
                 args.owner,
                 observed_head=args.observed_head,
