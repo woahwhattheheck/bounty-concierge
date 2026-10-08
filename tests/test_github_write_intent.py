@@ -143,6 +143,71 @@ class GitHubWriteIntentLedgerTests(unittest.TestCase):
             self.assertEqual(follow_up.expected_head, HEAD_B)
             self.assertEqual(len(ledger.records()), 2)
 
+    def test_leased_cross_head_can_be_superseded_then_new_head_enqueued(self):
+        with tempfile.TemporaryDirectory() as root:
+            ledger = self.ledger(root)
+            original = self.enqueue(ledger, operation_id="old-head")
+            owned = ledger.claim_ready("publisher-a", now_epoch=102.0)
+            self.assertIsNotNone(owned)
+
+            with self.assertRaisesRegex(WriteIntentError, "different expected head"):
+                ledger.enqueue_pr_body(
+                    operation_id="new-head",
+                    repository="Centurylong/sanctifier",
+                    pull_number=988,
+                    expected_head=HEAD_B,
+                    body="new head body",
+                    now_epoch=103.0,
+                )
+
+            superseded = ledger.supersede_head(
+                original.operation_id,
+                "publisher-a",
+                observed_head=HEAD_B,
+            )
+            self.assertEqual(superseded.state, "SUPERSEDED")
+            self.assertEqual(superseded.expected_head, HEAD_A)
+            self.assertEqual(superseded.body, "current technical body")
+            self.assertIsNone(superseded.lease_owner)
+            self.assertIsNone(superseded.lease_until_epoch)
+
+            follow_up = ledger.enqueue_pr_body(
+                operation_id="new-head",
+                repository="Centurylong/sanctifier",
+                pull_number=988,
+                expected_head=HEAD_B,
+                body="new head body",
+                now_epoch=104.0,
+            )
+            self.assertEqual(follow_up.state, "PENDING")
+            self.assertEqual(follow_up.expected_head, HEAD_B)
+            self.assertEqual(len(ledger.records()), 2)
+
+    def test_supersede_requires_current_owner_and_actual_head_drift(self):
+        with tempfile.TemporaryDirectory() as root:
+            ledger = self.ledger(root)
+            self.enqueue(ledger)
+            owned = ledger.claim_ready("publisher-a", now_epoch=110.0)
+            self.assertIsNotNone(owned)
+
+            with self.assertRaisesRegex(WriteIntentError, "not leased by this owner"):
+                ledger.supersede_head(
+                    owned.operation_id,
+                    "publisher-b",
+                    observed_head=HEAD_B,
+                )
+            with self.assertRaisesRegex(WriteIntentError, "still matches expected head"):
+                ledger.supersede_head(
+                    owned.operation_id,
+                    "publisher-a",
+                    observed_head=HEAD_A,
+                )
+
+            still_owned = ledger.claim_ready("publisher-a", now_epoch=111.0)
+            self.assertIsNotNone(still_owned)
+            self.assertEqual(still_owned.state, "LEASED")
+            self.assertEqual(still_owned.lease_owner, "publisher-a")
+
     def test_claim_serializes_publishers_and_expired_lease_is_reclaimable(self):
         with tempfile.TemporaryDirectory() as root:
             ledger = self.ledger(root)
