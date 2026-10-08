@@ -18,6 +18,7 @@ concierge-revenue = "concierge.revenue_cli:main"
 concierge-discover = "concierge.discovered_revenue_intake:main"
 concierge-notifications = "concierge.github_notification_queue:main"
 concierge-mova = "concierge.mova_factory:main"
+concierge-mova-progress = "concierge.mova_progress:main"
 concierge-intake-cache = "concierge.github_intake_cache:main"
 
 [tool.setuptools.packages.find]
