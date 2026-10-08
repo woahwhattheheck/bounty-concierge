@@ -115,6 +115,16 @@ def _lease(value: Any, repo: str, issue_number: int) -> dict[str, Any]:
     refreshed = value.get("refreshed")
     if not isinstance(original, dict) or not isinstance(refreshed, dict):
         raise MovaFactoryError("lease_receipt is missing generation evidence")
+    original_generation = _sha256(
+        original.get("source_generation_sha256"),
+        "lease original source_generation_sha256",
+    )
+    refreshed_generation = _sha256(
+        refreshed.get("source_generation_sha256"),
+        "lease refreshed source_generation_sha256",
+    )
+    if original_generation != refreshed_generation:
+        raise MovaFactoryError("READY lease source generation drift")
     return {
         "schema": LEASE_SCHEMA,
         "status": "READY",
@@ -129,10 +139,7 @@ def _lease(value: Any, repo: str, issue_number: int) -> dict[str, Any]:
             refreshed.get("capture_receipt_sha256"),
             "lease refreshed capture_receipt_sha256",
         ),
-        "source_generation_sha256": _sha256(
-            refreshed.get("source_generation_sha256"),
-            "lease refreshed source_generation_sha256",
-        ),
+        "source_generation_sha256": refreshed_generation,
     }
 
 
@@ -210,6 +217,8 @@ def compile_mova_packet(
     )
     expected_head = _git_sha_or_none(candidate.get("expected_head"), "expected_head")
     lease = _lease(candidate.get("lease_receipt"), repo, issue_number)
+    if capture_sha != lease["original_capture_receipt_sha256"]:
+        raise MovaFactoryError("candidate canonical capture disagrees with READY lease")
     if generation_sha != lease["source_generation_sha256"]:
         raise MovaFactoryError("candidate source generation disagrees with READY lease")
 
