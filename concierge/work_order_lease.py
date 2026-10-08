@@ -93,10 +93,19 @@ def _compare_projections(
     if refreshed_identity != identity:
         reasons.append("ISSUE_IDENTITY_CHANGED")
 
-    if _timestamp(refreshed["completed_at"], "refreshed completed_at") <= _timestamp(
-        original["completed_at"], "original completed_at"
-    ):
+    original_completed = _timestamp(original["completed_at"], "original completed_at")
+    refreshed_completed = _timestamp(refreshed["completed_at"], "refreshed completed_at")
+    original_observed = _timestamp(original["observed_at"], "original observed_at")
+    refreshed_observed = _timestamp(refreshed["observed_at"], "refreshed observed_at")
+    if refreshed_completed <= original_completed:
         reasons.append("REFRESH_NOT_NEWER")
+    # Finishing a replay or processing job later is not itself a fresh remote
+    # observation. A cached GitHub/marketplace snapshot can be stale even when
+    # its wrapper's completed_at and hash were generated just now.
+    if refreshed_observed <= original_observed:
+        reasons.append("REFRESH_OBSERVATION_NOT_NEWER")
+    if refreshed_observed > refreshed_completed:
+        reasons.append("REFRESH_OBSERVATION_AFTER_COMPLETION")
 
     if original["submission_target"] != refreshed["submission_target"]:
         reasons.append("SUBMISSION_TARGET_CHANGED")
