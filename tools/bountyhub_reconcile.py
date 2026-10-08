@@ -111,7 +111,14 @@ def reconcile(catalog: Any, snapshot: Any, *, as_of: datetime | None = None,
     # the BountyHub card may have been assigned, claimed, or withdrawn since
     # its funding snapshot was captured.
     catalog_observed_at = None
-    catalog_freshness = "missing_catalog_timestamp"
+    # Compact-v1 historically allowed no capture timestamp. Preserve the
+    # existing offline compatibility path; full v1 catalogs must be fresh.
+    catalog_freshness = (
+        "legacy_compact_without_timestamp"
+        if (catalog["schema"] == "bountyhub-public-intake/compact-v1"
+            and "retrieved_at" not in catalog)
+        else "missing_catalog_timestamp"
+    )
     if catalog.get("retrieved_at") is not None:
         try:
             catalog_observed_at = timestamp(catalog["retrieved_at"])
@@ -143,7 +150,7 @@ def reconcile(catalog: Any, snapshot: Any, *, as_of: datetime | None = None,
             evidence = None
         elif freshness != "fresh":
             status = freshness
-        elif catalog_freshness != "fresh":
+        elif catalog_freshness not in {"fresh", "legacy_compact_without_timestamp"}:
             status = catalog_freshness
         elif evidence["state"] == "closed":
             status = "closed"
