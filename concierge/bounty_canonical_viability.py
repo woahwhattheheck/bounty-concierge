@@ -173,8 +173,14 @@ def compile_bounty_canonical_viability(request: dict[str, Any]) -> dict[str, Any
     elif acceptance=="UNKNOWN": reasons.append("CANONICAL_ACCEPTANCE_UNKNOWN")
     if any(a!=actor for a in assignees) and not actor_assigned: reasons.append("ASSIGNED_TO_OTHER")
     blocking=[p for p in prs if not p["actor_owned"] and p["overlap"] in {"FULL","UNKNOWN"}]
+    # Reuse the original author's completed carrier rather than launching another build.
+    # Unknown overlap is not proof of completion: request a source-scope review.
+    actor_full=[p for p in prs if p["actor_owned"] and p["overlap"]=="FULL"]
+    actor_unknown=[p for p in prs if p["actor_owned"] and p["overlap"]=="UNKNOWN"]
     residual=col["maintainer_confirmed_residual"]
     if blocking and not residual: reasons.append("OVERLAPPING_OPEN_PR_PRESENT")
+    if actor_full: reasons.append("ACTOR_OWNED_FULL_PR_PRESENT")
+    elif actor_unknown: reasons.append("ACTOR_OWNED_PR_OVERLAP_UNKNOWN")
     if col["active_claim_count"]>=pressure and not residual and not actor_assigned: reasons.append("CLAIM_PRESSURE_HIGH")
     if pay=="UNVERIFIED": reasons.append("PAYMENT_PATH_UNVERIFIED")
     elif pay=="SELECTION_GATED" and not actor_assigned: reasons.append("SELECTION_GATE_NOT_SATISFIED")
@@ -182,6 +188,7 @@ def compile_bounty_canonical_viability(request: dict[str, Any]) -> dict[str, Any
 
     terminal={"LISTING_NOT_OPEN","LISTING_CANONICAL_STATE_MISMATCH","CANONICAL_REPOSITORY_ARCHIVED","CANONICAL_ISSUE_NOT_OPEN","REPORT_ONLY_NOT_IMPLEMENTATION_BOUNTY"}
     if terminal.intersection(reasons): disp,nexta="PRUNE","REMOVE_FROM_ACTIVE_BUILD_QUEUE"
+    elif actor_full: disp,nexta="HOLD","RECOVER_EXISTING_ORIGINAL_AUTHOR_PR"
     elif reasons: disp,nexta="HOLD","REFRESH_OR_RESOLVE_CANONICAL_BLOCKERS"
     elif reward["assignment_required"] and not actor_assigned:
         disp,nexta=("WAIT_ASSIGNMENT","WAIT_FOR_ASSIGNMENT_WITHOUT_IMPLEMENTATION") if reward["actor_applied"] else ("READY_FOR_CLAIM_REVIEW","REVIEW_CLAIM_OR_APPLICATION_ROUTE")
