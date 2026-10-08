@@ -13,9 +13,17 @@ Use it when a publisher has already fenced an existing pull request and knows:
 - a stable operation ID.
 
 The ledger stores that immutable payload in a private SQLite file. Reusing an
-operation ID with different coordinates, head, or body fails closed. Only one
-publisher may hold the intent lease at a time; an abandoned lease can be
-reclaimed after expiry.
+operation ID with different coordinates, head, or body fails closed. The
+ledger also deduplicates **different operation IDs targeting the same live
+repository/PR/head** (repository matching is case-insensitive) while an intent is
+PENDING or LEASED. An identical second enqueue returns the existing canonical
+intent; a different proposed body is refused until its original writer resolves
+that intent. This prevents two independently named publisher operations from
+racing to replace the same PR description. After a previous intent reaches DONE,
+a new intentional body revision may be enqueued for the same head.
+
+Only one publisher may hold the intent lease at a time; an abandoned lease can
+be reclaimed after expiry.
 
 ## Minimal flow
 
