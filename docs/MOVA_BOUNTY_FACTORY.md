@@ -10,7 +10,7 @@ A candidate must include the canonical GitHub issue identity, a green paid platf
 
 **Sponsor archive fence:** intake must directly check the canonical sponsor repository's current GitHub `archived` state, and set candidate `"repository_archived": false` **only after a real provider read**. The factory rejects `true`, absent, or string-valued states instead of inferring that an open issue and bounty label permit publication. The output retains `repository_archived: false` for the publishing handoff. This is an offline assertion from the supplied intake; a publisher must still refresh the sponsor state immediately before a real PR write. Archived sponsors require unarchiving or a separately authorized submission route; retrying other credentials does not fix repository policy.
 
-The compiler rejects stale leases, source-generation drift, mismatched canonical URLs, below-floor work, and required compensation text containing waiver/forfeit language. It never creates a claim, PR, provider application, payment action, or source mutation.
+The compiler rejects stale leases, source-generation drift, mismatched canonical URLs, below-floor work, and required compensation text containing waiver/forfeit language. The effective USD floor is **never below $15** on already-green platforms: callers may raise it for stricter cohorts, but zero, negative, NaN, infinity and non-Decimal overrides are rejected by packet and batch compilation. This is an eligibility floor, not evidence that any advertised bounty will be awarded. It never creates a claim, PR, provider application, payment action, or source mutation.
 
 ## Pipeline
 
