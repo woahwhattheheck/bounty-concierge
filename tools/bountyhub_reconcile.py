@@ -107,6 +107,30 @@ def reconcile(catalog: Any, snapshot: Any, *, as_of: datetime | None = None,
     evaluated_at = evaluated_at.astimezone(timezone.utc)
     age = (evaluated_at - observed_at).total_seconds()
     freshness = "future" if age < 0 else "stale" if age > max_age_seconds else "fresh"
+    # A fresh GitHub issue cannot revive a stale or unknown provider listing:
+    # the BountyHub card may have been assigned, claimed, or withdrawn since
+    # its funding snapshot was captured.
+    catalog_observed_at = None
+    # Compact-v1 historically allowed no capture timestamp. Preserve the
+    # existing offline compatibility path; full v1 catalogs must be fresh.
+    catalog_freshness = (
+        "legacy_compact_without_timestamp"
+        if (catalog["schema"] == "bountyhub-public-intake/compact-v1"
+            and "retrieved_at" not in catalog)
+        else "missing_catalog_timestamp"
+    )
+    if catalog.get("retrieved_at") is not None:
+        try:
+            catalog_observed_at = timestamp(catalog["retrieved_at"])
+        except ReconcileError:
+            catalog_freshness = "invalid_catalog_timestamp"
+        else:
+            catalog_age = (evaluated_at - catalog_observed_at).total_seconds()
+            catalog_freshness = (
+                "future_catalog" if catalog_age < 0
+                else "stale_catalog" if catalog_age > max_age_seconds
+                else "fresh"
+            )
     indexed: dict[str, dict[str, Any]] = {}
     conflicts = set()
     for issue in snapshot["issues"]:
@@ -126,6 +150,8 @@ def reconcile(catalog: Any, snapshot: Any, *, as_of: datetime | None = None,
             evidence = None
         elif freshness != "fresh":
             status = freshness
+        elif catalog_freshness not in {"fresh", "legacy_compact_without_timestamp"}:
+            status = catalog_freshness
         elif evidence["state"] == "closed":
             status = "closed"
         elif evidence["state"] is None:
@@ -141,6 +167,10 @@ def reconcile(catalog: Any, snapshot: Any, *, as_of: datetime | None = None,
         "schema": "bountyhub-github-reconciliation/v1",
         "observed_at": observed_at.isoformat(), "evaluated_at": evaluated_at.isoformat(),
         "max_age_seconds": max_age_seconds, "freshness": freshness,
+        "catalog_observed_at": (
+            catalog_observed_at.isoformat() if catalog_observed_at else None
+        ),
+        "catalog_freshness": catalog_freshness,
         "observed_issue_count": len(indexed), "conflicting_issue_count": len(conflicts),
         "row_status_counts": dict(sorted(counts.items())),
         "candidate_row_count": sum(row["reconciled_candidate"] for row in result["rows"]),
