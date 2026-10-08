@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-from concierge.work_order_lease import _compare_projections
+from concierge.work_order_lease import _compare_projections, reconcile_tracked_head
 
 
 def _projection(*, completed, semantic="a", linked_prs=None, generation=None):
@@ -84,3 +84,62 @@ def test_unknown_semantic_delta_fails_closed():
 
     assert result["status"] == "STALE"
     assert result["reason_codes"] == ["SOURCE_GENERATION_CHANGED"]
+
+
+def _head_reconciliation(**overrides):
+    values = {
+        "operation_id": "op-123",
+        "repo": "owner/repo",
+        "branch": "fix/example",
+        "expected_head": "a" * 40,
+        "observed_head": "b" * 40,
+        "claimed_paths": ["src/feature.py", "tests/test_feature.py"],
+        "touched_paths": ["src/feature.py", "tests/test_feature.py"],
+        "owner": "seat-a",
+        "source": "slack-work-order-123",
+        "provider_readback": {"provider": "github", "compare": "a..b"},
+    }
+    values.update(overrides)
+    return reconcile_tracked_head(**values)
+
+
+def test_head_reconciliation_tombstones_exact_scope_completion():
+    result = _head_reconciliation()
+
+    assert result["status"] == "COLLISION_RECONCILIATION"
+    assert result["classification"] == "CLAIMED_SCOPE_COMPLETE"
+    assert result["action"] == "TOMBSTONE_DUPLICATE"
+    assert result["dispatch"] is False
+    assert result["tombstone"] is True
+    assert result["next_expected_head"] == "b" * 40
+    assert result["overlap_paths"] == ["src/feature.py", "tests/test_feature.py"]
+
+
+def test_head_reconciliation_rebases_orthogonal_advance():
+    result = _head_reconciliation(
+        touched_paths=["docs/README.md"],
+        provider_readback={"provider": "github", "compare": "orthogonal"},
+    )
+
+    assert result["status"] == "READY"
+    assert result["classification"] == "ORTHOGONAL_ADVANCE"
+    assert result["action"] == "REBASE_EXPECTED_HEAD"
+    assert result["dispatch"] is True
+    assert result["rebase"] is True
+    assert result["next_expected_head"] == "b" * 40
+    assert result["overlap_paths"] == []
+
+
+def test_head_reconciliation_keeps_true_stale_lease_when_head_is_unchanged():
+    result = _head_reconciliation(
+        observed_head="a" * 40,
+        touched_paths=[],
+        provider_readback={"provider": "github", "head": "a" * 40},
+    )
+
+    assert result["status"] == "STALE"
+    assert result["classification"] == "UNCHANGED_STALE"
+    assert result["action"] == "RETAIN_STALE_LEASE"
+    assert result["dispatch"] is False
+    assert result["rebase"] is False
+    assert result["tombstone"] is False
