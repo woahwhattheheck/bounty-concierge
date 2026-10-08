@@ -74,6 +74,25 @@ Recognized terminal issue states are `closed`, `deleted`, and `not_found`.
 Recognized consumed reward states are `consumed`, `awarded`, `paid`, and
 `closed`. A merged same-scope PR is also terminal supply.
 
+## Canonical-target duplicates (batch-safe)
+
+The `resource` field is the canonical GitHub issue identity `owner/repo#number`,
+not a marketplace listing ID. A single GitHub issue may appear as five separate
+Algora cards or under mixed-case/leading-zero aliases. The batch gate normalizes
+these aliases before dispatch: identical canonical evidence keeps the original
+decision for the first occurrence and marks every subsequent card `PRUNE`
+with `duplicate_canonical_target` and `canonical_primary_row`. This prevents
+counting one issue or reward five times and prevents duplicate BUILD allocations.
+
+If duplicate cards disagree on issue/reward status, archive/scope, ownership
+collections, or an explicitly provided reward amount/currency, **every alias**
+becomes `VERIFY_REQUIRED` with `conflicting_duplicate_canonical_target`;
+the input order does not decide which conflicting state to trust. Stale
+snapshots still return `VERIFY_REQUIRED` for every row. Missing/invalid
+`resource` values retain v1 compatibility but cannot benefit from cross-row
+deduplication; collectors should always supply canonical resource IDs.
+
+
 ## Usage
 
 ```bash
