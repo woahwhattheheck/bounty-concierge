@@ -73,17 +73,28 @@ def reconciliation_status(snapshot: dict[str, Any]) -> str:
         if not isinstance(meta, dict):
             return "invalid"
         observed = datetime.fromisoformat(meta["observed_at"].replace("Z", "+00:00"))
-        catalog_stamp = meta["catalog_observed_at"]
-        if not isinstance(catalog_stamp, str) or meta.get("catalog_freshness") != "fresh":
+        catalog_stamp = meta.get("catalog_observed_at")
+        catalog_freshness = meta.get("catalog_freshness")
+        legacy = (
+            snapshot.get("schema") == "bountyhub-public-intake/compact-v1"
+            and catalog_freshness == "legacy_compact_without_timestamp"
+            and "retrieved_at" not in snapshot
+        )
+        if catalog_freshness != "fresh" and not legacy:
             return "invalid"
-        catalog_observed = datetime.fromisoformat(catalog_stamp.replace("Z", "+00:00"))
+        catalog_observed = (
+            datetime.fromisoformat(catalog_stamp.replace("Z", "+00:00"))
+            if isinstance(catalog_stamp, str) else None
+        )
         maximum = meta["max_age_seconds"]
-        if (observed.tzinfo is None or catalog_observed.tzinfo is None
-                or type(maximum) is not int or maximum <= 0):
+        if (observed.tzinfo is None or type(maximum) is not int
+                or maximum <= 0 or
+                (not legacy and (catalog_observed is None or catalog_observed.tzinfo is None))):
             return "invalid"
         now = datetime.now(timezone.utc)
-        ages = ((now - observed).total_seconds(),
-                (now - catalog_observed).total_seconds())
+        ages = ((now - observed).total_seconds(),)
+        if catalog_observed is not None:
+            ages += ((now - catalog_observed).total_seconds(),)
         return "future" if any(age < 0 for age in ages) else (
             "stale" if any(age > maximum for age in ages) else "fresh"
         )
