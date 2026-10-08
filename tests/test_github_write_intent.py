@@ -98,6 +98,51 @@ class GitHubWriteIntentLedgerTests(unittest.TestCase):
             self.assertEqual(replay.operation_id, first.operation_id)
             self.assertEqual(len(ledger.records()), 1)
 
+    def test_pending_different_head_cannot_enqueue_same_pr_target(self):
+        with tempfile.TemporaryDirectory() as root:
+            ledger = self.ledger(root)
+            original = self.enqueue(ledger, operation_id="seat-a-head-a")
+            with self.assertRaisesRegex(WriteIntentError, "different expected head"):
+                ledger.enqueue_pr_body(
+                    operation_id="seat-b-head-b",
+                    repository="centurylong/SANCTIFIER",
+                    pull_number=988,
+                    expected_head=HEAD_B,
+                    body="new head body",
+                    now_epoch=101.0,
+                )
+            self.assertEqual(len(ledger.records()), 1)
+            self.assertEqual(ledger.records()[0].operation_id, original.operation_id)
+
+    def test_leased_cross_head_is_blocked_then_done_allows_new_head(self):
+        with tempfile.TemporaryDirectory() as root:
+            ledger = self.ledger(root)
+            self.enqueue(ledger, operation_id="old-head")
+            original = ledger.claim_ready("publisher-a", now_epoch=102.0)
+            self.assertIsNotNone(original)
+            with self.assertRaisesRegex(WriteIntentError, "different expected head"):
+                ledger.enqueue_pr_body(
+                    operation_id="new-head",
+                    repository="Centurylong/sanctifier",
+                    pull_number=988,
+                    expected_head=HEAD_B,
+                    body="new head body",
+                    now_epoch=103.0,
+                )
+            self.assertIsNone(ledger.claim_ready("publisher-b", now_epoch=103.0))
+            ledger.complete(original.operation_id, "publisher-a", observed_head=HEAD_A)
+            follow_up = ledger.enqueue_pr_body(
+                operation_id="new-head",
+                repository="Centurylong/sanctifier",
+                pull_number=988,
+                expected_head=HEAD_B,
+                body="new head body",
+                now_epoch=104.0,
+            )
+            self.assertEqual(follow_up.state, "PENDING")
+            self.assertEqual(follow_up.expected_head, HEAD_B)
+            self.assertEqual(len(ledger.records()), 2)
+
     def test_claim_serializes_publishers_and_expired_lease_is_reclaimable(self):
         with tempfile.TemporaryDirectory() as root:
             ledger = self.ledger(root)

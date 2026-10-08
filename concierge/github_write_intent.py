@@ -236,12 +236,17 @@ class GitHubWriteIntentLedger:
             active = connection.execute(
                 "SELECT * FROM github_write_intent_v1 "
                 "WHERE lower(repository) = lower(?) AND pull_number = ? "
-                "AND expected_head = ? AND state IN ('PENDING', 'LEASED') "
+                "AND state IN ('PENDING', 'LEASED') "
                 "ORDER BY created_epoch, operation_id LIMIT 1",
-                (repository, pull_number, expected_head),
+                (repository, pull_number),
             ).fetchone()
             if active is not None:
                 canonical = self._decode(active)
+                if canonical.expected_head != expected_head:
+                    raise WriteIntentError(
+                        "active PR write intent has a different expected head; "
+                        "reconcile the existing operation before publishing"
+                    )
                 if canonical.payload_sha256 != payload_sha256:
                     raise WriteIntentError(
                         "active PR-head write intent has a different body; "
