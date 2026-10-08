@@ -86,7 +86,17 @@ def _canonical_hash(value: dict[str, Any]) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _enforce_minimum_reward_floor(value: Any) -> Decimal:
+    """Callers may raise, but cannot lower, the USD $15 active-work floor."""
+    if not isinstance(value, Decimal) or not value.is_finite():
+        raise MovaFactoryError("minimum_reward_usd must be a finite Decimal")
+    if value < Decimal("15"):
+        raise MovaFactoryError("minimum_reward_usd must be at least $15")
+    return value
+
+
 def _reward(value: Any, minimum_reward_usd: Decimal) -> str:
+    minimum_reward_usd = _enforce_minimum_reward_floor(minimum_reward_usd)
     if isinstance(value, bool) or not isinstance(value, (str, int, float)):
         raise MovaFactoryError("reward_usd must be numeric")
     try:
