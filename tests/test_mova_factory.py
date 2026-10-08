@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: MIT
+from copy import deepcopy
 from decimal import Decimal
 
 import pytest
 
-from concierge.mova_factory import MovaFactoryError, compile_mova_packet
+from concierge.mova_factory import MovaFactoryError, compile_mova_packet, compile_mova_batch
 
 
 CAPTURE = "1" * 64
@@ -77,3 +78,39 @@ def test_rejects_stale_or_mismatched_lease_before_dispatch():
     value["lease_receipt"]["dispatch"] = False
     with pytest.raises(MovaFactoryError, match="READY"):
         compile_mova_packet(value)
+
+
+def test_paid_work_cannot_omit_compensation_claim():
+    value = candidate()
+    value["compensation_claim"] = {"required": False, "text": None}
+    with pytest.raises(MovaFactoryError, match="affirmative"):
+        compile_mova_packet(value)
+
+
+def test_batch_deduplicates_exact_repeats_and_sorts_targets():
+    first = candidate()
+    second = deepcopy(first)
+    second["repo"] = "another/repo"
+    second["issue_number"] = 24
+    second["canonical_issue_url"] = "https://github.com/another/repo/issues/24"
+    second["lease_receipt"]["repo"] = "another/repo"
+    second["lease_receipt"]["number"] = 24
+    second["compensation_claim"]["text"] = "@algora-pbc /claim #24 — payment requested."
+    wave = compile_mova_batch([first, second, deepcopy(first)])
+    reverse = compile_mova_batch([second, first, deepcopy(first)])
+    assert wave == reverse
+    assert wave["count"] == 2
+    assert wave["deduplicated_count"] == 1
+    assert [target["target_key"] for target in wave["targets"]] == [
+        "another/repo#24", "owner/repo#42"
+    ]
+    assert all(packet["economics"]["compensation_claim"]["required"]
+               for packet in wave["packets"])
+
+
+def test_batch_rejects_conflicting_source_snapshot_same_issue():
+    first = candidate()
+    drifted = deepcopy(first)
+    drifted["canonical_capture_sha256"] = "f" * 64
+    with pytest.raises(MovaFactoryError, match="conflicting READY"):
+        compile_mova_batch([first, drifted])

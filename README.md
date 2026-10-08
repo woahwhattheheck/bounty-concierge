@@ -96,6 +96,37 @@ For a deep dive, see [docs/TECH_STACK.md](docs/TECH_STACK.md).
 
 ---
 
+## MOVA paid-bounty wave compilation
+
+Use the existing `concierge-mova` command to turn current, canonically open,
+green-platform bounty captures with READY lease receipts into collision-fenced
+SCOUT → BUILD → QA → PUBLISH → COLLECT work packets.
+
+```bash
+# Existing single-candidate behavior
+concierge-mova paid-candidate.json --output single-packet.json
+
+# Deterministic wave: 1–128 already-validated candidate objects in a JSON list
+concierge-mova paid-candidates.json --batch --output wave.json
+
+# Optional target-keyed role ownership (e.g. "owner/repo#42" → role-name map)
+concierge-mova paid-candidates.json --batch --owners wave-owners.json --output wave.json
+```
+
+The batch sorts tickets by canonical `owner/repo#issue`, collapses exact
+duplicates, and **rejects** conflicting snapshots or owner assignments for the
+same paid target; it never silently grants the same issue to two builders.
+It rejects ungreen, closed, below-minimum (default $15), stale lease, source
+generation drift, missing affirmative compensation requests, and waiver language.
+Each packet keeps work on `tokenjunkielabs` and publication/collection on
+`woahwhattheheck`, unless the supplied validated candidate overrides these
+identities. This command **only** writes an offline work manifest: it does not
+acquire a live provider lease, submit claims, send a Slack dispatch, or establish
+award/payment. Refresh provider evidence and respect active owner claims before
+acting on the manifest.
+
+---
+
 ## CLI Tool
 
 ### Installation
