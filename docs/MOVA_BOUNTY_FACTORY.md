@@ -8,6 +8,8 @@ The model is the fast MOVA pattern: keep discovery, implementation, acceptance r
 
 A candidate must include the canonical GitHub issue identity, a green paid platform, reward at or above the configured active-work floor, canonical capture and source-generation SHA-256 digests, a `bounty-work-order-lease/v1` receipt that is still `READY`, and the compensation claim that must survive publication. An optional expected Git head pins the source carrier.
 
+**Sponsor archive fence:** intake must directly check the canonical sponsor repository's current GitHub `archived` state, and set candidate `"repository_archived": false` **only after a real provider read**. The factory rejects `true`, absent, or string-valued states instead of inferring that an open issue and bounty label permit publication. The output retains `repository_archived: false` for the publishing handoff. This is an offline assertion from the supplied intake; a publisher must still refresh the sponsor state immediately before a real PR write. Archived sponsors require unarchiving or a separately authorized submission route; retrying other credentials does not fix repository policy.
+
 The compiler rejects stale leases, source-generation drift, mismatched canonical URLs, below-floor work, and required compensation text containing waiver/forfeit language. It never creates a claim, PR, provider application, payment action, or source mutation.
 
 ## Pipeline
