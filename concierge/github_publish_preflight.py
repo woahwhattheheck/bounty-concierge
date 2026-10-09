@@ -214,6 +214,32 @@ def execute_publish_operation(
             "reason": "fresh first-party repository archive metadata required before PR create",
         }
 
+    # Check the *local* shared cooldown before any sponsor repository or PR
+    # census reads. Otherwise a known HOT rail can burn precious GitHub API
+    # quota merely to discover that the subsequent write is deferred.
+    # This is an early read-only gate, not a recovery lease: the original
+    # authoritative snapshot and CAS recovery claim below still run after
+    # the live source/repository checks, immediately before transport.
+    early_snapshot = availability_snapshot(
+        path,
+        token,
+        rail=rail,
+        actor=actor,
+        cooldown_scope=cooldown_scope,
+    )
+    early_availability = early_snapshot.get("availability")
+    if early_availability in {"HOT", "RECOVERY_PROBE_IN_FLIGHT"}:
+        return _deferred(
+            early_snapshot,
+            operation=operation,
+            action=action,
+            repo=repo,
+            carrier=carrier,
+            expected_head=expected_head,
+        )
+    if early_availability not in {"AVAILABLE", "RECOVERY_READY"}:
+        raise CooldownStateError("shared GitHub rail availability invalid")
+
     if provider_repository_state is not None:
         repository_state = provider_repository_state()
         if (
