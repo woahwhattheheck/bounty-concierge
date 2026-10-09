@@ -12,9 +12,13 @@ The script traverses the checkout without following symlink directories, inspect
 
 **Verified incident source links:** [Sampled compromised commit](https://github.com/sampled-labs/sampled/commit/08a2d1db8317e1620ead99f8eb7bdfe1e002aef0), [BalloonFly committed loader](https://github.com/balloonfly-hq/hackathon-scaffold-stellar/commit/94192afc57ac20da6b9aa8c9a0254be995341792), [Scaffold Studio committed loader](https://github.com/scaffold-studio-hq/scaffold-studio-contracts/commit/7937aa5e1574be3830d37d0cfa8c1db94d80b172). Preserve historical evidence; do not execute the malicious file or echo any decoded remote payload.
 
-**Important operational limitation:** The rule now covers nested ESLint and PostCSS configs, not every executable source file, package lifecycle hook, VS Code task, fake font, or transitive dependency. A clean result cannot override existing security quarantine, payer-proof hold, acceptance review, or credentialed-runner controls. Sponsor forks, checkout branch changes and transitive dependencies require separate source inspection. Always confirm the current repository/branch and original commit identity before rescanning; do not treat a clean fork as proof its upstream is fixed.
+**Important operational limitation:** The rule now covers nested ESLint and PostCSS configs plus selected npm lifecycle metadata, VS Code automatic task metadata, and WOFF2 file headers. It does not inspect files launched indirectly by package scripts, all editor features, arbitrary file types, or transitive dependencies. A clean result cannot override existing security quarantine, payer-proof hold, acceptance review, or credentialed-runner controls. Sponsor forks, checkout branch changes and transitive dependencies require separate source inspection. Always confirm the current repository/branch and original commit identity before rescanning; do not treat a clean fork as proof its upstream is fixed.
 
-Validation: the original six focused standard-library tests in `tests/test_repo_exec_quarantine.py` remain; six focused nested/variant regressions are added in `tests/test_repo_exec_quarantine_nested_postcss.py` (source committed, no full-repository test run claimed). No network, npm, sponsor code execution or broad tests are needed.
+## Additional static checks
+
+The existing CLI and exit codes now include `concierge.repo_exec_autoexec`. It reads package manifests for lifecycle hook names, editor task configuration for folder-open triggers, and public font files for WOFF2 header bytes. It never executes inspected code. Verified high-confidence source indicators result in `QUARANTINE`; other automatic execution indicators and uncertain inputs require `REVIEW_REQUIRED`. Traversal and byte limits remain bounded. A negative result does not establish repository safety.
+
+Validation: the original six focused standard-library tests and six nested/variant regressions remain. Five new inert source fixtures in `tests/test_repo_exec_autoexec.py` passed in the ChatGPT cloud container. No broad tests or untrusted source execution were performed.
 
 ## Cross-repository source observations (October 9)
 
