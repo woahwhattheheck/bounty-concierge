@@ -17,6 +17,8 @@ import re
 
 import requests
 
+from concierge.bountyhub_canonical_admission import _known_dead_repository
+
 SCHEMA = "bountyhub-canonical-probe/v1"
 REPO = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
 
@@ -115,6 +117,10 @@ def check_shortlist(selected, *, max_requests=5, session=None, github_token=None
     )):
         raise ValueError("invalid GitHub token")
     rows = _targets(selected)
+    # Load the already-authoritative dead-repo policy once per distinct repo
+    # before consuming the GitHub request budget. Invalid/missing policy HOLDs.
+    denied = {row["repo"].casefold() for row in rows
+              if _known_dead_repository(row["repo"])}
     report = {"schema": SCHEMA, "observed_at": _now(), "request_limit": max_requests,
               "request_count": 0, "rate_limited": False, "stopped_early": False,
               "records": [], "cash_proof": False, "claim_authority": False,
@@ -124,7 +130,9 @@ def check_shortlist(selected, *, max_requests=5, session=None, github_token=None
         for row in rows:
             result = {**row, "checked_at": None, "state": None, "http_status": None,
                       "disposition": "HOLD", "reason": "NOT_CHECKED"}
-            if not stopped and report["request_count"] < max_requests:
+            if row["repo"].casefold() in denied:
+                result.update(disposition="PRUNE_NEW_BUILD", reason="REPO_KNOWN_DEAD")
+            elif not stopped and report["request_count"] < max_requests:
                 report["request_count"] += 1
                 result["checked_at"] = _now()
                 fetched = _probe(client, row, github_token)
