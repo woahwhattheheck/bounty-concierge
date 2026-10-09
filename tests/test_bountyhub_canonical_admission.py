@@ -55,7 +55,17 @@ def run():
     else:
         raise AssertionError("non-first-party source URL accepted")
 
-    print("4 focused admission cases passed")
+    # A dead repository cannot bypass the policy with a fabricated
+    # escrow card, active GitHub snapshot and paid-merge flag.
+    dead = baseline()
+    dead_url = "https://github.com/Claude-Builders-Bounty/claude-builders-bounty/issues/4"
+    dead["listing"]["issue_url"] = dead_url
+    dead["github"]["issue_url"] = dead_url
+    result = assess(dead)
+    assert result["decision"] == "HOLD", result
+    assert "REPO_KNOWN_DEAD" in result["reason_codes"], result
+
+    print("5 focused admission cases passed")
 
 
 if __name__ == "__main__":
