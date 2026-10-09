@@ -171,14 +171,16 @@ def audit(input_data: Any, *, as_of: datetime | None = None, max_age_seconds: in
         repo = _repo(case["repo"])
         issue = _issue(case["issue"])
         claimant = _canonical_name(case["claimant"], "claimant")
-        gh = _exact(case["github"], {"pr_url", "head_sha", "observed_at", "state", "author"}, "github")
+        gh = _exact(case["github"], {"pr_url", "head_sha", "observed_at", "state", "merged", "author"}, "github")
         pr_url, pr_repo, pr_number = _github_pr(gh["pr_url"])
         if pr_repo != repo or _canonical_name(gh["author"], "PR author") != claimant:
             raise PortalRegistrationError("GitHub PR, issue and claimant identities disagree")
         if type(gh["head_sha"]) is not str or not _HEX40.fullmatch(gh["head_sha"]):
             raise PortalRegistrationError("GitHub head must be a 40-character commit SHA")
-        if gh["state"] not in {"open", "closed"}:
-            raise PortalRegistrationError("unsupported GitHub PR state")
+        if gh["state"] not in {"open", "closed"} or type(gh["merged"]) is not bool:
+            raise PortalRegistrationError("unsupported GitHub PR state/merge evidence")
+        if gh["state"] == "open" and gh["merged"]:
+            raise PortalRegistrationError("an open GitHub PR cannot already be merged")
         identity = {"platform": platform, "repo": repo, "issue": issue,
                     "claimant": claimant, "pr_url": pr_url}
         identity_key = json.dumps(identity, sort_keys=True, separators=(",", ":"))
@@ -200,7 +202,13 @@ def audit(input_data: Any, *, as_of: datetime | None = None, max_age_seconds: in
         proof_status = _settlement(case["settlement"], identity, as_of, max_age_seconds)
         if proof_status:
             status = proof_status
-        elif not github_fresh or not portal_fresh or not portal["complete"] or case["settlement"] is not None:
+        elif not github_fresh:
+            status = "UNKNOWN"
+        elif gh["state"] == "closed" and not gh["merged"]:
+            # A maintainer-closed, unmerged PR is not an ordinary live
+            # portal-registration job, even if its sponsor pool still exists.
+            status = "PR_CLOSED_UNMERGED_HOLD"
+        elif not portal_fresh or not portal["complete"] or case["settlement"] is not None:
             # Stale positive award/payment evidence cannot be downgraded to
             # an affirmative unawarded stage merely because the portal is live.
             status = "UNKNOWN"
@@ -212,6 +220,7 @@ def audit(input_data: Any, *, as_of: datetime | None = None, max_age_seconds: in
         outcome = {
             "identity": identity, "identity_sha256": key, "pr_number": pr_number,
             "github_head_sha": gh["head_sha"], "status": status,
+            "github_pr_state": gh["state"], "github_merged": gh["merged"],
             "github_fresh": github_fresh, "portal_fresh": portal_fresh,
             "portal_complete": portal["complete"],
             "other_registered_count": len(normalized_roster - {pr_url}),
@@ -236,4 +245,4 @@ def audit(input_data: Any, *, as_of: datetime | None = None, max_age_seconds: in
             "cases": outcomes, "work_orders": work_orders,
             "summary": {status: sum(x["status"] == status for x in outcomes) for status in
                         ("GITHUB_SUBMITTED_PORTAL_NOT_REGISTERED", "PORTAL_REGISTERED_UNAWARDED",
-                         "AWARDED", "PAID", "UNKNOWN")}}
+                         "PR_CLOSED_UNMERGED_HOLD", "AWARDED", "PAID", "UNKNOWN")}}

@@ -26,6 +26,7 @@ The input is a JSON object with schema `bounty-portal-registration-audit/v1` and
         "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "observed_at": "2026-10-09T05:43:00Z",
         "state": "open",
+        "merged": false,
         "author": "woahwhattheheck"
       },
       "portal": {
@@ -42,7 +43,7 @@ The input is a JSON object with schema `bounty-portal-registration-audit/v1` and
 
 Use `complete:false` if the provider page was truncated, unavailable or cannot prove its output list is exhaustive; an empty or stale list must **never** become a confirmed absence. Both independent observations must be current (default at most 24h old) to produce a missing-registration work order. Platform native output aliases are accepted only in the IssueHunt `/r/<owner>/<repo>/pull/<number>` shape; a competing PR is not our submission.
 
-Result stages are `GITHUB_SUBMITTED_PORTAL_NOT_REGISTERED`, `PORTAL_REGISTERED_UNAWARDED`, `AWARDED`, `PAID`, and `UNKNOWN`. Award/paid states require a **separate, same-identity, fresh operator-certified settlement receipt** of the exact shape:
+Result stages are `GITHUB_SUBMITTED_PORTAL_NOT_REGISTERED`, `PORTAL_REGISTERED_UNAWARDED`, **`PR_CLOSED_UNMERGED_HOLD`**, `AWARDED`, `PAID`, and `UNKNOWN`. `github.merged` must be a separately verified GitHub boolean; an open PR cannot be merged. A **closed, unmerged PR** (including one closed by the sponsor maintainer) produces `PR_CLOSED_UNMERGED_HOLD`, *not* a routine portal-registration work order, even when a funded portal listing remains visible. Such a PR requires separate sponsor-acceptance or appeal evidence before action; never silently reopen or reapply.  Award/paid states require a **separate, same-identity, fresh operator-certified settlement receipt** of the exact shape:
 
 ```json
 {

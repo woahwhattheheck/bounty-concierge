@@ -15,7 +15,7 @@ def example():
         "platform": "issuehunt", "repo": "egoist/bili", "issue": 183,
         "claimant": "woahwhattheheck",
         "github": {"pr_url": "https://github.com/egoist/bili/pull/642",
-                   "head_sha": "a" * 40, "state": "open",
+                   "head_sha": "a" * 40, "state": "open", "merged": False,
                    "observed_at": T, "author": "woahwhattheheck"},
         "portal": {"source_url": "https://oss.issuehunt.io/r/egoist/bili/issues/183",
                    "observed_at": T, "complete": True,
@@ -50,6 +50,21 @@ class PortalGapFocused(unittest.TestCase):
             audit(src, as_of=AT)
         src = example()
         src["cases"][0]["portal"]["source_url"] = "https://oss.issuehunt.io.evil.org/r/egoist/bili/issues/183"
+        with self.assertRaises(PortalRegistrationError):
+            audit(src, as_of=AT)
+
+    def test_maintainer_closed_unmerged_is_not_a_register_job(self):
+        src = example()
+        src["cases"][0]["github"]["state"] = "closed"
+        src["cases"][0]["github"]["merged"] = False
+        result = audit(src, as_of=AT)
+        self.assertEqual(result["cases"][0]["status"], "PR_CLOSED_UNMERGED_HOLD")
+        self.assertEqual(result["work_orders"], [])
+        self.assertEqual(result["summary"]["PR_CLOSED_UNMERGED_HOLD"], 1)
+        # A sponsor-merged PR remains a potential legitimate registration gap.
+        src["cases"][0]["github"]["merged"] = True
+        self.assertEqual(audit(src, as_of=AT)["summary"]["GITHUB_SUBMITTED_PORTAL_NOT_REGISTERED"], 1)
+        src["cases"][0]["github"]["state"] = "open"
         with self.assertRaises(PortalRegistrationError):
             audit(src, as_of=AT)
 
