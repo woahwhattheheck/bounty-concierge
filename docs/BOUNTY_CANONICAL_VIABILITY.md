@@ -35,6 +35,24 @@ Schema v2 embeds the earlier `bounty_value_router` receipt plus the selected wor
 - SELECTION_GATED: hold until the actor is selected or assigned.
 - REPORT_ONLY: prune from implementation work unless a separate implementation award exists.
 
+## Live-clock replay fence
+
+The **CLI** compares `evaluated_at` in the supplied snapshot to the runner's
+actual UTC wall clock *before* compiling a receipt. It rejects an evaluation
+more than five minutes old or more than 60 seconds future-dated. This prevents
+an old canonical snapshot plus its old `evaluated_at` value from being replayed
+today as if all source observations were fresh. All listing, repository, issue,
+reward and collision observation ages are still assessed against the accepted
+evaluation clock by the existing compiler.
+
+The pure `compile_bounty_canonical_viability` function and `verify_receipt`
+remain deterministic for historical review; they deliberately do not assert
+the machine's current time. Any programmatic caller intending to dispatch live
+paid work must apply the same live clock check, refresh the first-party sponsor
+evidence, and satisfy the independent payer/active-repository policy. This
+receipt remains advisory and never grants claim, build, submission or payout
+authority.
+
 Run with:
 
     python -m concierge.bounty_canonical_viability snapshot.json --json
