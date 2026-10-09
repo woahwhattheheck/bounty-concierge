@@ -105,9 +105,20 @@ class GitHubRestReader:
 
 def _related(pr: dict[str, Any], owner: str, repo: str, number: int) -> bool:
     body = str(pr.get("title") or "") + "\n" + str(pr.get("body") or "")
+    # GitHub also uses owner/repo#N references. Only bind the target repository;
+    # issue URLs must not match longer numbers sharing the same prefix.
     short = re.compile(r"(?<![A-Za-z0-9])#" + str(number) + r"\b")
-    full = f"github.com/{owner}/{repo}/issues/{number}"
-    return bool(short.search(body) or full.casefold() in body.casefold())
+    qualified = re.compile(
+        r"(?<![A-Za-z0-9_./-])" + re.escape(owner) + "/" + re.escape(repo)
+        + r"#" + str(number) + r"\b",
+        re.IGNORECASE,
+    )
+    full = re.compile(
+        r"https://github\.com/" + re.escape(owner) + "/" + re.escape(repo)
+        + r"/issues/" + str(number) + r"(?![A-Za-z0-9])",
+        re.IGNORECASE,
+    )
+    return bool(short.search(body) or qualified.search(body) or full.search(body))
 
 
 def inspect_algora_listing(
