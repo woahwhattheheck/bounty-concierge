@@ -18,7 +18,7 @@ from urllib.parse import urlsplit
 import re
 import sys
 from typing import Any
-from concierge.mova_claim_target import validate_claim_target
+from concierge.mova_claim_target import ClaimTargetMismatch, validate_claim_target
 
 
 SCHEMA = "mova-bounty-factory/v1"
@@ -484,7 +484,10 @@ def compile_mova_packet(
         raise MovaFactoryError("candidate source generation disagrees with READY lease")
 
     claim = _claim(candidate.get("compensation_claim"))
-    validate_claim_target(claim["text"], issue_number)
+    try:
+        validate_claim_target(claim["text"], issue_number)
+    except ClaimTargetMismatch as exc:
+        raise MovaFactoryError(f"compensation_claim.text: {exc}") from exc
     role_owners = _owners(owners)
     constraints = _constraints(candidate.get("constraints"))
     work_account = _owner_account(
