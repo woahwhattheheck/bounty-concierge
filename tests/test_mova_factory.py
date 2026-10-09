@@ -84,6 +84,32 @@ def test_rejects_waiver_language_in_required_compensation_claim():
         compile_mova_packet(value)
 
 
+@pytest.mark.parametrize("unclaimed_text", [
+    "Patch uploaded; please review.",
+    "Bounty issue addressed; changes ready for maintainer review.",
+    "I do not claim the $50 bounty.",
+    "I am not requesting compensation for this work.",
+    "I claim no payment for this patch.",
+])
+def test_paid_packets_cannot_silently_omit_or_waive_claims(unclaimed_text):
+    value = candidate()
+    value["compensation_claim"]["text"] = unclaimed_text
+    with pytest.raises(MovaFactoryError, match="affirmative|waiver"):
+        compile_mova_packet(value)
+
+
+@pytest.mark.parametrize("claim_text", [
+    "@algora-pbc /claim #42",
+    "I claim the $50 bounty and request payout upon acceptance.",
+    "Payment requested for this accepted contribution.",
+])
+def test_valid_affirmative_reward_requests_survive(claim_text):
+    value = candidate()
+    value["compensation_claim"]["text"] = claim_text
+    result = compile_mova_packet(value)
+    assert result["economics"]["compensation_claim"]["text"] == claim_text
+
+
 def test_rejects_stale_or_mismatched_lease_before_dispatch():
     value = candidate()
     value["lease_receipt"]["status"] = "STALE"
