@@ -478,7 +478,9 @@ def qualify_dispatch(
         add(
             payer_gate["reason_code"],
             "HOLD",
-            "A fresh owner-curated same-payer paid-merge record is required for new bounty labor.",
+            ("A verified owner canonical exact-task preflight is required: historical paid-merger evidence only qualifies sponsor discovery."
+             if payer_gate["historical_paid_merge_proof"] else
+             "A fresh owner-curated same-payer paid-merge record is required for new bounty labor."),
         )
     if issue_method_prohibited:
         add(
