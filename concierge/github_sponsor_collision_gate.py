@@ -15,6 +15,7 @@ from typing import Any, Callable, Optional, TypeVar
 
 import requests
 
+from concierge.github_intake_cache import classify_github_403
 from concierge.github_publish_preflight import execute_publish_operation
 
 T = TypeVar("T")
@@ -49,13 +50,28 @@ def _get_json(session: Any, url: str, token: str) -> Any:
         if status != 200:
             rate = response.headers.get("X-RateLimit-Remaining")
             retry = response.headers.get("Retry-After")
-            scope = "INTEGRATION_SCOPE_DENIED" if status == 403 and (
-                "resource not accessible by integration"
-                in str(getattr(response, "text", "")).casefold()
-            ) else (
-                "RATE_LIMITED" if status in {403, 429} and (rate == "0" or retry)
-                else "PROVIDER_HTTP_ERROR"
-            )
+            if status in {403, 429}:
+                # A secondary throttle can have a healthy primary quota and
+                # no Retry-After header; GitHub's response text is decisive.
+                remaining = int(rate) if isinstance(rate, str) and rate.isdecimal() else None
+                retry_seconds = (
+                    int(retry) if isinstance(retry, str) and retry.isdecimal() else None
+                )
+                classification = classify_github_403(
+                    str(getattr(response, "text", "")),
+                    remaining=remaining,
+                    retry_after_seconds=retry_seconds,
+                )
+                if classification == "SCOPE_DENIED":
+                    scope = "INTEGRATION_SCOPE_DENIED"
+                elif classification in {"PRIMARY_RATE_LIMITED", "SECONDARY_RATE_LIMITED"}:
+                    scope = classification
+                elif status == 429:
+                    scope = "RATE_LIMITED"
+                else:
+                    scope = "PROVIDER_HTTP_ERROR"
+            else:
+                scope = "PROVIDER_HTTP_ERROR"
             raise SponsorCollisionPreflightError(
                 f"GitHub issue-carrier read blocked: HTTP {status} ({scope}); "
                 "no write attempted"

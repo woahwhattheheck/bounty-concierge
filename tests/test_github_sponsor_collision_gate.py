@@ -29,9 +29,11 @@ class FakeResponse:
 
 
 class FakeSession:
-    def __init__(self, prs=(), *, archived=False, pull_status=200):
+    def __init__(self, prs=(), *, archived=False, pull_status=200,
+                 pull_headers=None, pull_text=""):
         self.urls = []
         self.prs, self.archived, self.pull_status = list(prs), archived, pull_status
+        self.pull_headers, self.pull_text = pull_headers, pull_text
 
     def get(self, url, **kwargs):
         self.urls.append(url)
@@ -41,7 +43,10 @@ class FakeSession:
         if url == f"{API}/repos/{REPO}":
             return FakeResponse({"full_name": REPO, "archived": self.archived})
         if url == f"{API}/repos/{REPO}/pulls?state=all&per_page=100&page=1":
-            return FakeResponse(self.prs, status=self.pull_status)
+            return FakeResponse(
+                self.prs, status=self.pull_status,
+                headers=self.pull_headers, text=self.pull_text,
+            )
         raise AssertionError(f"unexpected GitHub API URL: {url}")
 
 
@@ -107,6 +112,21 @@ class SponsorCollisionPublisherTest(unittest.TestCase):
         archived, archived_calls = self.publish(FakeSession(archived=True))
         self.assertEqual(archived["status"], "PROVIDER_REPOSITORY_ARCHIVED")
         self.assertEqual(archived_calls, [])
+
+    def test_secondary_403_is_classified_without_publish(self):
+        session = FakeSession(
+            pull_status=403,
+            pull_headers={"X-RateLimit-Remaining": "500"},
+            pull_text="You have exceeded a secondary rate limit.",
+        )
+        with self.assertRaisesRegex(
+            SponsorCollisionPreflightError, "SECONDARY_RATE_LIMITED"
+        ):
+            self.publish(session)
+        self.assertEqual(
+            session.urls[-1],
+            f"{API}/repos/{REPO}/pulls?state=all&per_page=100&page=1",
+        )
 
     def test_rate_error_fails_closed_before_transport(self):
         calls = []
