@@ -34,9 +34,9 @@ HEADERS = (
     "Timeline",
     "Estimated Duration",
 )
-MONEY_PATTERN = re.compile(r"\\$([0-9]+(?:\\.[0-9]{1,2})?)\\Z")
-CAPACITY_PATTERN = re.compile(r"([0-9]{1,3})%\\s+full\\Z", re.IGNORECASE)
-SEPARATOR_PATTERN = re.compile(r":?-{3,}:?\\Z")
+MONEY_PATTERN = re.compile(r"\$([0-9]+(?:\.[0-9]{1,2})?)\Z")
+CAPACITY_PATTERN = re.compile(r"([0-9]{1,3})%\s+full\Z", re.IGNORECASE)
+SEPARATOR_PATTERN = re.compile(r":?-{3,}:?\Z")
 
 
 class IntakeError(ValueError):
