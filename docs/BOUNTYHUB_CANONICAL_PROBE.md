@@ -12,14 +12,14 @@ shortlist** JSON. Then run:
     python -m concierge.bountyhub_canonical_probe shortlist.json --max-requests 5
 
 A previously authenticated GITHUB_TOKEN may be supplied via secure runtime
-environment; none is printed. A bounded default of 5 GETs, 0..100 permitted,
+environment; none is printed. Known-dead repositories in `policies/repo_targeting_v1.json` are rejected locally as `PRUNE_NEW_BUILD`/`REPO_KNOWN_DEAD` without any GitHub GET. A missing/invalid policy fails closed rather than dispatching a build; this never changes previously submitted claims. Other candidate issues remain eligible for the normal canonical-source probe. A bounded default of 5 GETs, 0..100 permitted,
 each canonical issue only once, no redirects and no retries. HTTP403/429 and
 transport errors end the attempt without burning the remaining budget.
 
 - PROCEED_TO_PREFLIGHT: live OPEN GitHub issue, but NOT authorization to
   implement, submit a claim or presume money. Maintainer, paid-merge payer
   precedent, collision, submission, ownership and funding still need checks.
-- PRUNE_NEW_BUILD: GitHub original is CLOSED. Existing original author PRs,
+- PRUNE_NEW_BUILD: GitHub original is CLOSED or the repository is in the local known-dead policy. Existing original author PRs,
   claims and possible payments remain intact.
 - HOLD: 404/410 missing OR inaccessible (not definitive deletion), move,
   quota, permission, invalid payload or unchecked due budget.
