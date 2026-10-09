@@ -21,6 +21,7 @@ import requests
 
 from concierge import bounty_preflight as bp
 from concierge.submission_packet import validate_submission_target
+from concierge.test_target_admission import screen_paid_target
 
 
 _RECEIPT_SCHEMA = "bounty-live-cash-admission-receipt/v1"
@@ -395,6 +396,8 @@ def _build_api():
             else None
         )
 
+        self_disclosure = screen_paid_target(repo_norm) if repository is not None else None
+
         reasons: list[str] = []
         route: str | None = None
         if not generation_stable:
@@ -412,6 +415,9 @@ def _build_api():
             ):
                 raise LiveCashAdmissionError("preflight reason_codes were malformed")
             reasons.extend(raw_reasons)
+        elif self_disclosure is not None and self_disclosure["new_paid_work_allowed"] is False:
+            disposition = "REJECT_NONPAYABLE_TEST_REPOSITORY"
+            reasons.append("SPONSOR_SELF_DISCLOSED_TEST_ONLY")
         elif repository is not None and repository["archived"]:
             disposition = "REJECT_CANONICAL_REPOSITORY_ARCHIVED"
             reasons.append("CANONICAL_REPOSITORY_ARCHIVED")
@@ -459,6 +465,9 @@ def _build_api():
                 "preflight_sha256": _sha256_json(preflight),
                 "preflight": source_projection,
                 "repository": repository,
+                **({"self_disclosure": self_disclosure}
+                   if self_disclosure is not None and self_disclosure["new_paid_work_allowed"] is False
+                   else {}),
                 **({"submission_target_sha256": _sha256_json(submission_target)}
                    if submission_target is not None else {}),
             },
