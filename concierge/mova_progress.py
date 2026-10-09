@@ -164,6 +164,13 @@ def compile_mova_progress(manifest: Any, receipts: Any) -> dict[str, Any]:
             # provider-verified award or payment. Assign independent verification
             # explicitly rather than silently treating the receivable as settled.
             status, next_role, role_packet = "SETTLEMENT_PROVIDER_RECHECK_REQUIRED", None, None
+            economics = packet.get("economics")
+            _require(type(economics) is dict, "missing original bounty economics")
+            original_claim = economics.get("compensation_claim")
+            _require(type(original_claim) is dict and original_claim.get("required") is True
+                     and type(original_claim.get("text")) is str
+                     and bool(original_claim["text"].strip()),
+                     "missing active original compensation claim")
             collect_role = packet["roles"][-1]
             settlement_followup = {
                 "recheck_status": "INDEPENDENT_PROVIDER_RECHECK_REQUIRED",
@@ -175,7 +182,7 @@ def compile_mova_progress(manifest: Any, receipts: Any) -> dict[str, Any]:
                 "collect_evidence_sha256": done[-1]["evidence_sha256"],
                 "publication_url": done[3]["publication_url"],
                 "publication_head": done[3]["head_sha"],
-                "compensation_claim": packet["economics"]["compensation_claim"],
+                "compensation_claim": original_claim,
             }
         else:
             role_packet = packet["roles"][next_index]
