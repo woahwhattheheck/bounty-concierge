@@ -39,6 +39,11 @@ _NONFIXED_WORD_RE = re.compile(
 _MILESTONE_TOTAL_RE = re.compile(
     r"(?i)(?:\bmilestones?\b.{0,40}\btotal\b|\btotal\b.{0,40}\bmilestones?\b)"
 )
+_CONTINGENT_REWARD_RE = re.compile(
+    r"(?i)\b(?:may\s+qualify\s+for\s+(?:an?\s+)?(?:reward|bounty)|"
+    r"may\s+be\s+rewarded|(?:reward|bounty|payment)\s+is\s+not\s+guaranteed|"
+    r"(?:reward|bounty)\s+is\s+discretionary)\b"
+)
 _AUTHORITY = {
     "advisory_only": True,
     "claim_authority": False,
@@ -121,8 +126,19 @@ def _source_text(issue: dict[str, Any]) -> tuple[str, str, list[str]]:
 def _nonfixed_usd_semantics(
     issue: dict[str, Any], selected_amount: Decimal | None
 ) -> bool:
-    """Identify ceilings/ranges/pools and never treat them as fixed cash."""
+    """Identify contingent rewards, ceilings, ranges and pools as non-fixed."""
     title, body, labels = _source_text(issue)
+    # GrantFox places "Maybe Rewarded" in an issue label, while the dollar
+    # amount is often only in its title. The older per-line amount scanner
+    # missed this explicit discretionary condition and could route it as cash.
+    if selected_amount is not None:
+        if any(" ".join(label.casefold().split()) == "maybe rewarded" for label in labels):
+            return True
+        if (
+            _CONTINGENT_REWARD_RE.search(title) is not None
+            or _CONTINGENT_REWARD_RE.search(body) is not None
+        ):
+            return True
     for text in (title, body, *labels):
         lines = text.splitlines() or [text]
         for index, line in enumerate(lines):
