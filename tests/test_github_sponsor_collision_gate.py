@@ -113,6 +113,21 @@ class SponsorCollisionPublisherTest(unittest.TestCase):
         self.assertEqual(archived["status"], "PROVIDER_REPOSITORY_ARCHIVED")
         self.assertEqual(archived_calls, [])
 
+    def test_canonical_issue_url_requires_exact_issue_number(self):
+        # Another PR for #550 must not block a new bounty claim on #55.
+        for unrelated in ("550", "555", "5500"):
+            with self.subTest(unrelated=unrelated):
+                body = f"Related: https://github.com/{REPO}/issues/{unrelated}"
+                result, calls = self.publish(FakeSession([sponsor_pr(body=body)]))
+                self.assertEqual(result, {"created": True})
+                self.assertEqual(calls, ["CREATE"])
+
+        # Preserve case-insensitive matching for the exact same paid issue.
+        actual = f"Fixes https://github.com/{REPO.upper()}/issues/{ISSUE}"
+        result, calls = self.publish(FakeSession([sponsor_pr(body=actual)]))
+        self.assertEqual(result["status"], "HOLD_EXISTING_ISSUE_CARRIER")
+        self.assertEqual(calls, [])
+
     def test_secondary_403_is_classified_without_publish(self):
         session = FakeSession(
             pull_status=403,

@@ -116,8 +116,13 @@ def _issue_mentions(pr: dict[str, Any], repo: str, issue_number: int) -> bool:
     body = pr["body"] or ""
     bare = re.compile(rf"(?<![A-Za-z0-9_])#{issue_number}(?![0-9])")
     # A canonical issue URL or owner/repo#n is also a claim.
-    canonical = f"https://github.com/{repo}/issues/{issue_number}"
-    if canonical.casefold() in (title + "\n" + body).casefold():
+    # A substring comparison aliases #55 to #550 and needlessly blocks a real
+    # paid issue carrier. Only the exact numeric GitHub issue identity matches.
+    canonical = re.compile(
+        rf"https://github\.com/{re.escape(repo)}/issues/{issue_number}(?![0-9])",
+        flags=re.IGNORECASE,
+    )
+    if canonical.search(title + "\n" + body) is not None:
         return True
     if re.search(rf"{re.escape(repo)}#{issue_number}(?![0-9])",
                  title + "\n" + body, flags=re.IGNORECASE):
