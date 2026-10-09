@@ -58,6 +58,15 @@ _FORBIDDEN_CLAIM_PHRASES = (
 _CLAIM_COMMAND = re.compile(r"(?<!\S)/claim\b")
 _CLAIM_ACTION = re.compile(r"\b(?:claim(?:s|ed|ing)?|request(?:s|ed|ing)?|seek(?:s|ing)?|ask(?:s|ed|ing)?|demand(?:s|ed|ing)?)\b")
 _CLAIM_REWARD = re.compile(r"\b(?:bounty|reward|compensation|payment|payout|prize|allocation)\b")
+# A pending receipt is not a compensation waiver. Remove only recognized status
+# clauses from intent classification, never from the published original text.
+# Also exclude these clauses from affirmative-request detection: mentioning an
+# unpaid reward alone must not manufacture a request for that reward.
+_PENDING_SETTLEMENT_STATUS = re.compile(
+    r"\bno (?:compensation|payment|reward|payout) "
+    r"has (?:yet )?been (?:received|confirmed|awarded)(?: yet)?"
+    r"(?=$|[.!?;,]|\s+(?:and|but|however)\b)"
+)
 _ROLE_ORDER = ("SCOUT", "BUILD", "QA", "PUBLISH", "COLLECT")
 # Only already-authorized fleet GitHub actors may own paid source or payout lanes.
 # Preserve original @tokenjunkielabs contributions when the author differs from
@@ -351,11 +360,12 @@ def _claim(value: Any) -> dict[str, Any]:
         raise MovaFactoryError("paid candidate requires an affirmative compensation claim")
     text = _text(text, "compensation_claim.text", maximum=4096)
     folded = " ".join(text.casefold().split())
-    if any(phrase in folded for phrase in _FORBIDDEN_CLAIM_PHRASES):
+    claim_language = _PENDING_SETTLEMENT_STATUS.sub(" ", folded)
+    if any(phrase in claim_language for phrase in _FORBIDDEN_CLAIM_PHRASES):
         raise MovaFactoryError("compensation_claim.text contains waiver language")
     if not (
-        _CLAIM_COMMAND.search(folded)
-        or (_CLAIM_ACTION.search(folded) and _CLAIM_REWARD.search(folded))
+        _CLAIM_COMMAND.search(claim_language)
+        or (_CLAIM_ACTION.search(claim_language) and _CLAIM_REWARD.search(claim_language))
     ):
         raise MovaFactoryError(
             "compensation_claim.text requires an affirmative bounty or payment claim"
