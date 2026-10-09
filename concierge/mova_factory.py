@@ -86,18 +86,50 @@ def _canonical_hash(value: dict[str, Any]) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+# Cap currency values before any fixed-point formatting. A short input such as
+# "1e100000" is finite but would otherwise expand into a 100,001-digit packet.
+_MAX_REWARD_NUMERIC_CHARS = 64
+_MAX_REWARD_USD = Decimal("1000000000000")
+
+
+def _bounded_reward_amount(value: Decimal, name: str) -> Decimal:
+    if not value.is_finite():
+        raise MovaFactoryError(f"{name} must be finite")
+    if len(value.as_tuple().digits) > _MAX_REWARD_NUMERIC_CHARS or value > _MAX_REWARD_USD:
+        raise MovaFactoryError(f"{name} exceeds bounded USD magnitude")
+    return value
+
+
+def _enforce_minimum_reward_floor(value: Any) -> Decimal:
+    """Callers may raise, but cannot lower, the USD $15 active-work floor."""
+    if not isinstance(value, Decimal) or not value.is_finite():
+        raise MovaFactoryError("minimum_reward_usd must be a finite Decimal")
+    _bounded_reward_amount(value, "minimum_reward_usd")
+    if value < Decimal("15"):
+        raise MovaFactoryError("minimum_reward_usd must be at least $15")
+    return value
+
+
 def _reward(value: Any, minimum_reward_usd: Decimal) -> str:
+    minimum_reward_usd = _enforce_minimum_reward_floor(minimum_reward_usd)
     if isinstance(value, bool) or not isinstance(value, (str, int, float)):
         raise MovaFactoryError("reward_usd must be numeric")
     try:
-        reward = Decimal(str(value))
+        literal = str(value)
+        if len(literal) > _MAX_REWARD_NUMERIC_CHARS:
+            raise MovaFactoryError("reward_usd exceeds bounded numeric input")
+        reward = Decimal(literal)
     except (InvalidOperation, ValueError) as exc:
         raise MovaFactoryError("reward_usd must be numeric") from exc
-    if not reward.is_finite() or reward < minimum_reward_usd:
+    _bounded_reward_amount(reward, "reward_usd")
+    if reward < minimum_reward_usd:
         raise MovaFactoryError(
             f"reward_usd must meet the ${minimum_reward_usd} active-work floor"
         )
-    return format(reward.normalize(), "f")
+    result = format(reward.normalize(), "f")
+    if len(result) > _MAX_REWARD_NUMERIC_CHARS:
+        raise MovaFactoryError("reward_usd exceeds bounded numeric output")
+    return result
 
 
 def _lease(value: Any, repo: str, issue_number: int) -> dict[str, Any]:
