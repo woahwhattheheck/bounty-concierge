@@ -56,6 +56,42 @@ def _verify_digest(obj: dict[str, Any], field: str) -> None:
              f"{field} does not match canonical contents")
 
 
+def _role_specs_for_packet(packet: dict[str, Any]) -> tuple[tuple[str, str, str], ...]:
+    """Honor only the two factory-emitted role shapes, never arbitrary omissions."""
+    roles = packet.get("roles")
+    _require(type(roles) is list, "missing packet roles")
+    names = [role.get("role") if type(role) is dict else None for role in roles]
+    default = [spec[0] for spec in ROLE_SPEC]
+    if names == default:
+        return ROLE_SPEC
+
+    _require(names == ["SCOUT", "BUILD", "PUBLISH", "COLLECT"],
+             "invalid MOVA packet role sequence")
+    evidence = packet.get("evidence")
+    target = packet.get("target")
+    coordination = packet.get("coordination")
+    _require(type(evidence) is dict and type(target) is dict and
+             type(coordination) is dict, "missing optional-QA provenance")
+    waiver = evidence.get("qa_handoff")
+    _require(type(waiver) is dict and set(waiver) == {
+        "schema", "separate_qa_required", "issue_url", "capture_sha256",
+        "checked_at", "builder_focused_check",
+    }, "invalid optional-QA source evidence")
+    _require(waiver.get("schema") == "mova-independent-qa/v1" and
+             waiver.get("separate_qa_required") is False and
+             waiver.get("builder_focused_check") is True and
+             waiver.get("issue_url") == target.get("canonical_issue_url") and
+             waiver.get("capture_sha256") == evidence.get("canonical_capture_sha256") and
+             SHA256.fullmatch(str(waiver.get("capture_sha256"))) is not None and
+             coordination.get("independent_qa_handoff") ==
+             "NOT_REQUIRED_WITH_SOURCE_EVIDENCE" and
+             coordination.get("builder_focused_check_still_required") is True and
+             roles[2].get("depends_on") == ["BUILD_RECEIPT"],
+             "optional-QA source receipt or publish dependency is invalid")
+    _text(waiver.get("checked_at"), "optional-QA checked_at", 64)
+    return tuple(spec for spec in ROLE_SPEC if spec[0] != "QA")
+
+
 def _packets(manifest: Any) -> list[dict[str, Any]]:
     _require(type(manifest) is dict, "manifest must be an object")
     if manifest.get("schema") == SCHEMA:
@@ -74,15 +110,16 @@ def _packets(manifest: Any) -> list[dict[str, Any]]:
         _verify_digest(packet, "packet_sha256")
         target = packet.get("target")
         roles = packet.get("roles")
-        _require(type(target) is dict and type(roles) is list and len(roles) == len(ROLE_SPEC),
+        _require(type(target) is dict and type(roles) is list,
                  "invalid packet target or roles")
+        stage_specs = _role_specs_for_packet(packet)
         key = _text(target.get("target_key"), "target_key", 256)
         _require(key == f"{target.get('repo', '').casefold()}#{target.get('issue_number')}",
                  "target_key disagrees with target")
         _require(previous is None or key > previous, "targets must be unique and ordered")
         previous = key
         operation = _text(packet.get("operation_id"), "operation_id", 128)
-        for role, (name, _, _) in zip(roles, ROLE_SPEC):
+        for role, (name, _, _) in zip(roles, stage_specs):
             _require(type(role) is dict and role.get("role") == name and
                      role.get("lease_key") == f"{operation}:{name}" and
                      role.get("target_key") == key, "role identity mismatch")
@@ -100,18 +137,19 @@ def _validated_receipt(value: Any, packets_by_key: dict[str, dict[str, Any]]) ->
     _require(key in packets_by_key, "receipt targets an unknown bounty")
     packet = packets_by_key[key]
     role = _text(value.get("role"), "role", 16)
-    names = [spec[0] for spec in ROLE_SPEC]
-    _require(role in names, "unknown receipt role")
-    role_number = names.index(role)
-    role_packet = packet["roles"][role_number]
+    stage_specs = _role_specs_for_packet(packet)
+    role_index = next((i for i, spec in enumerate(stage_specs) if spec[0] == role), None)
+    _require(role_index is not None, "receipt role is not present in source packet")
+    role_packet = packet["roles"][role_index]
+    role_spec = stage_specs[role_index]
     _require(value.get("operation_id") == packet["operation_id"] and
              value.get("packet_sha256") == packet["packet_sha256"] and
              value.get("lease_key") == role_packet["lease_key"],
              "receipt operation, packet digest or lease mismatched")
     _require(value.get("owner") == role_packet["owner"] and
              role_packet["owner"] != "UNASSIGNED", "receipt owner not assigned")
-    _require(value.get("receipt_type") == ROLE_SPEC[role_number][1] and
-             value.get("status") == ROLE_SPEC[role_number][2],
+    _require(value.get("receipt_type") == role_spec[1] and
+             value.get("status") == role_spec[2],
              "receipt does not establish the required completion/acceptance")
     _text(value.get("receipt_id"), "receipt_id", 256)
     _require(SHA256.fullmatch(_text(value.get("evidence_sha256"), "evidence_sha256", 64)) is not None,
@@ -149,17 +187,23 @@ def compile_mova_progress(manifest: Any, receipts: Any) -> dict[str, Any]:
     results = []
     for packet in packets:
         key = packet["target"]["target_key"]
-        done = [completed.get((key, spec[0])) for spec in ROLE_SPEC]
+        stage_specs = _role_specs_for_packet(packet)
+        done = [completed.get((key, spec[0])) for spec in stage_specs]
+        by_role = {spec[0]: receipt for spec, receipt in zip(stage_specs, done)}
         next_index = next((i for i, receipt in enumerate(done) if receipt is None), len(done))
         _require(not any(done[next_index:]), f"non-contiguous receipt sequence for {key}")
-        if next_index >= 2:
-            _require(done[2] is None or done[2]["head_sha"] == done[1]["head_sha"],
+        built = by_role["BUILD"]
+        qa = by_role.get("QA")
+        published = by_role["PUBLISH"]
+        if qa is not None:
+            _require(built is not None and qa["head_sha"] == built["head_sha"],
                      f"QA accepted a different head for {key}")
-        if next_index >= 3:
-            _require(done[3] is None or done[3]["head_sha"] == done[2]["head_sha"],
-                     f"publication head differs from QA-accepted head for {key}")
+        if published is not None:
+            accepted = qa if "QA" in by_role else built
+            _require(accepted is not None and published["head_sha"] == accepted["head_sha"],
+                     f"publication head differs from accepted source head for {key}")
         settlement_followup = None
-        if next_index == len(ROLE_SPEC):
+        if next_index == len(stage_specs):
             # A COLLECT role receipt is only an operator assertion, never a
             # provider-verified award or payment. Assign independent verification
             # explicitly rather than silently treating the receivable as settled.
@@ -178,10 +222,10 @@ def compile_mova_progress(manifest: Any, receipts: Any) -> dict[str, Any]:
                 "original_collect_owner": collect_role["owner"],
                 "original_collect_account": collect_role["account"],
                 "original_collect_lease_key": collect_role["lease_key"],
-                "collect_receipt_id": done[-1]["receipt_id"],
-                "collect_evidence_sha256": done[-1]["evidence_sha256"],
-                "publication_url": done[3]["publication_url"],
-                "publication_head": done[3]["head_sha"],
+                "collect_receipt_id": by_role["COLLECT"]["receipt_id"],
+                "collect_evidence_sha256": by_role["COLLECT"]["evidence_sha256"],
+                "publication_url": published["publication_url"],
+                "publication_head": published["head_sha"],
                 "compensation_claim": original_claim,
             }
         else:
@@ -193,11 +237,11 @@ def compile_mova_progress(manifest: Any, receipts: Any) -> dict[str, Any]:
             "target_key": key,
             "operation_id": packet["operation_id"],
             "packet_sha256": packet["packet_sha256"],
-            "completed_roles": [spec[0] for spec in ROLE_SPEC[:next_index]],
+            "completed_roles": [spec[0] for spec in stage_specs[:next_index]],
             "next_role": next_role,
             "status": status,
             "role_packet": role_packet,
-            "source_head": done[1]["head_sha"] if next_index >= 2 else None,
+            "source_head": built["head_sha"] if built is not None else None,
             "award_state": "UNVERIFIED",
             "payment_state": "UNVERIFIED",
             "settlement_followup": settlement_followup,
