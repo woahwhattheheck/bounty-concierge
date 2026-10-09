@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: MIT
+"""Focused admission regression: payment proof is necessary, never sufficient."""
+from copy import deepcopy
+from concierge.bountyhub_canonical_admission import AdmissionError, assess, SCHEMA
+
+
+def baseline():
+    return {
+        "schema": SCHEMA, "as_of": "2026-10-09T08:30:00Z",
+        "listing": {
+            "id": "example-listing", "issue_url": "https://github.com/example/repo/issues/42",
+            "advertised_usd": "75.00", "funding_type": "escrowed",
+        },
+        "github": {
+            "observed_at": "2026-10-09T08:20:00Z",
+            "issue_url": "https://github.com/example/repo/issues/42", "state": "open",
+            "repository_archived": False, "last_maintainer_action_at": "2026-10-08T10:00:00Z",
+            "assignees": [], "linked_open_pr_urls": [], "linked_pr_census_complete": True,
+        },
+        "payer": {
+            "sponsor_name": "Example", "proof_sponsor_name": "Example",
+            "completed_paid_merge_verified": True,
+            "receipt_url": "https://opencollective.com/example/expenses/123",
+        },
+    }
+
+
+def run():
+    ready = assess(baseline())
+    assert ready["decision"] == "READY_FOR_NEW_BUILD", ready
+
+    contested = baseline()
+    contested["github"]["linked_open_pr_urls"] = ["https://github.com/example/repo/pull/55"]
+    contested["github"]["assignees"] = ["assigned-dev"]
+    result = assess(contested)
+    assert result["decision"] == "HOLD"
+    assert "EXISTING_OPEN_IMPLEMENTATION" in result["reason_codes"]
+    assert "ASSIGNED_TO_EXISTING_CONTRIBUTOR" in result["reason_codes"]
+
+    stale_card = baseline()
+    stale_card["github"]["issue_url"] = "https://github.com/example/repo/issues/43"
+    stale_card["github"]["state"] = "closed"
+    stale_card["payer"]["completed_paid_merge_verified"] = False
+    stale_card["github"]["observed_at"] = "2026-10-01T01:00:00Z"
+    result = assess(stale_card)
+    assert set(("CANONICAL_ISSUE_MISMATCH", "CANONICAL_ISSUE_CLOSED",
+                "SAME_SPONSOR_COMPLETED_PAID_MERGE_UNVERIFIED", "CANONICAL_SOURCE_STALE")).issubset(result["reason_codes"])
+
+    bad_pr = deepcopy(baseline())
+    bad_pr["github"]["linked_open_pr_urls"] = ["https://other-site.example/owner/repo/pull/6"]
+    try:
+        assess(bad_pr)
+    except AdmissionError:
+        pass
+    else:
+        raise AssertionError("non-first-party source URL accepted")
+
+    print("4 focused admission cases passed")
+
+
+if __name__ == "__main__":
+    run()
