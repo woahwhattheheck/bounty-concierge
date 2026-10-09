@@ -118,6 +118,48 @@ def _known_dead_repository(repo):
     return repo.casefold() in known
 
 
+
+def _known_nonpayable_program(repo):
+    """Fail closed for first-party confirmed symbolic/test/discontinued programs.
+
+    This is an independent program-level exclusion, not an accusation of
+    deception, and never touches the historical claims or PRs.
+    """
+    path = Path(__file__).resolve().parents[1] / "policies" / "repo_targeting_v1.json"
+    try:
+        policy = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError) as error:
+        raise AdmissionError("repo-targeting policy unavailable") from error
+    if type(policy) is not dict or policy.get("schema") != "repo-targeting-policy/v1":
+        raise AdmissionError("unsupported repo-targeting policy schema")
+    section = policy.get("program_exclusions")
+    if (type(section) is not dict or
+            section.get("schema") != "first-party-nonpayable-programs/v1" or
+            section.get("new_paid_builds") != "HOLD" or
+            type(section.get("preserve_existing_claims")) is not bool or
+            section.get("preserve_existing_claims") is not True):
+        raise AdmissionError("nonpayable-program exclusion policy unavailable")
+    records = section.get("repositories")
+    if type(records) is not list or len(records) > 200:
+        raise AdmissionError("invalid nonpayable-program list")
+    blocked = set()
+    for record in records:
+        if type(record) is not dict or type(record.get("repo")) is not str:
+            raise AdmissionError("invalid nonpayable-program record")
+        slug = record["repo"]
+        if not _REPO.fullmatch(slug):
+            raise AdmissionError("invalid nonpayable-program repository slug")
+        if type(record.get("evidence_url")) is not str:
+            raise AdmissionError("missing first-party exclusion evidence URL")
+        evidence = _url(record["evidence_url"], "program_exclusions.evidence_url", host="github.com")
+        if not evidence.path.startswith("/" + slug + "/"):
+            raise AdmissionError("first-party evidence URL does not match excluded repository")
+        if type(record.get("classification")) is not str or not record["classification"]:
+            raise AdmissionError("missing nonpayable-program classification")
+        blocked.add(slug.casefold())
+    return repo.casefold() in blocked
+
+
 def assess(packet):
     packet = _object(packet, "packet")
     if packet.get("schema") != SCHEMA:
@@ -164,6 +206,8 @@ def assess(packet):
         reasons.append("CANONICAL_ISSUE_MISMATCH")
     if _known_dead_repository(source_ref[0]):
         reasons.append("REPO_KNOWN_DEAD")
+    if _known_nonpayable_program(source_ref[0]):
+        reasons.append("REPO_PROGRAM_NONPAYABLE")
     if amount < Decimal("15"):
         reasons.append("BELOW_OWNER_USD_15_FLOOR")
     if funding == "unknown":
