@@ -12,6 +12,26 @@ Explicit Closes/Fixes/Refs/claim issue keys, canonical issue URLs, related-only 
 
 First-party HTTP 403 or 429, missing/ambiguous repository or actor identity, malformed PR response, and truncated pagination fail closed without trying alternate credentials. A colliding issue produces a SHA-256 digested HOLD_EXISTING_ISSUE_CARRIER receipt including canonical PR links, issuer, source head and observed timestamp, with provider_write_called=false. No hit passes to the existing provider-reconcile and shared cooldown admission; after allowed admission the supplied transport is the only code path that mutates GitHub.
 
+## Guard the lower-level publication call as well
+
+The shared `execute_publish_operation` now requires a `provider_repository_state`
+callback for **every** new PR-create action spelling, including
+`create_pull_request`, `create-pull-request`, `create-pr`, `pull.create`,
+and `pull-request.create`. A direct caller that omits it receives
+`PROVIDER_REPOSITORY_STATE_REQUIRED` without spending PR-census, cooldown,
+or create-request quota. Supplied metadata must have an exact matching
+`full_name` and Boolean `archived`; an archived destination returns
+`PROVIDER_REPOSITORY_ARCHIVED` before the other provider reads.
+
+The supported `publish_sponsor_issue_pr` adapter supplies this callback
+through the original-author authenticated `GET /user` and first-party
+`GET /repos/{owner}/{repo}` reads. A verified terminal capability denial
+may still finish without repository reads and without creating a PR. All
+real PR-create callers must provide fresh archive evidence, not a stale
+saved candidate; existing PR census, source-head, and rate-admission
+requirements remain in force. Other (non-PR-create) publication actions
+do not require this callback.
+
 ## Integrating the actual original-author PR transport
 
 Call publish_sponsor_issue_pr instead of generic execute_publish_operation for a new issue-bound sponsor PR. Supply the existing authorized original-author token, the exact sponsor issue, original branch, expected head, shared rail metadata, and existing one-shot authorized transport closure. The closure MUST use the same actor/token verified by GET /user. No credential is printed, created, or switched. Example:
