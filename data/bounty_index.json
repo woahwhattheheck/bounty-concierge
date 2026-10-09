@@ -1,5 +1,5 @@
 {
-  "started_at": "2026-10-08T12:51:47.443658+00:00",
+  "started_at": "2026-10-09T12:37:14.034219+00:00",
   "complete": true,
   "rate_limited": false,
   "retry_after_seconds": null,
@@ -12,7 +12,7 @@
       "repo": "Scottcjn/rustchain-bounties",
       "status": "COMPLETE",
       "pages_fetched": 3,
-      "bounty_count": 245,
+      "bounty_count": 246,
       "http_status": 200
     },
     {
@@ -328,7 +328,7 @@
         "bounty"
       ],
       "created_at": "2026-02-22T15:26:50Z",
-      "updated_at": "2026-10-07T15:55:58Z",
+      "updated_at": "2026-10-08T15:00:04Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 200.0,
@@ -430,7 +430,7 @@
         "bounty"
       ],
       "created_at": "2026-03-06T00:53:13Z",
-      "updated_at": "2026-09-28T10:06:25Z",
+      "updated_at": "2026-10-08T15:30:40Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 150.0,
@@ -1804,11 +1804,10 @@
       "body": "## The problem\n\nFour separate defects were found in the bounty payout pipeline on 2026-08-07/08, and all four shared one shape: **something reported success while doing nothing.** None raised an error. None turned a workflow red.\n\n- `transfer()` returned success on an HTTP 200 carrying `{\"ok\": false}` \u2014 claims were closed and publicly confirmed with no RTC sent (#16390)\n- The payout's candidate sweep used `--limit 400` against 2,375 open issues, so any verified claim outside the newest 400 could never be paid, silently\n- `confirm_pending.sh` had no execute bit for ~3 months. Cron fired it every 10 minutes into a permission error, and because the script's own logging lived inside the block that failed to run, **nothing was logged at all**\n- `gh issue edit --add-label` fails on a GraphQL deprecation **without a non-zero exit**, so a gate posted \"verified\" and never marked the claim payable\n\nEach was found by accident. There is no reason to think they were the last four.\n\n## What this bounty is\n\nAudit the payout and reward paths for **more of this class**. Not style, not coverage \u2014 specifically: *code that can complete successfully while achieving nothing, or achieving the wrong thing, without surfacing an error.*\n\nIn scope:\n- `scripts/bounty_payout.py`, `scripts/docstring_gate.py`, `scripts/pr_review_gate.py`, `scripts/pr_review_gate_backfill.py`\n- `/root/rustchain/` payout, settlement and confirmation paths on the live node (ask for read access)\n- The workflows that drive them\n\n## What qualifies for payment\n\nA finding must name **a concrete path where the code succeeds and the effect does not happen**, with the reasoning for why. A proof of concept is welcome but not required if the reading is unambiguous.\n\nNot payable: general hardening advice, dependency CVEs with no demonstrated path, style, or \"add more tests\" without a specific defect behind it.\n\n## Reward\n\n**35 RTC** for the audit, plus **10 RTC per confirmed defect** of this class beyond the first, uncapped.\n\nPaid on the finding, not on a fix. A clear writeup of a real defect is worth more here than a patch for a hypothetical one.\n",
       "url": "https://github.com/Scottcjn/rustchain-bounties/issues/16471",
       "labels": [
-        "bounty",
-        "claimed"
+        "bounty"
       ],
       "created_at": "2026-08-10T17:31:52Z",
-      "updated_at": "2026-10-03T10:48:43Z",
+      "updated_at": "2026-10-09T02:34:16Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 35.0,
@@ -1844,7 +1843,7 @@
         "open"
       ],
       "created_at": "2026-07-19T23:38:33Z",
-      "updated_at": "2026-10-01T15:17:46Z",
+      "updated_at": "2026-10-08T15:14:54Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 35.0,
@@ -1881,7 +1880,7 @@
         "distribution"
       ],
       "created_at": "2026-07-19T21:33:52Z",
-      "updated_at": "2026-09-25T19:15:49Z",
+      "updated_at": "2026-10-08T15:13:42Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 35.0,
@@ -2697,7 +2696,7 @@
         "bounty"
       ],
       "created_at": "2026-08-10T17:31:53Z",
-      "updated_at": "2026-10-06T03:20:11Z",
+      "updated_at": "2026-10-08T18:03:12Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 20.0,
@@ -3375,6 +3374,37 @@
     },
     {
       "repo": "Scottcjn/rustchain-bounties",
+      "number": 16524,
+      "title": "[CLAIM #16517] SNES 7.030 tok/s reproduced on Mesen 2.1.1 - 15 RTC",
+      "body": "## Claim for #16517 - SNES independent-emulator tier (15 RTC)\n\n### 1. Figure and pinned source\n\nI measured the published **SNES SlowROM 7.030 tokens/s** figure from\n[`Scottcjn/elya-snes`](https://github.com/Scottcjn/elya-snes) at commit\n[`0ed1aae3e9cc900da3bc6f88a9abf1bf612f669b`](https://github.com/Scottcjn/elya-snes/commit/0ed1aae3e9cc900da3bc6f88a9abf1bf612f669b).\n\nThe measured ROM is `out/nn.sfc` at that commit:\n\n```text\nSHA-256 a0951d2dc450c7dd7a991abe292e2ef0dc2f99c5cbd6acf6b6da281a42de5a6f\n```\n\n### 2. Emulator\n\n- Mesen 2.1.1, official macOS ARM64 release (Mesen-S SNES core)\n- NTSC clock reported by Mesen: 21,477,270 Hz\n- Mesen archive SHA-256: `c16068b3d934f7b993b782a0652b8f0e7fc0cde7464862fea91d5e76b68a813f`\n\nMesen/Mesen-S is listed in #16517 as an emulator not used for the original\non-console H/V-latch measurement.\n\n### 3. Rerunnable harness\n\nRepository: https://github.com/qingfeng312/elya-snes-mesen-benchmark\n\nPinned harness commit:\n[`fba064dcae07db833647ca0a3d862d7cce6c18d4`](https://github.com/qingfeng312/elya-snes-mesen-benchmark/commit/fba064dcae07db833647ca0a3d862d7cce6c18d4)\n\n`measure.lua` installs an S-CPU write callback over `$700010-$700023`, records\nMesen's SNES master clock for every token write, and waits for a fresh `DONE`\nmarker. `verify.py` checks the token gate and recomputes every result from the\nraw output.\n\n```sh\n./run.sh /path/to/Mesen /path/to/elya-snes/out/nn.sfc | tee raw-output.txt\npython3 verify.py raw-output.txt\n```\n\n### 4. Raw counts\n\nMaster-clock stamps for token slots 0 through 19:\n\n```text\n1264472, 3952126, 6680612, 9447504, 12258162,\n15108672, 18000232, 20933010, 23907586, 26923384,\n29978048, 33073916, 36208784, 39384776, 42601078,\n45858762, 49152598, 52489260, 55869556, 59286648\n```\n\nThe 19 generated-token intervals are:\n\n```text\n2687654, 2728486, 2766892, 2810658, 2850510,\n2891560, 2932778, 2974576, 3015798, 3054664,\n3095868, 3134868, 3175992, 3216302, 3257684,\n3293836, 3336662, 3380296, 3417092\n```\n\n- Total: **58,022,176 wall master clocks** for 19 generated tokens\n- Mean: **3,053,798.736842 wall master clocks/token**\n- Derived rate: **7.032968395 tokens/s**\n- Difference from 3,055,173 clocks/token: **-0.044982%**\n- Difference from 7.030 tokens/s: **+0.042225%**\n\nFull unrounded output:\n[`raw/mesen-2.1.1-slowrom.txt`](https://github.com/qingfeng312/elya-snes-mesen-benchmark/blob/fba064dcae07db833647ca0a3d862d7cce6c18d4/raw/mesen-2.1.1-slowrom.txt)\n\n### 5. Token output\n\n```text\n[1, 4, 2, 0, 20, 18, 33, 0, 44, 18, 0, 8, 3, 58, 29, 24, 49, 26, 2, 0]\n```\n\nPASS: **20/20 byte-identical** to the checked-in host reference (seed plus 19\ngenerated tokens), covering the required 16-token greedy gate.\n\n### Result\n\nThe independent Mesen measurement reproduces the published SNES SlowROM\n7.030 tokens/s figure to within 0.05%.\n\nRTC wallet: `RTC69a97c336ad63f4904a311997a0429fb6104ed32`\n",
+      "url": "https://github.com/Scottcjn/rustchain-bounties/issues/16524",
+      "labels": [
+        "bounty"
+      ],
+      "created_at": "2026-08-20T13:01:49Z",
+      "updated_at": "2026-10-08T15:23:17Z",
+      "state": "open",
+      "assignees": [],
+      "reward_rtc": 15.0,
+      "difficulty": "standard",
+      "skills": [
+        "python"
+      ],
+      "reward_evidence": {
+        "status": "matched",
+        "amount_rtc": 15.0,
+        "exact_text": "15 RTC",
+        "excerpt": "s reproduced on Mesen 2.1.1 - 15 RTC",
+        "mentions": [
+          "15 RTC",
+          "$700010",
+          "$700023"
+        ],
+        "evidence_kind": "rtc_exact"
+      }
+    },
+    {
+      "repo": "Scottcjn/rustchain-bounties",
       "number": 13951,
       "title": "[BOUNTY: 5\u201315 RTC] Antiquity Showcase \u2014 Photo/Video of Vintage Hardware Mining RustChain",
       "body": "## Show off real old iron earning RTC \u2014 5 to 15 RTC\n\nRustChain rewards **physical hardware antiquity**. Prove yours. Post a photo or short video of **real vintage hardware actually running a RustChain miner** (terminal output visible).\n\n### Tiers (by how vintage)\n| Hardware | Reward |\n|----------|--------|\n| Pre-2010 (PowerPC Mac, old ThinkPad, SPARC, 68k, retro x86\u2026) | **15 RTC** |\n| 2010\u20132015 era | **10 RTC** |\n| Modern-but-exotic (SBC, RISC-V, unusual arch) | **5 RTC** |\n\n### How to claim\nComment with:\n1. **Photo/video** of the machine + miner output on screen (the dry-run `--show-payload` is fine)\n2. CPU/model + rough year\n3. GitHub username + RTC wallet (or handle)\n\n### Rules\n- Must be **real hardware you ran** \u2014 no stock photos, no VMs/emulators (the fingerprint check would catch those anyway).\n- One claim per distinct machine. Bonus love for the weirdest hardware.\n\nThis is the heart of Proof-of-Antiquity \u2014 and it makes great content for the network.\n\n<!-- machine-readable bounty spec -->\n```bounty-spec\n# auto-backfilled; maintainer may refine\npaid: true\nreward_rtc: 5\nper: per-item\ncap: 1\nsubmit: [comment, email]\nnot_in_repo: true\n```\n\n",
@@ -3544,7 +3574,7 @@
         "live-url-verified"
       ],
       "created_at": "2026-02-17T20:14:47Z",
-      "updated_at": "2026-10-08T04:53:16Z",
+      "updated_at": "2026-10-09T04:56:22Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 15.0,
@@ -3749,7 +3779,7 @@
         "standard"
       ],
       "created_at": "2026-07-19T21:43:45Z",
-      "updated_at": "2026-09-29T23:36:46Z",
+      "updated_at": "2026-10-08T15:14:37Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 12.0,
@@ -3782,7 +3812,7 @@
         "standard"
       ],
       "created_at": "2026-07-19T21:43:36Z",
-      "updated_at": "2026-10-06T03:20:14Z",
+      "updated_at": "2026-10-08T15:14:27Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 10.0,
@@ -3815,7 +3845,7 @@
         "community"
       ],
       "created_at": "2026-07-19T21:34:00Z",
-      "updated_at": "2026-09-14T00:29:02Z",
+      "updated_at": "2026-10-08T15:13:51Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 10.0,
@@ -4689,7 +4719,7 @@
         "testing"
       ],
       "created_at": "2026-07-19T21:43:49Z",
-      "updated_at": "2026-09-29T16:14:21Z",
+      "updated_at": "2026-10-08T15:14:50Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 8.0,
@@ -4750,7 +4780,7 @@
         "bounty"
       ],
       "created_at": "2026-05-27T21:56:09Z",
-      "updated_at": "2026-09-26T00:09:55Z",
+      "updated_at": "2026-10-08T15:07:09Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 8.0,
@@ -4820,7 +4850,7 @@
         "micro"
       ],
       "created_at": "2026-07-19T21:43:46Z",
-      "updated_at": "2026-09-29T16:07:02Z",
+      "updated_at": "2026-10-08T15:39:56Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 7.0,
@@ -5309,7 +5339,7 @@
         "claimed"
       ],
       "created_at": "2026-07-19T21:43:33Z",
-      "updated_at": "2026-10-05T12:01:06Z",
+      "updated_at": "2026-10-08T15:14:14Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 5.0,
@@ -5344,7 +5374,7 @@
         "engagement"
       ],
       "created_at": "2026-07-19T21:34:02Z",
-      "updated_at": "2026-09-17T10:32:10Z",
+      "updated_at": "2026-10-08T15:14:08Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 5.0,
@@ -5381,7 +5411,7 @@
         "claimed"
       ],
       "created_at": "2026-07-19T21:34:01Z",
-      "updated_at": "2026-10-05T10:14:16Z",
+      "updated_at": "2026-10-09T09:02:22Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 5.0,
@@ -5557,7 +5587,7 @@
         "distribution"
       ],
       "created_at": "2026-03-17T02:05:49Z",
-      "updated_at": "2026-10-08T04:53:09Z",
+      "updated_at": "2026-10-09T04:56:15Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 5.0,
@@ -6015,7 +6045,7 @@
         "open"
       ],
       "created_at": "2026-07-20T15:41:39Z",
-      "updated_at": "2026-09-14T00:28:41Z",
+      "updated_at": "2026-10-08T15:15:02Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 4.0,
@@ -6086,7 +6116,7 @@
         "engagement"
       ],
       "created_at": "2026-07-19T21:33:51Z",
-      "updated_at": "2026-09-14T00:29:07Z",
+      "updated_at": "2026-10-08T15:13:36Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 3.0,
@@ -6355,7 +6385,7 @@
         "miner"
       ],
       "created_at": "2026-04-02T15:41:51Z",
-      "updated_at": "2026-10-08T04:29:39Z",
+      "updated_at": "2026-10-08T21:49:00Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 3.0,
@@ -6871,7 +6901,7 @@
         "bounty"
       ],
       "created_at": "2026-02-14T17:34:51Z",
-      "updated_at": "2026-10-08T04:52:18Z",
+      "updated_at": "2026-10-09T04:55:23Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 3.0,
@@ -6976,7 +7006,7 @@
         "bounty"
       ],
       "created_at": "2026-06-11T23:02:38Z",
-      "updated_at": "2026-10-08T04:52:28Z",
+      "updated_at": "2026-10-09T04:55:33Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 2.0,
@@ -7078,7 +7108,7 @@
         "bounty"
       ],
       "created_at": "2026-05-11T16:18:31Z",
-      "updated_at": "2026-10-08T04:52:16Z",
+      "updated_at": "2026-10-09T04:55:22Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 2.0,
@@ -7242,7 +7272,7 @@
         "bounty"
       ],
       "created_at": "2026-03-16T18:12:44Z",
-      "updated_at": "2026-10-08T04:52:30Z",
+      "updated_at": "2026-10-09T04:55:36Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 2.0,
@@ -7767,7 +7797,7 @@
         "community"
       ],
       "created_at": "2026-02-12T03:04:09Z",
-      "updated_at": "2026-10-05T03:34:56Z",
+      "updated_at": "2026-10-08T15:01:21Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 2.0,
@@ -7805,7 +7835,7 @@
         "stars"
       ],
       "created_at": "2026-07-19T21:33:49Z",
-      "updated_at": "2026-10-08T04:52:15Z",
+      "updated_at": "2026-10-09T04:55:21Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 1.0,
@@ -8654,7 +8684,7 @@
         "bounty"
       ],
       "created_at": "2026-02-20T18:43:46Z",
-      "updated_at": "2026-10-08T04:52:20Z",
+      "updated_at": "2026-10-09T04:55:26Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 1.0,
@@ -8725,7 +8755,7 @@
         "community"
       ],
       "created_at": "2026-02-14T21:05:30Z",
-      "updated_at": "2026-10-08T04:52:19Z",
+      "updated_at": "2026-10-09T04:55:24Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 1.0,
@@ -8906,7 +8936,7 @@
         "micro"
       ],
       "created_at": "2026-09-05T23:48:51Z",
-      "updated_at": "2026-10-07T21:29:49Z",
+      "updated_at": "2026-10-09T07:27:20Z",
       "state": "open",
       "assignees": [],
       "reward_rtc": 0.1,
@@ -9102,6 +9132,6 @@
       }
     }
   ],
-  "updated_at": "2026-10-08T12:51:52.060676+00:00",
-  "total_count": 266
+  "updated_at": "2026-10-09T12:37:18.280963+00:00",
+  "total_count": 267
 }
