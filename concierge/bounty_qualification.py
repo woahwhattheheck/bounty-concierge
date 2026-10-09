@@ -20,6 +20,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+from concierge.payer_paid_merge_gate import evaluate_payer_history
 from concierge.repository_contribution_policy import (
     AUTOMATED_UPSTREAM_SUBMISSION,
     RepositoryPolicyInputError,
@@ -387,7 +388,8 @@ def _canonical_audit(snapshot: dict[str, Any]) -> tuple[dict[str, Any], bool]:
 
 
 def qualify_dispatch(
-    snapshot: dict[str, Any], *, saturation_threshold: int = 4
+    snapshot: dict[str, Any], *, saturation_threshold: int = 4,
+    payer_registry: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return a safe paid-work dispatch decision for one normalized snapshot.
 
@@ -413,6 +415,7 @@ def qualify_dispatch(
     labels = _label_names(snapshot)
     texts, trusted_comment_count, ignored_untrusted_comment_count = _text_values(snapshot)
     audit, audit_complete = _canonical_audit(snapshot)
+    payer_gate = evaluate_payer_history(snapshot, payer_registry)
     try:
         repository_policy = evaluate_repository_policy(snapshot)
     except RepositoryPolicyInputError as exc:
@@ -471,6 +474,12 @@ def qualify_dispatch(
     def add(code: str, severity: str, message: str) -> None:
         reasons.append({"code": code, "severity": severity, "message": message})
 
+    if not payer_gate["eligible"]:
+        add(
+            payer_gate["reason_code"],
+            "HOLD",
+            "A fresh owner-curated same-payer paid-merge record is required for new bounty labor.",
+        )
     if issue_method_prohibited:
         add(
             "ISSUE_AUTOMATED_SUBMISSION_PROHIBITED",
@@ -630,6 +639,7 @@ def qualify_dispatch(
             "stale_listing_signal": stale_listing,
             "search_truncated": search_truncated,
             "canonical_audit_complete": audit_complete,
+            "same_payer_paid_merge_gate": payer_gate,
             "issue_state": issue_state,
             "saturation_threshold": saturation_threshold,
         },
@@ -674,13 +684,22 @@ def main(argv: list[str] | None = None) -> int:
         default=4,
         help="Hold dispatch at this many attempts/open PRs (default: 4)",
     )
+    parser.add_argument(
+        "--payer-registry", type=Path,
+        help="Owner-curated REPOSITORY_WORK_ELIGIBILITY JSON; absent means HOLD",
+    )
     parser.add_argument("--json", action="store_true", help="Emit full result JSON")
     args = parser.parse_args(argv)
 
     try:
         snapshot = _load_snapshot(args.snapshot)
+        payer_registry = (
+            json.loads(args.payer_registry.read_text(encoding="utf-8"))
+            if args.payer_registry is not None else None
+        )
         result = qualify_dispatch(
-            snapshot, saturation_threshold=args.saturation_threshold
+            snapshot, saturation_threshold=args.saturation_threshold,
+            payer_registry=payer_registry,
         )
     except (OSError, json.JSONDecodeError, QualificationInputError) as exc:
         parser.error(str(exc))
