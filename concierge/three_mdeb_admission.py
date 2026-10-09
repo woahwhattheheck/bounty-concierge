@@ -26,13 +26,17 @@ _OC_EXPENSE = re.compile(r"^/3mdeb_com/expenses/[0-9]+/?$")
 def _url(value: Any, host: str, path: re.Pattern[str]) -> bool:
     if not isinstance(value, str):
         return False
-    parts = urlsplit(value)
+    try:
+        parts = urlsplit(value)
+        port = parts.port
+    except ValueError:
+        return False
     return (
         parts.scheme == "https"
         and parts.hostname == host
         and not parts.username
         and not parts.password
-        and not parts.port
+        and port is None
         and not parts.query
         and not parts.fragment
         and bool(path.fullmatch(parts.path))
@@ -226,6 +230,8 @@ def main(argv: list[str] | None = None) -> int:
         payload = json.load(stream)
     if not isinstance(payload, dict) or not isinstance(payload.get("issues"), list):
         p.error("snapshot must contain an issues array")
+    if not all(isinstance(item, dict) for item in payload["issues"]):
+        p.error("every issue snapshot must be an object")
     results = [
         classify_issue(
             item,
@@ -234,7 +240,6 @@ def main(argv: list[str] | None = None) -> int:
             as_of=now,
         )
         for item in payload["issues"]
-        if isinstance(item, dict)
     ]
     print(json.dumps({"schema": SCHEMA, "results": results}, indent=2, sort_keys=True))
     return 0
