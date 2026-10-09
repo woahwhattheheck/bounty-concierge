@@ -17,7 +17,7 @@ from typing import Any
 from concierge.mova_factory import BATCH_SCHEMA, SCHEMA
 
 RECEIPT_SCHEMA = "mova-role-receipt/v1"
-PROGRESS_SCHEMA = "mova-wave-progress/v1"
+PROGRESS_SCHEMA = "mova-wave-progress/v2"
 ROLE_SPEC = (
     ("SCOUT", "SCOUT_RECEIPT", "COMPLETE"),
     ("BUILD", "BUILD_RECEIPT", "COMPLETE"),
@@ -158,8 +158,25 @@ def compile_mova_progress(manifest: Any, receipts: Any) -> dict[str, Any]:
         if next_index >= 3:
             _require(done[3] is None or done[3]["head_sha"] == done[2]["head_sha"],
                      f"publication head differs from QA-accepted head for {key}")
+        settlement_followup = None
         if next_index == len(ROLE_SPEC):
-            status, next_role, role_packet = "COMPLETE", None, None
+            # A COLLECT role receipt is only an operator assertion, never a
+            # provider-verified award or payment. Assign independent verification
+            # explicitly rather than silently treating the receivable as settled.
+            status, next_role, role_packet = "SETTLEMENT_PROVIDER_RECHECK_REQUIRED", None, None
+            collect_role = packet["roles"][-1]
+            settlement_followup = {
+                "recheck_status": "INDEPENDENT_PROVIDER_RECHECK_REQUIRED",
+                "recheck_owner": "UNASSIGNED",
+                "original_collect_owner": collect_role["owner"],
+                "original_collect_account": collect_role["account"],
+                "original_collect_lease_key": collect_role["lease_key"],
+                "collect_receipt_id": done[-1]["receipt_id"],
+                "collect_evidence_sha256": done[-1]["evidence_sha256"],
+                "publication_url": done[3]["publication_url"],
+                "publication_head": done[3]["head_sha"],
+                "compensation_claim": packet["economics"]["compensation_claim"],
+            }
         else:
             role_packet = packet["roles"][next_index]
             next_role = role_packet["role"]
@@ -174,6 +191,9 @@ def compile_mova_progress(manifest: Any, receipts: Any) -> dict[str, Any]:
             "status": status,
             "role_packet": role_packet,
             "source_head": done[1]["head_sha"] if next_index >= 2 else None,
+            "award_state": "UNVERIFIED",
+            "payment_state": "UNVERIFIED",
+            "settlement_followup": settlement_followup,
         })
     core = {"schema": PROGRESS_SCHEMA, "count": len(results), "results": results,
             "authority": {"offline_only": True, "provider_reads": False,
