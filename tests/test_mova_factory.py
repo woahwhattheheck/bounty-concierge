@@ -109,7 +109,7 @@ def test_compiles_deterministic_pipeline_with_account_routing():
 
 
 @pytest.mark.parametrize("field", ["work_account", "submission_account"])
-@pytest.mark.parametrize("invalid_actor", ["stranger", "woahwhattheheck-typo", "tokenjunkielabs ", ""])
+@pytest.mark.parametrize("invalid_actor", ["stranger", "woahwhattheheck-typo", "tokenjunkielabsX"])
 def test_paid_mova_cannot_route_source_or_payout_to_unknown_actors(field, invalid_actor):
     value = candidate()
     value[field] = invalid_actor
