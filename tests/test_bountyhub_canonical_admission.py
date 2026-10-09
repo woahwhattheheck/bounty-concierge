@@ -65,7 +65,26 @@ def run():
     assert result["decision"] == "HOLD", result
     assert "REPO_KNOWN_DEAD" in result["reason_codes"], result
 
-    print("5 focused admission cases passed")
+
+    # Explicit first-party nonpayable programs must HOLD even when a
+    # marketplace card says escrowed and a forged payout field says verified.
+    # Prior original claims/PRs are not changed by an intake-only decision.
+    for repo_slug in (
+        "UnsafeLabs/Bounty-Hunters",
+        "ApexOpsStudio/ai-gitops-test-target",
+        "golemcloud/golem-ai",
+    ):
+        excluded = baseline()
+        url = f"https://github.com/{repo_slug}/issues/42"
+        excluded["listing"]["issue_url"] = url
+        excluded["github"]["issue_url"] = url
+        decision = assess(excluded)
+        assert decision["decision"] == "HOLD", (repo_slug, decision)
+        assert "REPO_PROGRAM_NONPAYABLE" in decision["reason_codes"], (repo_slug, decision)
+        assert decision["paid_to_original_claimant"] is False
+        assert decision["claim_or_submission_performed"] is False
+
+    print("8 focused admission cases passed")
 
 
 if __name__ == "__main__":
