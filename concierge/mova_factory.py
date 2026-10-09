@@ -67,6 +67,20 @@ _PENDING_SETTLEMENT_STATUS = re.compile(
     r"has (?:yet )?been (?:received|confirmed|awarded)(?: yet)?"
     r"(?=$|[.!?;,]|\s+(?:and|but|however)\b)"
 )
+# Denials of an affirmative reward claim must not be mistaken for a claim
+# simply because the words "claim" and "bounty" both occur. The separate
+# settlement-status exception above intentionally permits "not yet received".
+_NEGATED_COMPENSATION_INTENT = re.compile(
+    r"\b(?:will|would|shall|can|could|may|might)\s+(?:not|never)\s+"
+    r"(?:be\s+)?(?:claim(?:ing)?|request(?:ing)?|seek(?:ing)?|ask(?:ing)?|demand(?:ing)?)\b"
+    r"|\b(?:won't|can't|wouldn't|couldn't|shan't)\s+(?:be\s+)?"
+    r"(?:claim(?:ing)?|request(?:ing)?|seek(?:ing)?|ask(?:ing)?|demand(?:ing)?)\b"
+    r"|\b(?:decline|refuse)\s+to\s+(?:claim|request|seek|ask|demand)\b"
+    r"|\b(?:opt|opts|opting)\s+out\s+of\s+(?:claiming|requesting|seeking)\b"
+    r"|\b(?:bounty|reward|compensation|payment|payout)\s+"
+    r"(?:is\s+)?(?:not|never)\s+(?:being\s+)?(?:claimed|requested|sought)\b"
+)
+
 _ROLE_ORDER = ("SCOUT", "BUILD", "QA", "PUBLISH", "COLLECT")
 # Only already-authorized fleet GitHub actors may own paid source or payout lanes.
 # Preserve original @tokenjunkielabs contributions when the author differs from
@@ -361,7 +375,8 @@ def _claim(value: Any) -> dict[str, Any]:
     text = _text(text, "compensation_claim.text", maximum=4096)
     folded = " ".join(text.casefold().split())
     claim_language = _PENDING_SETTLEMENT_STATUS.sub(" ", folded)
-    if any(phrase in claim_language for phrase in _FORBIDDEN_CLAIM_PHRASES):
+    if (any(phrase in claim_language for phrase in _FORBIDDEN_CLAIM_PHRASES)
+            or _NEGATED_COMPENSATION_INTENT.search(claim_language)):
         raise MovaFactoryError("compensation_claim.text contains waiver language")
     if not (
         _CLAIM_COMMAND.search(claim_language)
