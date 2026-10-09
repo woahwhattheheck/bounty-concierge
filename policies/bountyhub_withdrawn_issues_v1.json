@@ -1,0 +1,23 @@
+{
+  "schema": "bountyhub-issue-withdrawals/v1",
+  "records": [
+    {
+      "issue_url": "https://github.com/yiisoft/docs/issues/318",
+      "comment_url": "https://github.com/yiisoft/docs/issues/318#issuecomment-3751164866",
+      "issue_creator_login": "vjik",
+      "comment_author_login": "vjik",
+      "withdrawal_type": "TEST_LISTING_WITHDRAWN",
+      "quoted_statement": "I removed BountyHub message. It was published after moderation, but it was test only.",
+      "operator_verified_source": true
+    },
+    {
+      "issue_url": "https://github.com/yiisoft/docs/issues/318",
+      "comment_url": "https://github.com/yiisoft/docs/issues/318#issuecomment-3760043718",
+      "issue_creator_login": "vjik",
+      "comment_author_login": "vjik",
+      "withdrawal_type": "ISSUE_CREATOR_CANCELLED",
+      "quoted_statement": "Hello! Yes, close it. I don't found ability to remove bounty",
+      "operator_verified_source": true
+    }
+  ]
+}
