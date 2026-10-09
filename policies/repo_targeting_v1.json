@@ -1,0 +1,64 @@
+{
+  "schema": "repo-targeting-policy/v1",
+  "owner_direction": "FLEET-COMMON-SENSE-20261009-BRYCE-02",
+  "canonical_direction": "https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1791517244700339",
+  "complements": "REPO-ELIGIBILITY-20261009-BRYCE-01",
+  "priority": {
+    "merged_lookback_days": 60,
+    "rank_by": ["our_merged_prs_in_lookback", "documented_paid_merges"],
+    "no_new_source_batches_when_repo_has_no_merges_from_anyone_days": 30
+  },
+  "volume_cap": {
+    "max_open_unreviewed_prs_per_repo": 5,
+    "new_prs_per_repo_per_day_min": 2,
+    "new_prs_per_repo_per_day_formula": "max(new_prs_per_repo_per_day_min, our_merges_in_repo_last_30_days)",
+    "hold": "REPO_VOLUME_CAP"
+  },
+  "dead_repo": {
+    "no_merges_from_anyone_days": 30,
+    "no_maintainer_review_or_comment_days": 14,
+    "payment_rail_not_integrated_and_creator_silent_days": 14,
+    "hold": "REPO_DEAD",
+    "on_dead": {
+      "new_takes": false,
+      "claim_posts": false,
+      "repair_other_contributors_prs": false,
+      "delete_fork_when_no_open_pr_of_ours": true,
+      "close_existing_prs": false,
+      "close_existing_prs_authority": "owner_only"
+    },
+    "known_dead": [
+      {
+        "repo": "claude-builders-bounty/claude-builders-bounty",
+        "evidence": "0 merged of 4405 PRs since 2026-03-27; creator claudebounty has never commented or reviewed; Opire reports repo not integrated",
+        "observed_at": "2026-10-09"
+      }
+    ]
+  },
+  "inbox_sla": {
+    "accounts": ["woahwhattheheck", "tokenjunkielabs"],
+    "single_owner_seat": true,
+    "take_channel": "github-inbox",
+    "action_within_hours": 24,
+    "backlog_clear_within_hours": 72,
+    "backlog_order": "oldest_first_priority_repos_first",
+    "hold": "INBOX_SLA_BREACH",
+    "external_reasons_in_scope": ["mention", "comment", "review", "review_requested", "ci_activity", "state_change"],
+    "own_repos_auto_done": [
+      "woahwhattheheck/commons",
+      "woahwhattheheck/commons-ship-enforcer",
+      "woahwhattheheck/hive",
+      "woahwhattheheck/webmcp-pad",
+      "woahwhattheheck/motel-ops-suite",
+      "woahwhattheheck/smb-showcase-inventory"
+    ],
+    "daily_digest_channel": "github-inbox",
+    "read_path": {
+      "api": "GET /notifications",
+      "conditional_requests": true,
+      "honor_x_poll_interval": true,
+      "search_api_allowed": false
+    },
+    "reply_content_rule": "NO_PUBLIC_L_2026-09-07"
+  }
+}

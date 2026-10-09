@@ -40,3 +40,23 @@ Live closeout races produced duplicate `/claim #N` comments even when two seats 
 - This guard serializes our own closeout writes only. It does not establish sponsor assignment, platform eligibility, funding, acceptance, award, or payment.
 
 This is intentionally narrow: source builders, reviewers, and payout reconciliation keep their existing flows; only the provider claim mutation is serialized.
+
+
+## Effort follows merges, dead repos pruned, inbox SLA — owner instruction, 2026-10-09
+
+Bryce directed: "If we got merged work, focus there more than dead repos. In fact dead repos need to be pruned. None of them are reading our GitHub inbox or comments — there's days-old stuff unresponded to and there's mountains of it."
+
+Measured on 2026-10-09 (UTC): outside-repo PRs by @woahwhattheheck were 243 opened / 38 merged in September, concentrated in a handful of repos that review (mova-store 19, Quittance0 10, bottube 8). Oct 5–8 opened 666 across 49 repos with 16 merges in October; 61 went into one repo in one day. github.com/notifications held 4,923 unread, 4,508 of them self-notifications from our own repos; ~415 external, 183 older than three days, oldest Sept 7, with no seat owning them.
+
+Policy file: `policies/repo_targeting_v1.json` (schema `repo-targeting-policy/v1`). Doc: `docs/REPO_TARGETING_INBOX_SLA.md`.
+
+- **Effort follows merges.** Within repos that pass the 2026-10-08 active-maintainer + paid-merge eligibility gate (REPO-ELIGIBILITY-20261009-BRYCE-01), dispatch priority is our merged PRs in the last 60 days plus documented paid merges. New work and inbox attention go to those repos first. No new source batches into a repo where nobody's PR has merged in 30 days.
+- **Per-repo volume cap.** At most 5 open, un-reviewed PRs of ours in any one external repo. New PRs per repo per day ≤ max(2, our merges in that repo over the last 30 days). Dispatcher emits HOLD `REPO_VOLUME_CAP` above either bound.
+- **Dead repos are pruned.** A repo is DEAD when no PR from anyone has merged in 30 days and no maintainer review or comment has landed in 14 days, or when its payment rail is confirmed not integrated / unfunded and the creator has not responded in 14 days. Dispatcher emits HOLD `REPO_DEAD`: no new TAKEs, no `/opire try` or equivalent claim posts, no repairing other contributors' PRs there, delete our fork when it carries no open PR of ours. Existing open PRs stay open and untouched; original authors, claim IDs and payment linkage are preserved. Closing an existing PR is Bryce's call only. `claude-builders-bounty/claude-builders-bounty` is DEAD on this definition (0 merges of 4,405 PRs since 2026-03-27, creator silent since creation, Opire not integrated).
+- **Inbox SLA, one owner.** One named seat owns github.com/notifications for @woahwhattheheck and @tokenjunkielabs continuously and posts its TAKE in #github-inbox. Every external notification (mention, comment, review, review request, CI failure or state change on our PR) is read and actioned within 24 hours of arrival. Actioned means the actual thing: push the rebase, answer the question, fix the review, or mark done when nothing is owed. Items older than 24 hours without action are HOLD `INBOX_SLA_BREACH` and outrank new TAKEs for that seat. The backlog as of 2026-10-09 is cleared within 72 hours, oldest first, priority repos first.
+- **Inbox hygiene.** Notifications from our own repositories (commons, commons-ship-enforcer, hive, webmcp-pad, motel-ops-suite, smb-showcase-inventory) are auto-marked done or unwatched so external signal is visible. A daily digest goes to #github-inbox: external unread by repo and age, oldest unanswered items listed.
+- **Rate budget.** The inbox is read through the Notifications API with `If-Modified-Since` and the `X-Poll-Interval` header (304 responses do not count against the limit), never through search. Search fan-out is what exhausts the @woahwhattheheck token and is why the inbox went unread.
+- **Reply content** on external surfaces follows the 2026-09-07 NO PUBLIC L rule: substantive replies and fixes only, no apologies, retractions or withdrawal offers.
+
+Canonical direction: https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1791517244700339
+Copies: https://tokenjunkielabs.slack.com/archives/C0C3T1Z6LQH/p1791517252207739 and https://tokenjunkielabs.slack.com/archives/C0BVBTVMJ94/p1791517261300669
