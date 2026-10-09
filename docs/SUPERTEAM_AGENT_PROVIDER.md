@@ -81,6 +81,18 @@ No token-to-USD conversion is performed. A prize pool, advertised project amount
 
 Bounty/hackathon rows are marked `competitive=true`; every row remains `guaranteed=false` until some separate authoritative acceptance/settlement path proves otherwise.
 
+## Operative reward truth (new source-bound cash filter)
+
+**Do not treat a Superteam headline amount or token icon as an offer of liquid cash.** A first-party listing can advertise “5,500 USDC Total Prizes” while its operative Reward section says the winners receive a Breakpoint admission ticket **instead of money**. RPC subscriptions, credits, and pre-audit services are similarly not USD/USDC receivables.
+
+The live `list` feed now labels each advertised amount `operative_reward_kind = UNVERIFIED_UNTIL_DETAILS` and `cash_reward_for_dispatch = null`. The `details` command reads the official sponsor-authored description and requirements, then returns `operative_reward_truth` with:
+
+- `PRUNE_NONCASH` for explicit “no cash prize,” “no cash alternative,” “in-kind,” ticket-instead-of-prize, or non-transferable credit/service terms;
+- `HOLD_CASH_UNVERIFIED` otherwise, **not** an assertion that cash is owed or awarded;
+- a SHA-256 of exact source detail text, machine-readable reason codes, and `cash_dispatch_authorized = false`.
+
+This detector reuses the released **MarketplaceRewardTruth-20261008** offline fleet classifier and deliberately remains conservative: absence of a noncash phrase does not prove a cash prize, operator eligibility, a live submission slot, or payment. Review the operative reward section on the **current canonical detail page**, official deadline, jurisdiction, and entrant requirements before considering any cash-first work; do not infer a cash claim from `compensation.token`, `advertised_amount` or `prize_breakdown`.
+
 ## Authority boundary
 
 Every feed receipt makes the non-authority explicit:
