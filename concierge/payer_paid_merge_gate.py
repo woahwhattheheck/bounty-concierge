@@ -17,7 +17,7 @@ _REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
 _PR = re.compile(r"/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[1-9][0-9]*\Z")
 _RECEIPT_HOSTS = frozenset({"opencollective.com", "algora.io", "console.algora.io"})
 MAX_SNAPSHOT_AGE = timedelta(hours=72)
-MAX_MAINTAINER_IDLE = timedelta(days=90)
+MAX_MAINTAINER_IDLE = timedelta(days=30)
 
 
 def _hold(code: str) -> dict[str, Any]:
@@ -87,6 +87,10 @@ def evaluate_payer_history(
             or not isinstance(owner_registry.get("repositories"), dict)):
         return _hold("PAYER_REGISTRY_MISSING_OR_INVALID")
 
+    # The owner's current exact-payer policy is 30 days, not the superseded
+    # 90-day historical sponsor-discovery heuristic.
+    if type(owner_registry.get("activity_max_age_days")) is not int or owner_registry.get("activity_max_age_days") != 30:
+        return _hold("PAYER_ACTIVITY_POLICY_MISMATCH")
     if now is None:
         now = datetime.now(timezone.utc)
     if not isinstance(now, datetime) or now.tzinfo is None or now.utcoffset() is None:
@@ -125,8 +129,12 @@ def evaluate_payer_history(
                 or not isinstance(recipient, str) or not recipient.strip()):
             continue
         return {
-            "eligible": True,
-            "reason_code": None,
+            # Historical payment can qualify a SPONSOR for discovery only.
+            # The separate exact repository/platform/issue/claimant/amount/payout
+            # canonical checker is not represented in this mirror; NEVER turn
+            # history into a new-work permit here.
+            "eligible": False,
+            "reason_code": "EXACT_TASK_PREFLIGHT_REQUIRED",
             "historical_paid_merge_proof": True,
             "registry_repository": repo.casefold(),
             "historical_merged_pr_url": event["merged_pr_url"],
