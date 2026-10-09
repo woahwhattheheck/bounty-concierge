@@ -14,6 +14,7 @@ from decimal import Decimal, InvalidOperation
 import hashlib
 import json
 from pathlib import Path
+from urllib.parse import urlsplit
 import re
 import sys
 from typing import Any
@@ -109,6 +110,106 @@ def _canonical_hash(value: dict[str, Any]) -> str:
     ).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
 
+
+_ELIGIBILITY_POLICY_ID = "REPO-ELIGIBILITY-20261009-BRYCE-01"
+
+
+def _policy_time(value: Any, field: str) -> datetime:
+    raw = _text(value, field, maximum=64)
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise MovaFactoryError(f"{field} must be an ISO-8601 timestamp") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise MovaFactoryError(f"{field} must include a timezone")
+    return parsed.astimezone(timezone.utc)
+
+
+def _https_url(value: Any, field: str, *, github_pr: bool = False) -> str:
+    raw = _text(value, field, maximum=2048)
+    parsed = urlsplit(raw)
+    if (parsed.scheme != "https" or not parsed.hostname or parsed.username
+            or parsed.password or parsed.fragment):
+        raise MovaFactoryError(f"{field} needs a canonical HTTPS evidence URL")
+    if github_pr and (
+        parsed.hostname != "github.com"
+        or re.fullmatch(r"/[^/]+/[^/]+/pull/[1-9][0-9]*", parsed.path) is None
+        or parsed.query
+    ):
+        raise MovaFactoryError(f"{field} needs a canonical merged GitHub PR URL")
+    return raw
+
+
+def _qualified_paid_repository(repo: str, policy: Any) -> dict[str, Any]:
+    """Require a *separately verified* owner-controlled sponsor policy snapshot.
+
+    This checks policy consistency/freshness, not the remote payment itself.
+    Preserve original already-published PRs through their existing claim lane.
+    """
+    if (not isinstance(policy, dict)
+            or policy.get("schema_version") != 1
+            or policy.get("policy_id") != _ELIGIBILITY_POLICY_ID
+            or policy.get("default_status") != "HOLD_UNVERIFIED"):
+        raise MovaFactoryError("verified repository eligibility policy is required")
+    days = policy.get("activity_max_age_days")
+    if type(days) is not int or not 1 <= days <= 90:
+        raise MovaFactoryError("repository policy activity window is invalid")
+    now = datetime.now(timezone.utc)
+    observed = _policy_time(policy.get("observed_at"), "policy.observed_at")
+    age = now - observed
+    if age < timedelta(minutes=-5) or age > timedelta(hours=24):
+        raise MovaFactoryError("repository eligibility policy is stale or future dated")
+    records = policy.get("repositories")
+    if not isinstance(records, dict):
+        raise MovaFactoryError("repository policy entries are missing")
+    matches = [(key, value) for key, value in records.items()
+               if isinstance(key, str) and key.casefold() == repo.casefold()]
+    if len(matches) != 1:
+        raise MovaFactoryError("repository is absent or ambiguous in paid eligibility policy")
+    record = matches[0][1]
+    if not isinstance(record, dict) or record.get("status") != "QUALIFIED_ACTIVE_PAID":
+        raise MovaFactoryError("repository is not QUALIFIED_ACTIVE_PAID")
+    activity = record.get("maintainer_activity")
+    if not isinstance(activity, dict) or activity.get("kind") not in {"merge", "review", "response"}:
+        raise MovaFactoryError("qualifying maintainer activity is missing")
+    _text(activity.get("actor"), "maintainer_activity.actor", maximum=128)
+    activity_url = _https_url(activity.get("evidence_url"), "maintainer_activity.evidence_url")
+    expected_prefix = f"https://github.com/{repo}/".casefold()
+    if not activity_url.casefold().startswith(expected_prefix):
+        raise MovaFactoryError("maintainer activity is not in the candidate repository")
+    activity_at = _policy_time(activity.get("event_at"), "maintainer_activity.event_at")
+    if not timedelta(minutes=-5) <= now - activity_at <= timedelta(days=days):
+        raise MovaFactoryError("maintainer activity is outside the allowed window")
+    receipts = record.get("paid_merge_history")
+    if not isinstance(receipts, list) or not receipts:
+        raise MovaFactoryError("historical completed same-payer merge payment is missing")
+    for receipt in receipts:
+        if not isinstance(receipt, dict):
+            raise MovaFactoryError("historical paid-merge record is malformed")
+        _text(receipt.get("payer"), "paid_merge_history.payer", maximum=128)
+        _text(receipt.get("recipient"), "paid_merge_history.recipient", maximum=128)
+        _text(receipt.get("currency"), "paid_merge_history.currency", maximum=16)
+        amount_raw = _text(str(receipt.get("amount")), "paid_merge_history.amount", maximum=64)
+        try:
+            amount = Decimal(amount_raw)
+        except InvalidOperation as exc:
+            raise MovaFactoryError("historical paid-merge amount is invalid") from exc
+        if not amount.is_finite() or amount <= 0:
+            raise MovaFactoryError("historical payment amount must be positive")
+        _https_url(receipt.get("merged_pr_url"), "paid_merge_history.merged_pr_url", github_pr=True)
+        _https_url(receipt.get("payment_evidence_url"), "paid_merge_history.payment_evidence_url")
+        paid_at = _policy_time(receipt.get("paid_at"), "paid_merge_history.paid_at")
+        if paid_at > now + timedelta(minutes=5):
+            raise MovaFactoryError("historical payment date is in the future")
+    return {
+        "policy_id": _ELIGIBILITY_POLICY_ID,
+        "policy_snapshot_sha256": _canonical_hash(policy),
+        "status": "QUALIFIED_ACTIVE_PAID",
+        "observed_at": observed.isoformat(),
+        "maintainer_evidence_url": activity_url,
+        "paid_merge_receipt_count": len(receipts),
+        "provider_verification": "operator-supplied-owner-policy",
+    }
 
 # Cap currency values before any fixed-point formatting. A short input such as
 # "1e100000" is finite but would otherwise expand into a 100,001-digit packet.
@@ -282,6 +383,7 @@ def compile_mova_packet(
     *,
     owners: dict[str, str] | None = None,
     minimum_reward_usd: Decimal = Decimal("15"),
+    repo_eligibility_policy: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compile a canonical paid candidate into collision-safe role work orders."""
     if not isinstance(candidate, dict):
@@ -301,6 +403,7 @@ def compile_mova_packet(
     repo = _text(candidate.get("repo"), "repo", maximum=256)
     if _REPO.fullmatch(repo) is None:
         raise MovaFactoryError("repo must be owner/name")
+    qualified_repo = _qualified_paid_repository(repo, repo_eligibility_policy)
     issue_number = candidate.get("issue_number")
     if isinstance(issue_number, bool) or not isinstance(issue_number, int) or issue_number <= 0:
         raise MovaFactoryError("issue_number must be a positive integer")
@@ -403,6 +506,7 @@ def compile_mova_packet(
             "submission_account": submission_account,
         },
         "evidence": {
+            "repo_paid_eligibility": qualified_repo,
             "canonical_capture_sha256": capture_sha,
             "source_generation_sha256": generation_sha,
             "lease": lease,
@@ -441,6 +545,7 @@ def compile_mova_batch(
     *,
     owners: dict[str, dict[str, str]] | None = None,
     minimum_reward_usd: Decimal = Decimal("15"),
+    repo_eligibility_policy: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compile a bounded wave without permitting conflicting claims on a target.
 
@@ -468,6 +573,7 @@ def compile_mova_batch(
         packet = compile_mova_packet(
             candidate, owners=owners.get(target_key),
             minimum_reward_usd=minimum_reward_usd,
+            repo_eligibility_policy=repo_eligibility_policy,
         )
         previous = packets.get(target_key)
         if previous is not None and previous["packet_sha256"] != packet["packet_sha256"]:
@@ -518,18 +624,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--batch", action="store_true", help="compile a list of paid candidates with collision checks")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--minimum-reward-usd", default="15")
+    parser.add_argument("--repo-eligibility-policy", type=Path,
+                        help="current owner-controlled qualified paid-repo JSON snapshot")
     args = parser.parse_args(argv)
 
     try:
         minimum = Decimal(args.minimum_reward_usd)
         if not minimum.is_finite() or minimum < 0:
             raise MovaFactoryError("minimum reward must be a non-negative number")
+        policy = (_load(args.repo_eligibility_policy)
+                  if args.repo_eligibility_policy is not None else None)
         owners = _load(args.owners) if args.owners is not None else None
         data = _load(args.candidate)
         packet = (
-            compile_mova_batch(data, owners=owners, minimum_reward_usd=minimum)
+            compile_mova_batch(data, owners=owners, minimum_reward_usd=minimum,
+                               repo_eligibility_policy=policy)
             if args.batch
-            else compile_mova_packet(data, owners=owners, minimum_reward_usd=minimum)
+            else compile_mova_packet(data, owners=owners, minimum_reward_usd=minimum,
+                                     repo_eligibility_policy=policy)
         )
         rendered = json.dumps(packet, indent=2, sort_keys=True) + "\n"
         if args.output is None:
