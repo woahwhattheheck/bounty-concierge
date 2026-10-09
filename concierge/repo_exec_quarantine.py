@@ -13,7 +13,10 @@ import re
 from typing import Any, Iterable
 
 SCHEMA = "tjl-repo-exec-quarantine/v1"
-HOSTILE_GIT_BLOBS = frozenset({"7da565bcb57517fa1c3adc1c824b7e105dae2699"})
+HOSTILE_GIT_BLOBS = frozenset({
+    "7da565bcb57517fa1c3adc1c824b7e105dae2699",  # observed identical loader cohort
+    "0290e72b7db38a21c14e86357e2002d7f00709e3",  # Stellita obfuscated variant
+})
 CANDIDATES = ("eslint.config.js", "eslint.config.mjs", "eslint.config.cjs")
 MAX_FILE_BYTES = 2_000_000
 

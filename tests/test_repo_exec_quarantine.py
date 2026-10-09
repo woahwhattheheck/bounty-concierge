@@ -41,6 +41,12 @@ class IncidentGuardTests(unittest.TestCase):
             self.assertEqual(result["disposition"], "REVIEW_REQUIRED")
             self.assertEqual(result["checks"][0]["reason"], "symlink not followed")
 
+    def test_confirmed_variant_fingerprint_blocked(self):
+        from concierge.repo_exec_quarantine import HOSTILE_GIT_BLOBS
+
+        self.assertIn("7da565bcb57517fa1c3adc1c824b7e105dae2699", HOSTILE_GIT_BLOBS)
+        self.assertIn("0290e72b7db38a21c14e86357e2002d7f00709e3", HOSTILE_GIT_BLOBS)
+
 
 if __name__ == "__main__":
     unittest.main()
