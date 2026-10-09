@@ -31,10 +31,32 @@ _FORBIDDEN_CLAIM_PHRASES = (
     "not a claim",
     "i am not claiming",
     "no claim",
+    "do not claim",
+    "don't claim",
+    "not requesting",
+    "do not request",
+    "not seeking",
+    "not asking for",
+    "no compensation",
+    "no payment",
+    "no reward",
+    "no payout",
+    "without compensation",
+    "without payment",
     "waive compensation",
     "waive payment",
+    "waiver of compensation",
+    "waiver of payment",
+    "decline payment",
+    "decline reward",
     "forfeit",
 )
+# A paid-work packet must positively request money, not merely mark a Boolean.
+# Standalone /claim is an explicit portal claim; otherwise require both an
+# affirmative action verb and a monetary reward reference in the claim text.
+_CLAIM_COMMAND = re.compile(r"(?<!\S)/claim\b")
+_CLAIM_ACTION = re.compile(r"\b(?:claim(?:s|ed|ing)?|request(?:s|ed|ing)?|seek(?:s|ing)?|ask(?:s|ed|ing)?|demand(?:s|ed|ing)?)\b")
+_CLAIM_REWARD = re.compile(r"\b(?:bounty|reward|compensation|payment|payout|prize|allocation)\b")
 _ROLE_ORDER = ("SCOUT", "BUILD", "QA", "PUBLISH", "COLLECT")
 _DEPENDENCIES = {
     "SCOUT": (),
@@ -204,6 +226,13 @@ def _claim(value: Any) -> dict[str, Any]:
     folded = " ".join(text.casefold().split())
     if any(phrase in folded for phrase in _FORBIDDEN_CLAIM_PHRASES):
         raise MovaFactoryError("compensation_claim.text contains waiver language")
+    if not (
+        _CLAIM_COMMAND.search(folded)
+        or (_CLAIM_ACTION.search(folded) and _CLAIM_REWARD.search(folded))
+    ):
+        raise MovaFactoryError(
+            "compensation_claim.text requires an affirmative bounty or payment claim"
+        )
     return {"required": True, "text": text}
 
 
