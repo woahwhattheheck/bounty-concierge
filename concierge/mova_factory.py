@@ -198,9 +198,22 @@ def _qualified_paid_repository(repo: str, policy: Any) -> dict[str, Any]:
             raise MovaFactoryError("historical payment amount must be positive")
         _https_url(receipt.get("merged_pr_url"), "paid_merge_history.merged_pr_url", github_pr=True)
         _https_url(receipt.get("payment_evidence_url"), "paid_merge_history.payment_evidence_url")
-        paid_at = _policy_time(receipt.get("paid_at"), "paid_merge_history.paid_at")
-        if paid_at > now + timedelta(minutes=5):
-            raise MovaFactoryError("historical payment date is in the future")
+        # Providers sometimes publish a definitive "paid" settlement status
+        # without disclosing its date. Never replace the unknown date with the
+        # claim-submission/update timestamp (which may precede payment).
+        status = receipt.get("payment_status")
+        if status is not None and status != "PAID":
+            raise MovaFactoryError("historical payment status must be PAID")
+        paid_at_raw = receipt.get("paid_at")
+        if paid_at_raw is None:
+            if status != "PAID" or receipt.get("paid_at_precision") != "not_published":
+                raise MovaFactoryError(
+                    "undated paid history requires explicit PAID status and unknown-date provenance"
+                )
+        else:
+            paid_at = _policy_time(paid_at_raw, "paid_merge_history.paid_at")
+            if paid_at > now + timedelta(minutes=5):
+                raise MovaFactoryError("historical payment date is in the future")
     return {
         "policy_id": _ELIGIBILITY_POLICY_ID,
         "policy_snapshot_sha256": _canonical_hash(policy),
