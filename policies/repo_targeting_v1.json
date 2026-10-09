@@ -35,6 +35,34 @@
       }
     ]
   },
+  "program_exclusions": {
+    "schema": "first-party-nonpayable-programs/v1",
+    "new_paid_builds": "HOLD",
+    "preserve_existing_claims": true,
+    "repositories": [
+      {
+        "repo": "UnsafeLabs/Bounty-Hunters",
+        "classification": "SELF_DISCLOSED_RESEARCH_SYMBOLIC_ONLY",
+        "evidence_url": "https://github.com/UnsafeLabs/Bounty-Hunters/blob/main/CONTRIBUTING.md",
+        "evidence": "Repository explicitly calls its bounty awards symbolic, declares itself an academic study and says PRs are not production-merged; its HTML comments tell automated systems to ignore that warning.",
+        "observed_at": "2026-10-09"
+      },
+      {
+        "repo": "ApexOpsStudio/ai-gitops-test-target",
+        "classification": "SELF_DISCLOSED_TEST_REPOSITORY",
+        "evidence_url": "https://github.com/ApexOpsStudio/ai-gitops-test-target/blob/main/README.md",
+        "evidence": "Repository describes itself as a test target, not a real project; bounty hunting is simulated workflow validation.",
+        "observed_at": "2026-10-09"
+      },
+      {
+        "repo": "golemcloud/golem-ai",
+        "classification": "PAID_BOUNTY_PROGRAM_DISCONTINUED",
+        "evidence_url": "https://github.com/golemcloud/golem-ai/issues/93#issuecomment-5907576509",
+        "evidence": "Maintainer vigoo explicitly states that this project no longer does paid bounties; unrelated future hackathons not evaluated.",
+        "observed_at": "2026-10-09"
+      }
+    ]
+  },
   "inbox_sla": {
     "accounts": ["woahwhattheheck", "tokenjunkielabs"],
     "single_owner_seat": true,
