@@ -13,13 +13,18 @@ The registry path is explicit. Omitting it or supplying a stale or unmatched
 record intentionally produces HOLD. An advertised reward, platform marked green,
 escrowed listing, /claim, merged PR, or bounty card does not establish payment.
 
-Positive eligibility needs a fresh owner registry (72h), the exact canonical
-repository with status QUALIFIED_ACTIVE_PAID, maintainer activity within 90
-days, and historical merged PR paired with a first-party paid-expense/claim
-evidence source. Invalid or missing evidence produces HOLD.
+Historical sponsor evidence requires a fresh owner registry (72h), exact canonical
+repository with status QUALIFIED_ACTIVE_PAID, owner activity policy set to 30 days,
+maintainer activity within 30 days, and a historical merged PR paired with a
+first-party paid-expense/claim evidence source. Even a valid historical payer
+record returns HOLD/EXACT_TASK_PREFLIGHT_REQUIRED for **new work** until the
+separate owner's canonical exact repository + platform + task + claimant + amount
++ collection-rail preflight has been run and independently confirmed. This
+cloud-side registry is not the authoritative local checker and never by itself
+grants a new claim, build or unpaid revision.
 
 This is an offline *curated registry* gate; it does not independently query
-provider payout databases. Passing does not prove present task acceptance,
+provider payout databases. A historical receipt does not prove present task acceptance,
 payment, award, assignment, or eligibility of the current claimant.
 
 Retain other issue, contributor policy, maintainer response, overlap, and
