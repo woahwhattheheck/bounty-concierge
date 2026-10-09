@@ -13,7 +13,7 @@
 
 ## What is RustChain?
 
-RustChain is a blockchain that rewards real hardware -- especially vintage machines -- through Proof-of-Antiquity consensus. A PowerPC G4 from 2001 earns 2.5x more than a modern server, because preservation matters. The native utility token is **RTC**, valued at **$0.15 USD** per token, and bounties range from 1 RTC micro-tasks to 200 RTC red-team security audits.
+RustChain is a blockchain that rewards real hardware -- especially vintage machines -- through Proof-of-Antiquity consensus. A PowerPC G4 from 2001 earns 2.5x more than a modern server, because preservation matters. The native ecosystem token is **RTC**, used to recognize contributions and pay for services. It has **no official cash value or fiat off-ramp**, and RTC awards must not be counted as USD earned or received. Bounty terms and awards are denominated in RTC; verify each live issue before participating. This follows the [maintainer's current token policy](https://github.com/Scottcjn/Rustchain/pull/8592) and [disabled bridge](https://github.com/Scottcjn/Rustchain/pull/8562).
 
 ---
 
@@ -88,8 +88,8 @@ For a deep dive, see [docs/TECH_STACK.md](docs/TECH_STACK.md).
 |---------|---------|
 | **RIP-200** | 1 CPU = 1 Vote. Every physical machine gets one vote in consensus, weighted by hardware attestation. No GPU farms, no cloud VMs. |
 | **Proof-of-Antiquity** | Vintage hardware earns higher rewards. G4 = 2.5x, G5 = 2.0x, G3 = 1.8x, Apple Silicon = 1.2x, modern x86 = 1.0x. Multipliers decay over ~17 years. |
-| **RTC Token** | Native utility token of the RustChain network. Reference rate: **1 RTC = $0.15 USD**. Used for bounties, agent economy, and miner rewards. |
-| **wRTC** | Wrapped RTC on Base L2 for DeFi access. Bridges RTC from the attestation chain to Ethereum L2 liquidity. |
+| **RTC Token** | Experimental in-ecosystem reward and service token. No official USD rate, cash redemption, or fiat off-ramp; report RTC awards and wallet balances in RTC, not as cash received. |
+| **wRTC** | Historical wrapped-token project. The wRTC bridge and airdrop claim routes are disabled; do not advertise a conversion path or liquidity. |
 | **RIP-201** | Fleet immune system. Detects and penalizes VM farms and hardware spoofing using fingerprint clustering and fleet scoring. |
 | **Beacon Protocol** | Agent-to-agent coordination layer. Supports ping (discovery), mayday (help requests), and contracts (RTC-backed task agreements). |
 | **Hebbian / PSE** | POWER8 vec_perm non-bijunctive collapse. Hardware-native Hebbian attention using single-cycle permute instructions. Research frontier, not required for bounties. |
