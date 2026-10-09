@@ -16,6 +16,7 @@ from concierge.github_breaker_ledger import (
 )
 from concierge.github_cooldown import CooldownStateError, GitHubCooldown
 from concierge.github_rail_availability import availability_snapshot
+from concierge.bounty_claim_text import audit_bounty_claim_text
 
 
 _HEAD_SHA = re.compile(r"[0-9a-f]{40}\Z")
@@ -116,6 +117,8 @@ def execute_publish_operation(
         Callable[[], Optional[dict[str, Any]]]
     ] = None,
     provider_repository_state: Optional[Callable[[], dict[str, Any]]] = None,
+    bounty_claim_body: Optional[str] = None,
+    bounty_claim_required: bool = False,
 ) -> Union[T, dict[str, Any]]:
     """Execute one GitHub provider operation only when shared rail state admits it.
 
@@ -168,6 +171,26 @@ def execute_publish_operation(
         raise ValueError("provider_capability_denial must be callable")
     if provider_repository_state is not None and not callable(provider_repository_state):
         raise ValueError("provider_repository_state must be callable")
+
+    # An explicit bounty admission request is resolved BEFORE sponsor/provider I/O.
+    if type(bounty_claim_required) is not bool:
+        raise ValueError("bounty_claim_required must be a boolean")
+    if bounty_claim_required or bounty_claim_body is not None:
+        findings = audit_bounty_claim_text(
+            bounty_claim_body, require_affirmative=bounty_claim_required
+        )
+        if findings:
+            return {
+                "status": "BOUNTY_CLAIM_TEXT_BLOCKED",
+                "provider_called": False,
+                "provider_write_called": False,
+                "operation": operation,
+                "action": action,
+                "repo": repo,
+                "carrier": carrier,
+                "expected_head": expected_head,
+                "finding_codes": list(findings),
+            }
 
     create_action = action.casefold().replace("_", "-")
     is_create_pr = create_action in {
