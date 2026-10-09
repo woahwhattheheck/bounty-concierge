@@ -56,6 +56,31 @@ class AlgoraCanonicalProbeTest(unittest.TestCase):
         self.assertEqual(receipt["canonical"]["linked_prs"][0]["number"], 42)
         self.assertFalse(receipt["authority"]["build"])
 
+    def test_qualified_same_repo_refs_and_numeric_prefixes(self):
+        related = [
+            "Fixes projectdiscovery/nuclei#6674",
+            "Fixes PROJECTDISCOVERY/NUCLEI#6674",
+            "Fixes https://github.com/projectdiscovery/nuclei/issues/6674",
+            "Fixes https://github.com/projectdiscovery/nuclei/issues/6674#comment",
+        ]
+        unrelated = [
+            "Fixes someoneelse/nuclei#6674",
+            "Fixes projectdiscovery/otherrepo#6674",
+            "Fixes someone/projectdiscovery/nuclei#6674",
+            "Fixes https://github.com/projectdiscovery/nuclei/issues/66740",
+            "Fixes https://github.com/projectdiscovery/nuclei/issues/6674abc",
+            "Fixes https://github.com/otherowner/nuclei/issues/6674",
+        ]
+        for reference in related + unrelated:
+            pr = {"number": 75, "title": reference, "body": "",
+                  "html_url": "https://github.com/projectdiscovery/nuclei/pull/75",
+                  "user": {"login": "otherdev"}}
+            receipt = inspect_algora_listing(listing(), reader=provider(prs=[pr]))
+            actual = "OPEN_PR_REFERENCE_PRESENT" in receipt["reason_codes"]
+            self.assertEqual(actual, reference in related, reference)
+            self.assertEqual(len(receipt["canonical"]["linked_prs"]),
+                             1 if reference in related else 0)
+
     def test_incomplete_pr_pages_and_failed_provider_reads_hold(self):
         one_hundred = [{"number": i + 1, "title": "another change", "body": ""}
                        for i in range(100)]
