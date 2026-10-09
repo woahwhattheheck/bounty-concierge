@@ -54,9 +54,9 @@ _FORBIDDEN_CLAIM_PHRASES = (
 # A paid-work packet must positively request money, not merely mark a Boolean.
 # Standalone /claim is an explicit portal claim; otherwise require both an
 # affirmative action verb and a monetary reward reference in the claim text.
-_CLAIM_COMMAND = re.compile(r"(?<!\\S)/claim\\b")
-_CLAIM_ACTION = re.compile(r"\\b(?:claim|claiming|request|requesting|seek|seeking|ask|asking|demand|demanding)\\b")
-_CLAIM_REWARD = re.compile(r"\\b(?:bounty|reward|compensation|payment|payout|prize|allocation)\\b")
+_CLAIM_COMMAND = re.compile(r"(?<!\S)/claim\b")
+_CLAIM_ACTION = re.compile(r"\b(?:claim(?:s|ed|ing)?|request(?:s|ed|ing)?|seek(?:s|ing)?|ask(?:s|ed|ing)?|demand(?:s|ed|ing)?)\b")
+_CLAIM_REWARD = re.compile(r"\b(?:bounty|reward|compensation|payment|payout|prize|allocation)\b")
 _ROLE_ORDER = ("SCOUT", "BUILD", "QA", "PUBLISH", "COLLECT")
 _DEPENDENCIES = {
     "SCOUT": (),
