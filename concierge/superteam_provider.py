@@ -224,6 +224,27 @@ def _deadline_floor(value: str | None, *, as_of: datetime) -> str:
     return parsed.isoformat()
 
 
+def operative_window_open(
+    deadline: str,
+    winners_announced: bool,
+    *,
+    as_of: datetime,
+) -> bool:
+    """Check the actual submission window rather than the provider's OPEN label.
+
+    A listing with already-announced winners is terminal even if the feed
+    continues to advertise it. Expiry is the precise aware UTC deadline, not
+    a day-only comparison, so same-day closed listings are excluded too.
+    """
+    if type(winners_announced) is not bool:
+        raise SuperteamProviderError("winners_announced must be boolean")
+    if as_of.tzinfo is None or as_of.utcoffset() is None:
+        raise SuperteamProviderError("as_of must be timezone-aware")
+    normalized = _iso_datetime(deadline, "deadline")
+    expiry = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+    return not winners_announced and expiry > as_of.astimezone(timezone.utc)
+
+
 def _api_key(value: str | None) -> str:
     if value is None:
         value = os.environ.get(API_KEY_ENV)
@@ -590,6 +611,7 @@ def fetch_live_opportunities(
     floor = _deadline_floor(deadline, as_of=now)
     rows: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
+    excluded_closed = 0
     last_full = False
 
     for _batch in range(max_batches):
@@ -630,6 +652,11 @@ def fetch_live_opportunities(
                     "Superteam pagination repeated an excluded listing"
                 )
             seen_ids.add(listing_id)
+            if not operative_window_open(
+                normalized["deadline"], normalized["winners_announced"], as_of=now
+            ):
+                excluded_closed += 1
+                continue
             rows.append(normalized)
         if len(payload) < take:
             break
@@ -642,7 +669,8 @@ def fetch_live_opportunities(
         "deadline_floor": floor,
         "listing_type": listing_type,
         "count": len(rows),
-        "truncated": bool(last_full and len(rows) == take * max_batches),
+        "excluded_closed": excluded_closed,
+        "truncated": bool(last_full and len(seen_ids) == take * max_batches),
         "opportunities": rows,
         "authority": {
             "discovery": "first_party_agent_feed",
@@ -661,6 +689,7 @@ def fetch_listing_details(
     slug: str,
     *,
     api_key: str | None = None,
+    as_of: datetime | None = None,
     session: Any = requests,
 ) -> dict[str, Any]:
     """Fetch the first-party public contract for one agent-eligible listing."""
@@ -701,6 +730,9 @@ def fetch_listing_details(
             "_count": {"Submission": 0, "Comments": 0},
         }
     )
+    now = datetime.now(timezone.utc) if as_of is None else as_of
+    if not operative_window_open(core["deadline"], core["winners_announced"], as_of=now):
+        raise SuperteamProviderError("Superteam listing is no longer open for submissions")
     description = _text(
         payload.get("description"),
         "description",
