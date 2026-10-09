@@ -65,6 +65,38 @@ def test_hot_rail_defers_without_transport(tmp_path, monkeypatch):
     }
 
 
+def test_hot_rail_skips_expensive_sponsor_reads_before_create(tmp_path, monkeypatch):
+    """A known HOT token must not run user/repo or all-state PR census reads."""
+    monkeypatch.setattr(github_cooldown, "time", lambda: 1000.0)
+    monkeypatch.setattr(github_rail_availability, "time", lambda: 1000.0)
+    path = tmp_path / "cooldown.sqlite"
+    GitHubCooldown(path, "credential").extend(1200.0)
+    calls = []
+
+    result = execute_publish_operation(
+        path,
+        "credential",
+        rail="private-token",
+        actor="actor-293",
+        operation="hot-create-pr",
+        action="create-pull-request",
+        repo="Owner/Repo",
+        carrier="Owner/Repo#17",
+        expected_head=HEAD,
+        provider_repository_state=lambda: (
+            calls.append("repository-get")
+            or {"full_name": "Owner/Repo", "archived": False}
+        ),
+        provider_reconcile=lambda: (calls.append("pr-census") or None),
+        transport=lambda: calls.append("write"),
+    )
+
+    assert result["status"] == "RAIL_DEFERRED"
+    assert result["retry_after"] == 200
+    assert result["provider_called"] is False
+    assert calls == []
+
+
 def test_recovery_ready_admits_one_operation_and_defers_follower(
     tmp_path, monkeypatch,
 ):
