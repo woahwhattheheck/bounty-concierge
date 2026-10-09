@@ -142,6 +142,35 @@ def _object_payload(value: Any, context: str) -> dict[str, Any]:
     return value
 
 
+class CanonicalIssueSnapshotError(BountyAuditError):
+    """GitHub issue response did not establish a canonical issue identity."""
+
+
+_CANONICAL_ISSUE_URL = re.compile(
+    r"^https://github[.]com/([A-Za-z0-9][A-Za-z0-9_.-]*)/([A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)/?$",
+    re.IGNORECASE,
+)
+
+
+def _require_canonical_issue(issue: dict[str, Any], repo: str, number: int) -> None:
+    """Do not accept a transferred-owner empty or alias-mismatched 200 reply.
+
+    Historical GitHub routes can report a 200-shaped object with all-null
+    fields. Callers must re-read the resolved canonical repository before any
+    PR/claim/search work, rather than infer payable OPEN from that old alias.
+    """
+    state, url = issue.get("state"), issue.get("html_url")
+    match = _CANONICAL_ISSUE_URL.fullmatch(url) if isinstance(url, str) else None
+    if state not in ("open", "closed") or match is None:
+        raise CanonicalIssueSnapshotError(f"GitHub issue snapshot incomplete for {repo}#{number}")
+    actual_repo = f"{match.group(1)}/{match.group(2)}"
+    if actual_repo.casefold() != repo.casefold() or int(match.group(3)) != number:
+        raise CanonicalIssueSnapshotError(
+            f"GitHub canonical issue differs for {repo}#{number}: "
+            f"resolve {actual_repo}#{match.group(3)} before auditing"
+        )
+
+
 def _issue_reference_pattern(
     repo: str, number: int, *, allow_short: bool = True
 ) -> re.Pattern[str]:
@@ -438,14 +467,14 @@ def audit_bounty(
             _get_json(session, issue_url, headers=headers),
             f"issue {repo}#{number}",
         )
-        if "pull_request" not in issue and _source_issue_cache is not None:
-            # Retain only canonical fields needed by repeated target variants.
-            # The body is required solely for marker-bounded IssueHunt submission links.
-            _source_issue_cache[source_identity] = {
-                key: deepcopy(issue[key]) for key in ("state", "html_url", "body") if key in issue
-            }
     if "pull_request" in issue:
         raise ValueError(f"{repo}#{number} is a pull request, not an issue")
+    _require_canonical_issue(issue, repo, number)
+    if _source_issue_cache is not None and source_identity not in _source_issue_cache:
+        # Cache only verified canonical identity; never cache an all-null 200.
+        _source_issue_cache[source_identity] = {
+            key: deepcopy(issue[key]) for key in ("state", "html_url", "body") if key in issue
+        }
 
     issuehunt_submissions, issuehunt_truncated = _issuehunt_submission_prs(issue.get("body"))
     search_repos = [repo]
@@ -752,10 +781,13 @@ def audit_bounties(bounties: list[dict[str, Any]], token: str | None = None, *, 
                 )
             except BountyAuditError as exc:
                 if (
-                    exc.http_status in {404, 410}
-                    and exc.request_url is not None
-                    and exc.request_url.casefold() == f"https://api.github.com/repos/{repo}/issues/{key[1]}".casefold()
-                    and exc.retry_after is None and exc.rate_limit_remaining != 0
+                    isinstance(exc, CanonicalIssueSnapshotError)
+                    or (
+                        exc.http_status in {404, 410}
+                        and exc.request_url is not None
+                        and exc.request_url.casefold() == f"https://api.github.com/repos/{repo}/issues/{key[1]}".casefold()
+                        and exc.retry_after is None and exc.rate_limit_remaining != 0
+                    )
                 ):
                     # Unavailable is an observation, not proof of permanent
                     # deletion or permission to submit. Keep it out of the
