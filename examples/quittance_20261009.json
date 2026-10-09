@@ -1,0 +1,29 @@
+{
+  "schema": "grantfox-oss-cash-evidence/v1",
+  "as_of": "2026-10-09T09:30:00Z",
+  "sponsor_repo": "Quittance-Labs/Quittance0",
+  "original_contributor": "woahwhattheheck",
+  "merged_pr_urls": [
+    "https://github.com/Quittance-Labs/Quittance0/pull/562",
+    "https://github.com/Quittance-Labs/Quittance0/pull/564",
+    "https://github.com/Quittance-Labs/Quittance0/pull/565",
+    "https://github.com/Quittance-Labs/Quittance0/pull/567",
+    "https://github.com/Quittance-Labs/Quittance0/pull/568",
+    "https://github.com/Quittance-Labs/Quittance0/pull/569",
+    "https://github.com/Quittance-Labs/Quittance0/pull/570",
+    "https://github.com/Quittance-Labs/Quittance0/pull/572",
+    "https://github.com/Quittance-Labs/Quittance0/pull/573",
+    "https://github.com/Quittance-Labs/Quittance0/pull/574"
+  ],
+  "points": {
+    "cumulative_awarded": 350,
+    "award_record_kind": "github_bot_comment",
+    "award_record_url": "https://github.com/Quittance-Labs/Quittance0/issues/443#issuecomment-5971364152"
+  },
+  "cash": {},
+  "collection": {
+    "request_comment_url": "https://github.com/Quittance-Labs/Quittance0/issues/443#issuecomment-6073925279",
+    "request_sent_at": "2026-10-09T03:54:07Z",
+    "response_requested_by": "2026-10-14T03:59:59Z"
+  }
+}
