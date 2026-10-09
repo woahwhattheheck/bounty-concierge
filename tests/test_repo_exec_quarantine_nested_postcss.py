@@ -53,8 +53,9 @@ class NestedConfigQuarantineTest(unittest.TestCase):
 
     def test_symlinked_config_directory_is_not_followed(self):
         with tempfile.TemporaryDirectory() as d:
-            root = Path(d)
-            hidden = root / "hidden"
+            root = Path(d) / "repo"
+            root.mkdir()
+            hidden = Path(d) / "outside"
             hidden.mkdir()
             (hidden / "postcss.config.mjs").write_text(FAMILY)
             (root / "apps").symlink_to(hidden, target_is_directory=True)
