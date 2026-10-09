@@ -63,6 +63,12 @@ def classify_github_403(
     normalized = message.casefold()
     if "resource not accessible by integration" in normalized:
         return "SCOPE_DENIED"
+    # Explicit authentication failures outrank rate headers, which can be
+    # populated independently of the failing credential. Otherwise a 403 with
+    # Retry-After is misreported as a temporary secondary-rate throttle and
+    # needlessly freezes work that requires an authentication repair.
+    if "bad credentials" in normalized or "requires authentication" in normalized:
+        return "AUTH_DENIED"
     if remaining == 0 or "api rate limit exceeded" in normalized:
         return "PRIMARY_RATE_LIMITED"
     if (
@@ -74,8 +80,6 @@ def classify_github_403(
         )
     ):
         return "SECONDARY_RATE_LIMITED"
-    if "bad credentials" in normalized or "requires authentication" in normalized:
-        return "AUTH_DENIED"
     return "FORBIDDEN"
 
 
