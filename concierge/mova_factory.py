@@ -9,6 +9,7 @@ reads or writes, creates no claims, and never changes payout state.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 import hashlib
 import json
@@ -21,6 +22,7 @@ from typing import Any
 SCHEMA = "mova-bounty-factory/v1"
 BATCH_SCHEMA = "mova-paid-bounty-wave/v1"
 LEASE_SCHEMA = "bounty-work-order-lease/v1"
+QA_EVIDENCE_SCHEMA = "mova-independent-qa/v1"
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 _REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
@@ -213,6 +215,39 @@ def _constraints(value: Any) -> list[str]:
     return sorted(set(_text(item, "constraint", maximum=1024) for item in value))
 
 
+def _optional_qa_handoff(value: Any, issue_url: str, capture: str) -> dict[str, Any] | None:
+    """Remove only a separate QA seat, never the builder's focused acceptance checks."""
+    if value is None:
+        return None
+    fields = {
+        "schema", "separate_qa_required", "issue_url", "capture_sha256",
+        "checked_at", "builder_focused_check",
+    }
+    if not isinstance(value, dict) or set(value) != fields:
+        raise MovaFactoryError("qa_handoff requires exact evidence fields")
+    if (
+        value["schema"] != QA_EVIDENCE_SCHEMA
+        or value["separate_qa_required"] is not False
+        or value["builder_focused_check"] is not True
+        or value["issue_url"] != issue_url
+        or _sha256(value["capture_sha256"], "qa_handoff.capture_sha256") != capture
+    ):
+        raise MovaFactoryError("independent QA waiver lacks canonical, focused-check evidence")
+    raw = value["checked_at"]
+    if not isinstance(raw, str) or not 20 <= len(raw) <= 64 or raw != raw.strip():
+        raise MovaFactoryError("qa_handoff.checked_at must be a bounded timestamp")
+    try:
+        instant = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise MovaFactoryError("qa_handoff.checked_at is malformed") from exc
+    if instant.tzinfo is None or instant.utcoffset() is None:
+        raise MovaFactoryError("qa_handoff.checked_at must be timezone aware")
+    elapsed = datetime.now(timezone.utc) - instant.astimezone(timezone.utc)
+    if elapsed < timedelta(0) or elapsed > timedelta(hours=6):
+        raise MovaFactoryError("independent QA waiver requires a fresh source capture")
+    return dict(value)
+
+
 def compile_mova_packet(
     candidate: dict[str, Any],
     *,
@@ -251,6 +286,9 @@ def compile_mova_packet(
     capture_sha = _sha256(
         candidate.get("canonical_capture_sha256"), "canonical_capture_sha256"
     )
+    qa_evidence = _optional_qa_handoff(
+        candidate.get("qa_handoff"), canonical_issue_url, capture_sha,
+    )
     generation_sha = _sha256(
         candidate.get("source_generation_sha256"), "source_generation_sha256"
     )
@@ -284,8 +322,12 @@ def compile_mova_packet(
     operation_id = f"MOVA-{operation_digest[:20].upper()}"
     target_key = f"{repo.casefold()}#{issue_number}"
 
+    if qa_evidence is not None and role_owners["QA"] != "UNASSIGNED":
+        raise MovaFactoryError("cannot drop an assigned QA handoff")
     role_packets: list[dict[str, Any]] = []
     for role in _ROLE_ORDER:
+        if role == "QA" and qa_evidence is not None:
+            continue
         account = submission_account if role in {"PUBLISH", "COLLECT"} else work_account
         role_packets.append(
             {
@@ -294,7 +336,10 @@ def compile_mova_packet(
                 "account": account,
                 "lease_key": f"{operation_id}:{role}",
                 "target_key": target_key,
-                "depends_on": list(_DEPENDENCIES[role]),
+                "depends_on": (
+                    ["BUILD_RECEIPT"] if role == "PUBLISH" and qa_evidence is not None
+                    else list(_DEPENDENCIES[role])
+                ),
                 "must_preserve": [
                     "canonical_issue_identity",
                     "source_generation",
@@ -353,6 +398,10 @@ def compile_mova_packet(
             "payment_writes": False,
         },
     }
+    if qa_evidence is not None:
+        core["evidence"]["qa_handoff"] = qa_evidence
+        core["coordination"]["independent_qa_handoff"] = "NOT_REQUIRED_WITH_SOURCE_EVIDENCE"
+        core["coordination"]["builder_focused_check_still_required"] = True
     packet = dict(core)
     packet["packet_sha256"] = _canonical_hash(core)
     return packet
