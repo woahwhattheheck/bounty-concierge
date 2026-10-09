@@ -127,6 +127,31 @@ def test_stale_terminal_state_is_cleaned_up(tmp_path):
     assert ledger.admit("write", owner="worker", now_epoch=1200.0).decision == "ALLOW"
 
 
+def test_stale_cleanup_preserves_future_provider_reset(tmp_path):
+    ledger = GitHubBreakerLedger(
+        tmp_path / "breaker.sqlite",
+        provider_route="token-primary",
+        credential="same-token",
+        stale_ttl_seconds=100,
+    )
+    ledger.record_receipt(
+        "search", "PRIMARY_RATE_LIMIT", observed_epoch=1000.0, reset_epoch=2500.0
+    )
+    ledger.record_receipt("write", "AUTH_FAILED", observed_epoch=1000.0)
+
+    # The terminal error is stale, but the primary rate limit is still active.
+    assert ledger.cleanup_stale(now_epoch=1200.0) == 1
+    blocked = ledger.admit("search", owner="worker-a", now_epoch=1200.0)
+    assert blocked.decision == "SKIP"
+    assert blocked.state == OPEN_UNTIL
+    assert blocked.until_epoch == 2500.0
+    assert ledger.admit("write", owner="worker-b", now_epoch=1200.0).decision == "ALLOW"
+
+    # Only after the actual provider deadline passes may cleanup remove it.
+    assert ledger.cleanup_stale(now_epoch=2501.0) == 1
+    assert ledger.admit("search", owner="worker-c", now_epoch=2501.0).decision == "ALLOW"
+
+
 def test_failed_probe_keeps_followers_cool_until_lease_window_expires(tmp_path):
     ledger = GitHubBreakerLedger(
         tmp_path / "breaker.sqlite",
