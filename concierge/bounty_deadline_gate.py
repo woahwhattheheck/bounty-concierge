@@ -33,6 +33,9 @@ _GITHUB_API_ISSUE_PATH_RE = re.compile(
 )
 _GITHUB_ISSUE_COMMENT_RE = re.compile(r"issuecomment-[1-9][0-9]*")
 _SHA256_RE = re.compile(r"[0-9a-f]{64}")
+_RFC3339_UTC_RE = re.compile(
+    r"[0-9]{4}-[0-9]{2}-[0-9]{2}T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\.[0-9]{1,6})?Z\Z"
+)
 _ALLOWED_DEADLINE_KINDS = frozenset({"DATE", "INSTANT"})
 _ALLOWED_BASE_AUTHORITIES = frozenset(
     {"ISSUE_BODY", "OFFICIAL_PROVIDER", "REPO_OWNER", "REPO_MEMBER"}
@@ -164,6 +167,8 @@ def _parse_timestamp(value: Any, field: str) -> datetime:
     raw = _require_string(value, field)
     if not raw.endswith("Z"):
         raise BountyDeadlineInputError(f"{field} must be UTC RFC3339 ending in Z")
+    if _RFC3339_UTC_RE.fullmatch(raw) is None:
+        raise BountyDeadlineInputError(f"{field} must be extended UTC RFC3339")
     try:
         parsed = datetime.fromisoformat(raw[:-1] + "+00:00")
     except ValueError as exc:
