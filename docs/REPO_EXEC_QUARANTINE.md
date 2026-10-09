@@ -14,4 +14,4 @@ The script reads root `eslint.config.js`, `.mjs`, and `.cjs` **as bytes only**; 
 
 **Important operational limitation:** The rule covers only root ESLint configs and two observed static heuristics. A clean result cannot override existing security quarantine, payer-proof hold, acceptance review, or credentialed-runner controls. Sponsor forks, checkout branch changes and transitive dependencies require separate source inspection. Always confirm the current repository/branch and original commit identity before rescanning; do not treat a clean fork as proof its upstream is fixed.
 
-Validation: five focused standard-library tests in `tests/test_repo_exec_quarantine.py` using synthetic fixture data only. No network, npm, sponsor code execution or broad tests are needed.
+Validation: six focused standard-library tests in `tests/test_repo_exec_quarantine.py` using synthetic fixture data only. No network, npm, sponsor code execution or broad tests are needed.
