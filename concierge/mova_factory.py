@@ -59,6 +59,10 @@ _CLAIM_COMMAND = re.compile(r"(?<!\S)/claim\b")
 _CLAIM_ACTION = re.compile(r"\b(?:claim(?:s|ed|ing)?|request(?:s|ed|ing)?|seek(?:s|ing)?|ask(?:s|ed|ing)?|demand(?:s|ed|ing)?)\b")
 _CLAIM_REWARD = re.compile(r"\b(?:bounty|reward|compensation|payment|payout|prize|allocation)\b")
 _ROLE_ORDER = ("SCOUT", "BUILD", "QA", "PUBLISH", "COLLECT")
+# Only already-authorized fleet GitHub actors may own paid source or payout lanes.
+# Preserve original @tokenjunkielabs contributions when the author differs from
+# the usual @woahwhattheheck claim/submission account.
+_OWNER_GITHUB_ACTORS = frozenset(("tokenjunkielabs", "woahwhattheheck"))
 _DEPENDENCIES = {
     "SCOUT": (),
     "BUILD": ("SCOUT_RECEIPT",),
@@ -300,6 +304,15 @@ def _lease(value: Any, repo: str, issue_number: int) -> dict[str, Any]:
     }
 
 
+def _owner_account(value: Any, field: str) -> str:
+    account = _text(value, field, maximum=128)
+    if account not in _OWNER_GITHUB_ACTORS:
+        raise MovaFactoryError(
+            f"{field} must be an authorized original-contributor GitHub actor"
+        )
+    return account
+
+
 def _owners(value: Any) -> dict[str, str]:
     if value is None:
         value = {}
@@ -434,13 +447,12 @@ def compile_mova_packet(
     claim = _claim(candidate.get("compensation_claim"))
     role_owners = _owners(owners)
     constraints = _constraints(candidate.get("constraints"))
-    work_account = _text(
-        candidate.get("work_account", "tokenjunkielabs"), "work_account", maximum=128
+    work_account = _owner_account(
+        candidate.get("work_account", "tokenjunkielabs"), "work_account"
     )
-    submission_account = _text(
+    submission_account = _owner_account(
         candidate.get("submission_account", "woahwhattheheck"),
         "submission_account",
-        maximum=128,
     )
 
     operation_material = {
