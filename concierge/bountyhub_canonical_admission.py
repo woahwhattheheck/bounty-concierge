@@ -95,6 +95,29 @@ def _amount(value):
         raise AdmissionError("listing.advertised_usd is invalid") from error
 
 
+def _known_dead_repository(repo):
+    """Fail closed on unavailable policy; preserve existing claims and PRs."""
+    policy_path = Path(__file__).resolve().parents[1] / "policies" / "repo_targeting_v1.json"
+    try:
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError) as error:
+        raise AdmissionError("repo-targeting policy unavailable") from error
+    if type(policy) is not dict or policy.get("schema") != "repo-targeting-policy/v1":
+        raise AdmissionError("unsupported repo-targeting policy schema")
+    dead = policy.get("dead_repo")
+    if type(dead) is not dict or type(dead.get("known_dead")) is not list:
+        raise AdmissionError("repo-targeting policy missing known_dead list")
+    known = set()
+    for record in dead["known_dead"]:
+        if type(record) is not dict or type(record.get("repo")) is not str:
+            raise AdmissionError("invalid known_dead repository record")
+        slug = record["repo"]
+        if not _REPO.fullmatch(slug):
+            raise AdmissionError("invalid known_dead repository slug")
+        known.add(slug.casefold())
+    return repo.casefold() in known
+
+
 def assess(packet):
     packet = _object(packet, "packet")
     if packet.get("schema") != SCHEMA:
@@ -139,6 +162,8 @@ def assess(packet):
     reasons = []
     if listing_ref != source_ref:
         reasons.append("CANONICAL_ISSUE_MISMATCH")
+    if _known_dead_repository(source_ref[0]):
+        reasons.append("REPO_KNOWN_DEAD")
     if amount < Decimal("15"):
         reasons.append("BELOW_OWNER_USD_15_FLOOR")
     if funding == "unknown":
