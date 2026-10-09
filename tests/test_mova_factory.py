@@ -336,3 +336,10 @@ def test_direct_factory_qualified_policy_is_auditable_and_batch_bound():
     assert receipt["status"] == "QUALIFIED_ACTIVE_PAID"
     assert len(receipt["policy_snapshot_sha256"]) == 64
     assert receipt["paid_merge_receipt_count"] == 1
+
+
+def test_wrong_explicit_claim_number_is_standard_factory_validation_error():
+    value = candidate()
+    value["compensation_claim"]["text"] = "/claim #999\nI request bounty payment."
+    with pytest.raises(MovaFactoryError, match="explicit claim target must match canonical issue"):
+        compile_mova_packet(value)
