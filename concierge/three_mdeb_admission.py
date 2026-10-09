@@ -138,11 +138,21 @@ def classify_issue(
     if not _reward_verified(issue, minimum_usd):
         reasons.append("CONFIRMED_USD_REWARD_REQUIRED")
 
-    # Even an author's existing PR is a continuation, not another BUILD slot.
-    for pr in issue.get("open_prs", []) if isinstance(issue.get("open_prs", []), list) else [{}]:
-        if not isinstance(pr, dict) or pr.get("state") != "open":
+    # A missing search receipt is not evidence that a competing PR is absent.
+    open_prs = issue.get("open_prs")
+    if not isinstance(open_prs, list):
+        reasons.append("OPEN_PR_SEARCH_UNVERIFIED")
+        open_prs = []
+    for pr in open_prs:
+        if not isinstance(pr, dict) or pr.get("state") not in ("open", "closed"):
+            reasons.append("OPEN_PR_SEARCH_UNVERIFIED")
             continue
-        if _login(pr.get("user", pr.get("author"))) in ACTORS:
+        if pr["state"] != "open":
+            continue
+        owner = _login(pr.get("user", pr.get("author")))
+        if not owner:
+            reasons.append("OPEN_PR_SEARCH_UNVERIFIED")
+        elif owner in ACTORS:
             reasons.append("ORIGINAL_CARRIER_ALREADY_EXISTS")
         else:
             reasons.append("COMPETING_OPEN_PR")
@@ -163,25 +173,14 @@ def classify_issue(
     if assigned_logins and actor.lower() not in assigned_logins:
         reasons.append("ASSIGNED_TO_ANOTHER_CONTRIBUTOR")
     approval = issue.get("maintainer_assignment_proof")
-    approved = (
-        isinstance(approval, dict)
-        and approval.get("actor") == actor
-        and approval.get("approved") is True
-        and _url(
-            approval.get("comment_url"),
-            "github.com",
-            re.compile(r"^/[^/]+/[^/]+/issues/[0-9]+/?$"),
-        )
-        and isinstance(approval.get("comment_url"), str)
-        and "#issuecomment-" in approval.get("comment_url", "")
-    )
-    # _url deliberately rejects fragments. Check exact comment permalinks separately.
+    approved = False
     if isinstance(approval, dict):
         comment = approval.get("comment_url", "")
-        if isinstance(comment, str) and "#issuecomment-" in comment:
-            base, _, anchor = comment.partition("#")
+        if isinstance(comment, str):
+            base, separator, anchor = comment.partition("#")
             approved = (
-                approval.get("actor") == actor
+                separator == "#"
+                and approval.get("actor") == actor
                 and approval.get("approved") is True
                 and anchor.startswith("issuecomment-")
                 and anchor[13:].isdigit()
