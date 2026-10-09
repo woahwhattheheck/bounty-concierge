@@ -122,7 +122,7 @@ def assess_expense_page(page_text: str, *, expense_url: str, observed_at: str) -
     if type(page_text) is not str or not 0 < len(page_text) <= 2_000_000:
         raise ExpenseProofError("page_text must be a nonempty bounded full-page capture")
     lines = [line.strip() for line in page_text.splitlines() if line.strip()]
-    heads = [(i, _HEAD_INVOICE.fullmatch(line)) for i, line in enumerate(lines)]
+    heads = [(i, _HEAD_INVOICE.match(line)) for i, line in enumerate(lines)]
     heads = [(i, match) for i, match in heads if match]
     if not heads or any(int(match.group(1)) != number for _, match in heads):
         raise ExpenseProofError("invoice heading missing or does not match expense_url")
