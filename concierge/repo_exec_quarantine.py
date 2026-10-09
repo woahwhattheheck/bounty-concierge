@@ -13,6 +13,8 @@ from pathlib import Path
 import re
 from typing import Any, Iterable
 
+from .repo_exec_autoexec import scan_autoexec
+
 SCHEMA = "tjl-repo-exec-quarantine/v1"
 HOSTILE_GIT_BLOBS = frozenset({
     "7da565bcb57517fa1c3adc1c824b7e105dae2699",  # observed identical loader cohort
@@ -146,13 +148,15 @@ def scan_repository(root: Path, *, hostile_blobs: Iterable[str] = HOSTILE_GIT_BL
         if files_seen > MAX_SCAN_FILES:
             break
 
+    # The same user-facing CLI disposition also gates other auto-execution surfaces.
+    results.extend(scan_autoexec(root, hostile_blobs=bad))
     statuses = {x["status"] for x in results}
     disposition = ("QUARANTINE" if statuses & {"KNOWN_HOSTILE_BLOB", "KNOWN_HOSTILE_FAMILY"}
                    else "REVIEW_REQUIRED" if statuses & {"REVIEW_REQUIRED", "SUSPICIOUS_EXECUTION_REVIEW"}
                    else "NO_KNOWN_INDICATOR")
     return {
         "schema": SCHEMA, "disposition": disposition, "checks": results,
-        "scope": "Nested ESLint/PostCSS configs scanned within bounded non-following traversal. No clean/safe-to-execute assertion; other execution vectors are not cleared.",
+        "scope": "Nested ESLint/PostCSS, npm lifecycle hooks, VS Code folderOpen tasks and public/fonts WOFF2 magic checked offline under bounds. No clean/safe-to-execute assertion; other execution vectors are not cleared.",
     }
 
 
