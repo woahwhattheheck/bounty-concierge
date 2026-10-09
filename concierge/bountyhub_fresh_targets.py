@@ -165,11 +165,25 @@ def select_fresh_targets(
     return _exclude_assigned_exclusive(report, selected, max_open_claims=max_open_claims)
 
 
+_MAX_INPUT_BYTES = 32 * 1024 * 1024
+
+
 def _load(path: Path | None) -> Any:
+    """Bound retained input bytes before parsing potentially huge JSON trees."""
     if path is None:
         return None
-    with path.open(encoding="utf-8") as source:
-        return json.load(source, object_pairs_hook=unique_exclusion_fields)
+    with path.open("rb") as source:
+        raw = source.read(_MAX_INPUT_BYTES + 1)
+    if len(raw) > _MAX_INPUT_BYTES:
+        raise ValueError("retained BountyHub input exceeds 32 MiB")
+    return json.loads(raw, object_pairs_hook=unique_exclusion_fields)
+
+
+def _same_destination(left: Path, right: Path) -> bool:
+    """Catch lexical, symlink, and existing hardlink aliases before writing."""
+    if left.resolve() == right.resolve():
+        return True
+    return left.exists() and right.exists() and left.samefile(right)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -202,16 +216,19 @@ def main(argv: list[str] | None = None) -> int:
             excluded_issues=_load(args.exclude_issues),
             max_open_claims=args.max_open_claims,
         )
-        if (
-            args.output is not None
-            and args.preflight_output is not None
-            and args.output.absolute() == args.preflight_output.absolute()
-        ):
-            raise ValueError("--output and --preflight-output must differ")
+        # Never overwrite the very evidence or options just used for this dispatch.
+        # Resolve symlinked paths and existing hardlinks, not only identical names.
+        inputs = [p for p in (args.report, args.submission_targets, args.exclude_issues)
+                  if p is not None]
+        outputs = [p for p in (args.output, args.preflight_output) if p is not None]
+        for offset, destination in enumerate(outputs):
+            if any(_same_destination(destination, other)
+                   for other in inputs + outputs[:offset]):
+                raise ValueError("BountyHub output aliases an input or another output")
         _emit_json(result, args.output)
         if args.preflight_output is not None:
             _emit_json(result["canonical_preflight_candidates"], args.preflight_output)
-    except (OSError, ValueError, TypeError, KeyError):
+    except (OSError, ValueError, TypeError, KeyError, RuntimeError):
         # Do not echo paths, raw retained fields or JSON payloads on input failure.
         print("bountyhub-fresh-targets: invalid input or output destination", file=sys.stderr)
         return 2
