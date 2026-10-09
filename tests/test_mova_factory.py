@@ -1,10 +1,52 @@
 # SPDX-License-Identifier: MIT
 from copy import deepcopy
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
 
-from concierge.mova_factory import MovaFactoryError, compile_mova_packet, compile_mova_batch
+from concierge.mova_factory import (
+    MovaFactoryError,
+    compile_mova_packet as _compile_mova_packet,
+    compile_mova_batch as _compile_mova_batch,
+)
+
+# Synthetic policy fixtures, NOT claims that the named sponsors have paid.
+NOW = datetime.now(timezone.utc)
+POLICY = {
+    "schema_version": 1,
+    "policy_id": "REPO-ELIGIBILITY-20261009-BRYCE-01",
+    "default_status": "HOLD_UNVERIFIED",
+    "activity_max_age_days": 90,
+    "observed_at": NOW.isoformat(),
+    "repositories": {},
+}
+for _repo in ("owner/repo", "another/repo"):
+    POLICY["repositories"][_repo] = {
+        "status": "QUALIFIED_ACTIVE_PAID",
+        "maintainer_activity": {
+            "kind": "merge", "actor": "fixture-maintainer",
+            "event_at": (NOW - timedelta(hours=1)).isoformat(),
+            "evidence_url": f"https://github.com/{_repo}/pull/7",
+        },
+        "paid_merge_history": [{
+            "payer": _repo.split("/")[0],
+            "recipient": "fixture-recipient",
+            "currency": "USD", "amount": "25",
+            "merged_pr_url": f"https://github.com/{_repo}/pull/6",
+            "payment_evidence_url": "https://algora.io/claims/synthetic-example",
+            "paid_at": (NOW - timedelta(days=1)).isoformat(),
+        }],
+    }
+
+
+def compile_mova_packet(*args, **kwargs):
+    return _compile_mova_packet(*args, repo_eligibility_policy=POLICY, **kwargs)
+
+
+def compile_mova_batch(*args, **kwargs):
+    return _compile_mova_batch(*args, repo_eligibility_policy=POLICY, **kwargs)
+
 
 
 CAPTURE = "1" * 64
@@ -220,3 +262,33 @@ def test_bounded_reward_keeps_normal_currency_and_raised_floor():
     result = compile_mova_packet(value, minimum_reward_usd=Decimal("25"))
     assert result["economics"]["reward_usd"] == "2500.5"
     assert result["economics"]["minimum_reward_usd"] == "25"
+
+
+def test_direct_factory_rejects_missing_or_unqualified_sponsor_policy():
+    value = candidate()
+    with pytest.raises(MovaFactoryError, match="eligibility policy is required"):
+        _compile_mova_packet(value)
+    with pytest.raises(MovaFactoryError, match="eligibility policy is required"):
+        _compile_mova_batch([value])
+    inactive = deepcopy(POLICY)
+    inactive["repositories"]["owner/repo"]["status"] = "HOLD_UNVERIFIED"
+    with pytest.raises(MovaFactoryError, match="not QUALIFIED_ACTIVE_PAID"):
+        _compile_mova_packet(value, repo_eligibility_policy=inactive)
+    stale = deepcopy(POLICY)
+    stale["observed_at"] = (NOW - timedelta(days=3)).isoformat()
+    with pytest.raises(MovaFactoryError, match="stale"):
+        _compile_mova_packet(value, repo_eligibility_policy=stale)
+    missing_receipt = deepcopy(POLICY)
+    missing_receipt["repositories"]["owner/repo"]["paid_merge_history"] = []
+    with pytest.raises(MovaFactoryError, match="historical completed"):
+        _compile_mova_packet(value, repo_eligibility_policy=missing_receipt)
+
+
+def test_direct_factory_qualified_policy_is_auditable_and_batch_bound():
+    single = compile_mova_packet(candidate())
+    batch = compile_mova_batch([candidate(), candidate()])
+    assert batch["packets"][0] == single
+    receipt = single["evidence"]["repo_paid_eligibility"]
+    assert receipt["status"] == "QUALIFIED_ACTIVE_PAID"
+    assert len(receipt["policy_snapshot_sha256"]) == 64
+    assert receipt["paid_merge_receipt_count"] == 1
