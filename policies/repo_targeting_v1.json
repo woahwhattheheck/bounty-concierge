@@ -35,6 +35,28 @@
       }
     ]
   },
+    "source_integrity": {
+      "purpose": "Execution-safety hold for unsafe sponsor source; never implies a payout default or cancels existing claims",
+      "known_unsafe": [
+        {
+          "repo": "balloonfly-hq/hackathon-scaffold-stellar",
+          "source_path": "eslint.config.js",
+          "observed_unsafe_blob_sha1": "7da565bcb57517fa1c3adc1c824b7e105dae2699",
+          "evidence_url": "https://github.com/balloonfly-hq/hackathon-scaffold-stellar/blob/main/eslint.config.js",
+          "observed_at": "2026-10-09",
+          "status": "ACTIVE_SECURITY_HOLD"
+        },
+        {
+          "repo": "scaffold-studio-hq/scaffold-studio-contracts",
+          "source_path": "eslint.config.js",
+          "observed_unsafe_blob_sha1": "7da565bcb57517fa1c3adc1c824b7e105dae2699",
+          "evidence_url": "https://github.com/scaffold-studio-hq/scaffold-studio-contracts/blob/main/eslint.config.js",
+          "observed_at": "2026-10-09",
+          "status": "ACTIVE_SECURITY_HOLD"
+        }
+      ],
+      "release_requires": "New first-party safe revision plus targeted static review of default and retained contribution branches, and runner/credential trust assessment"
+    },
   "inbox_sla": {
     "accounts": ["woahwhattheheck", "tokenjunkielabs"],
     "single_owner_seat": true,
