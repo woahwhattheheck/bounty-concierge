@@ -143,6 +143,33 @@ def test_rejects_waiver_language_in_required_compensation_claim():
         compile_mova_packet(value)
 
 
+@pytest.mark.parametrize("waiver_text", [
+    "I will not claim the $50 bounty.",
+    "I would never request the reward.",
+    "I won't claim the payment.",
+    "I can't request this compensation.",
+    "I decline to claim the Algora bounty.",
+    "I refuse to request any compensation.",
+    "I opt out of claiming the reward.",
+    "The bounty is not requested.",
+])
+def test_future_tense_or_indirect_compensation_waiver_is_not_claim(waiver_text):
+    value = candidate()
+    value["compensation_claim"]["text"] = waiver_text
+    with pytest.raises(MovaFactoryError, match="waiver"):
+        compile_mova_packet(value)
+
+
+def test_received_status_does_not_void_affirmative_reward_request():
+    value = candidate()
+    value["compensation_claim"]["text"] = (
+        "I claim the $50 bounty and request payment upon acceptance. "
+        "No payment has been received yet."
+    )
+    result = compile_mova_packet(value)
+    assert "request payment" in result["economics"]["compensation_claim"]["text"]
+
+
 @pytest.mark.parametrize("unclaimed_text", [
     "Patch uploaded; please review.",
     "Bounty issue addressed; changes ready for maintainer review.",
