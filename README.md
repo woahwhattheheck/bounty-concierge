@@ -102,6 +102,14 @@ Use the existing `concierge-mova` command to turn current, canonically open,
 green-platform bounty captures with READY lease receipts into collision-fenced
 SCOUT → BUILD → QA → PUBLISH → COLLECT work packets.
 
+Paid MOVA role accounts are restricted to the two authorized GitHub contributor
+actors, `tokenjunkielabs` and `woahwhattheheck`, regardless of candidate JSON.
+Normal fresh work uses `tokenjunkielabs` with `woahwhattheheck` for submission
+and collection; an existing original `tokenjunkielabs`-authored contribution
+can retain that actor for its published claim. Unknown or mistyped account
+identities fail before role dispatch; this does not switch credentials or bypass
+provider rate limits.
+
 ```bash
 # Existing single-candidate behavior
 concierge-mova paid-candidate.json --output single-packet.json --repo-eligibility-policy /secure/path/REPOSITORY_WORK_ELIGIBILITY.json

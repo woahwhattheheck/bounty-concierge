@@ -108,6 +108,23 @@ def test_compiles_deterministic_pipeline_with_account_routing():
     assert first["economics"]["compensation_claim"]["required"] is True
 
 
+@pytest.mark.parametrize("field", ["work_account", "submission_account"])
+@pytest.mark.parametrize("invalid_actor", ["stranger", "woahwhattheheck-typo", "tokenjunkielabsX"])
+def test_paid_mova_cannot_route_source_or_payout_to_unknown_actors(field, invalid_actor):
+    value = candidate()
+    value[field] = invalid_actor
+    with pytest.raises(MovaFactoryError, match="authorized original-contributor"):
+        compile_mova_packet(value)
+
+
+def test_original_secondary_author_preserved_for_existing_compensation_lane():
+    value = candidate()
+    value["submission_account"] = "tokenjunkielabs"
+    result = compile_mova_packet(value)
+    assert result["roles"][3]["account"] == "tokenjunkielabs"
+    assert result["roles"][4]["account"] == "tokenjunkielabs"
+
+
 def test_rejects_archived_or_unverified_sponsor_repositories():
     for value in (True, "false", None):
         blocked = candidate()
