@@ -1,0 +1,13 @@
+{
+  "schema": "self-disclosed-test-targets/v1",
+  "classification": "nonpayable_test_work_not_fraud_finding",
+  "rule": "Hard-block NEW paid-work intake for explicitly self-disclosed test/research repositories; preserve claims and do not infer fraud or payment state.",
+  "blocked": [
+    {
+      "repo": "ApexOpsStudio/ai-gitops-test-target",
+      "reason": "Owner README explicitly says test target, not real project, to validate AI bounty-hunting workflow. The sponsor's issues 1/2/3 advertise /bounty $50/$75/$100 and its #1 Bounty label identifies itself as a test bounty issue.",
+      "evidence_url": "https://github.com/ApexOpsStudio/ai-gitops-test-target/blob/main/README.md",
+      "readme_blob_sha": "91da9a7d29915af0508a0a90e29cff05760b9856"
+    }
+  ]
+}
