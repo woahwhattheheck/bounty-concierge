@@ -1,10 +1,52 @@
 # SPDX-License-Identifier: MIT
 from copy import deepcopy
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
 
-from concierge.mova_factory import MovaFactoryError, compile_mova_packet, compile_mova_batch
+from concierge.mova_factory import (
+    MovaFactoryError,
+    compile_mova_packet as _compile_mova_packet,
+    compile_mova_batch as _compile_mova_batch,
+)
+
+# Synthetic policy fixtures, NOT claims that the named sponsors have paid.
+NOW = datetime.now(timezone.utc)
+POLICY = {
+    "schema_version": 1,
+    "policy_id": "REPO-ELIGIBILITY-20261009-BRYCE-01",
+    "default_status": "HOLD_UNVERIFIED",
+    "activity_max_age_days": 90,
+    "observed_at": NOW.isoformat(),
+    "repositories": {},
+}
+for _repo in ("owner/repo", "another/repo"):
+    POLICY["repositories"][_repo] = {
+        "status": "QUALIFIED_ACTIVE_PAID",
+        "maintainer_activity": {
+            "kind": "merge", "actor": "fixture-maintainer",
+            "event_at": (NOW - timedelta(hours=1)).isoformat(),
+            "evidence_url": f"https://github.com/{_repo}/pull/7",
+        },
+        "paid_merge_history": [{
+            "payer": _repo.split("/")[0],
+            "recipient": "fixture-recipient",
+            "currency": "USD", "amount": "25",
+            "merged_pr_url": f"https://github.com/{_repo}/pull/6",
+            "payment_evidence_url": "https://algora.io/claims/synthetic-example",
+            "paid_at": (NOW - timedelta(days=1)).isoformat(),
+        }],
+    }
+
+
+def compile_mova_packet(*args, **kwargs):
+    return _compile_mova_packet(*args, repo_eligibility_policy=POLICY, **kwargs)
+
+
+def compile_mova_batch(*args, **kwargs):
+    return _compile_mova_batch(*args, repo_eligibility_policy=POLICY, **kwargs)
+
 
 
 CAPTURE = "1" * 64
@@ -66,6 +108,23 @@ def test_compiles_deterministic_pipeline_with_account_routing():
     assert first["economics"]["compensation_claim"]["required"] is True
 
 
+@pytest.mark.parametrize("field", ["work_account", "submission_account"])
+@pytest.mark.parametrize("invalid_actor", ["stranger", "woahwhattheheck-typo", "tokenjunkielabsX"])
+def test_paid_mova_cannot_route_source_or_payout_to_unknown_actors(field, invalid_actor):
+    value = candidate()
+    value[field] = invalid_actor
+    with pytest.raises(MovaFactoryError, match="authorized original-contributor"):
+        compile_mova_packet(value)
+
+
+def test_original_secondary_author_preserved_for_existing_compensation_lane():
+    value = candidate()
+    value["submission_account"] = "tokenjunkielabs"
+    result = compile_mova_packet(value)
+    assert result["roles"][3]["account"] == "tokenjunkielabs"
+    assert result["roles"][4]["account"] == "tokenjunkielabs"
+
+
 def test_rejects_archived_or_unverified_sponsor_repositories():
     for value in (True, "false", None):
         blocked = candidate()
@@ -82,6 +141,59 @@ def test_rejects_waiver_language_in_required_compensation_claim():
     value["compensation_claim"]["text"] = "This is not a claim for compensation."
     with pytest.raises(MovaFactoryError, match="waiver"):
         compile_mova_packet(value)
+
+
+@pytest.mark.parametrize("waiver_text", [
+    "I will not claim the $50 bounty.",
+    "I would never request the reward.",
+    "I won't claim the payment.",
+    "I can't request this compensation.",
+    "I decline to claim the Algora bounty.",
+    "I refuse to request any compensation.",
+    "I opt out of claiming the reward.",
+    "The bounty is not requested.",
+])
+def test_future_tense_or_indirect_compensation_waiver_is_not_claim(waiver_text):
+    value = candidate()
+    value["compensation_claim"]["text"] = waiver_text
+    with pytest.raises(MovaFactoryError, match="waiver"):
+        compile_mova_packet(value)
+
+
+def test_received_status_does_not_void_affirmative_reward_request():
+    value = candidate()
+    value["compensation_claim"]["text"] = (
+        "I claim the $50 bounty and request payment upon acceptance. "
+        "No payment has been received yet."
+    )
+    result = compile_mova_packet(value)
+    assert "request payment" in result["economics"]["compensation_claim"]["text"]
+
+
+@pytest.mark.parametrize("unclaimed_text", [
+    "Patch uploaded; please review.",
+    "Bounty issue addressed; changes ready for maintainer review.",
+    "I do not claim the $50 bounty.",
+    "I am not requesting compensation for this work.",
+    "I claim no payment for this patch.",
+])
+def test_paid_packets_cannot_silently_omit_or_waive_claims(unclaimed_text):
+    value = candidate()
+    value["compensation_claim"]["text"] = unclaimed_text
+    with pytest.raises(MovaFactoryError, match="affirmative|waiver"):
+        compile_mova_packet(value)
+
+
+@pytest.mark.parametrize("claim_text", [
+    "@algora-pbc /claim #42",
+    "I claim the $50 bounty and request payout upon acceptance.",
+    "Payment requested for this accepted contribution.",
+])
+def test_valid_affirmative_reward_requests_survive(claim_text):
+    value = candidate()
+    value["compensation_claim"]["text"] = claim_text
+    result = compile_mova_packet(value)
+    assert result["economics"]["compensation_claim"]["text"] == claim_text
 
 
 def test_rejects_stale_or_mismatched_lease_before_dispatch():
@@ -194,3 +306,33 @@ def test_bounded_reward_keeps_normal_currency_and_raised_floor():
     result = compile_mova_packet(value, minimum_reward_usd=Decimal("25"))
     assert result["economics"]["reward_usd"] == "2500.5"
     assert result["economics"]["minimum_reward_usd"] == "25"
+
+
+def test_direct_factory_rejects_missing_or_unqualified_sponsor_policy():
+    value = candidate()
+    with pytest.raises(MovaFactoryError, match="eligibility policy is required"):
+        _compile_mova_packet(value)
+    with pytest.raises(MovaFactoryError, match="eligibility policy is required"):
+        _compile_mova_batch([value])
+    inactive = deepcopy(POLICY)
+    inactive["repositories"]["owner/repo"]["status"] = "HOLD_UNVERIFIED"
+    with pytest.raises(MovaFactoryError, match="not QUALIFIED_ACTIVE_PAID"):
+        _compile_mova_packet(value, repo_eligibility_policy=inactive)
+    stale = deepcopy(POLICY)
+    stale["observed_at"] = (NOW - timedelta(days=3)).isoformat()
+    with pytest.raises(MovaFactoryError, match="stale"):
+        _compile_mova_packet(value, repo_eligibility_policy=stale)
+    missing_receipt = deepcopy(POLICY)
+    missing_receipt["repositories"]["owner/repo"]["paid_merge_history"] = []
+    with pytest.raises(MovaFactoryError, match="historical completed"):
+        _compile_mova_packet(value, repo_eligibility_policy=missing_receipt)
+
+
+def test_direct_factory_qualified_policy_is_auditable_and_batch_bound():
+    single = compile_mova_packet(candidate())
+    batch = compile_mova_batch([candidate(), candidate()])
+    assert batch["packets"][0] == single
+    receipt = single["evidence"]["repo_paid_eligibility"]
+    assert receipt["status"] == "QUALIFIED_ACTIVE_PAID"
+    assert len(receipt["policy_snapshot_sha256"]) == 64
+    assert receipt["paid_merge_receipt_count"] == 1

@@ -26,6 +26,8 @@ from concierge.submission_packet import validate_submission_target
 _RECEIPT_SCHEMA = "bounty-live-cash-admission-receipt/v1"
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _USD_TOKEN_RE = re.compile(r"\$([0-9][0-9,]*(?:\.[0-9]{1,2})?)\b")
+_MAX_USD_AMOUNT = Decimal("1000000000000")
+_FIXED_USD_RE = re.compile(r"(?:[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+)(?:\.[0-9]{1,8})?\Z")
 _REWARD_WORD_RE = re.compile(r"(?i)\b(?:bounty|reward|prize)\b|/(?:bounty)\b")
 _REWARD_CONTEXT_RE = re.compile(
     r"(?i)\b(?:bounty|reward|prize|payment|payout|amount|compensation|milestones?)\b"
@@ -75,18 +77,29 @@ def _issue_number(value: int) -> int:
 
 
 def _decimal(value: Any, field: str) -> Decimal:
+    # Live GitHub titles/labels are untrusted input. Never accept exponents or
+    # unconstrained digits: format(Decimal("1e100000"), "f") expands >100 KiB.
+    # Preserve ordinary fixed USD tokens, including properly grouped thousands.
     if not isinstance(value, str) or not value or value != value.strip():
         raise LiveCashAdmissionError(f"{field} must be an exact decimal string")
+    if len(value) > 48 or _FIXED_USD_RE.fullmatch(value) is None:
+        raise LiveCashAdmissionError(f"{field} must be bounded fixed-point USD")
     try:
         amount = Decimal(value.replace(",", ""))
     except InvalidOperation as exc:
         raise LiveCashAdmissionError(f"{field} is not a valid decimal") from exc
-    if not amount.is_finite() or amount < 0:
-        raise LiveCashAdmissionError(f"{field} must be finite and non-negative")
+    if not amount.is_finite() or amount < 0 or amount > _MAX_USD_AMOUNT:
+        raise LiveCashAdmissionError(f"{field} is outside the supported USD range")
     return amount
 
 
 def _format_decimal(value: Decimal) -> str:
+    # Keep this final output boundary independent of the input parser.
+    if (
+        not isinstance(value, Decimal) or not value.is_finite() or value < 0
+        or value > _MAX_USD_AMOUNT or value.as_tuple().exponent < -8
+    ):
+        raise LiveCashAdmissionError("fixed USD amount exceeds formatting bounds")
     text = format(value, "f")
     if "." in text:
         text = text.rstrip("0").rstrip(".")
@@ -190,12 +203,15 @@ def _read_repository_snapshot(
     archived, fork = payload.get("archived"), payload.get("fork")
     if (
         not isinstance(full_name, str)
-        or full_name.casefold() != repo.casefold()
+        or _REPO_RE.fullmatch(full_name) is None
         or type(archived) is not bool
         or type(fork) is not bool
     ):
         raise LiveCashAdmissionError("canonical repository snapshot was malformed")
-    return {"full_name": full_name, "archived": archived, "fork": fork}
+    snapshot = {"full_name": full_name, "archived": archived, "fork": fork}
+    if full_name.casefold() != repo.casefold():
+        snapshot["relocated_from"] = repo
+    return snapshot
 
 
 
@@ -399,6 +415,9 @@ def _build_api():
         elif repository is not None and repository["archived"]:
             disposition = "REJECT_CANONICAL_REPOSITORY_ARCHIVED"
             reasons.append("CANONICAL_REPOSITORY_ARCHIVED")
+        elif repository is not None and "relocated_from" in repository:
+            disposition = "HOLD_CANONICAL_REPOSITORY_RELOCATED"
+            reasons.append("CANONICAL_REPOSITORY_AND_ISSUE_RECHECK_REQUIRED")
         elif repository is not None and repository["fork"]:
             # A sponsor fork may still be payable, but needs explicit review.
             disposition = "HOLD_CANONICAL_REPOSITORY_FORK"

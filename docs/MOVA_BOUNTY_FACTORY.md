@@ -24,6 +24,32 @@ Each packet has a deterministic `MOVA-...` operation ID and five role leases:
 
 The packet makes normal routing explicit: routine source work defaults to `tokenjunkielabs`; publication and collection default to `woahwhattheheck`. Role owners are separate from account routing and default to `UNASSIGNED`, allowing the coordinator to spread work across the fleet without silently inventing an owner.
 
+## Current issue evidence permits optional independent QA
+
+The existing five-stage MOVA handoff remains the default. If a fresh canonical issue review
+confirms no independent QA seat is required, add the opt-in qa_handoff object to the
+otherwise verified READY candidate (not to the provider or its original PR):
+
+    "qa_handoff": {
+      "schema": "mova-independent-qa/v1",
+      "separate_qa_required": false,
+      "issue_url": "https://github.com/owner/repo/issues/42",
+      "capture_sha256": "<actual canonical_capture_sha256>",
+      "checked_at": "<actually observed timezone-aware timestamp within 6 hours>",
+      "builder_focused_check": true
+    }
+
+This source-bound intake assertion must refer to the SAME canonical issue and capture.
+The source digest must match the READY candidate and the timestamp must be fresh,
+never future dated. An explicitly assigned QA owner cannot be silently dropped.
+No opt-in or unclear acceptance criteria retains the exact prior five-stage packet.
+
+The alternative produces SCOUT -> BUILD -> PUBLISH -> COLLECT; PUBLISH depends on
+the actual BUILD_RECEIPT, not a fabricated QA_ACCEPT_RECEIPT. The builder remains
+responsible for focused tests/review required by the changed behavior and sponsor.
+Authors, original contribution claims, exact heads, payout paths and provider
+permissions are unchanged. The operation ID stays stable, but packet_sha256
+changes with the opt-in evidence and role dependencies. This makes no live calls.
 ## CLI
 
 ```bash

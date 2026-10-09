@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse, hashlib, json, re
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -47,6 +47,8 @@ def _login(v: Any, name: str) -> str:
 def _time(v: Any, name: str) -> datetime:
     s = _txt(v, name, 64)
     if not s.endswith("Z"): raise BountyCanonicalViabilityInputError(f"{name} must end in Z")
+    if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,6})?Z", s) is None:
+        raise BountyCanonicalViabilityInputError(f"{name} must be strict UTC RFC3339")
     try: d = datetime.fromisoformat(s[:-1] + "+00:00")
     except ValueError as e: raise BountyCanonicalViabilityInputError(f"{name} is not RFC3339") from e
     return d
@@ -219,10 +221,22 @@ def verify_receipt(receipt: dict[str, Any], *, semantic: bool = True) -> bool:
     except (BountyCanonicalViabilityInputError,KeyError,TypeError,ValueError): return False
 
 
+def _require_live_cli_clock(request: Any) -> None:
+    """Require real UTC clock freshness for the live CLI, not archival replay."""
+    payload = _obj(request, "request")
+    evaluated_at = _time(payload.get("evaluated_at"), "evaluated_at")
+    age = (datetime.now(timezone.utc) - evaluated_at).total_seconds()
+    if not -60 <= age <= 300:
+        raise BountyCanonicalViabilityInputError(
+            "evaluated_at must be within 5m of live UTC, at most 60s ahead"
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     p=argparse.ArgumentParser(); p.add_argument("snapshot"); p.add_argument("--json",action="store_true"); a=p.parse_args(argv)
     try:
         payload=json.load(__import__("sys").stdin) if a.snapshot=="-" else json.loads(Path(a.snapshot).read_text())
+        _require_live_cli_clock(payload)
         receipt=compile_bounty_canonical_viability(payload)
     except (OSError,json.JSONDecodeError,BountyCanonicalViabilityInputError) as e: p.error(str(e))
     print(json.dumps(receipt,indent=2,sort_keys=True) if a.json else f"{receipt['disposition']} {receipt['identity']['owner']}/{receipt['identity']['repo']}#{receipt['identity']['issue_number']} {','.join(receipt['reason_codes']) or 'none'}")

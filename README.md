@@ -13,7 +13,7 @@
 
 ## What is RustChain?
 
-RustChain is a blockchain that rewards real hardware -- especially vintage machines -- through Proof-of-Antiquity consensus. A PowerPC G4 from 2001 earns 2.5x more than a modern server, because preservation matters. The native utility token is **RTC**, valued at **$0.15 USD** per token, and bounties range from 1 RTC micro-tasks to 200 RTC red-team security audits.
+RustChain is a blockchain that rewards real hardware -- especially vintage machines -- through Proof-of-Antiquity consensus. A PowerPC G4 from 2001 earns 2.5x more than a modern server, because preservation matters. The native ecosystem token is **RTC**, used to recognize contributions and pay for services. It has **no official cash value or fiat off-ramp**, and RTC awards must not be counted as USD earned or received. Bounty terms and awards are denominated in RTC; verify each live issue before participating. This follows the [maintainer's current token policy](https://github.com/Scottcjn/Rustchain/pull/8592) and [disabled bridge](https://github.com/Scottcjn/Rustchain/pull/8562).
 
 ---
 
@@ -88,8 +88,8 @@ For a deep dive, see [docs/TECH_STACK.md](docs/TECH_STACK.md).
 |---------|---------|
 | **RIP-200** | 1 CPU = 1 Vote. Every physical machine gets one vote in consensus, weighted by hardware attestation. No GPU farms, no cloud VMs. |
 | **Proof-of-Antiquity** | Vintage hardware earns higher rewards. G4 = 2.5x, G5 = 2.0x, G3 = 1.8x, Apple Silicon = 1.2x, modern x86 = 1.0x. Multipliers decay over ~17 years. |
-| **RTC Token** | Native utility token of the RustChain network. Reference rate: **1 RTC = $0.15 USD**. Used for bounties, agent economy, and miner rewards. |
-| **wRTC** | Wrapped RTC on Base L2 for DeFi access. Bridges RTC from the attestation chain to Ethereum L2 liquidity. |
+| **RTC Token** | Experimental in-ecosystem reward and service token. No official USD rate, cash redemption, or fiat off-ramp; report RTC awards and wallet balances in RTC, not as cash received. |
+| **wRTC** | Historical wrapped-token project. The wRTC bridge and airdrop claim routes are disabled; do not advertise a conversion path or liquidity. |
 | **RIP-201** | Fleet immune system. Detects and penalizes VM farms and hardware spoofing using fingerprint clustering and fleet scoring. |
 | **Beacon Protocol** | Agent-to-agent coordination layer. Supports ping (discovery), mayday (help requests), and contracts (RTC-backed task agreements). |
 | **Hebbian / PSE** | POWER8 vec_perm non-bijunctive collapse. Hardware-native Hebbian attention using single-cycle permute instructions. Research frontier, not required for bounties. |
@@ -102,16 +102,26 @@ Use the existing `concierge-mova` command to turn current, canonically open,
 green-platform bounty captures with READY lease receipts into collision-fenced
 SCOUT → BUILD → QA → PUBLISH → COLLECT work packets.
 
+Paid MOVA role accounts are restricted to the two authorized GitHub contributor
+actors, `tokenjunkielabs` and `woahwhattheheck`, regardless of candidate JSON.
+Normal fresh work uses `tokenjunkielabs` with `woahwhattheheck` for submission
+and collection; an existing original `tokenjunkielabs`-authored contribution
+can retain that actor for its published claim. Unknown or mistyped account
+identities fail before role dispatch; this does not switch credentials or bypass
+provider rate limits.
+
 ```bash
 # Existing single-candidate behavior
-concierge-mova paid-candidate.json --output single-packet.json
+concierge-mova paid-candidate.json --output single-packet.json --repo-eligibility-policy /secure/path/REPOSITORY_WORK_ELIGIBILITY.json
 
 # Deterministic wave: 1–128 already-validated candidate objects in a JSON list
-concierge-mova paid-candidates.json --batch --output wave.json
+concierge-mova paid-candidates.json --batch --repo-eligibility-policy /secure/path/REPOSITORY_WORK_ELIGIBILITY.json --output wave.json
 
 # Optional target-keyed role ownership (e.g. "owner/repo#42" → role-name map)
-concierge-mova paid-candidates.json --batch --owners wave-owners.json --output wave.json
+concierge-mova paid-candidates.json --batch --owners wave-owners.json --repo-eligibility-policy /secure/path/REPOSITORY_WORK_ELIGIBILITY.json --output wave.json
 ```
+
+The direct factory now also **fails closed without** the separately acquired current, owner-controlled `ground/REPOSITORY_WORK_ELIGIBILITY.json` sponsor policy, including `QUALIFIED_ACTIVE_PAID` entry, fresh dated maintainer action, and completed historical same-payer merged-PR payment evidence. The JSON policy path is local and must be populated from an authenticated first-party Commons source; never paste private policy details into public tickets. Its normalized snapshot SHA-256 is recorded in each packet without altering stable MOVA target operation identity. The factory validates policy consistency, **not** the remote original payment, and does not replace live bounty eligibility, overlap checks or payment approval. Existing original-author PRs and claims use their existing collection routes; they are not discarded by this *new BUILD admission* guard.
 
 The batch sorts tickets by canonical `owner/repo#issue`, collapses exact
 duplicates, and **rejects** conflicting snapshots or owner assignments for the

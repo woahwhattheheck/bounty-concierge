@@ -10,9 +10,11 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
+import re
 from pathlib import Path
 import sys
 from typing import Any
+from urllib.parse import urlsplit
 
 
 _SCHEMA = "bounty-concierge.github-notification-exact-queue/v1"
@@ -33,6 +35,7 @@ _ACTION_CLASS = {
     "subscribed": "SUBSCRIBED_UPDATE",
 }
 _ALLOWED_TYPES = {"PullRequest", "Issue"}
+_REPO_SLUG = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
 
 
 class NotificationQueueError(ValueError):
@@ -52,11 +55,30 @@ def _utc_timestamp(value: Any, *, field: str) -> str:
     return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _api_url(value: Any, *, field: str) -> str | None:
+def _api_url(
+    value: Any, *, field: str, repository: str, endpoint: str,
+) -> str | None:
+    """Allow only an exact GitHub API resource for this notification's repo.
+
+    Retained JSON is not trusted just because its URL starts with the API
+    prefix. A cross-repository or decorated URL can otherwise send a bounded
+    inbox worker to the wrong issue/PR and spend scarce provider reads.
+    """
     if value is None:
         return None
-    if type(value) is not str or not value.startswith("https://api.github.com/repos/"):
-        raise NotificationQueueError(f"{field} must be a GitHub repository API URL")
+    if type(value) is not str or value != value.strip():
+        raise NotificationQueueError(f"{field} must be an exact GitHub API URL")
+    parsed = urlsplit(value)
+    if (
+        parsed.scheme != "https"
+        or parsed.netloc != "api.github.com"
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise NotificationQueueError(f"{field} must be an exact GitHub API URL")
+    match = re.fullmatch(r"/repos/([^/]+)/([^/]+)/(" + endpoint + r")", parsed.path)
+    if not match or f"{match.group(1)}/{match.group(2)}".casefold() != repository.casefold():
+        raise NotificationQueueError(f"{field} must target the notification repository")
     return value
 
 
@@ -70,12 +92,14 @@ def _repo_name(raw: Any) -> str:
         or "/" not in full_name
         or full_name.startswith("/")
         or full_name.endswith("/")
+        or _REPO_SLUG.fullmatch(full_name) is None
+        or any(part in {".", ".."} for part in full_name.split("/"))
     ):
         raise NotificationQueueError("repository.full_name must be owner/repo")
     return full_name
 
 
-def _subject(raw: Any) -> dict[str, Any] | None:
+def _subject(raw: Any, *, repository: str) -> dict[str, Any] | None:
     if type(raw) is not dict:
         raise NotificationQueueError("subject must be an object")
     subject_type = raw.get("type")
@@ -87,11 +111,17 @@ def _subject(raw: Any) -> dict[str, Any] | None:
     title = raw.get("title")
     if type(title) is not str or not title.strip():
         raise NotificationQueueError("subject.title must be nonempty text")
-    subject_url = _api_url(raw.get("url"), field="subject.url")
+    subject_url = _api_url(
+        raw.get("url"), field="subject.url", repository=repository,
+        endpoint=r"issues/[1-9][0-9]*" if subject_type == "Issue"
+        else r"pulls/[1-9][0-9]*",
+    )
     if subject_url is None:
         raise NotificationQueueError("subject.url is required")
     latest_comment_url = _api_url(
-        raw.get("latest_comment_url"), field="subject.latest_comment_url"
+        raw.get("latest_comment_url"), field="subject.latest_comment_url",
+        repository=repository,
+        endpoint=r"(?:issues|pulls)/comments/[1-9][0-9]*",
     )
     return {
         "type": subject_type,
@@ -117,7 +147,7 @@ def _row(raw: Any, *, index: int) -> dict[str, Any] | None:
         raw.get("updated_at"), field=f"notifications[{index}].updated_at"
     )
     repo = _repo_name(raw.get("repository"))
-    subject = _subject(raw.get("subject"))
+    subject = _subject(raw.get("subject"), repository=repo)
     if subject is None:
         return None
 
@@ -144,13 +174,22 @@ def _row(raw: Any, *, index: int) -> dict[str, Any] | None:
 
 
 def compile_notification_queue(
-    notifications: Any, *, include_read: bool = False, limit: int = 100
+    notifications: Any, *, include_read: bool = False, limit: int = 100,
+    as_of_utc: str | None = None,
 ) -> dict[str, Any]:
     """Return a deduplicated, priority-ordered exact-read queue."""
     if type(notifications) is not list:
         raise NotificationQueueError("notification input must be a JSON array")
     if isinstance(limit, bool) or type(limit) is not int or not 1 <= limit <= 1000:
         raise NotificationQueueError("limit must be an integer between 1 and 1000")
+
+    # A caller-supplied clock makes overdue sorting deterministic without I/O.
+    as_of = (
+        datetime.fromisoformat(
+            _utc_timestamp(as_of_utc, field="as_of_utc").replace("Z", "+00:00")
+        )
+        if as_of_utc is not None else None
+    )
 
     retained: dict[str, dict[str, Any]] = {}
     skipped_unsupported = 0
@@ -163,11 +202,14 @@ def compile_notification_queue(
         # generation before applying unread filtering; otherwise an older unread
         # copy could survive after a newer copy has already been marked read.
         previous = retained.get(row["notification_id"])
+        # Equal provider timestamps do not imply identical read/unread state.
+        # Retained snapshots are ordered oldest to newest; on an exact tie
+        # prefer the later input row, not the stale first row.
         # ISO text omits fractional seconds when zero, so lexical ordering
         # would rank "...00Z" above the newer "...00.500000Z".
         if previous is None or datetime.fromisoformat(
             row["updated_at"].replace("Z", "+00:00")
-        ) > datetime.fromisoformat(previous["updated_at"].replace("Z", "+00:00")):
+        ) >= datetime.fromisoformat(previous["updated_at"].replace("Z", "+00:00")):
             retained[row["notification_id"]] = row
 
     eligible = []
@@ -178,16 +220,29 @@ def compile_notification_queue(
             continue
         eligible.append(row)
 
-    ordered = sorted(
-        eligible,
-        key=lambda row: (
-            _REASON_PRIORITY.get(row["reason"], 99),
-            0 if row["subject_type"] == "PullRequest" else 1,
-            -datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00")).timestamp(),
-            row["repo"].casefold(),
-            row["notification_id"],
-        ),
-    )
+    def is_overdue(row: dict[str, Any]) -> bool:
+        if as_of is None:
+            return False
+        updated = datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00"))
+        return (as_of - updated).total_seconds() > 24 * 3600
+
+    overdue_rows = sum(is_overdue(row) for row in eligible)
+
+    def priority(row: dict[str, Any]) -> tuple[Any, ...]:
+        updated_epoch = datetime.fromisoformat(
+            row["updated_at"].replace("Z", "+00:00")
+        ).timestamp()
+        reason_priority = _REASON_PRIORITY.get(row["reason"], 99)
+        kind_priority = 0 if row["subject_type"] == "PullRequest" else 1
+        if is_overdue(row):
+            # Older unanswered candidates go first. An old notification alone
+            # is not proof the maintainer needs a response: inspect exact reads.
+            return (0, updated_epoch, reason_priority, kind_priority,
+                    row["repo"].casefold(), row["notification_id"])
+        return (1, reason_priority, kind_priority, -updated_epoch,
+                row["repo"].casefold(), row["notification_id"])
+
+    ordered = sorted(eligible, key=priority)
     selected = ordered[:limit]
     unique_reads: list[str] = []
     seen_reads: set[str] = set()
@@ -208,6 +263,11 @@ def compile_notification_queue(
             "skipped_read_rows": skipped_read,
             "skipped_unsupported_rows": skipped_unsupported,
             "returned_rows": len(selected),
+            "estimated_overdue_rows": overdue_rows,
+            "as_of_utc": (
+                as_of.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+                if as_of is not None else None
+            ),
             "truncated": len(ordered) > len(selected),
         },
         "queue": selected,
@@ -247,6 +307,11 @@ def _parser() -> argparse.ArgumentParser:
         help="Include notifications already marked read",
     )
     parser.add_argument(
+        "--as-of-utc",
+        default=None,
+        help="Optional ISO-8601 UTC time: prioritize unread threads older than 24h, oldest first",
+    )
+    parser.add_argument(
         "--limit",
         type=int,
         default=100,
@@ -259,7 +324,8 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         result = compile_notification_queue(
-            _load(args.input), include_read=args.include_read, limit=args.limit
+            _load(args.input), include_read=args.include_read, limit=args.limit,
+            as_of_utc=args.as_of_utc,
         )
     except NotificationQueueError as exc:
         print(f"Error: {exc}", file=sys.stderr)

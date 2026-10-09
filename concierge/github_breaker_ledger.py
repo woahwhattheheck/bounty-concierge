@@ -445,9 +445,14 @@ class GitHubBreakerLedger:
                 "AND lease_until_epoch <= ?",
                 (self.route_key, now),
             )
+            # An old observation can still impose a live provider reset. Never
+            # discard that deadline merely because the observation TTL elapsed.
+            # Terminal/closed rows can expire normally, while in-flight probes
+            # are protected by the lease condition above.
             cursor = connection.execute(
                 "DELETE FROM github_breaker_v1 WHERE route_key=? AND observed_epoch < ? "
-                "AND (lease_until_epoch IS NULL OR lease_until_epoch <= ?)",
-                (self.route_key, cutoff, now),
+                "AND (lease_until_epoch IS NULL OR lease_until_epoch <= ?) "
+                "AND (state != ? OR until_epoch <= ?)",
+                (self.route_key, cutoff, now, OPEN_UNTIL, now),
             )
             return cursor.rowcount
