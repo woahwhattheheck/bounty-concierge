@@ -10,7 +10,13 @@ _WAIVER = tuple(re.compile(pattern, re.IGNORECASE) for pattern in (
     r"(?:claim(?:ing)?|request(?:ing)?|seek(?:ing)?|pursu(?:e|ing))\s+"
     r"(?:(?:this|the|any|a|an)\s+)?"
     r"(?:bounty|reward|payment|payout|compensation|prize)\b",
-    r"\bthis\s+is\s+not\s+(?:an?\s+)?(?:bounty\s+)?claim\b",
+    r"\bthis\s+(?:is\s+not|isn't)\s+(?:an?\s+)?(?:bounty\s+)?claim\b",
+    r"\b(?:I|we)\s+(?:do\s+not|don't)\s+"
+    r"(?:claim|request|seek|pursue)\s+(?:(?:this|the|any|a|an|my|our)\s+)?"
+    r"(?:bounty|reward|payment|payout|compensation|prize)\b",
+    r"\b(?:I\s+am|we\s+are|I'm|we're)\s+not\s+claiming\b",
+    r"\bno\s+(?:bounty|reward|payment|payout|compensation|prize)\s+"
+    r"(?:is\s+)?(?:expected|desired|wanted|needed)\b",
     r"\b(?:I|we)\s+(?:(?:hereby|explicitly)\s+)?"
     r"(?:waive|forfeit|decline)\s+(?:(?:my|our|this|the|any)\s+)?"
     r"(?:bounty|reward|compensation|payment|payout|prize)\b",
@@ -22,6 +28,11 @@ _AFFIRMATIVE = tuple(re.compile(pattern, re.IGNORECASE) for pattern in (
     r"\b(?:I|we)\s+(?:(?:am|are|hereby|affirmatively)\s+){0,3}"
     r"(?:claim(?:ing)?|request(?:ing)?|seek(?:ing)?)\s+"
     r"(?:(?:the|this|my|our|advertised|published|eligible|conditional|stated)\s+){0,4}"
+    r"(?:bounty|reward|payment|payout|compensation|prize)\b",
+    r"\b(?:I|we)\s+(?:(?:am|are|hereby|affirmatively)\s+){0,3}"
+    r"(?:claim(?:ing)?|request(?:ing)?|seek(?:ing)?)\s+"
+    r"(?:(?:the|this|my|our|advertised|published|eligible|conditional|stated)\s+){0,4}"
+    r"[$€£][0-9][0-9,.]*\s+(?:(?:Algora|BountyHub|GrantFox|Frantic)\s+)?"
     r"(?:bounty|reward|payment|payout|compensation|prize)\b",
     r"\b(?:the|this|eligible|advertised)\s+"
     r"(?:bounty|reward|payment|payout|compensation|prize)\s+"
