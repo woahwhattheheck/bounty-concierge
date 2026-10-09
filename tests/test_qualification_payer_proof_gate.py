@@ -28,6 +28,7 @@ def owner_registry(*, observed=None, state="QUALIFIED_ACTIVE_PAID", history=True
     observed = observed or now - timedelta(minutes=15)
     return {
         "schema_version": 1,
+        "activity_max_age_days": 30,
         "observed_at": observed.isoformat(),
         "repositories": {
             "acme/plugin": {
@@ -53,10 +54,11 @@ class PaidPayerProofDispatchTest(unittest.TestCase):
         self.assertFalse(result["dispatch"])
         self.assertIn("PAYER_REGISTRY_MISSING_OR_INVALID", result["reason_codes"])
 
-    def test_curated_same_payer_paid_merge_allows_eligible_candidate(self):
+    def test_curated_paid_history_remains_hold_without_exact_task_authorization(self):
         result = qualify_dispatch(candidate(), payer_registry=owner_registry())
-        self.assertEqual(result["disposition"], "ACTIONABLE")
-        self.assertTrue(result["dispatch"])
+        self.assertEqual(result["disposition"], "HOLD")
+        self.assertFalse(result["dispatch"])
+        self.assertIn("EXACT_TASK_PREFLIGHT_REQUIRED", result["reason_codes"])
         self.assertTrue(result["signals"]["same_payer_paid_merge_gate"]["historical_paid_merge_proof"])
         self.assertFalse(result["signals"]["same_payer_paid_merge_gate"]["payment_to_our_claimant_verified"])
 
@@ -69,6 +71,21 @@ class PaidPayerProofDispatchTest(unittest.TestCase):
         result = qualify_dispatch(candidate("Elsewhere/Unrelated"), payer_registry=owner_registry())
         self.assertEqual(result["disposition"], "HOLD")
         self.assertIn("SAME_PAYER_PAID_MERGE_UNVERIFIED", result["reason_codes"])
+
+    def test_inactive_31_day_maintainer_is_not_green(self):
+        registry = owner_registry()
+        registry["repositories"]["acme/plugin"]["maintainer_activity"]["event_at"] = (
+            datetime.now(timezone.utc) - timedelta(days=31)
+        ).isoformat()
+        result = qualify_dispatch(candidate(), payer_registry=registry)
+        self.assertIn("PAID_PAYER_MAINTAINER_INACTIVE", result["reason_codes"])
+        self.assertFalse(result["dispatch"])
+
+    def test_outdated_activity_policy_cannot_pass(self):
+        registry = owner_registry()
+        registry["activity_max_age_days"] = 90
+        result = qualify_dispatch(candidate(), payer_registry=registry)
+        self.assertIn("PAYER_ACTIVITY_POLICY_MISMATCH", result["reason_codes"])
 
     def test_stale_owner_registry_is_not_passed_as_live(self):
         stale = owner_registry(observed=datetime.now(timezone.utc) - timedelta(days=5))
