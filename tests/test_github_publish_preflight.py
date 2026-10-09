@@ -201,6 +201,7 @@ def test_stale_handoff_reconciles_before_admission_or_publish(tmp_path):
         carrier="owner/repo#34",
         expected_head=HEAD.upper(),
         transport=lambda: calls.append("provider-write"),
+        provider_repository_state=lambda: {"full_name": "Owner/Repo", "archived": False},
         provider_reconcile=lambda: provider_match,
     )
 
@@ -264,6 +265,35 @@ def test_known_provider_capability_denial_reroutes_before_admission_or_publish(t
     }
 
 
+
+def test_pr_create_requires_first_party_archive_callback_before_census_or_write(tmp_path):
+    """Every accepted spelling of PR creation fails closed without repo state."""
+    path = tmp_path / "cooldown.sqlite"
+    for action in (
+        "create-pull-request", "create_pull_request", "create-pr",
+        "pull.create", "pull-request.create",
+    ):
+        calls = []
+        receipt = execute_publish_operation(
+            path,
+            "credential",
+            rail="private-token",
+            actor="actor-293",
+            operation="unverified-repository",
+            action=action,
+            repo="Sponsor/Repo",
+            carrier="Sponsor/Repo#152",
+            expected_head=HEAD,
+            provider_reconcile=lambda: calls.append("all-states-reconcile"),
+            transport=lambda: calls.append("provider-write"),
+        )
+        assert receipt["status"] == "PROVIDER_REPOSITORY_STATE_REQUIRED"
+        assert receipt["provider_repository_state_called"] is False
+        assert receipt["provider_write_called"] is False
+        assert calls == []
+        assert not path.exists()
+
+
 def test_pr_create_without_all_state_reconciliation_never_writes(tmp_path):
     """A stale open-PR scan is insufficient; missing fresh match check must stop."""
     path = tmp_path / "cooldown.sqlite"
@@ -279,6 +309,7 @@ def test_pr_create_without_all_state_reconciliation_never_writes(tmp_path):
         carrier="Owner/Repo#32398",
         expected_head=HEAD,
         transport=lambda: calls.append("write"),
+        provider_repository_state=lambda: {"full_name": "Owner/Repo", "archived": False},
     )
     assert calls == []
     assert not path.exists()
@@ -301,10 +332,14 @@ def test_pr_create_with_current_provider_clear_check_can_write(tmp_path):
         repo="Owner/Repo",
         carrier="Owner/Repo#32398",
         expected_head=HEAD,
+        provider_repository_state=lambda: (
+            calls.append("repository-metadata")
+            or {"full_name": "Owner/Repo", "archived": False}
+        ),
         provider_reconcile=lambda: (calls.append("all-states-reconcile") or None),
         transport=lambda: (calls.append("provider-write") or {"number": 32399}),
     )
-    assert calls == ["all-states-reconcile", "provider-write"]
+    assert calls == ["repository-metadata", "all-states-reconcile", "provider-write"]
     assert result == {"number": 32399}
 
 
