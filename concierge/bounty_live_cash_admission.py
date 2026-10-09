@@ -190,12 +190,15 @@ def _read_repository_snapshot(
     archived, fork = payload.get("archived"), payload.get("fork")
     if (
         not isinstance(full_name, str)
-        or full_name.casefold() != repo.casefold()
+        or _REPO_RE.fullmatch(full_name) is None
         or type(archived) is not bool
         or type(fork) is not bool
     ):
         raise LiveCashAdmissionError("canonical repository snapshot was malformed")
-    return {"full_name": full_name, "archived": archived, "fork": fork}
+    snapshot = {"full_name": full_name, "archived": archived, "fork": fork}
+    if full_name.casefold() != repo.casefold():
+        snapshot["relocated_from"] = repo
+    return snapshot
 
 
 
@@ -399,6 +402,9 @@ def _build_api():
         elif repository is not None and repository["archived"]:
             disposition = "REJECT_CANONICAL_REPOSITORY_ARCHIVED"
             reasons.append("CANONICAL_REPOSITORY_ARCHIVED")
+        elif repository is not None and "relocated_from" in repository:
+            disposition = "HOLD_CANONICAL_REPOSITORY_RELOCATED"
+            reasons.append("CANONICAL_REPOSITORY_AND_ISSUE_RECHECK_REQUIRED")
         elif repository is not None and repository["fork"]:
             # A sponsor fork may still be payable, but needs explicit review.
             disposition = "HOLD_CANONICAL_REPOSITORY_FORK"
