@@ -19,7 +19,7 @@ SCHEMA = "bountyhub-canonical-admission/v1"
 _REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _GITHUB_ISSUE = re.compile(r"^/([^/]+)/([^/]+)/issues/([1-9][0-9]*)$")
 _GITHUB_PR = re.compile(r"^/([^/]+)/([^/]+)/pull/([1-9][0-9]*)$")
-_FIRST_PARTY_PAYERS = {"opencollective.com", "algora.io"}
+_FIRST_PARTY_PAYERS = {"opencollective.com", "algora.io", "console.algora.io"}
 MAX_RECEIPT_AGE = timedelta(hours=24)
 MAX_MAINTAINER_IDLE = timedelta(days=90)
 
