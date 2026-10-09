@@ -484,7 +484,10 @@ def compile_mova_packet(
         raise MovaFactoryError("candidate source generation disagrees with READY lease")
 
     claim = _claim(candidate.get("compensation_claim"))
-    validate_claim_target(claim["text"], issue_number)
+    try:
+        validate_claim_target(claim["text"], issue_number)
+    except ValueError as exc:
+        raise MovaFactoryError("explicit claim target must match canonical issue") from exc
     role_owners = _owners(owners)
     constraints = _constraints(candidate.get("constraints"))
     work_account = _owner_account(
