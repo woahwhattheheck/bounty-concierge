@@ -163,6 +163,42 @@ def _read_issue_generation(
     return payload, marker
 
 
+
+def _read_repository_snapshot(
+    repo: str, token: str | None, *, session: Any
+) -> dict[str, Any]:
+    """Read canonical sponsor repository state, not a marketplace listing.
+
+    Only run this additional GitHub request after an otherwise dispatchable
+    issue passes the issue-generation/preflight checks. A malformed, relocated
+    or inaccessible sponsor repository fails closed instead of leasing work.
+    """
+    effective_token = token or bp.GITHUB_TOKEN
+    try:
+        payload = bp._object_payload(
+            bp._get_json(
+                session, f"https://api.github.com/repos/{repo}",
+                headers=bp._headers(effective_token),
+            ),
+            f"repository {repo}",
+        )
+    except bp.BountyPreflightError as exc:
+        raise LiveCashAdmissionError(
+            f"canonical sponsor repository check failed: {exc}"
+        ) from exc
+    full_name = payload.get("full_name")
+    archived, fork = payload.get("archived"), payload.get("fork")
+    if (
+        not isinstance(full_name, str)
+        or full_name.casefold() != repo.casefold()
+        or type(archived) is not bool
+        or type(fork) is not bool
+    ):
+        raise LiveCashAdmissionError("canonical repository snapshot was malformed")
+    return {"full_name": full_name, "archived": archived, "fork": fork}
+
+
+
 def _usd_amount_from_preflight(preflight: dict[str, Any]) -> Decimal | None:
     qualification = preflight.get("qualification")
     if not isinstance(qualification, dict):
@@ -334,6 +370,15 @@ def _build_api():
         nonfixed = _nonfixed_usd_semantics(issue_after, amount)
         native_non_usd = _has_native_non_usd_reward(preflight)
 
+        # Save rate budget: check the repository only for an otherwise
+        # actionable paid row; blocked/closed/unfunded issues need no extra GET.
+        repository = (
+            _read_repository_snapshot(repo_norm, token, session=session)
+            if generation_stable and dispatch and amount is not None
+            and not nonfixed and not native_non_usd and amount >= pile_floor
+            else None
+        )
+
         reasons: list[str] = []
         route: str | None = None
         if not generation_stable:
@@ -351,6 +396,13 @@ def _build_api():
             ):
                 raise LiveCashAdmissionError("preflight reason_codes were malformed")
             reasons.extend(raw_reasons)
+        elif repository is not None and repository["archived"]:
+            disposition = "REJECT_CANONICAL_REPOSITORY_ARCHIVED"
+            reasons.append("CANONICAL_REPOSITORY_ARCHIVED")
+        elif repository is not None and repository["fork"]:
+            # A sponsor fork may still be payable, but needs explicit review.
+            disposition = "HOLD_CANONICAL_REPOSITORY_FORK"
+            reasons.append("CANONICAL_REPOSITORY_FORK_REVIEW_REQUIRED")
         elif nonfixed:
             disposition = "HOLD_NON_FIXED_USD_REWARD"
             reasons.append("USD_REWARD_NOT_FIXED_GUARANTEED_AMOUNT")
@@ -387,6 +439,7 @@ def _build_api():
                 "issue_generation_sha256": _sha256_json(marker_after),
                 "preflight_sha256": _sha256_json(preflight),
                 "preflight": source_projection,
+                "repository": repository,
                 **({"submission_target_sha256": _sha256_json(submission_target)}
                    if submission_target is not None else {}),
             },
