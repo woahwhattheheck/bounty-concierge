@@ -124,11 +124,12 @@ def execute_publish_operation(
     recovery lease before transport is allowed; followers re-read and defer.
     AVAILABLE proceeds directly.
 
-    For create-pull-request (including create_pull_request and pull.create),\n    provider_reconcile is mandatory unless an independently observed capability\n    denial has already terminally rerouted the request. Missing reconciliation\n    returns PROVIDER_RECONCILIATION_REQUIRED before provider or quota admission.\n    Callers must obtain a live all-states (open, closed, merged) matching-head\n    read and current-base source reconciliation; this wrapper never treats a\n    historical open-only census as proof that a new write is safe.\n\n    An optional provider_repository_state callback must return fresh first-party
+    For create-pull-request (including create_pull_request and pull.create),\n    provider_reconcile is mandatory unless an independently observed capability\n    denial has already terminally rerouted the request. Missing reconciliation\n    returns PROVIDER_RECONCILIATION_REQUIRED before provider or quota admission.\n    Callers must obtain a live all-states (open, closed, merged) matching-head\n    read and current-base source reconciliation; this wrapper never treats a\n    historical open-only census as proof that a new write is safe.\n\n    For PR creation, provider_repository_state must return fresh first-party
     GitHub repository metadata with matching full_name and a boolean archived.
     Archived destinations are terminally blocked before PR reconciliation,
     cooldown admission, or write I/O; this is not an integration-scope failure.
-    Missing or mismatched archive evidence fails closed when supplied. This
+    Missing PR-create archive callbacks and mismatched metadata fail closed; a
+    verified capability denial may terminate without consuming repository reads. This
     avoids wasting retries on read-only archived sponsor repositories.
 
     When provider_reconcile is supplied, it runs after repo/head canonicalization
@@ -167,6 +168,51 @@ def execute_publish_operation(
         raise ValueError("provider_capability_denial must be callable")
     if provider_repository_state is not None and not callable(provider_repository_state):
         raise ValueError("provider_repository_state must be callable")
+
+    create_action = action.casefold().replace("_", "-")
+    is_create_pr = create_action in {
+        "create-pull-request", "create-pr", "pull.create", "pull-request.create"
+    }
+
+    # A verified capability denial is a terminal non-write. Resolve it before
+    # spending sponsor metadata or PR-census reads on a known unusable rail.
+    if provider_capability_denial is not None:
+        capability_evidence = provider_capability_denial()
+        if capability_evidence is not None:
+            if not isinstance(capability_evidence, dict):
+                raise ValueError(
+                    "provider_capability_denial must return a mapping or None"
+                )
+            return {
+                "status": "PROVIDER_REROUTE_REQUIRED",
+                "provider_called": False,
+                "provider_capability_called": True,
+                "provider_write_called": False,
+                "operation": operation,
+                "action": action,
+                "repo": repo,
+                "carrier": carrier,
+                "expected_head": expected_head,
+                "capability_evidence": dict(capability_evidence),
+            }
+
+
+    # PR creation must NEVER rely on the caller remembering the optional
+    # archive guard. No repository metadata means no create transport, even
+    # when an all-states PR census has been supplied.
+    if is_create_pr and provider_repository_state is None:
+        return {
+            "status": "PROVIDER_REPOSITORY_STATE_REQUIRED",
+            "provider_called": False,
+            "provider_repository_state_called": False,
+            "provider_write_called": False,
+            "operation": operation,
+            "action": action,
+            "repo": repo,
+            "carrier": carrier,
+            "expected_head": expected_head,
+            "reason": "fresh first-party repository archive metadata required before PR create",
+        }
 
     if provider_repository_state is not None:
         repository_state = provider_repository_state()
@@ -213,33 +259,12 @@ def execute_publish_operation(
             }
 
 
-    if provider_capability_denial is not None:
-        capability_evidence = provider_capability_denial()
-        if capability_evidence is not None:
-            if not isinstance(capability_evidence, dict):
-                raise ValueError(
-                    "provider_capability_denial must return a mapping or None"
-                )
-            return {
-                "status": "PROVIDER_REROUTE_REQUIRED",
-                "provider_called": False,
-                "provider_capability_called": True,
-                "provider_write_called": False,
-                "operation": operation,
-                "action": action,
-                "repo": repo,
-                "carrier": carrier,
-                "expected_head": expected_head,
-                "capability_evidence": dict(capability_evidence),
-            }
-
     # Creating a sponsor PR is uniquely vulnerable to stale all-open-only
     # censuses: another publisher can merge the same source head between the
     # prior check and this write. Do not spend provider write quota without a
     # supplied fresh, all-states same-source reconciliation callback. The
     # callback may return None after a genuine clear read; capability-denied
     # rails are still rerouted above without requiring a redundant read.
-    create_action = action.casefold().replace("_", "-")
     if create_action in {
         "create-pull-request", "create-pr", "pull.create", "pull-request.create"
     } and provider_reconcile is None:
