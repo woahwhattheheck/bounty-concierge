@@ -104,14 +104,16 @@ SCOUT → BUILD → QA → PUBLISH → COLLECT work packets.
 
 ```bash
 # Existing single-candidate behavior
-concierge-mova paid-candidate.json --output single-packet.json
+concierge-mova paid-candidate.json --output single-packet.json --repo-eligibility-policy /secure/path/REPOSITORY_WORK_ELIGIBILITY.json
 
 # Deterministic wave: 1–128 already-validated candidate objects in a JSON list
-concierge-mova paid-candidates.json --batch --output wave.json
+concierge-mova paid-candidates.json --batch --repo-eligibility-policy /secure/path/REPOSITORY_WORK_ELIGIBILITY.json --output wave.json
 
 # Optional target-keyed role ownership (e.g. "owner/repo#42" → role-name map)
-concierge-mova paid-candidates.json --batch --owners wave-owners.json --output wave.json
+concierge-mova paid-candidates.json --batch --owners wave-owners.json --repo-eligibility-policy /secure/path/REPOSITORY_WORK_ELIGIBILITY.json --output wave.json
 ```
+
+The direct factory now also **fails closed without** the separately acquired current, owner-controlled `ground/REPOSITORY_WORK_ELIGIBILITY.json` sponsor policy, including `QUALIFIED_ACTIVE_PAID` entry, fresh dated maintainer action, and completed historical same-payer merged-PR payment evidence. The JSON policy path is local and must be populated from an authenticated first-party Commons source; never paste private policy details into public tickets. Its normalized snapshot SHA-256 is recorded in each packet without altering stable MOVA target operation identity. The factory validates policy consistency, **not** the remote original payment, and does not replace live bounty eligibility, overlap checks or payment approval. Existing original-author PRs and claims use their existing collection routes; they are not discarded by this *new BUILD admission* guard.
 
 The batch sorts tickets by canonical `owner/repo#issue`, collapses exact
 duplicates, and **rejects** conflicting snapshots or owner assignments for the
