@@ -161,3 +161,36 @@ def test_higher_reward_floor_still_restricts_claims():
     value["reward_usd"] = "25"
     accepted = compile_mova_packet(value, minimum_reward_usd=Decimal("25"))
     assert accepted["economics"]["minimum_reward_usd"] == "25"
+
+
+@pytest.mark.parametrize("oversized", [
+    "1e100000",
+    "1e1000000",
+    "1e13",
+    "15." + "0" * 100,
+])
+def test_extreme_decimal_reward_expansion_is_rejected(oversized):
+    """Finite scientific-notation values must not expand to giant work packets."""
+    value = candidate()
+    value["reward_usd"] = oversized
+    with pytest.raises(MovaFactoryError, match="bounded"):
+        compile_mova_packet(value)
+    with pytest.raises(MovaFactoryError, match="bounded"):
+        compile_mova_batch([value])
+
+
+def test_extreme_caller_floor_is_rejected_before_output_formatting():
+    # The floor itself is formatted as fixed-point in the result, so fence it.
+    huge = Decimal("1e100000")
+    with pytest.raises(MovaFactoryError, match="bounded"):
+        compile_mova_packet(candidate(), minimum_reward_usd=huge)
+    with pytest.raises(MovaFactoryError, match="bounded"):
+        compile_mova_batch([candidate()], minimum_reward_usd=huge)
+
+
+def test_bounded_reward_keeps_normal_currency_and_raised_floor():
+    value = candidate()
+    value["reward_usd"] = "2500.50"
+    result = compile_mova_packet(value, minimum_reward_usd=Decimal("25"))
+    assert result["economics"]["reward_usd"] == "2500.5"
+    assert result["economics"]["minimum_reward_usd"] == "25"
