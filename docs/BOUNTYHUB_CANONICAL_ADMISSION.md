@@ -42,6 +42,8 @@ python3 -m concierge.bountyhub_canonical_admission candidate.json --output decis
 PYTHONPATH=. python3 tests/test_bountyhub_canonical_admission.py
 ```
 
+The gate also reads the repository-local `policies/repo_targeting_v1.json` known-dead set on every assessment. Any matching canonical GitHub repository (case-insensitive) receives `REPO_KNOWN_DEAD` and HOLD even when a listing is marked escrowed and its claimed sponsor receipt flag is true. A missing or invalid policy fails closed. The gate does not delete, close, or waive existing PRs or payment claims. Clear only after verifiable payer remediation is recorded in the authoritative policy.
+
 Reasons include: closed or mismatched issue, source older than 24h, maintainer idle >90 days, archive, assigned contributor, existing open solution, incomplete linked-PR census, unsuitable/unknown payout evidence or funding, and amounts under the $15 owner floor.
 
 `READY_FOR_NEW_BUILD` is **not** an assignment, claim, sponsor acceptance, or payment entitlement. Promised and escrowed cards remain distinguishable; review and claim using the original GitHub account after satisfying all separate marketplace terms. Never convert a previously authored/claimed PR into a new contribution.
