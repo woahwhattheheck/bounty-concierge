@@ -19,7 +19,7 @@ Exit 0: valid evidence and no actionable missing claims (or gaps exist without
 --fail-on-gaps). Exit 2: actionable gaps with --fail-on-gaps. Exit 1: bad input.
 Only one focused optional check:
 
-    python -m unittest tests.test_claim_gap_audit
+    python -m unittest discover -s tests -p test_claim_gap_audit.py
 
 ## Input contract
 
