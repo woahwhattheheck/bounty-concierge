@@ -94,7 +94,6 @@ def availability_snapshot(
             (
                 cooldown.cooldown_scope,
                 cooldown.scope,
-                cooldown.scope,
                 cooldown.cooldown_scope,
             ),
         ).fetchall()
