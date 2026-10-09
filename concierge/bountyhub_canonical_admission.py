@@ -118,6 +118,38 @@ def _known_dead_repository(repo):
     return repo.casefold() in known
 
 
+def _known_unsafe_source_repository(repo):
+    """Block new sponsor builds on independently observed unsafe source.
+
+    Never infer maintainer intent, past payment, or waiver of existing claims.
+    """
+    policy_path = Path(__file__).resolve().parents[1] / "policies" / "repo_targeting_v1.json"
+    try:
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError) as error:
+        raise AdmissionError("source integrity policy unavailable") from error
+    if type(policy) is not dict or policy.get("schema") != "repo-targeting-policy/v1":
+        raise AdmissionError("unsupported source integrity policy schema")
+    integrity = policy.get("source_integrity")
+    if type(integrity) is not dict or type(integrity.get("known_unsafe")) is not list:
+        raise AdmissionError("source integrity policy missing known_unsafe list")
+    unsafe = set()
+    for record in integrity["known_unsafe"]:
+        if type(record) is not dict or any(type(record.get(key)) is not str
+            for key in ("repo", "source_path", "observed_unsafe_blob_sha1", "evidence_url", "status")):
+            raise AdmissionError("invalid unsafe source record")
+        slug = record["repo"]
+        if (not _REPO.fullmatch(slug) or
+                not re.fullmatch(r"[a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)*", record["source_path"]) or
+                not re.fullmatch(r"[0-9a-f]{40}", record["observed_unsafe_blob_sha1"]) or
+                record["evidence_url"] !=
+                f"https://github.com/{slug}/blob/main/{record['source_path']}" or
+                record["status"] != "ACTIVE_SECURITY_HOLD"):
+            raise AdmissionError("invalid unsafe source evidence")
+        unsafe.add(slug.casefold())
+    return repo.casefold() in unsafe
+
+
 def assess(packet):
     packet = _object(packet, "packet")
     if packet.get("schema") != SCHEMA:
@@ -164,6 +196,8 @@ def assess(packet):
         reasons.append("CANONICAL_ISSUE_MISMATCH")
     if _known_dead_repository(source_ref[0]):
         reasons.append("REPO_KNOWN_DEAD")
+    if _known_unsafe_source_repository(source_ref[0]):
+        reasons.append("REPO_UNSAFE_SOURCE")
     if amount < Decimal("15"):
         reasons.append("BELOW_OWNER_USD_15_FLOOR")
     if funding == "unknown":
