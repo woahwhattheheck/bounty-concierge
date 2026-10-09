@@ -10,9 +10,11 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
+import re
 from pathlib import Path
 import sys
 from typing import Any
+from urllib.parse import urlsplit
 
 
 _SCHEMA = "bounty-concierge.github-notification-exact-queue/v1"
@@ -33,6 +35,7 @@ _ACTION_CLASS = {
     "subscribed": "SUBSCRIBED_UPDATE",
 }
 _ALLOWED_TYPES = {"PullRequest", "Issue"}
+_REPO_SLUG = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
 
 
 class NotificationQueueError(ValueError):
@@ -52,11 +55,30 @@ def _utc_timestamp(value: Any, *, field: str) -> str:
     return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _api_url(value: Any, *, field: str) -> str | None:
+def _api_url(
+    value: Any, *, field: str, repository: str, endpoint: str,
+) -> str | None:
+    """Allow only an exact GitHub API resource for this notification's repo.
+
+    Retained JSON is not trusted just because its URL starts with the API
+    prefix. A cross-repository or decorated URL can otherwise send a bounded
+    inbox worker to the wrong issue/PR and spend scarce provider reads.
+    """
     if value is None:
         return None
-    if type(value) is not str or not value.startswith("https://api.github.com/repos/"):
-        raise NotificationQueueError(f"{field} must be a GitHub repository API URL")
+    if type(value) is not str or value != value.strip():
+        raise NotificationQueueError(f"{field} must be an exact GitHub API URL")
+    parsed = urlsplit(value)
+    if (
+        parsed.scheme != "https"
+        or parsed.netloc != "api.github.com"
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise NotificationQueueError(f"{field} must be an exact GitHub API URL")
+    match = re.fullmatch(r"/repos/([^/]+)/([^/]+)/(" + endpoint + r")", parsed.path)
+    if not match or f"{match.group(1)}/{match.group(2)}".casefold() != repository.casefold():
+        raise NotificationQueueError(f"{field} must target the notification repository")
     return value
 
 
@@ -70,12 +92,14 @@ def _repo_name(raw: Any) -> str:
         or "/" not in full_name
         or full_name.startswith("/")
         or full_name.endswith("/")
+        or _REPO_SLUG.fullmatch(full_name) is None
+        or any(part in {".", ".."} for part in full_name.split("/"))
     ):
         raise NotificationQueueError("repository.full_name must be owner/repo")
     return full_name
 
 
-def _subject(raw: Any) -> dict[str, Any] | None:
+def _subject(raw: Any, *, repository: str) -> dict[str, Any] | None:
     if type(raw) is not dict:
         raise NotificationQueueError("subject must be an object")
     subject_type = raw.get("type")
@@ -87,11 +111,17 @@ def _subject(raw: Any) -> dict[str, Any] | None:
     title = raw.get("title")
     if type(title) is not str or not title.strip():
         raise NotificationQueueError("subject.title must be nonempty text")
-    subject_url = _api_url(raw.get("url"), field="subject.url")
+    subject_url = _api_url(
+        raw.get("url"), field="subject.url", repository=repository,
+        endpoint=r"issues/[1-9][0-9]*" if subject_type == "Issue"
+        else r"pulls/[1-9][0-9]*",
+    )
     if subject_url is None:
         raise NotificationQueueError("subject.url is required")
     latest_comment_url = _api_url(
-        raw.get("latest_comment_url"), field="subject.latest_comment_url"
+        raw.get("latest_comment_url"), field="subject.latest_comment_url",
+        repository=repository,
+        endpoint=r"(?:issues|pulls)/comments/[1-9][0-9]*",
     )
     return {
         "type": subject_type,
@@ -117,7 +147,7 @@ def _row(raw: Any, *, index: int) -> dict[str, Any] | None:
         raw.get("updated_at"), field=f"notifications[{index}].updated_at"
     )
     repo = _repo_name(raw.get("repository"))
-    subject = _subject(raw.get("subject"))
+    subject = _subject(raw.get("subject"), repository=repo)
     if subject is None:
         return None
 
