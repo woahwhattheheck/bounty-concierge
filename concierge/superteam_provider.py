@@ -10,6 +10,7 @@ claims a payout, performs KYC/wallet actions, or recognizes revenue.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -39,6 +40,53 @@ _ALLOWED_COMPENSATION = frozenset({"fixed", "range", "variable"})
 _ALLOWED_ELIGIBILITY_TYPES = frozenset({"text", "link"})
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,199}$")
 _CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
+
+# Conservative, sponsor-detail reward-kind detector, ported from the fleet's
+# MarketplaceRewardTruth-20261008 offline gate. Header currency icons and total
+# prize fields are never by themselves evidence of a liquid payout.
+_NONCASH_PRIZE_RE = re.compile(
+    r"(?i)(?:\bno\s+cash\s+(?:prize|alternative|payout|reward)\b"
+    r"|\bin[- ]kind\b"
+    r"|\btickets?\s+in\s+place\s+of\b"
+    r"|\bnon[- ]transferable\b.{0,100}\b(?:credits?|subscriptions?|services?|audits?|tickets?)\b"
+    r"|\b(?:credits?|subscriptions?|tickets?|passes?)\b.{0,80}\b(?:not\s+redeemable|cannot\s+be\s+(?:cashed|redeemed))\b"
+    r"|\bno\s+cash\s+will\s+be\s+awarded\b"
+    r"|\b(?:subscriptions?|credits?|tickets?|services?)\s+instead\s+of\s+(?:cash|USDC|USDG|USD)\b)"
+)
+
+
+def classify_operative_reward_kind(
+    description: str, requirements: str | None
+) -> dict[str, Any]:
+    """Flag explicit noncash prize contracts; never certify cash from a headline.
+
+    Sponsor detail text is untrusted evidence. A negative match establishes a
+    reason to PRUNE cash-first routing; no match only establishes UNVERIFIED.
+    This function does not grant submission, payout, or cash authority.
+    """
+    if type(description) is not str or not description or len(description) > 100_000:
+        raise SuperteamProviderError("reward description is missing or unbounded")
+    if requirements is not None and (
+        type(requirements) is not str or len(requirements) > 100_000
+    ):
+        raise SuperteamProviderError("reward requirements are unbounded")
+    raw = description + "\n" + (requirements or "")
+    # Strip HTML tags for detection only. Retain exact source bytes in the
+    # normal public contract; a hash lets later auditors identify this version.
+    normalized = re.sub(r"<[^>]{1,500}>", " ", raw)
+    noncash = bool(_NONCASH_PRIZE_RE.search(normalized))
+    return {
+        "classification": "PRUNE_NONCASH" if noncash else "HOLD_CASH_UNVERIFIED",
+        "reason_codes": (
+            ["EXPLICIT_IN_KIND_OR_NO_CASH_OPERATIVE_TERMS"]
+            if noncash else ["CASH_REWARD_NOT_VERIFIED_FROM_DETAILS"]
+        ),
+        "evidence_sha256": hashlib.sha256(raw.encode("utf-8")).hexdigest(),
+        "evidence_source": "first_party_agent_details_sponsor_text",
+        "source_text_untrusted": True,
+        "cash_payout_confirmed": False,
+        "cash_dispatch_authorized": False,
+    }
 
 
 class SuperteamProviderError(ValueError):
@@ -478,6 +526,8 @@ def normalize_live_listing(row: Any) -> dict[str, Any]:
             "min_ask": _decimal_text(min_ask),
             "max_ask": _decimal_text(max_ask),
             "prize_breakdown": prize_breakdown,
+            "operative_reward_kind": "UNVERIFIED_UNTIL_DETAILS",
+            "cash_reward_for_dispatch": None,
             "competitive": competitive,
             # Advertisement is not acceptance, award, settlement, or payment.
             "guaranteed": False,
@@ -664,9 +714,12 @@ def fetch_listing_details(
         allow_none=True,
         allow_newlines=True,
     )
+    reward_kind = classify_operative_reward_kind(description, requirements)
+    core["compensation"]["operative_reward_kind"] = reward_kind["classification"]
     return {
         "schema": "superteam-agent-listing-details/v1",
         "listing": core,
+        "operative_reward_truth": reward_kind,
         "public_contract": {
             "skills": _skills(payload.get("skills")),
             "eligibility": _eligibility(payload.get("eligibility")),
