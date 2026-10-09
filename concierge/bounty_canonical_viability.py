@@ -47,6 +47,8 @@ def _login(v: Any, name: str) -> str:
 def _time(v: Any, name: str) -> datetime:
     s = _txt(v, name, 64)
     if not s.endswith("Z"): raise BountyCanonicalViabilityInputError(f"{name} must end in Z")
+    if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,6})?Z", s) is None:
+        raise BountyCanonicalViabilityInputError(f"{name} must be strict UTC RFC3339")
     try: d = datetime.fromisoformat(s[:-1] + "+00:00")
     except ValueError as e: raise BountyCanonicalViabilityInputError(f"{name} is not RFC3339") from e
     return d
