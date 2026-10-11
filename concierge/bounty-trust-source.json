@@ -1,0 +1,16 @@
+{
+  "policy_id": "BOUNTY-TRUST-BAN-20261011",
+  "source_repository": "woahwhattheheck/commons",
+  "status": "source_snapshot_not_live_deployment",
+  "source_paths": {
+    "bounty_payer_checker.py": {
+      "canonical_path": "docs/policies/check_bounty_payer.py",
+      "sha256": "d8745bfcf9f5bfc041388037f5fc1a6b2a072421c09ee3de90d66f8c745ed877"
+    },
+    "maintainer-credibility-registry.json": {
+      "canonical_path": "docs/policies/maintainer-credibility-registry.json",
+      "sha256": "1fb9021a2843fc3d3ea0418d8aae2db0532cc99e174ee4f0b4d74562e6a6a1d8"
+    }
+  },
+  "update_contract": "Copy the exact maintained canonical checker and registry together; gate never accepts a request-supplied trust flag or registry path. Preserve all other package source. Missing/stale/malformed trust denies collection; historical packets remain evidence."
+}

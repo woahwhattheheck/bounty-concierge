@@ -119,3 +119,11 @@ initiate payouts, touch wallets, recognize revenue, or turn an advertised reward
 into debt/cash. It only composes already-existing evidence gates and emits a
 receipt proving whether one elected writer may advance to the local pre-send
 lease.
+
+## Current trust gate source (2026-10-11)
+
+`authorize_collection_dispatch` now consults the fixed packaged canonical registry/checker snapshot through `collection_trust` before provider census or writer election. An unknown, excluded, stale, malformed or ambiguous trust scope emits `HOLD`, `dispatch=false`, `BOUNTY_TRUST_BAN`; request-supplied allow flags and alternate registry paths are not accepted. The existing source packet and historical verification remain intact.
+
+`acquire_guarded_local_lease` reads the same current snapshot again. It refuses old CLEAR receipts without current trust provenance and receipts generated against changed registry bytes. Exact canonical checker and registry hashes are retained in `concierge/bounty-trust-source.json`; synchronize those two source files together from Commons when trust evidence changes. The JSON snapshot is packaged for installed and checkout use. Exact existing contribution exceptions remain bound to their original PR URLs; a different PR does not inherit them.
+
+This is source enforcement in the collection guard and its local lease entrypoint, not evidence of deployment or proof that other senders invoke it. Runtime operators must adopt these exact sources, stop excluded queued operations, and return actual queue IDs and readback. No external send, provider mutation, or blanket queue-cancel receipt is produced by this patch.

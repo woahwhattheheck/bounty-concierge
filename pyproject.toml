@@ -25,4 +25,5 @@ concierge-intake-cache = "concierge.github_intake_cache:main"
 include = ["concierge*"]
 
 [tool.setuptools.package-data]
-concierge = ["*.source"]
+concierge = ["*.source", "maintainer-credibility-registry.json", "bounty-trust-source.json"]
+

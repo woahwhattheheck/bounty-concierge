@@ -1,0 +1,564 @@
+{
+  "schema_version": 2,
+  "updated_at": "2026-10-11",
+  "policy_id": "BOUNTY-TRUST-BAN-20261011",
+  "default_decision": "BLOCK",
+  "payers": [
+    {
+      "identity": "go-gitea project; individual award payer identities not resolved in this pass",
+      "display_name": "go-gitea / Gitea",
+      "platform": "Algora",
+      "repository": "UNRESOLVED",
+      "status": "BLOCK_UNVERIFIED",
+      "last_verified_at": "2026-10-09",
+      "recent_activity_at": null,
+      "recent_activity_evidence_ref": null,
+      "completed_payments": [],
+      "known_overdue_accepted_bounty": false,
+      "reason": "No documented current trust exception in this exact scope. Stop bounty discovery, due diligence, labor, submissions, claims, collections, retries, and monitoring. Retain historical evidence; do not infer fraud from missing proof.",
+      "source_evidence": {
+        "evidence_url": "https://algora.io/go-gitea/bounties?status=completed",
+        "slack_source": "https://tokenjunkielabs.slack.com/archives/C0BVANHNB26/p1791535313397989",
+        "source_timestamp": "2026-10-09T08:48:33Z",
+        "details": "Recent first-party scout recorded 13 COMPLETED awards with recipient names and reward rows across issues #24635, #35898, #32257, #23725, and #26219. This establishes a same-sponsor successful completed-award history, not payment to the owner/account in this task."
+      },
+      "historical_status": "HOLD",
+      "historical_reason": "Suitable as prior-paid sponsor candidate. To finalize GREEN for any exact work, bind the responsible maintainer, a fresh current activity observation, and the exact eligible award/claim route. The 13 completed awards are not 13 new opportunities."
+    },
+    {
+      "identity": "Archestra project; exact payer/maintainer account not captured in this evidence pass",
+      "display_name": "Archestra",
+      "platform": "Algora",
+      "repository": "UNRESOLVED",
+      "status": "BLOCK_UNVERIFIED",
+      "last_verified_at": "2026-10-09",
+      "recent_activity_at": null,
+      "recent_activity_evidence_ref": null,
+      "completed_payments": [],
+      "known_overdue_accepted_bounty": false,
+      "reason": "No documented current trust exception in this exact scope. Stop bounty discovery, due diligence, labor, submissions, claims, collections, retries, and monitoring. Retain historical evidence; do not infer fraud from missing proof.",
+      "source_evidence": {
+        "slack_source": "https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1791535757536739",
+        "source_timestamp": "2026-10-09T08:55:57Z",
+        "details": "A recent scout summarizes Archestra as having verified prior paid claims, while the current Algora board has zero open bounties. This summary does not expose individual bounty IDs, amounts, recipient, merge, payout receipt, or named payer."
+      },
+      "historical_status": "HOLD",
+      "historical_reason": "Do not promote from the summary alone. Recover exact completed award/recipient/merged PR evidence and recheck a live eligible task before assigning GREEN. No evidence supports BLACKLISTED."
+    },
+    {
+      "identity": "sampled-labs/sampled sponsor; individual decision-maker not verified",
+      "display_name": "sampled-labs / sampled",
+      "platform": "Direct GitHub reward requests; portal/rail not confirmed",
+      "repository": "UNRESOLVED",
+      "status": "BLOCK_UNVERIFIED",
+      "last_verified_at": "2026-10-09",
+      "recent_activity_at": null,
+      "recent_activity_evidence_ref": null,
+      "completed_payments": [],
+      "known_overdue_accepted_bounty": false,
+      "reason": "No documented current trust exception in this exact scope. Stop bounty discovery, due diligence, labor, submissions, claims, collections, retries, and monitoring. Retain historical evidence; do not infer fraud from missing proof.",
+      "source_evidence": {
+        "slack_source": "https://tokenjunkielabs.slack.com/archives/C0BVANHNB26/p1791535674566279",
+        "additional_merge_census": "https://tokenjunkielabs.slack.com/archives/C0BVANHNB26/p1791535294400429",
+        "details": "Recent source readback says both original claimant PRs #158/#159 are merged, both original issue-side conditional $75 claims exist, PR discussions have zero maintainer award/payment replies, and payout rail is unconfirmed. A separate exhaustive Gmail notification census reports 23 merged PRs dated Oct 9, but explicitly does not establish payout."
+      },
+      "historical_status": "HOLD",
+      "historical_reason": "HOLD is not a fraud allegation. Merge, advertised amounts, and conditional claims do not prove award or payment. No exact due date/default/refusal evidence was found, so do not blacklist."
+    },
+    {
+      "identity": "mjfekri",
+      "display_name": "mjfekri / moorcheh-ai",
+      "platform": "BountyHub",
+      "repository": "UNRESOLVED",
+      "status": "BLOCK_UNVERIFIED",
+      "last_verified_at": "2026-10-09",
+      "recent_activity_at": null,
+      "recent_activity_evidence_ref": null,
+      "completed_payments": [],
+      "known_overdue_accepted_bounty": false,
+      "reason": "No documented current trust exception in this exact scope. Stop bounty discovery, due diligence, labor, submissions, claims, collections, retries, and monitoring. Retain historical evidence; do not infer fraud from missing proof.",
+      "source_evidence": {
+        "evidence_url": "https://www.bountyhub.dev/en/bounty/view/b21928e9-70dd-4d95-adc6-3009df47e9f5/x",
+        "local_source_file": "C:/Users/lucys/Documents/Codex/2026-09-05/yo/work/PAYER_CREDIBILITY.md",
+        "source_date": "2026-10-01",
+        "details": "Historical ledger reports memanto #1609 ($200) paid to Suraj-kumar00 for PR #1893 and six earlier memanto bounty payouts. Ledger's method distinguishes claim isPaid=true from funds escrowed in paymentStatus."
+      },
+      "historical_status": "HOLD",
+      "historical_reason": "Strong historic paid precedent; refresh payer activity and current exact-task award/claim path before GREEN admission."
+    },
+    {
+      "identity": "FrancescoBorzi / azerothcore",
+      "display_name": "FrancescoBorzi / azerothcore",
+      "platform": "BountyHub",
+      "repository": "UNRESOLVED",
+      "status": "BLOCK_UNVERIFIED",
+      "last_verified_at": "2026-10-09",
+      "recent_activity_at": null,
+      "recent_activity_evidence_ref": null,
+      "completed_payments": [],
+      "known_overdue_accepted_bounty": false,
+      "reason": "No documented current trust exception in this exact scope. Stop bounty discovery, due diligence, labor, submissions, claims, collections, retries, and monitoring. Retain historical evidence; do not infer fraud from missing proof.",
+      "source_evidence": {
+        "evidence_url": "https://www.bountyhub.dev/en/bounty/view/33c90022-6fa1-4a3f-b7da-b987706326b5/x",
+        "local_source_file": "C:/Users/lucys/Documents/Codex/2026-09-05/yo/work/PAYER_CREDIBILITY.md",
+        "source_date": "2026-10-01",
+        "details": "azerothcore #21729 ($110) reported paid to killerwife for PR #23015; 4/4 paid. Historical ledger says last posting 2025-09-18."
+      },
+      "historical_status": "HOLD",
+      "historical_reason": "Paid precedent is strong, but current activity is stale."
+    },
+    {
+      "identity": "MosleyTheMalO / SPLURT-Station",
+      "display_name": "MosleyTheMalO / SPLURT-Station",
+      "platform": "Direct PayPal/crypto via Discord per project guidelines",
+      "repository": "UNRESOLVED",
+      "status": "BLOCK_UNVERIFIED",
+      "last_verified_at": "2026-10-09",
+      "recent_activity_at": null,
+      "recent_activity_evidence_ref": null,
+      "completed_payments": [],
+      "known_overdue_accepted_bounty": false,
+      "reason": "No documented current trust exception in this exact scope. Stop bounty discovery, due diligence, labor, submissions, claims, collections, retries, and monitoring. Retain historical evidence; do not infer fraud from missing proof.",
+      "source_evidence": {
+        "source_url": "https://github.com/SPLURT-Station/S.P.L.U.R.T-tg/issues/136",
+        "local_source_file": "C:/Users/lucys/Documents/Codex/2026-09-05/yo/work/PAYER_CREDIBILITY.md",
+        "source_date": "2026-10-01",
+        "details": "Historical ledger reports multiple merged [BOUNTY] PRs and a direct-payment policy, but no public paid confirmation and no complaint."
+      },
+      "historical_status": "HOLD",
+      "historical_reason": "Missing receipts stay UNVERIFIED/HOLD. No basis for blacklist."
+    },
+    {
+      "identity": "AleksandarCole",
+      "platform": "BountyHub",
+      "repository": "superplanehq/superplane",
+      "status": "GREEN",
+      "last_verified_at": "2026-10-09",
+      "recent_activity_at": "2026-10-06",
+      "recent_activity_evidence_ref": "https://github.com/superplanehq/superplane/issues/8194#issuecomment-6012758233",
+      "completed_payments": [
+        {
+          "contributor": "harxhist",
+          "repository": "superplanehq/superplane",
+          "bounty_ref": "https://www.bountyhub.dev/en/bounty/view/59a1be33-5243-4348-bbbe-aa52120f3f91/x (BountyHub bounty ID 59a1be33-5243-4348-bbbe-aa52120f3f91; GitHub issue #3568)",
+          "pr_ref": "https://github.com/superplanehq/superplane/pull/3607",
+          "paid_at": null,
+          "payment_verified_at": "2026-10-09",
+          "paid_out": true,
+          "accepted": true,
+          "merged_upstream": true,
+          "evidence_ref": "https://api.bountyhub.dev/api/bounties/59a1be33-5243-4348-bbbe-aa52120f3f91 (claim ID 720a1892-c443-433a-a4c9-360568ee5b09, isPaid=true; payer issueOwner and paid pledge are AleksandarCole, amount $200); https://github.com/superplanehq/superplane/pull/3607 (merged 2026-04-15T20:43:55Z). BountyHub exposes no paid-at field; payment_verified_at is the read date, not the payment date."
+        }
+      ],
+      "known_overdue_accepted_bounty": false,
+      "status_reason": "Exact BountyHub payer identity, claimant payout flag, and upstream merge verified. Current direct payer activity is present in this repository within the 30-day window. No unresolved overdue accepted bounty was found in the bounded open-bounty check; exact-task eligibility/payment terms remain a separate check.",
+      "recent_activity_note": "GitHub issue #8194 was authored and commented on by the same account AleksandarCole on 2026-10-06T08:50:12Z; current issue remains open. This is direct account activity, not bot or fleet activity.",
+      "display_name": "AleksandarCole",
+      "trust_basis": "proven_payer",
+      "policy_note": "Historical payout and identity evidence retained; exact current trust/task checks and existing owner holds still apply. This entry does not establish a new task or override the owner's exclusions."
+    },
+    {
+      "identity": "Kami-no-san",
+      "platform": "BountyHub",
+      "repository": "VeridionLabs/veridion",
+      "status": "GREEN",
+      "last_verified_at": "2026-10-09",
+      "recent_activity_at": "2026-09-13",
+      "recent_activity_evidence_ref": "https://github.com/VeridionLabs/veridion/issues/24#issuecomment-5649611170",
+      "completed_payments": [
+        {
+          "contributor": "Dev-Ugee",
+          "repository": "VeridionLabs/veridion",
+          "bounty_ref": "https://www.bountyhub.dev/en/bounty/view/25b7aeb4-9cb8-4bfe-8fde-e906aff97e75/x (BountyHub bounty ID 25b7aeb4-9cb8-4bfe-8fde-e906aff97e75; GitHub issue #16; $10 advertised/promised)",
+          "pr_ref": "https://github.com/VeridionLabs/veridion/pull/110",
+          "paid_at": "2026-09-12T14:53:00Z",
+          "paid_out": true,
+          "accepted": true,
+          "merged_upstream": true,
+          "evidence_ref": "https://github.com/VeridionLabs/veridion/pull/110#issuecomment-5646635300 (payer Kami-no-san wrote â€˜Payment sentâ€™ with transfer screenshots after Dev-Ugee's payment request); https://github.com/VeridionLabs/veridion/pull/110 (merged 2026-09-10T17:31:47Z). BountyHub claim ID 40b45316-d1fe-4275-9296-5903282dc3a7 was later rejected and isPaid=false because the payment was off-platform; the direct sponsor payment comment is the payout evidence. The public record does not state the exact transferred amount, so $10 remains the listed bounty amount, not a verified received amount."
+        }
+      ],
+      "known_overdue_accepted_bounty": false,
+      "status_reason": "BountyHub identifies Kami-no-san as payer for this repository. The merged contributor PR has a dated direct payment-sent statement and screenshots. The payer made a separate same-repository comment on 2026-09-13. The stale BountyHub open/claim status is not treated as nonpayment because the GitHub source records the off-platform transfer; exact amount and current-task terms remain separate checks.",
+      "recent_activity_note": "Kami-no-san directly replied to a contributor on Veridion issue #24 on 2026-09-13T00:14:23Z and posted the payment confirmation for PR #110 on 2026-09-12T14:53:00Z.",
+      "display_name": "Kami-no-san",
+      "trust_basis": "proven_payer",
+      "policy_note": "Historical payout and identity evidence retained; exact current trust/task checks and existing owner holds still apply. This entry does not establish a new task or override the owner's exclusions."
+    },
+    {
+      "identity": "Appium / Open Collective",
+      "display_name": "Appium / Open Collective",
+      "platform": "Open Collective",
+      "repository": "appium/appium",
+      "status": "GREEN",
+      "trust_basis": "proven_maintainer",
+      "last_verified_at": "2026-10-09",
+      "recent_activity_at": "2026-10-08",
+      "recent_activity_evidence_ref": "https://github.com/appium/appium/pull/22914",
+      "known_overdue_accepted_bounty": false,
+      "sponsor_scope_verified": true,
+      "sponsor_scope_evidence_ref": "https://api.github.com/repos/woahwhattheheck/commons/git/blobs/1be61164e9e31c53e452b4b355f527ec0ed6df0f",
+      "source_blob_sha": "1be61164e9e31c53e452b4b355f527ec0ed6df0f",
+      "historical_source_status": "QUALIFIED_ACTIVE_PAID",
+      "policy_note": "Retained source-backed sponsor payout and current maintainer activity establish proven-maintainer trust only. Exact task/assignment/payment terms and all owner holds still apply. Historical payment is not payment to Bryce or a new opportunity.",
+      "completed_payments": [
+        {
+          "contributor": "Mohamed Mostafa",
+          "repository": "appium/appium-mcp",
+          "bounty_ref": "https://opencollective.com/appium/expenses/347815",
+          "pr_ref": "https://github.com/appium/appium-mcp/pull/446",
+          "paid_at": "2026-09-29T00:00:00Z",
+          "payment_verified_at": "2026-10-09",
+          "paid_out": true,
+          "accepted": true,
+          "merged_upstream": true,
+          "evidence_ref": "https://opencollective.com/appium/expenses/347815",
+          "amount": "70.75",
+          "currency": "USD"
+        }
+      ]
+    },
+    {
+      "identity": "WebdriverIO / Open Collective",
+      "display_name": "WebdriverIO / Open Collective",
+      "platform": "Open Collective",
+      "repository": "webdriverio/webdriverio",
+      "status": "GREEN",
+      "trust_basis": "proven_maintainer",
+      "last_verified_at": "2026-10-09",
+      "recent_activity_at": "2026-10-08",
+      "recent_activity_evidence_ref": "https://github.com/webdriverio/webdriverio/pull/15986",
+      "known_overdue_accepted_bounty": false,
+      "sponsor_scope_verified": true,
+      "sponsor_scope_evidence_ref": "https://api.github.com/repos/woahwhattheheck/commons/git/blobs/1be61164e9e31c53e452b4b355f527ec0ed6df0f",
+      "source_blob_sha": "1be61164e9e31c53e452b4b355f527ec0ed6df0f",
+      "historical_source_status": "QUALIFIED_ACTIVE_PAID",
+      "policy_note": "Retained source-backed sponsor payout and current maintainer activity establish proven-maintainer trust only. Exact task/assignment/payment terms and all owner holds still apply. Historical payment is not payment to Bryce or a new opportunity.",
+      "completed_payments": [
+        {
+          "contributor": "mccmrunal",
+          "repository": "webdriverio/webdriverio",
+          "bounty_ref": "https://opencollective.com/webdriverio/expenses/282627",
+          "pr_ref": "https://github.com/webdriverio/webdriverio/pull/15034",
+          "paid_at": "2026-01-27T00:00:00Z",
+          "payment_verified_at": "2026-10-09",
+          "paid_out": true,
+          "accepted": true,
+          "merged_upstream": true,
+          "evidence_ref": "https://opencollective.com/webdriverio/expenses/282627",
+          "amount": "35",
+          "currency": "USD"
+        }
+      ]
+    },
+    {
+      "identity": "tscircuit",
+      "display_name": "tscircuit",
+      "platform": "Algora",
+      "repository": "tscircuit/core",
+      "status": "GREEN",
+      "trust_basis": "proven_maintainer",
+      "last_verified_at": "2026-10-09",
+      "recent_activity_at": "2026-10-08",
+      "recent_activity_evidence_ref": "https://github.com/tscircuit/core/pull/4456",
+      "known_overdue_accepted_bounty": false,
+      "sponsor_scope_verified": true,
+      "sponsor_scope_evidence_ref": "https://api.github.com/repos/woahwhattheheck/commons/git/blobs/1be61164e9e31c53e452b4b355f527ec0ed6df0f",
+      "source_blob_sha": "1be61164e9e31c53e452b4b355f527ec0ed6df0f",
+      "historical_source_status": "QUALIFIED_ACTIVE_PAID",
+      "policy_note": "Retained source-backed sponsor payout and current maintainer activity establish proven-maintainer trust only. Exact task/assignment/payment terms and all owner holds still apply. Historical payment is not payment to Bryce or a new opportunity.",
+      "completed_payments": [
+        {
+          "contributor": "Anshgrover23",
+          "repository": "tscircuit/template-api-fake",
+          "bounty_ref": "https://algora.io/claims/U42qweQ5hdqakHZT",
+          "pr_ref": "https://github.com/tscircuit/template-api-fake/pull/11",
+          "paid_at": "2025-05-16T00:00:00Z",
+          "payment_verified_at": "2026-10-09",
+          "paid_out": true,
+          "accepted": true,
+          "merged_upstream": true,
+          "evidence_ref": "https://algora.io/claims/U42qweQ5hdqakHZT",
+          "amount": "10",
+          "currency": "USD"
+        }
+      ]
+    },
+    {
+      "identity": "Archestra",
+      "display_name": "Archestra",
+      "platform": "Algora",
+      "repository": "archestra-ai/archestra",
+      "status": "GREEN",
+      "trust_basis": "proven_maintainer",
+      "last_verified_at": "2026-10-09",
+      "recent_activity_at": "2026-10-09",
+      "recent_activity_evidence_ref": "https://github.com/archestra-ai/archestra/pull/8622",
+      "known_overdue_accepted_bounty": false,
+      "sponsor_scope_verified": true,
+      "sponsor_scope_evidence_ref": "https://api.github.com/repos/woahwhattheheck/commons/git/blobs/1be61164e9e31c53e452b4b355f527ec0ed6df0f",
+      "source_blob_sha": "1be61164e9e31c53e452b4b355f527ec0ed6df0f",
+      "historical_source_status": "QUALIFIED_ACTIVE_PAID",
+      "policy_note": "Retained source-backed sponsor payout and current maintainer activity establish proven-maintainer trust only. Exact task/assignment/payment terms and all owner holds still apply. Historical payment is not payment to Bryce or a new opportunity.",
+      "completed_payments": [
+        {
+          "contributor": "abhinav-m22",
+          "repository": "archestra-ai/archestra",
+          "bounty_ref": "https://algora.io/claims/YnDQ2PtaNjKGdDJX",
+          "pr_ref": "https://github.com/archestra-ai/archestra/pull/4667",
+          "paid_at": null,
+          "payment_verified_at": "2026-10-09",
+          "paid_out": true,
+          "accepted": true,
+          "merged_upstream": true,
+          "evidence_ref": "https://algora.io/claims/YnDQ2PtaNjKGdDJX",
+          "amount": "250",
+          "currency": "USD"
+        },
+        {
+          "contributor": "Excellencedev",
+          "repository": "archestra-ai/archestra",
+          "bounty_ref": "https://algora.io/claims/yDgieQvf98Su9TKC",
+          "pr_ref": "https://github.com/archestra-ai/archestra/pull/4690",
+          "paid_at": null,
+          "payment_verified_at": "2026-10-09",
+          "paid_out": true,
+          "accepted": true,
+          "merged_upstream": true,
+          "evidence_ref": "https://algora.io/claims/yDgieQvf98Su9TKC",
+          "amount": "75",
+          "currency": "USD"
+        }
+      ]
+    },
+    {
+      "identity": "Aqualink.org / Algora",
+      "display_name": "Aqualink.org / Algora",
+      "platform": "Algora",
+      "repository": "aqualinkorg/aqualink-app",
+      "status": "GREEN",
+      "trust_basis": "proven_maintainer",
+      "last_verified_at": "2026-10-09",
+      "recent_activity_at": "2026-10-02",
+      "recent_activity_evidence_ref": "https://github.com/aqualinkorg/aqualink-app/pull/1386",
+      "known_overdue_accepted_bounty": false,
+      "sponsor_scope_verified": true,
+      "sponsor_scope_evidence_ref": "https://api.github.com/repos/woahwhattheheck/commons/git/blobs/1be61164e9e31c53e452b4b355f527ec0ed6df0f",
+      "source_blob_sha": "1be61164e9e31c53e452b4b355f527ec0ed6df0f",
+      "historical_source_status": "QUALIFIED_ACTIVE_PAID",
+      "policy_note": "Retained source-backed sponsor payout and current maintainer activity establish proven-maintainer trust only. Exact task/assignment/payment terms and all owner holds still apply. Historical payment is not payment to Bryce or a new opportunity.",
+      "completed_payments": [
+        {
+          "contributor": "abcds07",
+          "repository": "aqualinkorg/aqualink-app",
+          "bounty_ref": "https://algora.io/abcds07",
+          "pr_ref": "https://github.com/aqualinkorg/aqualink-app/pull/1166",
+          "paid_at": null,
+          "payment_verified_at": "2026-10-09",
+          "paid_out": true,
+          "accepted": true,
+          "merged_upstream": true,
+          "evidence_ref": "https://algora.io/abcds07; https://algora.io/aqualinkorg/bounties?status=completed",
+          "amount": "30",
+          "currency": "USD"
+        }
+      ]
+    }
+  ],
+  "blacklist": [
+    {
+      "payer": "Lilly-Protocol",
+      "platform": "GitHub bounty",
+      "repository": "Lilly-Protocol/agentlily-runtime",
+      "status": "BLACKLISTED",
+      "documented": true,
+      "bounty_payment_promised_or_owed": true,
+      "accepted_or_merged": true,
+      "ignored_requests_or_refused_or_default": true,
+      "amount": 90,
+      "currency": "USD",
+      "bounty_ref": "https://github.com/Lilly-Protocol/agentlily-runtime/issues/267",
+      "pr_ref": "https://github.com/Lilly-Protocol/agentlily-runtime/pull/384",
+      "merged_at": "2026-09-06T08:15:00Z",
+      "observed_at": "2026-10-09",
+      "reason": "Advertised $90 bounty, upstream merge, repeated unanswered payment requests September 6 through October 5, including four September email follow-ups.",
+      "evidence_refs": [
+        "https://github.com/Lilly-Protocol/agentlily-runtime/issues/267",
+        "https://github.com/Lilly-Protocol/agentlily-runtime/pull/384#issuecomment-5558469563",
+        "https://github.com/Lilly-Protocol/agentlily-runtime/pull/384#issuecomment-5651485223",
+        "https://github.com/Lilly-Protocol/lily-sdk/issues/577#issuecomment-6073940017"
+      ],
+      "settlement_state": "UNKNOWN - receiving-rail reconciliation unavailable; no zero balance assertion",
+      "latest_requested_response_date": "2026-10-13",
+      "latest_requested_response_date_elapsed": false,
+      "report_status": "AWAITING_DIRECT_CDP_TRANSPORT_NOT_SUBMITTED",
+      "private_evidence_record": "lilly-payer-blacklist-entry-20261009.json",
+      "collections_permitted": false,
+      "policy_id": "BOUNTY-TRUST-BAN-20261011",
+      "policy_note": "All bounty activity, including collections and scheduled/queued retries, stops. Retain historical claim, source, and incident evidence; no outward waiver or collection demand is authorized."
+    }
+  ],
+  "owner_overrides": [],
+  "record_fields": {
+    "payer": [
+      "identity",
+      "platform",
+      "repository",
+      "status",
+      "last_verified_at",
+      "recent_activity_at",
+      "recent_activity_evidence_ref",
+      "completed_payments",
+      "known_overdue_accepted_bounty"
+    ],
+    "completed_payment": [
+      "repository",
+      "bounty_ref",
+      "pr_ref",
+      "paid_at",
+      "payment_verified_at",
+      "paid_out",
+      "accepted",
+      "merged_upstream",
+      "evidence_ref"
+    ],
+    "blacklist": [
+      "payer",
+      "platform",
+      "repository",
+      "documented",
+      "bounty_payment_promised_or_owed",
+      "accepted_or_merged",
+      "ignored_requests_or_refused_or_default",
+      "reason",
+      "evidence_refs"
+    ],
+    "owner_override": [
+      "authorized_by",
+      "payer",
+      "platform",
+      "repository",
+      "task_ref",
+      "amount",
+      "currency",
+      "eligibility_evidence_ref",
+      "payment_rail",
+      "payment_rail_evidence_ref",
+      "instruction_ref",
+      "supersedes_policy_id",
+      "approved_operations",
+      "explicitly_reinstates_excluded_scope"
+    ],
+    "established_repository_exception": [
+      "payer",
+      "platform",
+      "repository",
+      "status",
+      "legitimate_repository",
+      "reputable_maintainer",
+      "reputation_evidence_ref",
+      "substantial_real_adoption",
+      "stars_observed",
+      "adoption_evidence_ref",
+      "merged_owner_contribution",
+      "claimant",
+      "merged_pr_ref",
+      "merge_evidence_ref",
+      "last_verified_at",
+      "known_overdue_accepted_bounty",
+      "claimant_verified_owner"
+    ]
+  },
+  "notes": [
+    "BOUNTY-TRUST-BAN-20261011 supersedes earlier platform-wide GREEN instructions and any instruction to continue collection or bounty due diligence for excluded or unverified maintainers.",
+    "Default BLOCK covers all new and existing bounty discovery, due diligence, research, implementation, revisions, submissions, claims, collections, follow-ups, queued sends, retries, watchers, and local/cloud execution.",
+    "Only a documented exact-scope reputable proven maintainer or an established legitimate well-starred repository with our already-merged contribution qualifies. Stars alone, escrow, advertised rewards, or a third-party merge do not qualify.",
+    "Existing evidence-backed GREEN payout records remain the proven-payer route, subject to freshness, no unresolved overdue accepted bounty, current exact-task terms, and all other owner holds.",
+    "Established-repository exceptions require legitimate/reputation evidence, a recorded observation of substantial real repository adoption/stars with no invented numeric cutoff, and a provider reference proving an original owner-account contribution merged upstream.",
+    "established_repository_exceptions is intentionally empty until existing retained evidence supports exact scope. Do not prospect or research excluded/unverified bounties to populate it.",
+    "Security evidence preservation, authorized factual reporting, and blocking remain permitted. These operations do not authorize bounty diligence, checkout, download, installation, running suspect code, or payment pursuit.",
+    "Unknown eligibility is not a fraud or malware finding. Retained blacklist evidence and owner exclusions remain distinct from platform report/block receipts.",
+    "Existing claim, PR, payment, and incident histories remain intact as historical evidence. Excluded collections stop without transmitting a waiver or withdrawal.",
+    "Only Bryce can change this rule or explicitly reinstate an excluded scope; older blanket overrides cannot bypass this policy.",
+    "Shared credentials remain directly accessible under existing custody; this policy creates no credential admission gate.",
+    "Other owner restrictions, contact holds, focused validation, and cost limits remain effective.",
+    "Five exact sponsor records are reconciled from source blob 1be61164e9e31c53e452b4b355f527ec0ed6df0f. Appium and tscircuit paid-merge history belongs to another repository under the same documented sponsor; sponsor_scope_verified binds that retained sponsor evidence to the listed repository. It is not blanket eligibility for every repository under the organization."
+  ],
+  "freshness": {
+    "max_days": 30
+  },
+  "authoritative_policy_ref": "ground/BOUNTY_TRUST_BAN.md",
+  "owner_instruction_ref": "https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1791743946412259",
+  "legacy_policy_id": "bryce-bounty-payer-credibility",
+  "owner_exclusions": [
+    {
+      "name": "Mova",
+      "payer_aliases": [
+        "Mova",
+        "Movalabs-crew"
+      ],
+      "repository_owners": [
+        "Mova",
+        "Movalabs-crew"
+      ],
+      "status": "OWNER_EXCLUDED",
+      "scope": "All bounty work and collection; named alias matches case-insensitively. Additional provider identities must be bound to the owner's target before account-level reporting/blocking.",
+      "instruction_ref": "https://tokenjunkielabs.slack.com/archives/C0BU51F1PL3/p1791743946412259",
+      "reason": "Bryce explicitly excluded Mova from bounty work and collections on 2026-10-11.",
+      "reporting_note": "Owner exclusion is sufficient to stop our work; public fraud or malware allegations require specific retained evidence. Do not treat unverified identities as the named target.",
+      "repositories": [
+        "Movalabs-crew/mova-store"
+      ],
+      "identity_evidence_refs": [
+        "https://github.com/Movalabs-crew/mova-store/issues/967",
+        "https://api.github.com/repos/woahwhattheheck/commons/git/blobs/1be61164e9e31c53e452b4b355f527ec0ed6df0f"
+      ]
+    }
+  ],
+  "established_repository_exceptions": [],
+  "continued_work_exceptions": [
+    {
+      "repository": "BasedHardware/omi",
+      "owner_contribution_author": "woahwhattheheck",
+      "merged_pr_ref": "https://github.com/BasedHardware/omi/pull/12888",
+      "merged_at": "2026-09-07T14:40:08Z",
+      "merged_by": "kodjima33",
+      "repository_id": 776121034,
+      "stars_observed": 13690,
+      "status": "CONTINUED_WORK_EXCEPTION",
+      "observed_at": "2026-10-11",
+      "provider_readback": "GET 200; repository and original owner-authored merged PR verified by evidence agent.",
+      "scope": "Continue existing original owner work in this established legitimate repository. Not proof of same-payer payment or blanket authorization for unrelated/new bounties.",
+      "evidence_record": "/tmp/maintainer-evidence-20261011.json"
+    },
+    {
+      "repository": "marktext/marktext",
+      "owner_contribution_author": "woahwhattheheck",
+      "merged_pr_ref": "https://github.com/marktext/marktext/pull/5633",
+      "merged_at": "2026-10-06T12:31:08Z",
+      "merged_by": "Jocs",
+      "repository_id": 110446844,
+      "stars_observed": 62439,
+      "status": "CONTINUED_WORK_EXCEPTION",
+      "observed_at": "2026-10-11",
+      "provider_readback": "GET 200; repository and original owner-authored merged PR verified by evidence agent.",
+      "scope": "Continue existing original owner work in this established legitimate repository. Not proof of same-payer payment or blanket authorization for unrelated/new bounties.",
+      "evidence_record": "/tmp/maintainer-evidence-20261011.json"
+    },
+    {
+      "repository": "FreezingMoon/AncientBeast",
+      "owner_contribution_author": "woahwhattheheck",
+      "merged_pr_ref": "https://github.com/FreezingMoon/AncientBeast/pull/3213",
+      "merged_at": "2026-09-16T13:55:27Z",
+      "merged_by": "DreadKnight",
+      "repository_id": 2089437,
+      "stars_observed": 1882,
+      "status": "CONTINUED_WORK_EXCEPTION",
+      "observed_at": "2026-10-11",
+      "provider_readback": "GET 200; repository and original owner-authored merged PR verified by evidence agent.",
+      "scope": "Continue existing original owner work in this established legitimate repository. Not proof of same-payer payment or blanket authorization for unrelated/new bounties.",
+      "evidence_record": "/tmp/maintainer-evidence-20261011.json"
+    }
+  ]
+}
+

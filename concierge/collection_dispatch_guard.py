@@ -28,6 +28,7 @@ from concierge.collection_request import (
     CollectionRequestInputError,
     verify_collection_request,
 )
+from concierge.bounty_trust import collection_trust
 from concierge.outbound_dedupe import (
     OutboundDedupeInputError,
     evaluate_outbound_dedupe,
@@ -167,6 +168,7 @@ def _packet_binding(packet: Any) -> dict[str, Any]:
     return {
         "packet_sha256": packet_sha256,
         "repo": repo,
+        "sponsor_name": sponsor_name,
         "pr": pr,
         "phase": phase,
         "work_id": work_id,
@@ -242,6 +244,13 @@ def authorize_collection_dispatch(
     """
     current = _utc_time(now)
     binding = _packet_binding(packet)
+    trust = collection_trust(binding["repo"], binding["sponsor_name"],
+        f"https://github.com/{binding['repo']}/pull/{binding['pr']}", today=current.date())
+    if trust.get("allow") is not True:
+        return _decision_receipt({"schema": SCHEMA, "disposition": "HOLD", "dispatch": False,
+            "packet_sha256": binding["packet_sha256"], "bounty_trust": trust,
+            "reason_codes": ["BOUNTY_TRUST_BAN"], "owner": owner,
+            "work": {"repo": binding["repo"], "pr": binding["pr"]}})
     owner_text = _text(owner, "owner", limit=256)
     claim_id = _text(claim_event_id, "claim_event_id", limit=256)
     if type(provider_queries) is not list:
@@ -270,7 +279,9 @@ def authorize_collection_dispatch(
             "phase": binding["phase"],
             "work_id": binding["work_id"],
             "sponsor_id": binding["sponsor_id"],
+            "sponsor_name": binding["sponsor_name"],
         },
+        "bounty_trust": trust,
         "offer_key": binding["offer_key"],
         "operation_key": binding["operation_key"],
         "singlewriter": {
@@ -384,6 +395,15 @@ def acquire_guarded_local_lease(
     owner_text = _text(owner, "owner", limit=256)
     if guard.get("disposition") != "CLEAR" or guard.get("dispatch") is not True:
         _fail("GUARD_NOT_CLEAR")
+    work = guard.get("work", {})
+    prior_trust = guard.get("bounty_trust", {})
+    trust = collection_trust(work.get("repo"), work.get("sponsor_name"),
+        f"https://github.com/{work.get('repo')}/pull/{work.get('pr')}",
+        today=_utc_time(now).date())
+    if (trust.get("allow") is not True or prior_trust.get("allow") is not True
+            or prior_trust.get("policy_id") != trust.get("policy_id")
+            or prior_trust.get("registry_sha256") != trust.get("registry_sha256")):
+        _fail("BOUNTY_TRUST_BAN")
     if guard.get("owner") != owner_text:
         _fail("GUARD_OWNER_MISMATCH")
     shared = guard.get("shared_claim")
@@ -501,3 +521,4 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
+
