@@ -5,7 +5,10 @@
   "complements": "REPO-ELIGIBILITY-20261009-BRYCE-01",
   "priority": {
     "merged_lookback_days": 60,
-    "rank_by": ["our_merged_prs_in_lookback", "documented_paid_merges"],
+    "rank_by": [
+      "our_merged_prs_in_lookback",
+      "documented_paid_merges"
+    ],
     "no_new_source_batches_when_repo_has_no_merges_from_anyone_days": 30
   },
   "volume_cap": {
@@ -64,14 +67,24 @@
     ]
   },
   "inbox_sla": {
-    "accounts": ["woahwhattheheck", "tokenjunkielabs"],
+    "accounts": [
+      "woahwhattheheck",
+      "tokenjunkielabs"
+    ],
     "single_owner_seat": true,
     "take_channel": "github-inbox",
     "action_within_hours": 24,
     "backlog_clear_within_hours": 72,
     "backlog_order": "oldest_first_priority_repos_first",
     "hold": "INBOX_SLA_BREACH",
-    "external_reasons_in_scope": ["mention", "comment", "review", "review_requested", "ci_activity", "state_change"],
+    "external_reasons_in_scope": [
+      "mention",
+      "comment",
+      "review",
+      "review_requested",
+      "ci_activity",
+      "state_change"
+    ],
     "own_repos_auto_done": [
       "woahwhattheheck/commons",
       "woahwhattheheck/commons-ship-enforcer",
@@ -88,5 +101,16 @@
       "search_api_allowed": false
     },
     "reply_content_rule": "NO_PUBLIC_L_2026-09-07"
+  },
+  "owner_policy_precedence": {
+    "policy_id": "BOUNTY-TRUST-BAN-20261011",
+    "default_decision": "STOP",
+    "unknown_or_unproven": "STOP",
+    "mova": "OWNER_EXCLUDED",
+    "excluded_collections_permitted": false,
+    "excluded_queued_dispatch_permitted": false,
+    "policy_ref": "https://github.com/woahwhattheheck/commons/blob/main/ground/BOUNTY_TRUST_BAN.json",
+    "registry_ref": "https://github.com/woahwhattheheck/commons/blob/main/docs/policies/maintainer-credibility-registry.json",
+    "note": "Evaluate current trust before historic merge-priority or collection instructions. Preserve history; do not resume excluded work."
   }
 }
